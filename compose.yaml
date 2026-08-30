@@ -114,6 +114,12 @@ services:
             - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
         networks:
             - sail
+    apprise:
+        image: 'caronc/apprise:latest'
+        ports:
+            - '${FORWARD_APPRISE_PORT:-8026}:8000'
+        networks:
+            - sail
 networks:
     sail:
         driver: bridge

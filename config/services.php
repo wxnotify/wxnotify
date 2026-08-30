@@ -41,6 +41,11 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'apprise' => [
+        'base_url' => env('APPRISE_API_URL', 'http://apprise:8000'),
+        'from_email' => env('APPRISE_FROM_EMAIL', 'alerts@wxnotify.test'),
+    ],
+
     'chatwoot' => [
         'base_url' => env('CHATWOOT_BASE_URL'),
         'website_token' => env('CHATWOOT_WEBSITE_TOKEN'),

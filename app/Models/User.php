@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Tier;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
 use Database\Factories\UserFactory;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
@@ -53,6 +54,28 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $limit = $this->locationLimit();
 
         return $limit === null || $this->locations()->count() < $limit;
+    }
+
+    public function notificationChannels(): HasMany
+    {
+        return $this->hasMany(NotificationChannel::class);
+    }
+
+    public function canAddChannel(string $channelTypeSlug): bool
+    {
+        $registry = app(ChannelTypeRegistry::class);
+        $type = $registry->find($channelTypeSlug);
+
+        if (! $type) {
+            return false;
+        }
+
+        if ($this->tier() !== Tier::Free || ! $type->countsTowardFreeSlot()) {
+            return true;
+        }
+
+        return ! $this->notificationChannels
+            ->contains(fn (NotificationChannel $channel) => $registry->find($channel->channel_type)?->countsTowardFreeSlot() ?? false);
     }
 
     /**
