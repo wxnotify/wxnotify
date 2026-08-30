@@ -8,11 +8,16 @@ use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
+use Database\Seeders\ProductCatalogSeeder;
 use Illuminate\Support\Facades\Http;
 
 use function Pest\Livewire\livewire;
 
 beforeEach(function () {
+    // Populates Product::category, which the weather-alerts/spc-wpc product
+    // sections below are grouped by.
+    $this->seed(ProductCatalogSeeder::class);
+
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
     $this->location = Location::factory()->for($this->user)->create(['label' => 'Home']);
@@ -61,7 +66,7 @@ test('creating a weather alerts rule persists the chosen products and matching m
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->id],
+            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
             'matching_mode' => 'location',
             'location_id' => $this->location->id,
             'channel_ids' => [$this->channel->id],
@@ -82,7 +87,7 @@ test('creating a nationwide weather alerts rule does not require a location', fu
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->id],
+            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
             'matching_mode' => 'nationwide',
             'channel_ids' => [$this->channel->id],
         ])
@@ -101,7 +106,7 @@ test('creating an spc wpc rule persists the chosen risk levels', function () {
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'spc_wpc',
-            'product_ids' => [$outlook->id],
+            'product_ids' => [$outlook->category->value => [$outlook->id]],
             'risk_levels' => ['Enhanced', 'Moderate', 'High'],
             'matching_mode' => 'nationwide',
             'channel_ids' => [$this->channel->id],

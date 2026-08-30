@@ -5,6 +5,7 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Schemas;
 use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
+use App\Enums\ProductCategory;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
@@ -13,6 +14,7 @@ use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\ChannelType;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Radio;
@@ -20,11 +22,13 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rules\Exists;
 
 class AlertRuleForm
@@ -170,13 +174,9 @@ class AlertRuleForm
     protected static function weatherAlertsFields(): array
     {
         return [
-            self::productCheckboxList()
-                ->options(fn (): array => Product::query()
-                    ->whereIn('family', ['warning', 'watch', 'advisory', 'statement'])
-                    ->where('status', 'active')
-                    ->orderBy('sort_order')
-                    ->pluck('name', 'id')
-                    ->all()),
+            ...self::productSections(Product::query()
+                ->whereIn('family', ['warning', 'watch', 'advisory', 'statement'])
+                ->where('status', 'active')),
             ...self::matchingModeFields(),
         ];
     }
@@ -187,18 +187,14 @@ class AlertRuleForm
     protected static function spcWpcFields(): array
     {
         return [
-            self::productCheckboxList()
-                ->options(fn (): array => Product::query()
-                    ->where('family', 'spc_wpc')
-                    ->where('status', 'active')
-                    ->orderBy('sort_order')
-                    ->pluck('name', 'id')
-                    ->all()),
+            ...self::productSections(Product::query()
+                ->where('family', 'spc_wpc')
+                ->where('status', 'active')),
             CheckboxList::make('risk_levels')
                 ->label('Risk levels')
                 ->columns(2)
                 ->options(fn (Get $get): array => Product::query()
-                    ->whereIn('id', $get('product_ids') ?? [])
+                    ->whereIn('id', self::selectedProductIds($get))
                     ->whereNotNull('risk_level_options')
                     ->get()
                     ->pluck('risk_level_options')
@@ -208,7 +204,7 @@ class AlertRuleForm
                     ->all())
                 ->helperText('Leave all unchecked to receive every risk level for the products above.')
                 ->visible(fn (Get $get): bool => Product::query()
-                    ->whereIn('id', $get('product_ids') ?? [])
+                    ->whereIn('id', self::selectedProductIds($get))
                     ->whereNotNull('risk_level_options')
                     ->exists()),
             ...self::matchingModeFields(),
@@ -216,21 +212,74 @@ class AlertRuleForm
     }
 
     /**
-     * Deliberately CheckboxList, not Select::multiple(): a multi-select
-     * Select can never render natively (Filament forces its choices.js
-     * widget whenever ->multiple() is set), and that widget's
-     * $wire.$entangle() binding errors for a field that only exists inside
-     * this Wizard step's dynamically-built schema — see the note on
-     * locationSelect(). CheckboxList uses plain wire:model instead.
+     * Renders the given product query as one collapsible Section per
+     * ProductCategory present in the results, each holding a CheckboxList
+     * (deliberately not Select::multiple() — see locationSelect()'s note on
+     * the dynamic-Wizard-step entangle bug; CheckboxList uses plain
+     * wire:model instead) of that category's products with their
+     * descriptions shown inline.
+     *
+     * Each CheckboxList is named `product_ids.{category}` rather than a
+     * single flat `product_ids` — Filament stores this as a nested array
+     * (`product_ids => ['warning' => [1, 2], 'watch' => [3]]`), so every
+     * category keeps its own field/state without a manual merge step. Callers
+     * needing the flat list of selected IDs (risk_levels above, and the
+     * Create/Edit pages' pivot sync) use selectedProductIds()/flattening.
+     *
+     * @return array<Section>
      */
-    protected static function productCheckboxList(): CheckboxList
+    protected static function productSections(Builder $query): array
     {
-        return CheckboxList::make('product_ids')
-            ->label('Products')
-            ->searchable()
-            ->columns(2)
-            ->required()
-            ->live();
+        $productsByCategory = $query->orderBy('sort_order')->get(['id', 'name', 'description', 'category'])
+            ->groupBy(fn (Product $product): ?string => $product->category?->value);
+
+        return collect(ProductCategory::cases())
+            ->filter(fn (ProductCategory $category): bool => $productsByCategory->has($category->value))
+            ->values()
+            ->map(function (ProductCategory $category, int $index) use ($productsByCategory): Section {
+                $fieldName = "product_ids.{$category->value}";
+                $products = $productsByCategory->get($category->value);
+
+                $checkboxList = CheckboxList::make($fieldName)
+                    ->hiddenLabel()
+                    ->searchable()
+                    ->columns(1)
+                    ->live()
+                    ->options($products->pluck('name', 'id'))
+                    ->descriptions($products->pluck('description', 'id'));
+
+                // Only the first section carries the "at least one product"
+                // check — it validates the flattened total across every
+                // section, so attaching it to each one would just repeat the
+                // same error under every category.
+                if ($index === 0) {
+                    $checkboxList = $checkboxList->rules([
+                        fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                            if (self::selectedProductIds($get) === []) {
+                                $fail('Select at least one product.');
+                            }
+                        },
+                    ]);
+                }
+
+                return Section::make($category->label())
+                    ->collapsible()
+                    ->collapsed(fn (Get $get): bool => self::selectedProductIds($get, $fieldName) === [])
+                    ->schema([$checkboxList]);
+            })
+            ->all();
+    }
+
+    /**
+     * @return array<int>
+     */
+    protected static function selectedProductIds(Get $get, ?string $onlyPath = null): array
+    {
+        if ($onlyPath !== null) {
+            return collect($get($onlyPath))->values()->all();
+        }
+
+        return collect($get('product_ids'))->flatten()->unique()->values()->all();
     }
 
     /**

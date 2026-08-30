@@ -31,7 +31,7 @@ class CreateAlertRule extends CreateRecord
 
     protected function afterCreate(): void
     {
-        $this->record->products()->sync($this->data['product_ids'] ?? []);
+        $this->record->products()->sync(collect($this->data['product_ids'] ?? [])->flatten()->all());
         $this->record->notificationChannels()->sync($this->data['channel_ids'] ?? []);
     }
 }
