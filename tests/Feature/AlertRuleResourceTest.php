@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
 
 use function Pest\Livewire\livewire;
 
@@ -208,4 +209,44 @@ test('the inline location action is hidden once a Free subscriber is at their lo
     livewire(CreateAlertRule::class)
         ->fillForm(['category' => 'lightning'])
         ->assertFormComponentActionHidden('location_id', 'createOption');
+});
+
+test('connecting a channel inline from the channels field dispatches a code and attaches it to the alert', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    // beforeEach's $this->channel (discord) already fills the Free tier's one
+    // no-cost slot, so a second no-cost type like ntfy needs a paid tier here.
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+
+    $component = livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'lightning', 'channel_ids' => [$this->channel->id]])
+        ->mountFormComponentAction('channel_ids', 'connect_ntfy')
+        ->setFormComponentActionData(['topic' => 'wxnotify-inline-topic'])
+        ->callMountedFormComponentAction();
+
+    $newChannel = NotificationChannel::where('user_id', $this->user->id)
+        ->where('channel_type', 'ntfy')
+        ->sole();
+
+    expect($newChannel->apprise_url)->toBe('ntfy://wxnotify-inline-topic')
+        ->and($newChannel->isVerified())->toBeFalse()
+        ->and($newChannel->confirmation_code)->not->toBeNull();
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/notify/'));
+
+    $component
+        ->fillForm(['location_id' => $this->location->id, 'radius_miles' => 10])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($rule->notificationChannels->pluck('id')->all())->toBe([$this->channel->id, $newChannel->id]);
+});
+
+test('the inline channel action for a no-cost type is hidden once a Free subscriber has used their slot', function () {
+    // beforeEach's $this->channel is a discord channel, which fills the Free tier's one no-cost slot.
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'lightning'])
+        ->assertFormComponentActionHidden('channel_ids', 'connect_slack')
+        ->assertFormComponentActionVisible('channel_ids', 'connect_email');
 });

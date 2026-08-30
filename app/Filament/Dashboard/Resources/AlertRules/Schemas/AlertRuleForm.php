@@ -2,26 +2,29 @@
 
 namespace App\Filament\Dashboard\Resources\AlertRules\Schemas;
 
+use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
+use App\Models\NotificationChannel;
 use App\Models\Product;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\Contracts\ChannelType;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
-use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rules\Exists;
 
 class AlertRuleForm
@@ -79,21 +82,68 @@ class AlertRuleForm
     {
         return Step::make('Notify me on')
             ->schema([
-                Placeholder::make('no_channels')
-                    ->hiddenLabel()
-                    ->content(new HtmlString(
-                        'You don\'t have any verified notification channels yet. <a href="'
-                        .route('filament.dashboard.resources.notification-channels.index')
-                        .'" class="underline">Connect one</a> first, then come back to finish this alert.'
-                    ))
-                    ->visible(fn (): bool => auth()->user()->notificationChannels()->whereNotNull('verified_at')->doesntExist()),
-                CheckboxList::make('channel_ids')
-                    ->hiddenLabel()
-                    ->options(fn (): array => auth()->user()->notificationChannels()->whereNotNull('verified_at')->pluck('label', 'id')->all())
-                    ->columns(2)
-                    ->required()
-                    ->visible(fn (): bool => auth()->user()->notificationChannels()->whereNotNull('verified_at')->exists()),
+                self::channelsSelect(),
             ]);
+    }
+
+    /**
+     * Multiple, not CheckboxList: unlike product_ids/location_id, this field
+     * lives in a STATIC step schema (channelsStep() above is a plain array,
+     * not a Step::schema(fn (Get $get) => ...) closure) — it exists on every
+     * render from the wizard's first mount onward, so it doesn't hit the
+     * entangle bug documented on locationSelect()/productCheckboxList().
+     * That's what makes it safe to use Select::multiple() here.
+     *
+     * One suffix action per channel type, not a single createOptionForm()
+     * with an internal type picker: a Select action's modal is one flat
+     * schema, and Filament doesn't reliably validate a field that's only
+     * conditionally required based on another field in that same schema —
+     * confirmed via a failing test where a required() closure gated on
+     * $get('channel_type') still rejected the correct, present value as
+     * missing. Each suffix action's modal is a fixed, unconditional schema
+     * (exactly one type's formSchema()), which sidesteps that entirely.
+     */
+    protected static function channelsSelect(): Select
+    {
+        $registry = app(ChannelTypeRegistry::class);
+
+        return Select::make('channel_ids')
+            ->label('Channels')
+            ->multiple()
+            ->required()
+            ->options(fn (): array => auth()->user()->notificationChannels()->get()
+                ->mapWithKeys(fn (NotificationChannel $channel): array => [
+                    $channel->id => $channel->isVerified() ? $channel->label : "{$channel->label} (unverified)",
+                ])
+                ->all())
+            ->helperText('A channel can\'t actually deliver until it\'s verified — add one here and finish confirming it from Notification Channels.')
+            ->suffixActions($registry->forPicker()
+                ->map(fn (array $row): Action => self::connectChannelAction($row['type']))
+                ->all());
+    }
+
+    protected static function connectChannelAction(ChannelType $type): Action
+    {
+        $slug = $type->slug();
+
+        return Action::make("connect_{$slug}")
+            ->label($type->label())
+            ->tooltip("Add a {$type->label()} channel")
+            ->icon($type->icon())
+            ->visible(fn (): bool => auth()->user()->canAddChannel($slug))
+            ->schema($type->formSchema())
+            ->modalHeading("Add a {$type->label()} channel")
+            ->action(function (array $data, Set $set, Get $get) use ($type, $slug): void {
+                $channel = auth()->user()->notificationChannels()->create([
+                    'channel_type' => $slug,
+                    'label' => $type->label(),
+                    'apprise_url' => $type->buildAppriseUrl($data),
+                ]);
+
+                app(DispatchChannelConfirmationCode::class)($channel);
+
+                $set('channel_ids', [...($get('channel_ids') ?? []), $channel->getKey()]);
+            });
     }
 
     protected static function quietHoursStep(): Step
