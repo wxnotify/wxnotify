@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Models\AlertRule;
@@ -177,4 +178,34 @@ test('a subscriber cannot point an alert rule at another subscriber\'s location'
         ->assertHasFormErrors(['location_id']);
 
     expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+});
+
+test('creating a location inline from the location field attaches it to the alert', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+
+    $component = livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'lightning'])
+        ->callFormComponentAction('location_id', 'createOption', data: [
+            'label' => 'Office',
+            'lat' => 38.8976,
+            'lng' => -77.0365,
+            'address' => '1600 Pennsylvania Ave NW, Washington, DC',
+        ]);
+
+    $location = Location::where('user_id', $this->user->id)->where('label', 'Office')->sole();
+
+    $component
+        ->fillForm(['radius_miles' => 10, 'channel_ids' => [$this->channel->id]])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($rule->location_id)->toBe($location->id);
+});
+
+test('the inline location action is hidden once a Free subscriber is at their location limit', function () {
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'lightning'])
+        ->assertFormComponentActionHidden('location_id', 'createOption');
 });

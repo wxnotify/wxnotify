@@ -7,7 +7,9 @@ use App\Enums\MatchingMode;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
+use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
 use App\Models\Product;
+use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
@@ -289,9 +291,16 @@ class AlertRuleForm
             ->options(fn (): array => auth()->user()->locations()->pluck('label', 'id')->all())
             ->required()
             ->exists('locations', 'id', fn (Exists $rule): Exists => $rule->where('user_id', auth()->id()))
-            ->helperText(fn (): ?string => auth()->user()->locations()->doesntExist()
-                ? 'You don\'t have any saved locations yet — add one first from My Locations.'
-                : null);
+            ->createOptionForm(LocationForm::fields())
+            ->createOptionAction(fn (Action $action): Action => $action
+                ->visible(fn (): bool => auth()->user()->canCreateLocation())
+                ->modalHeading('Add a location'))
+            ->createOptionUsing(fn (array $data): int => auth()->user()->locations()->create($data)->getKey())
+            ->helperText(fn (): ?string => match (true) {
+                auth()->user()->locations()->exists() => null,
+                auth()->user()->canCreateLocation() => 'No saved locations yet — use the + button to add one.',
+                default => 'You\'ve reached your location limit — remove one or upgrade to add another.',
+            });
     }
 
     protected static function wfoField(): TextInput
