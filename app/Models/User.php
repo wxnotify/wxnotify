@@ -12,6 +12,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -28,6 +29,30 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'admin' => $this->is_staff,
             default => true,
         };
+    }
+
+    public function locations(): HasMany
+    {
+        return $this->hasMany(Location::class);
+    }
+
+    /**
+     * Maximum number of locations this user's tier allows, or null for unlimited.
+     */
+    public function locationLimit(): ?int
+    {
+        return match ($this->tier()) {
+            Tier::Free => 1,
+            Tier::Plus => 5,
+            Tier::Pro => null,
+        };
+    }
+
+    public function canCreateLocation(): bool
+    {
+        $limit = $this->locationLimit();
+
+        return $limit === null || $this->locations()->count() < $limit;
     }
 
     /**
