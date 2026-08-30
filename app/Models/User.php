@@ -78,6 +78,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             ->contains(fn (NotificationChannel $channel) => $registry->find($channel->channel_type)?->countsTowardFreeSlot() ?? false);
     }
 
+    public function alertRules(): HasMany
+    {
+        return $this->hasMany(AlertRule::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
