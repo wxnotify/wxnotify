@@ -21,8 +21,8 @@ class RedirectAdmins
         // Ensure the user is logged in
         if ($user) {
             // Detect admin users and redirect them to the admin panel
-            if ($user->is_staff) { 
-                
+            if ($user->is_staff) {
+
                 // Prevent infinite redirect loops by checking the current path
                 if (! str_starts_with($request->getPathInfo(), '/admin')) {
                     return redirect()->to('/admin');

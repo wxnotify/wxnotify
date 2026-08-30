@@ -34,6 +34,7 @@ use Illuminate\Support\Str;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Socialite\Contracts\User as SocialiteUserContract;
 use Swis\Filament\Backgrounds\FilamentBackgroundsPlugin;
+use Swis\Filament\Backgrounds\ImageProviders\MyImages;
 
 class DashboardPanelProvider extends PanelProvider
 {
@@ -91,7 +92,11 @@ class DashboardPanelProvider extends PanelProvider
                     }),
                 KnowledgeBaseCompanionPlugin::make()
                     ->knowledgeBasePanelId('kb'),
-                FilamentBackgroundsPlugin::make(),
+                FilamentBackgroundsPlugin::make()
+                    ->imageProvider(
+                        MyImages::make()
+                            ->directory('images/backgrounds/weather_wallpapers')
+                    ),
             ])
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_FOOTER,
