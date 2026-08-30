@@ -1,0 +1,46 @@
+WUUS53 KPAH 040052
+SVRPAH
+MOC023-181-040115-
+/O.NEW.KPAH.SV.W.0236.240704T0052Z-240704T0115Z/
+
+BULLETIN - IMMEDIATE BROADCAST REQUESTED
+Severe Thunderstorm Warning
+National Weather Service Paducah KY
+752 PM CDT Wed Jul 3 2024
+
+The National Weather Service in Paducah has issued a
+
+* Severe Thunderstorm Warning for...
+  Southeastern Ripley County in southeastern Missouri...
+  Southwestern Butler County in southeastern Missouri...
+
+* Until 815 PM CDT.
+
+* At 752 PM CDT, a severe thunderstorm was located near
+  Oxly, or near Doniphan, moving east at 15 mph.
+
+  HAZARD...60 mph wind gusts.
+
+  SOURCE...Radar indicated.
+
+  IMPACT...Expect damage to roofs, siding, and trees.
+
+* Locations impacted include...
+  Naylor and Oxly.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+For your protection move to an interior room on the lowest
+floor of a building.
+
+&&
+
+LAT...LON 3650 9082 3666 9079 3663 9055 3650 9058
+TIME...MOT...LOC 0052Z 278DEG 15KT 3656 9073
+
+HAIL THREAT...RADAR INDICATED
+MAX HAIL SIZE...<.75 IN
+WIND THREAT...RADAR INDICATED
+MAX WIND GUST...60 MPH
+
+$$

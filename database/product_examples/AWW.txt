@@ -1,0 +1,25 @@
+WUS84 KBRO 071929
+AWWBRO
+TXZ255-072030-
+
+Airport Weather Warning
+National Weather Service Brownsville TX
+228 PM CDT Tue Oct 7 2025
+
+...AIRPORT WEATHER WARNING...
+
+The National Weather Service in Brownsville has issued an Airport
+Weather Warning for...
+
+Brownsville/South Padre Island International Airport /BRO/
+
+The following weather hazards are expected:
+
+Thunderstorms producing occasional cloud-to-ground lightning until
+3:30 PM.
+
+Airport personnel should remain alert for updates to this weather
+situation.
+
+LAT...LON 2586 9744 2591 9746 2592 9741 2588 9739
+$$

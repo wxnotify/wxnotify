@@ -1,0 +1,59 @@
+
+MORNING TEMPERATURE AND PRECIPITATION SUMMARY FOR SOUTH TEXAS
+National Weather Service Corpus Christi TX
+1115 AM CDT Fri Oct 10 2025
+
+Values represent yesterdays high...the low over the last 12 hours
+and 24 hour precipitation ending at 6 AM CST/7 AM CDT
+
+.BR CRP  1010 C DH01/TAIRZX/DH07/TAIRZP/PPDRZZ
+:
+:
+:        STATION                     HIGH   LOW    AT OB  24-HR
+:         NAME                       TEMP   TEMP   TEMP   PCPN
+:
+...VICTORIA CROSSROADS AREA...
+CKDT2 : Coleto Creek Reservoir   :    91  /  68  /  69  / 0.00
+KPEZ  : Pleasanton AWOS          :    95  /  69  /   M  /   M
+KVCT  : Victoria Airport ASOS    :    93  /  67  /  67  / 0.00
+:
+...COASTAL COUNTIES...
+ATWT2 : Austwell                 :    88  /  75  /  75  / 0.00
+KCRP  : Corpus Christi ASOS      :    91  /  74  /  75  / 0.00
+KNGP  : NAS Corpus Christi ASOS  :    86  /  79  /  82  /   T
+KNQI  : NAS Kingsville ASOS      :    92  /  72  /  72  / 0.00
+KGST2 : Kingsville (City)        :    94  /  72  /  75  / 0.00
+MTHT2 : Mathis 4SSW              :    92  /  72  /  72  / 0.00
+KTFP  : McCampbell AWOS          :    92  /  76  /  81  /   M
+PDIT2 : Padre Island             :     M  /   M  /   M  / 0.04
+KPSX  : Palacios ASOS            :    91  /   M  /  73  / 0.00
+KRAS  : Port Aransas AWOS        :    86  /  78  /  80  /   M
+PTTT2 : Port Aransas 11 SSW      :    86  /  78  /  79  / 0.10
+KPKV  : Port Lavaca AWOS         :    93  /  73  /  77  /   M
+KRBO  : Robstown AWOS            :    92  /  40  /  76  /   M
+ROBT2 : Robstown                 :     M  /   M  /   M  / 0.00
+KRKP  : Rockport ASOS            :    89  /  74  /  78  / 0.00
+KT69  : Sinton AWOS              :    90  /  72  /  73  /   M
+WODT2 : Welder Wildlife          :     M  /   M  /   M  /   M
+:
+...INLAND COUNTIES...
+KALI  : Alice Airport/ASOS       :    95  /  71  /  76  /    M
+KBEA  : Beeville AWOS            :    93  /  69  /  74  /   M
+BVDT2 : Benavides                :     M  /   M  /   M  /    M
+CALT2 : Caliham                  :    95  /  68  /  70  /  0.00
+CHOT2 : Choke Canyon             :    95  /  71  /  71  /  0.00
+KCOT  : Cotulla ASOS             :    94  /  70  /  75  /  0.00
+CROT2 : Cross                    :    94  /  65  /  65  /  0.00
+FEET2 : Freer                    :    95  /  70  /  70  /  0.00
+GEWT2 : George West              :     M  /   M  /   M  /    M
+KHBV  : Hebbronville AWOS        :    90  /  70  /  74  /   M
+KLRD  : Laredo Airport           :    94  /  72  /  74  /    T
+SVST2 : Loma Alta                :     M  /   M  /   M  /    M
+.END
+
+These data are preliminary and have not undergone final quality
+control (QC) by NCEI. Therefore these data are subject to revision.
+Final and certified climate data can be accessed at the National
+Centers Environmental Information (NCEI) - www.ncei.noaa.gov
+
+$$

@@ -1,0 +1,39 @@
+WHUS44 KCRP 121701
+CFWCRP
+
+Coastal Hazard Message
+National Weather Service Corpus Christi TX
+1201 PM CDT Sun Oct 12 2025
+
+TXZ245-342>347-442-443-447-130115-
+/O.NEW.KCRP.CF.Y.0012.251012T2300Z-251013T1600Z/
+Coastal Aransas-Coastal Kleberg-Coastal Nueces-
+Coastal San Patricio-Aransas Islands-Coastal Refugio-
+Coastal Calhoun-Kleberg Islands-Nueces Islands-Calhoun Islands-
+1201 PM CDT Sun Oct 12 2025
+
+...COASTAL FLOOD ADVISORY IN EFFECT FROM 6 PM THIS EVENING TO
+11 AM CDT MONDAY...
+
+* WHAT...Minor coastal flooding expected.
+
+* WHERE...Coastal Aransas, Coastal Kleberg, Coastal Nueces,
+  Coastal San Patricio, Aransas Islands, Coastal Refugio,
+  Coastal Calhoun, Kleberg Islands, Nueces Islands and Calhoun
+  Islands Counties.
+
+* WHEN...From 6 PM this evening to 11 AM CDT Monday.
+
+* IMPACTS...Flooding of lots, parks, and roads with only isolated
+  road closures expected.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+If travel is required, allow extra time as some roads may be
+closed. Do not drive around barricades or through water of
+unknown depth. Take the necessary actions to protect flood-prone
+property.
+
+&&
+
+$$

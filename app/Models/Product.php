@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProductCategory;
 use App\Enums\ProductFamily;
 use App\Enums\ProductStatus;
 use Database\Factories\ProductFactory;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['code', 'name', 'family', 'has_polygon', 'risk_level_options', 'status', 'sort_order'])]
+#[Fillable(['code', 'name', 'family', 'category', 'has_polygon', 'risk_level_options', 'status', 'sort_order', 'description', 'example', 'wea_warning'])]
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
@@ -22,16 +23,18 @@ class Product extends Model
     {
         return [
             'family' => ProductFamily::class,
+            'category' => ProductCategory::class,
             'has_polygon' => 'boolean',
             'risk_level_options' => 'array',
             'status' => ProductStatus::class,
+            'wea_warning' => 'boolean',
         ];
     }
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['code', 'name', 'family', 'status'])
+            ->logOnly(['code', 'name', 'family', 'category', 'status', 'wea_warning'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }

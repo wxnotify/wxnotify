@@ -1,0 +1,41 @@
+
+Public Information Statement
+National Weather Service Indianapolis IN
+1126 AM EDT Wed Oct 8 2025
+
+...41-HR RAINFALL for 6AM 10/6 - 11PM EDT 10/7/2025...
+
+GREATEST REPORTS for each Central Indiana COUNTY over 0.25...
+
+County      Location              Rainfall  Source
+
+BARTHOLOMEW Columbus 1.9 NNE       4.57 in  CoCoRaHS
+BROWN       Stone Head 2.3 ENE     3.70 in  CoCoRaHS
+MONROE      Hardin Ridge           3.35 in  Mesonet
+SHELBY      Shelbyville 7.1 WSW    3.17 in  CoCoRaHS
+DECATUR     Greensburg 6.0 SW      2.99 in  CoCoRaHS
+LAWRENCE    Harrodsburg 3.0 SSW    2.69 in  CoCoRaHS
+RUSH        Rushville 0.7 ENE      2.24 in  CoCoRaHS
+JENNINGS    Millhousen 4.2 SSW     2.23 in  CoCoRaHS
+JOHNSON     Franklin 4.4 S         2.15 in  CoCoRaHS
+-----------------------------------------------------
+GREENE      Stanford 1.7 SSW       1.51 in  CoCoRaHS
+OWEN        Whitehall 0.6 WSW      1.34 in  CoCoRaHS
+HENRY       New Castle 3 SW        1.22 in  COOP
+MARTIN      Williams 3 SW          1.00 in  COOP
+MORGAN      Martinsville 3.9 ESE   0.93 in  CoCoRaHS
+HENCOCK     Greenfield Water       0.90 in  COOP
+CLAY        Howesville             0.82 in  CoCoRaHS
+RANDOLPH    Union City 3.6 WSW     0.77 in  CoCoRaHS
+DAVIESS     Washington 1.5 NW      0.65 in  CoCoRaHS
+SULLIVAN    Sullivan               0.63 in  CoCoRaHS
+-----------------------------------------------------
+JACKSON     Seymour 0.8 SSW        0.48 in  CoCoRaHS
+MARION      Southport              0.47 in  CoCoRaHS
+HAMILTON    Fortville 2.7 W        0.39 in  CoCoRaHS
+PARKE       Nyesville              0.38 in  CoCoRaHS
+KNOX        Wheatland 1.4 SSW      0.37 in  CoCoRaHS
+DELAWARE    Muncie WWTP            0.34 in  COOP
+MADISON     Alexandria             0.33 in  CoCoRaHS
+
+$$

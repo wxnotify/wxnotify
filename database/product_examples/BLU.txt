@@ -1,0 +1,21 @@
+
+URGENT - BLUE ALERT
+National Weather Service (Relay)
+[Date / Time UTC & Local]
+
+…BLUE ALERT IN EFFECT FOR [List of Counties / Zones]…
+
+BLUE ALERT ISSUED FOR SETH ALTMAN WANTED FOR THE INVOLVEMENT IN THE INJURY OF AN OFFICER BY HALL COUNTY SHERIFF’S OFFICE
+* SUSPECT: Male, 33 years old, ~6’2”, 220 lbs, possibly wearing jeans & t-shirt
+* VEHICLE: (if known) [Make / model / color / license plate]
+* LOCATION: Last seen in [city / county / route / area]
+* THREAT: Considered armed and dangerous, poses an imminent risk to public safety and law enforcement
+
+**Action for Public**
+- Do **not** approach the suspect.
+- If you see someone matching this description or vehicle, **call 911 immediately**.
+- Be alert in the alert area and report suspicious activity to authorities.
+
+This alert remains in effect until canceled or updated by law enforcement.
+
+$$

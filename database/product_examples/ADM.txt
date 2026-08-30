@@ -1,0 +1,35 @@
+
+SENIOR DUTY METEOROLOGIST NWS ADMINISTRATIVE MESSAGE
+NWS NCEP CENTRAL OPERATIONS COLLEGE PARK MD
+1530Z MON OCT 13 2025
+
+12Z NCEP Model Production is running on time with 8 Alaskan...
+26 Canadian...51 CONUS...13 Mexican...7 Caribbean...and 9
+Pacific stations available for ingest.
+
+UPDATED 12Z GFS RAOB RECAP...
+70273/AFC - No report for the NAM/GFS.
+72202/MFL - No report for the NAM/GFS.
+72240/LCH - No report for the NAM/GFS.
+72248/SHV - No report for the NAM/GFS.
+72251/CRP - No report for the NAM/GFS.
+72365/ABQ - No report for the NAM/GFS.
+72476/GJT - No report for the NAM/GFS.
+72558/OAX - No report for the NAM/GFS.
+72562/LBF - No report for the NAM/GFS.
+72662/UNR - No report for the NAM/GFS.
+70133/OTZ - 10159.
+70219/BET - 10159.
+70231/MCG - 10142...Ground equipment failure.
+70308/SNP - 10159.
+70316/CDB - 10159.
+72274/TWC - 10159.
+72363/AMA - 10159.
+72582/LKN - 10159.
+72597/MFR - 10159.
+72776/TFX - 10159.
+72786/OTX - 10159.
+78384/GCM - 10142...Ground equipment failure.
+
+
+Kempisty/SDM/NCO/NCEP

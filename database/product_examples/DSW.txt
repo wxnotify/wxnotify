@@ -1,0 +1,36 @@
+
+WWUS55 KPSR 190030
+DSWPSR
+
+BULLETIN - IMMEDIATE BROADCAST REQUESTED
+Dust Storm Warning
+National Weather Service Phoenix AZ
+530 PM MST Tue Jul 18 2023
+
+AZC013-021-190115-
+/O.NEW.KPSR.DS.W.0004.230719T0030Z-230719T0115Z/
+
+The National Weather Service in Phoenix has issued a
+
+* **Dust Storm Warning for...**
+  Pinal County in southeastern Arizona...
+  Maricopa County in south-central Arizona...
+
+* **Until 615 PM MST.**
+
+* **HAZARDS...** Less than one-quarter mile visibility with strong wind gusts over 50 mph.
+
+* **SOURCE...** Trained weather spotters and Doppler radar.
+
+* **IMPACT...** Dangerous life-threatening travel. Blinding dust will cause zero visibility in spots, especially along Interstate 10 between Casa Grande and Phoenix.
+
+* **LOCATIONS IMPACTED INCLUDE...**
+  Casa Grande, Maricopa, Queen Creek, Chandler, and parts of the Phoenix metro area.
+
+**PRECAUTIONARY/PREPAREDNESS ACTIONS...**
+Dust storms can be life-threatening. Avoid driving in dust storms if possible. If you encounter a dust storm, **PULL ASIDE, STAY ALIVE** — move off the roadway, turn off lights, set the parking brake, and keep your foot off the brake pedal.
+
+LAT...LON 3335 11200 3290 11160 3270 11160 3270 11210 3325 11215
+TIME...MOT...LOC 0025Z 260DEG 35KT 3315 11195
+
+$$

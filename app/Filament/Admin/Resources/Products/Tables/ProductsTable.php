@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\Products\Tables;
 
 use App\Actions\Catalog\RetireProduct;
+use App\Enums\ProductCategory;
 use App\Enums\ProductFamily;
 use App\Enums\ProductStatus;
 use App\Models\Product;
@@ -27,6 +28,10 @@ class ProductsTable
                 TextColumn::make('family')
                     ->badge()
                     ->formatStateUsing(fn (ProductFamily $state): string => $state->label()),
+                TextColumn::make('category')
+                    ->badge()
+                    ->toggleable()
+                    ->formatStateUsing(fn (?ProductCategory $state): string => $state?->label() ?? '—'),
                 TextColumn::make('status')
                     ->badge()
                     ->color(fn (ProductStatus $state): string => match ($state) {
@@ -36,12 +41,18 @@ class ProductsTable
                     }),
                 IconColumn::make('has_polygon')
                     ->boolean(),
+                IconColumn::make('wea_warning')
+                    ->label('WEA')
+                    ->boolean()
+                    ->toggleable(),
                 TextColumn::make('sort_order'),
             ])
             ->reorderable('sort_order')
             ->filters([
                 SelectFilter::make('family')
                     ->options(collect(ProductFamily::cases())->mapWithKeys(fn (ProductFamily $f) => [$f->value => $f->label()])),
+                SelectFilter::make('category')
+                    ->options(collect(ProductCategory::cases())->mapWithKeys(fn (ProductCategory $c) => [$c->value => $c->label()])),
                 SelectFilter::make('status')
                     ->options(collect(ProductStatus::cases())->mapWithKeys(fn (ProductStatus $s) => [$s->value => ucfirst($s->value)])),
             ])

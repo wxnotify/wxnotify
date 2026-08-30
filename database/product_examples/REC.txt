@@ -1,0 +1,18 @@
+
+Recreational Forecast for Lake Winnebago
+National Weather Service Green Bay WI
+315 AM CDT Sat Oct 11 2025
+
+.EARLY THIS MORNING...North winds 5 to 10 knots. Mostly clear.
+Waves 1 foot or less. Near steady temperature in the upper 40s.
+.TODAY...Northeast winds 5 to 10 knots. Mostly sunny. Waves
+1 foot or less. Highs in the lower 60s.
+.TONIGHT...Southeast winds 5 to 10 knots. Partly cloudy. Waves
+less than 1 foot. Lows in the mid 50s.
+.SUNDAY...Southeast winds 5 to 15 knots. Mostly sunny. Waves
+1 foot or less. Highs in the mid 60s.
+.SUNDAY NIGHT...South winds 10 to 20 knots. Partly cloudy in the
+evening then becoming mostly cloudy. Waves 1 foot or less. Near
+steady temperature in the upper 50s.
+
+$$

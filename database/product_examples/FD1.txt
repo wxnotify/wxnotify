@@ -1,0 +1,57 @@
+FNUS21 KWNS 231554
+FWDDY1
+
+Day 1 Fire Weather Outlook  
+NWS Storm Prediction Center Norman OK
+1053 AM CDT Mon Mar 23 2026
+
+Valid 231700Z - 241200Z
+
+Much of the Elevated area was refined to account for the footprint
+of recent precipitation across portions of South Carolina and
+Georgia. The strong cold front and resultant associated downslope
+flow over the lee side of the southern Appalachians required
+expansion of the Elevated area farther west into portions of
+northern Georgia as well. Higher recent rainfall accumulation to the
+south of this area (where some of the windiest conditions are
+expected) may allow for locally elevated conditions this evening as
+the front passes.
+
+..Stearns.. 03/23/2026
+
+.PREV DISCUSSION... /ISSUED 0100 AM CDT Mon Mar 23 2026/
+
+...Synopsis...
+An upper-level trough will modestly amplify in the Northeast today.
+A cold front will push southward through the southern Appalachians.
+Farther west, a weak lee trough will help to enhance surface winds
+on the western flank of a surface high.
+
+...Piedmont...
+Dry, downslope winds off of the southern Appalachians will promote
+elevated fire weather this afternoon. Winds of 15-20 mph will be
+possible in the lee of the terrain. RH is not as certain, but 25-30%
+appears probable. Values closer to 20% may occur locally.
+
+...Central Plains...
+An enhanced surface pressure gradient will develop as a weak lee
+trough deepens on the westerly flank of a seasonably strong surface
+high in the Upper Midwest. Surface winds of 15-20 mph are possible.
+How low RH will drop during the afternoon is the biggest uncertainty
+in this scenario. Copious mid/high-level cloud cover is expected.
+Most guidance suggests RH will be only marginally below elevated
+criteria. Furthermore, the strongest winds may be slightly displaced
+from the lowest RH. Overall, locally elevated conditions are
+expected given dry fuels, but broad, sustained elevated conditions
+are much less certain.
+
+...Southwest into central High Plains...
+Very dry conditions will exist from the Southwest into southeast
+Colorado. RH of 10-20% is expected by the afternoon. Winds in most
+locations will be relatively weak. Terrain-enhanced wind could reach
+up to 20 mph. Locally elevated to near critical conditions could
+occur.
+
+...Please see www.spc.noaa.gov/fire for graphic product...
+
+$$

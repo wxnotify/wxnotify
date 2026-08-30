@@ -1,0 +1,24 @@
+
+Flash Flood Statement
+National Weather Service Jacksonville FL
+1205 PM EDT Fri Oct 10 2025
+
+GAC069-101615-
+/O.EXP.KJAX.FF.W.0031.000000T0000Z-251010T1615Z/
+/00000.0.ER.000000T0000Z.000000T0000Z.000000T0000Z.OO/
+Coffee GA-
+1205 PM EDT Fri Oct 10 2025
+
+...FLASH FLOOD WARNING WILL EXPIRE AT 1215 PM EDT THIS AFTERNOON FOR
+WEST CENTRAL COFFEE COUNTY...
+
+The heavy rain has ended. Flooding is no longer expected to pose a
+threat. Please continue to heed remaining road closures.
+
+&&
+
+LAT...LON 3150 8297 3150 8310 3151 8310 3152 8308
+      3153 8307 3156 8306 3161 8306 3159 8298
+      3157 8295
+
+$$

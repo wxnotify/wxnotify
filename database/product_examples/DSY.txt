@@ -1,0 +1,59 @@
+WWUS56 KPDT 102239
+DSWPDT
+
+Dust Advisory
+National Weather Service Pendleton OR
+339 PM PDT Fri Oct 10 2025
+
+ORC059-WAC005-071-102345-
+/O.NEW.KPDT.DS.Y.0001.251010T2239Z-251010T2345Z/
+Umatilla OR-Benton WA-Walla Walla WA-
+339 PM PDT Fri Oct 10 2025
+
+The National Weather Service in Pendleton Oregon has issued a
+
+* Dust Advisory for...
+  Northeastern Umatilla County in northeastern Oregon...
+  Southeastern Benton County in south central Washington...
+  Southeastern Walla Walla County in southeastern Washington...
+
+* Until 445 PM PDT.
+
+* At 337 PM PDT, a wall of dust was along a line extending from 6
+  miles north of Holdman to near Mission to 16 miles northwest of
+  Lehman Hot Springs, moving east at 30 mph.
+
+  HAZARD...Less than one mile visibility with strong wind in excess
+           of 50 mph.
+
+  SOURCE...Doppler radar.
+
+  IMPACT...Hazardous travel.
+
+* Interstate 84, Oregon Highway 11, and US 12 may experience brief
+  reductions in visibility with initial arrival of strong winds,
+  with visibilities slow clear afterwards.
+
+Locations impacted include...
+Walla Walla, Pendleton, Meacham, College Place, Milton-Freewater,
+Athena, Weston, Adams, Helix, Thorn Hollow, Umapine, Cayuse, Bingham
+Springs, Holdman, Rieth, Garrett, Umatilla Reservation, Touchet,
+Mission, and Gibbon.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Blowing dust brings reduced visibility, leading to dangerous driving
+conditions. If driving, avoid blowing dust if possible. If caught in
+dense blowing dust, pull off the road, turn off your lights and keep
+your foot off the brake.
+
+Motorists should not drive into an area of blowing dust. PULL ASIDE
+STAY ALIVE!
+
+&&
+
+LAT...LON 4611 11817 4570 11818 4543 11847 4530 11907
+      4574 11896 4602 11923
+TIME...MOT...LOC 2237Z 274DEG 28KT 4596 11893 4574 11872 4537 11881
+
+$$

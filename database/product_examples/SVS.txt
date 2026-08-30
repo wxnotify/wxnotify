@@ -1,0 +1,22 @@
+
+Severe Weather Statement
+National Weather Service Tucson AZ
+736 PM MST Sat Oct 11 2025
+
+AZC009-120246-
+/O.EXP.KTWC.SV.W.0114.000000T0000Z-251012T0245Z/
+Graham AZ-
+736 PM MST Sat Oct 11 2025
+
+...SEVERE THUNDERSTORM WARNING WILL EXPIRE AT 745 PM MST FOR SOUTH
+CENTRAL GRAHAM COUNTY...
+
+The storm which prompted the warning has moved out of the area.
+Therefore, the warning will be allowed to expire.
+
+&&
+
+LAT...LON 3264 10986 3280 11001 3294 10983 3275 10962
+TIME...MOT...LOC 0224Z 238DEG 22KT 3279 10978
+
+$$

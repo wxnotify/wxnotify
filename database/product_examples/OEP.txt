@@ -1,0 +1,29 @@
+
+TERMINAL FORECAST DISCUSSION
+NATIONAL WEATHER SERVICE CWSU PALMDALE/LOS ANGELES CA
+1649 UTC SUN OCT 12 2025
+
+.KLAX/LOS ANGELES...
+Stratus cigs <008 should return 07Z-09Z. Sig E wind components
+possible 12Z-21Z.
+
+LAX is West, AAR 66. Visual max 74. Peak demand 68 0345Z-0445Z.
+
+$$
+
+.KSAN/SAN DIEGO...
+Stratus cigs >006 should return 03Z-05Z then continue thru 14/00Z.
+
+SAN is West, AAR 24. Peak demand 26 18Z-19Z, 28 2215Z-2315Z, 37
+0245Z-0345Z.
+
+$$
+
+.KLAS/LAS VEGAS...
+Chance of sig NNE wind components until 20Z. Sig SSW wind components
+should begin 13/17Z-19Z.
+
+LAS is Config 3 (1/26), AAR 56 due to E winds. If Config 2 (1/8),
+AAR 44. Peak demand 58 1730Z-1830Z, 57 2015Z-2115Z, 59 2245Z-2345Z.
+
+$$

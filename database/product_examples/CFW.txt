@@ -1,0 +1,57 @@
+
+Coastal Hazard Message
+National Weather Service Wakefield VA
+229 PM EDT Mon Oct 13 2025
+
+MDZ024-132200-
+/O.CON.KAKQ.CF.W.0006.000000T0000Z-251013T2200Z/
+Inland Worcester-
+229 PM EDT Mon Oct 13 2025
+
+...COASTAL FLOOD WARNING REMAINS IN EFFECT UNTIL 6 PM EDT THIS
+EVENING...
+
+* WHAT...One to two feet of inundation above ground level in low-
+  lying areas near shorelines and tidal waterways.
+
+* WHERE...Inland Worcester County.
+
+* WHEN...Until 6 PM EDT this evening.
+
+* IMPACTS...Widespread flooding of vulnerable areas will result
+  in an elevated threat of property damage to homes and
+  businesses near the waterfront and shoreline. Water will be 1
+  to 2 feet above ground level in some areas resulting in a
+  sufficient depth to close numerous roads and threaten homes
+  and businesses. Flooding will extend inland from the
+  waterfront along tidal rivers and bays resulting in some road
+  closures and flooding of vehicles.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Take the necessary actions to protect flood-prone property. If
+travel is required, do not drive around barricades or through
+water of unknown depth.
+
+&&
+
+Time of high total tides are approximate to the nearest hour.
+
+OCEAN CITY INLET MD
+MLLW CATEGORIES - MINOR 4.0 FT, MODERATE 5.0 FT, MAJOR 6.0 FT
+MHHW CATEGORIES - MINOR 1.5 FT, MODERATE 2.5 FT, MAJOR 3.5 FT
+
+             TOTAL      TOTAL    DEPARTURE
+ DAY/TIME    TIDE       TIDE     FROM NORM   WAVES    FLOOD
+            FT MLLW    FT MHHW       FT       FT      IMPACT
+ --------  ---------  ---------  ---------  -------  --------
+ 13/02 PM     4.7        2.2        1.9        1      MINOR
+ 14/02 AM     4.0        1.5        1.8        1      MINOR
+ 14/03 PM     4.4        1.9        1.7        1      MINOR
+ 15/03 AM     3.7        1.2        1.5        1       NONE
+ 15/04 PM     3.6        1.1        0.9        1       NONE
+ 16/05 AM     3.5        1.0        1.2        1       NONE
+
+&&
+
+$$

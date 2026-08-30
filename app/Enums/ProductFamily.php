@@ -10,6 +10,9 @@ enum ProductFamily: string
     case Statement = 'statement';
     case SpcWpc = 'spc_wpc';
     case ForecastDiscussion = 'forecast_discussion';
+    case Informational = 'informational';
+    case Administrative = 'administrative';
+    case Aviation = 'aviation';
 
     public function label(): string
     {
@@ -20,6 +23,9 @@ enum ProductFamily: string
             self::Statement => 'Statements',
             self::SpcWpc => 'SPC & WPC Products',
             self::ForecastDiscussion => 'Forecast Discussions',
+            self::Informational => 'Informational',
+            self::Administrative => 'Administrative & Civil Emergency',
+            self::Aviation => 'Aviation',
         };
     }
 }

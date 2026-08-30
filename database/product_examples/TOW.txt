@@ -1,0 +1,56 @@
+WFUS53 KPAH 091747
+TORPAH
+KYC035-157-221-091815-
+/O.NEW.KPAH.TO.W.0110.240709T1747Z-240709T1815Z/
+
+BULLETIN - EAS ACTIVATION REQUESTED
+Tornado Warning
+National Weather Service Paducah KY
+1247 PM CDT Tue Jul 9 2024
+
+The National Weather Service in Paducah has issued a
+
+* Tornado Warning for...
+  Northeastern Calloway County in western Kentucky...
+  Southeastern Marshall County in western Kentucky...
+  Southwestern Trigg County in western Kentucky...
+
+* Until 115 PM CDT.
+
+* At 1247 PM CDT, a severe thunderstorm capable of producing a
+  tornado was located 8 miles south of Turkey Bay, moving north
+  at 35 mph.
+
+  HAZARD...Tornado.
+
+  SOURCE...Radar indicated rotation.
+
+  IMPACT...Flying debris will be dangerous to those caught
+           without shelter. Mobile homes will be damaged or
+           destroyed. Damage to roofs, windows, and vehicles
+           will occur.  Tree damage is likely.
+
+* This dangerous storm will be near...
+  Land Between The Lakes Area, Turkey Bay, and Golden Pond
+  Visitors Center around 1250 PM CDT.
+
+Other locations impacted by this tornadic thunderstorm include
+Aurora.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+TAKE COVER NOW! Move to a basement or an interior room on the
+lowest floor of a sturdy building. Avoid windows. If you are
+outdoors, in a mobile home, or in a vehicle, move to the closest
+substantial shelter and protect yourself from flying debris.
+
+&&
+
+LAT...LON 3683 8816 3683 8800 3668 8805 3668 8807
+      3665 8806 3660 8808 3660 8814
+TIME...MOT...LOC 1747Z 183DEG 30KT 3663 8810
+
+TORNADO...RADAR INDICATED
+MAX HAIL SIZE...<.75 IN
+
+$$

@@ -1,0 +1,99 @@
+
+Preliminary Local Storm Report
+National Weather Service Pocatello ID
+822 PM MDT Sat Oct 11 2025
+
+..TIME...   ...EVENT...      ...CITY LOCATION...     ...LAT.LON...
+..DATE...   ....MAG....      ..COUNTY LOCATION..ST.. ...SOURCE....
+            ..REMARKS..
+
+0740 PM     Non-Tstm Wnd Gst 4 E Montpelier          42.32N 111.22W
+10/11/2025  M58 MPH          Bear Lake          ID   Mesonet
+
+            Mesonet station PC506 Sheep Creek Hills.
+
+0230 PM     Non-Tstm Wnd Gst 5 WSW Craters of Moon   43.41N 113.63W
+10/11/2025  M53 MPH          Butte              ID   Mesonet
+
+            Mesonet station 3021 D6 Tom Cat Summit
+            US-20.
+
+0500 PM     Non-Tstm Wnd Gst 4 NNW Black Pine        42.07N 113.02W
+10/11/2025  M51 MPH          Cassia             ID   Mesonet
+
+            Mesonet station MSI04 Pilot Gold.
+
+0633 PM     Non-Tstm Wnd Gst 7 WSW Grace             42.54N 111.86W
+10/11/2025  M51 MPH          Caribou            ID   Mesonet
+
+            Mesonet station GRAI1 Grace.
+
+0730 PM     Non-Tstm Wnd Gst 2 ESE Alton             42.21N 111.11W
+10/11/2025  M49 MPH          Bear Lake          ID   Mesonet
+
+            Mesonet station 2247 D5 Border Summit US-30.
+
+0700 PM     Non-Tstm Wnd Gst 2 E Alton               42.23N 111.11W
+10/11/2025  M48 MPH          Bear Lake          ID   Mesonet
+
+            Mesonet station PC624 Alpon East.
+
+0440 PM     Non-Tstm Wnd Gst 2 ESE Whitney           42.06N 111.80W
+10/11/2025  M46 MPH          Franklin           ID   Mesonet
+
+            Mesonet station PC130 Cub River.
+
+0535 PM     Non-Tstm Wnd Gst 12 SE Butte City        43.50N 113.05W
+10/11/2025  M46 MPH          Butte              ID   Mesonet
+
+            Mesonet station SORWM Radioactive Waste
+            Management.
+
+0535 PM     Non-Tstm Wnd Gst 12 SE Butte City        43.50N 113.05W
+10/11/2025  M46 MPH          Butte              ID   Mesonet
+
+            Mesonet station RWM INL Radioactive Waste
+            Mgmt.
+
+0445 PM     Non-Tstm Wnd Gst 9 N Black Pine          42.14N 112.98W
+10/11/2025  M45 MPH          Oneida             ID   Mesonet
+
+            Mesonet station 3004 D4 Juniper Interchange
+            I-84.
+
+0525 PM     Non-Tstm Wnd Gst 9 SSW Mud Lake          43.72N 112.53W
+10/11/2025  M45 MPH          Jefferson          ID   Mesonet
+
+            Mesonet station ROV 9 SSW Mud Lake.
+
+0305 PM     Non-Tstm Wnd Gst 9 NW Atomic City        43.53N 112.95W
+10/11/2025  M45 MPH          Butte              ID   Mesonet
+
+            Mesonet station SOCFA Central Facilities
+            Area Building.
+
+0305 PM     Non-Tstm Wnd Gst 9 NW Atomic City        43.53N 112.95W
+10/11/2025  M45 MPH          Butte              ID   Mesonet
+
+            Mesonet station 690 INL Central Facilities.
+
+0330 PM     Non-Tstm Wnd Gst 6 NW Atomic City        43.51N 112.89W
+10/11/2025  M45 MPH          Butte              ID   Mesonet
+
+            Mesonet station 3699 D6 INL Puzzle
+            US-20/US-26.
+
+0340 PM     Non-Tstm Wnd Gst 11 WSW Atomic City      43.40N 113.02W
+10/11/2025  M45 MPH          Butte              ID   Mesonet
+
+            Mesonet station SUM Big Southern Butte.
+
+0730 PM     Non-Tstm Wnd Gst 4 SW Alton              42.19N 111.20W
+10/11/2025  M45 MPH          Bear Lake          ID   Mesonet
+
+            Mesonet station 8831 D5 Rocky Point US-30.
+
+
+&&
+
+$$

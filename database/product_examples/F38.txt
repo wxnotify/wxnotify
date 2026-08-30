@@ -1,0 +1,71 @@
+FNUS28 KWNS 232125
+FWDD38
+
+Day 3-8 Fire Weather Outlook  
+NWS Storm Prediction Center Norman OK
+0423 PM CDT Mon Mar 23 2026
+
+Valid 251200Z - 311200Z
+
+Daily high temperature records over much of the southern two-thirds
+of the western US will continue to be broken during Day 1/Monday and
+Day 2/Tuesday. On Day 3/Wednesday, a potent upper-level trough
+approaches the Pacific Northwest and will significantly dampen the
+amplitude of the existing ridge as it moves across the northern
+CONUS border on Day 4/Thursday. The jet max will exit the Eastern
+Seaboard on Day 5/Friday. The western US upper-level ridge is poised
+to build back next weekend. Forecast guidance suggests that this
+ridge will be nudged eastward by a robust trough moving across the
+northern Pacific, but the timing and speed of the parent trough is
+uncertain at this point. The latest forecast guidance does suggest
+that a shortwave could move through the flow around Day 8/Monday. If
+this does come to fruition, it could provide some precipitation
+across portions of the Intermountain West starting on Day 7/Sunday.
+
+On Day 3/Wednesday, as the ridge over the western US breaks down,
+warm surface temperatures will support a deep boundary layer, mixing
+strong westerly winds associated with the passing upper-level jet to
+the surface. Forecast guidance indicates sustained west winds of
+20-30 mph will combine with RHs of 10-20% at the surface for several
+hours during the afternoon. This warrants a 70% area for much of
+east-central Wyoming while 40% probabilities cover portions of
+northern Colorado, extreme northeast Utah, eastern Idaho, southern
+Montana, southwest South Dakota, and western Nebraska where surface
+winds will be slightly weaker and/or RHs slightly higher. A very
+small potential for a thunderstorm or two will be possible over the
+western slopes of Colorado during peak heating. If convection does
+initiate, very little precipitation will be realized at the ground
+level.
+
+On Day 4/Thursday, a cold front, supported by the aforementioned
+passing upper-level trough, is expected to surge south across the
+central and southern Plains. A 70% probability was added over the
+area of greatest certainty covering much of the Oklahoma and Texas
+Panhandles and portions of east-central New Mexico. The 40%
+probability area was expanded slightly east due to forecast guidance
+advecting drier conditions farther across the southern Plains while
+the western extent was expanded to include extreme eastern Arizona
+and across much of New Mexico. Uncertainty in the timing and
+evolution of this front will likely necessitate adjustments to the
+risk area.
+
+On Day 6/Saturday, northerly winds behind the cold front passing
+through the Southeast CONUS late on Day 5/Friday will likely produce
+downslope flow, contributing to lower RHs and gusty surface winds
+once again. However, precipitation between now and then is likely
+across portions of the area. Where rainfall may accumulate will
+likely dictate the extent of any fire weather concerns over this
+region. Thus, the drawn 40% area is likely to evolve over the coming
+days as this precipitation influences fuels receptivity to ignition
+over this region. Additionally, a 40% area was drawn over a good
+portion of the central Plains for Day 6/Saturday. The surface
+pressure gradient will tighten across this area as a result of a
+surface high located over the mid-Mississippi River Valley and a
+strengthening surface low over Wyoming, resulting in strong
+southerly winds from Kansas to South Dakota.
+
+..Stearns.. 03/23/2026
+
+...Please see www.spc.noaa.gov/fire for graphic product...
+
+$$

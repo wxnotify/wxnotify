@@ -1,0 +1,13 @@
+
+WSR-88D Outage Notification
+National Weather Service Indianapolis IN
+1113 AM EDT Thu Oct 9 2025
+
+The National Weather Service Indianapolis (KIND) radar will be
+out of service for routine maintenance until approximately 2000
+UTC. We apologize for any inconvenience.
+
+Alternate nearby radars include...KILX...KIWX...KLVX...KVWX...
+KPAH and TIDS.
+
+$$

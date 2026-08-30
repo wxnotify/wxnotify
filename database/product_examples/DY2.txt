@@ -1,0 +1,47 @@
+
+Day 2 Convective Outlook
+NWS Storm Prediction Center Norman OK
+1255 AM CDT Mon Oct 13 2025
+
+Valid 141200Z - 151200Z
+
+...THERE IS A MARGINAL RISK OF SEVERE THUNDERSTORMS ACROSS PARTS OF
+FAR WEST TEXAS...NEW MEXICO AND SOUTHERN CALIFORNIA...
+
+...SUMMARY...
+Thunderstorms with marginally severe wind gusts and hail will be
+possible on Tuesday across parts of far west Texas and New Mexico
+from mid afternoon into the early evening. An isolated tornado and
+wind-damage threat will be possible around midday Tuesday along the
+coast in southern California.
+
+...Far West Texas/New Mexico...
+At mid-levels, a ridge will remain over the central U.S. on Tuesday,
+as a low moves eastward across central California. Southwesterly
+flow will be in place from the Desert Southwest into the southern
+and central Rockies. Along the southeastern periphery of the
+stronger flow, an axis of instability will be in place by Tuesday
+afternoon from far west Texas northward into central and
+northeastern New Mexico. As surface temperatures warm during the day
+near the instability axis, isolated to scattered thunderstorms will
+form in the higher terrain and spread northeastward into the lower
+elevations. Near the instability axis, MLCAPE is forecast to peak in
+the 1000 to 1200 J/kg range. The instability combined with moderate
+deep-layer shear and steep low-level lapse rates should be enough
+for a marginal severe threat from mid afternoon into early evening.
+Isolated severe wind gusts and hail will be the primary threats.
+
+...Southern California Coast...
+A mid-level low will move across central California on Tuesday, as
+an associated trough moves inland across southern California.
+Thunderstorm development will likely take place near the trough,
+along a focused band of large-scale ascent. The storms will form
+near the axis of 80 to 90 knot mid-level jet, which will contribute
+to strong deep-layer shear. Forecast soundings along the coast from
+Los Angeles to San Diego around midday on Tuesday have 0-6 km shear
+near 80 knots, with 0-3 km storm-relative helicity in the 150 to 250
+m2/s2 range. This could be enough for a marginal tornado and
+wind-damage threat, mainly with low-topped rotating storms that move
+inland.
+
+..Broyles.. 10/13/2025

@@ -1,0 +1,40 @@
+FNUS22 KWNS 231823
+FWDDY2
+
+Day 2 Fire Weather Outlook  
+NWS Storm Prediction Center Norman OK
+0122 PM CDT Mon Mar 23 2026
+
+Valid 241200Z - 251200Z
+
+...NO CRITICAL AREAS...
+
+No changes were made to the graphical forecast. Locally elevated
+conditions will be likely over portions of northwest Nevada and
+southeast Oregon where above normal surface temperatures will
+promote deep boundary layer mixing. This will mix southwest winds of
+10-20 mph to the surface combined with RHs of 15-25%. Similarly,
+deep mixing promoted by warm temperatures will support northwest
+flow aloft mixing to the surface over portions of the High Plains.
+While RHs of 18-30% will not be quite as low over these areas, brief
+and locally elevated conditions remain possible over portions of
+portions of eastern Wyoming, southwest South Dakota, and much of the
+Nebraska Panhandle.
+
+..Stearns.. 03/23/2026
+
+.PREV DISCUSSION... /ISSUED 0107 AM CDT Mon Mar 23 2026/
+
+...Synopsis...
+The western upper-level ridge will amplify on Tuesday. With the
+eastern surface high weakening and moving offshore, the surface
+pressure gradient will weaken compared to previous days. Pockets of
+marginally dry and breezy conditions may occur in central Plains and
+the Midwest. A weak lee trough will also encourage localized dry and
+windy conditions in the immediate lee of southern/central Rockies.
+Given the marginal fire weather conditions expected, only localized
+concerns are expected at this time.
+
+...Please see www.spc.noaa.gov/fire for graphic product...
+
+$$

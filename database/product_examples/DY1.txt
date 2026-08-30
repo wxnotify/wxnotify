@@ -1,0 +1,41 @@
+
+Day 1 Convective Outlook
+NWS Storm Prediction Center Norman OK
+1218 AM CDT Mon Oct 13 2025
+
+Valid 131200Z - 141200Z
+
+...THERE IS A MARGINAL RISK OF SEVERE THUNDERSTORMS ACROSS PORTIONS
+OF THE SOUTHWESTERN U.S....
+
+...SUMMARY...
+Isolated, marginally severe hail and wind will be possible from the
+Four Corners and eastern Arizona to the Texas Trans-Pecos this
+afternoon into mid-evening. Locally damaging winds are possible
+later tonight along the south-central portion of coastal California.
+
+...Southwestern U.S...
+
+Strong upper low is currently located along the WA Coast, shifting
+south in line with latest model guidance. This feature will continue
+to dig south as the primary midlevel speed max has yet to round the
+base of the trough. Left-exit region of the jet max will approach
+the central CA Coast after 14/06z which should encourage low-topped
+convection to move onshore after midnight. This activity could be
+locally strong with some gust potential as scattered convection
+advances inland in association with a pronounced cold front.
+Forecast soundings yield little more than 500 J/kg MLCAPE so any
+hail that forms with this activity should remain below severe
+levels.
+
+Downstream, deep south-southwesterly tropical feed across northwest
+Mexico into the southern Rockies will continue. Considerable amount
+of clouds and scattered precipitation should limit lapse rates and
+instability across this region. Even so, strong 0-6km shear does
+favor organized updrafts, especially during the afternoon/early
+evening when air mass will be most unstable. A low risk for
+hail/wind can be expected with the most robust convection, but
+widespread severe is not anticipated due to aforementioned poor
+lapse rates/modest buoyancy.
+
+..Darrow/Weinman.. 10/13/2025

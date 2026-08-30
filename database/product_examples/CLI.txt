@@ -1,0 +1,84 @@
+CDUS43 KDMX 130630
+CLILWD
+
+CLIMATE REPORT
+NATIONAL WEATHER SERVICE DES MOINES IA
+130 AM CDT MON OCT 13 2025
+
+...................................
+
+...THE LAMONI IA CLIMATE SUMMARY FOR OCTOBER 12 2025...
+
+CLIMATE NORMAL PERIOD 1991 TO 2020
+CLIMATE RECORD PERIOD 9999 TO 9999
+
+
+WEATHER ITEM   OBSERVED TIME   NORMAL DEPARTURE LAST
+                VALUE   (LST)  VALUE  FROM      YEAR
+                                      NORMAL
+.......................................................
+TEMPERATURE (F)
+ YESTERDAY
+  MAXIMUM         78    240 PM  66     12       81
+  MINIMUM         57    353 AM  45     12       52
+  AVERAGE         68            55     13       67
+
+PRECIPITATION (IN)
+  YESTERDAY        T             0.10  -0.10
+  MONTH TO DATE    2.20          1.21   0.99
+  SINCE JAN 1     28.85         32.20  -3.35
+
+DEGREE DAYS
+ HEATING
+  YESTERDAY        0            10    -10        0
+  MONTH TO DATE   28            99    -71       38
+  SINCE SEP 1     58           186   -128       67
+  SINCE JUL 1     66           192   -126       71
+
+ COOLING
+  YESTERDAY        3             1      2        2
+  MONTH TO DATE   44            13     31       16
+  SINCE SEP 1    205           125     80      133
+  SINCE JAN 1   1089          1035     54     1027
+.......................................................
+
+
+WIND (MPH)
+  HIGHEST WIND SPEED    20   HIGHEST WIND DIRECTION    SE (150)
+  HIGHEST GUST SPEED    29   HIGHEST GUST DIRECTION    SE (150)
+  AVERAGE WIND SPEED    11.4
+
+
+WEATHER CONDITIONS
+THE FOLLOWING WEATHER WAS RECORDED YESTERDAY.
+  NO SIGNIFICANT WEATHER WAS OBSERVED.
+
+
+RELATIVE HUMIDITY (PERCENT)
+ HIGHEST    96           200 AM
+ LOWEST     54           100 PM
+ AVERAGE    75
+
+..........................................................
+
+
+THE LAMONI IA CLIMATE NORMALS FOR TODAY
+                         NORMAL    RECORD    YEAR
+ MAXIMUM TEMPERATURE (F)   65        MM        MM
+ MINIMUM TEMPERATURE (F)   45        MM        MM
+
+
+SUNRISE AND SUNSET
+OCTOBER 13 2025.......SUNRISE   725 AM CDT   SUNSET   638 PM CDT
+OCTOBER 14 2025.......SUNRISE   726 AM CDT   SUNSET   637 PM CDT
+
+
+-  INDICATES NEGATIVE NUMBERS.
+R  INDICATES RECORD WAS SET OR TIED.
+MM INDICATES DATA IS MISSING.
+T  INDICATES TRACE AMOUNT.
+
+
+
+
+$$

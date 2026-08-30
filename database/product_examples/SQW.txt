@@ -1,0 +1,41 @@
+
+WWUS51 KCTP 061716
+SQWCTP
+
+BULLETIN - IMMEDIATE BROADCAST REQUESTED
+Snow Squall Warning
+National Weather Service State College PA
+1216 PM EST Sat Jan 6 2024
+
+PAC027-055-061-071-081-099-107-061745-
+/O.NEW.KCTP.SQ.W.0001.240106T1716Z-240106T1745Z/
+
+The National Weather Service in State College PA has issued a
+
+* **Snow Squall Warning for...**
+  Central Centre County in central Pennsylvania...
+  Southeastern Clearfield County in central Pennsylvania...
+  Northern Huntingdon County in central Pennsylvania...
+  Mifflin County in central Pennsylvania...
+  Juniata County in central Pennsylvania...
+  Snyder County in central Pennsylvania...
+  Union County in central Pennsylvania...
+
+* **Until 1245 PM EST.**
+
+* **HAZARDS...** Intense bursts of heavy snow and gusty winds leading to whiteout conditions. Visibility dropping to near zero. Rapid snow accumulation on roads.
+
+* **SOURCE...** Radar and webcams.
+
+* **IMPACT...** Dangerous travel due to near-zero visibility and slick roads. Multiple accidents have already been reported along Interstate 80 and Route 322.
+
+* **LOCATIONS IMPACTED INCLUDE...**
+  State College, Lewistown, Selinsgrove, and Mifflintown.
+
+**PRECAUTIONARY/PREPAREDNESS ACTIONS...**
+Reduce speed! Turn on headlights! During snow squalls, visibility may drop suddenly to near zero. If you must travel, leave extra space between vehicles and avoid sudden braking.
+
+LAT...LON 4060 7750 4030 7700 4065 7700 4090 7750
+TIME...MOT...LOC 1714Z 260DEG 45KT 4065 7745
+
+$$

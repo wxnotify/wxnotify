@@ -1,0 +1,95 @@
+
+Coastal Hazard Message
+National Weather Service Newport/Morehead City NC
+425 AM EDT Mon Oct 13 2025
+
+NCZ205-132030-
+/O.NEW.KMHX.CF.A.0004.251014T1500Z-251014T2200Z/
+/O.CON.KMHX.CF.W.0004.000000T0000Z-251013T2100Z/
+/O.CON.KMHX.SU.Y.0009.000000T0000Z-251014T0500Z/
+/O.CON.KMHX.BH.S.0088.251013T1100Z-251014T0000Z/
+Hatteras Island-
+425 AM EDT Mon Oct 13 2025
+
+...COASTAL FLOOD WARNING REMAINS IN EFFECT UNTIL 5 PM EDT THIS
+AFTERNOON...
+...HIGH SURF ADVISORY REMAINS IN EFFECT UNTIL 1 AM EDT TUESDAY...
+...BEACH HAZARDS STATEMENT REMAINS IN EFFECT THROUGH THIS
+EVENING...
+...COASTAL FLOOD WATCH IN EFFECT FROM TUESDAY MORNING THROUGH
+TUESDAY AFTERNOON...
+
+* WHAT...For the Coastal Flood Warning, up to 2 to 4 feet of
+  inundation above ground level in low-lying areas near shorelines
+  and tidal waterways around high tide this afternoon. For the
+  High Surf Advisory, large breaking waves of 7 to 10 feet in the
+  surf zone. For the Beach Hazards Statement, dangerous rip
+  currents. For the Coastal Flood Watch, up to 2 to 4 feet of
+  inundation above ground level possible in low-lying areas near
+  shorelines and tidal waterways around high tide Tuesday
+  afternoon.
+
+* WHERE...Hatteras Island.
+
+* WHEN...For the Coastal Flood Warning, until 5 PM EDT this
+  afternoon. For the High Surf Advisory, until 1 AM EDT Tuesday.
+  For the Beach Hazards Statement, through this evening. For the
+  Coastal Flood Watch, from Tuesday morning through Tuesday
+  afternoon.
+
+* IMPACTS...Up to 2 to 4 feet of inundation above ground level is
+  possible in some areas near shorelines and tidal waterways
+  resulting in an elevated threat of property damage. Flooding
+  will extend inland from the waterfront threatening some homes
+  and businesses. Numerous road closures and flooding of vehicles
+  will be possible, including portions of NC 12. Dangerous
+  swimming and surfing conditions and localized beach erosion. Rip
+  currents can sweep even the best swimmers away from shore into
+  deeper water.
+
+* ADDITIONAL DETAILS...The combination of strong onshore winds,
+  high astronomical tides, wave run up, and already battered and
+  weakened dune and other oceanside structures will bring the
+  potential of significant impacts to Hatteras Island, mostly
+  north of Cape Hatteras, with this afternoon`s high tide, and
+  again tomorrow (Tuesday 10/14). Additionally, minor soundside
+  flooding is expected to begin later today and last through at
+  least Wednesday.
+
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Take the necessary actions to protect flood-prone property. If
+travel is required, do not drive around barricades or through
+water of unknown depth.
+
+Inexperienced swimmers should remain out of the water due to
+dangerous surf conditions.
+
+Life-threatening rip currents. If caught in a rip current, remain
+calm. Swim in a direction following the shoreline. If tired,
+float or tread water until out of the rip current. If unable to
+escape, face the shore and call or wave for help.
+
+&&
+
+Time of high total tides are approximate to the nearest hour.
+
+Coast Guard Hatteras NC
+MLLW Categories - Minor 2.5 ft, Moderate 3.5 ft, Major 4.5 ft
+MHHW Categories - Minor 1.3 ft, Moderate 2.3 ft, Major 3.3 ft
+
+             Total      Total    Departure
+ Day/Time    Tide       Tide     from Norm   Waves    Flood
+            ft MLLW    ft MHHW       ft       ft      Impact
+ --------  ---------  ---------  ---------  -------  --------
+ 13/03 AM     2.4        1.2        1.8        3       None
+ 13/02 PM     2.5        1.3        1.8        3      Minor
+ 14/03 AM     2.5        1.3        1.9        2      Minor
+ 14/04 PM     3.0        1.8        2.3        3      Minor
+ 15/03 AM     2.7        1.5        2.1        3      Minor
+ 15/03 PM     2.6        1.4        2.0        3      Minor
+
+&&
+
+$$

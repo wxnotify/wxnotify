@@ -1,0 +1,45 @@
+
+Mesoscale Precipitation Discussion 1161
+NWS Weather Prediction Center College Park MD
+937 AM EDT Mon Oct 06 2025
+
+Areas affected...portions of southeast LA and southern MS
+
+Concerning...Heavy rainfall...Flash flooding possible
+
+Valid 061337Z - 061637Z
+
+Summary...Training thunderstorms are possible over the next few
+hours roughly between Baton Rouge LA and Prentiss MS.  Hourly rain
+amounts to 2.5" and additional local totals are possible where
+cell training occurs, which would be most problematic in recently
+saturated and urban areas.
+
+Discussion...A training band of convection remains active across
+south-central MS at the present time, while another area of slowly
+developing scattered convection near Baton Rouge aligning.
+Precipitable water values are around 2.25" per GPS data.  ML CAPE
+of 500-1000 J/kg persists to the southeast of a low- to mid-level
+disturbance near southeast AR.  Effective bulk shear across the
+region is 20 kts or so, which has fostered convective organization
+at times.
+
+The concern is that the scattered aligned convection in LA
+continues to slowly build, consolidate, and train in the next few
+hours, potentially advecting downstream into areas that receieved
+5-10" of rain this morning per radar estimates.  The remaining
+convective band is also a source of concern for another 2-3 hours.
+ Where training occurs, hourly amounts to 2.5" with additional
+local amounts to 4" would be possible, which would be most
+problematic in urban areas and were soils have recently saturated.
+
+Roth
+
+...Please see www.wpc.ncep.noaa.gov for graphic product...
+
+ATTN...WFO...JAN...LCH...LIX...
+
+ATTN...RFC...ORN...NWC...
+
+LAT...LON   31938979 31228976 30489041 30149122 30169166
+            30619135 31359058

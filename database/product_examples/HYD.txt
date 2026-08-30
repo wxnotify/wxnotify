@@ -1,0 +1,88 @@
+
+Daily Hydrometeorological Data Summary
+National Weather Service Columbia SC
+1139 AM EDT Sat Oct 11 2025
+
+.BR CAE 1011 ES DH07/TX/TN/TA/PPP/TSIRZX/TSIRZN/TSIRZ/EP
+:
+:Max...High Temperature last 24 hrs min...Low Temperature last 24 hrs
+:Cur...Temperature at Observation....Pcpn...Precipitation last 24 hrs
+:Evaporation in inches
+:
+:                                       Air Temp                      Soil Temp
+:Station               SID    Max    Min    Cur    Pcpn    Max    Min    Cur    Evap
+:
+:...Northern Midlands...
+:Jefferson 0.1 NW    :JEFS2    68/    53/    56/   0.00/      /      /      /
+:Little Mountain     :LIMS1    68/    56/    59/   0.00/      /      /      /
+:Lugoff              :LUGS1    69/    57/    60/   0.00/      /      /      /
+:
+:...Central Midlands...
+:Cedar Creek         :BLYS1    68/    54/    58/   0.00/    72/    71/    71/
+:Columbia Airport    :CAE      70/    59/    61/      T/    73/    72/    72/
+:Flotilla Island     :LMFS1    69/    56/    60/       /      /      /      /
+:Mcentire Ang        :MMT      73/    60/    63/      T/      /      /      /
+:Owens Field         :CUB      70/    59/    61/   0.00/      /      /      /
+:Pontiac             :PTCS1    67/    55/    59/      M/      /      /      /
+:Saluda              :SADS1    70/    54/    57/   0.00/      /      /      /
+:Shaw Air Force Base :SSC      71/    58/    60/      T/      /      /      /
+:St. Matthews        :SMWS1    71/    56/    58/   0.06/      /      /      /
+:Sumter              :SMRS1    71/    58/    60/   0.00/      /      /      /
+:Swansea 3.5 NE      :SWAS1    68/    57/    60/   0.00/      /      /      /
+:
+:...Southern Midlands...
+:Orangeburg          :OGB      70/    57/    59/   0.01/      /      /      /
+:Salley              :SLYS1    68/    56/    59/   0.00/      /      /      /
+:
+:...Central Savannah River Area...
+:Augusta Bush Field  :AGS      73/    59/    60/   0.00/      /      /      /
+:Augusta Daniel Field:DNL      71/    55/    59/      T/      /      /      /
+:Barnwell 5 ENE      :BNLS1    70/    52/    59/   0.04/    65/    64/    65/   0.08
+:Graniteville 1.2 NE :GNTS1    71/    56/    58/   0.00/    73/    70/    70/   0.14
+:Mccormick           :MCCS1    70/    50/    54/   0.00/      /      /      /
+.END
+:
+:
+.BR CAE  1011 ES DH00/TX/TN/TA/PPP/
+: Orangeburg Water Plant data are from midnight to midnight.
+:
+:Orangeburg:ORBS1   66/   55/   60/   0.00
+: Fairfield Pump Storage data is from midnight to midnight.
+:
+.END
+:
+: NWS precipitation only stations
+:
+.BR CAE  1011 ES DH07/PPP
+:Lincolnton         :LNCG2   0.00
+:
+: USGS Rain Gage stations
+:
+:Blackville Clem.   :BLVS1   0.01
+:Chesterfield       :CSFS1   0.00
+:Congaree NP RAWS   :GDNS1   0.02
+:Edgefield          :EGFS1   0.00
+:Jefferson          :JEFS1   0.00
+:Kiokee Cr. Evans   :EVNG1   0.00
+:L. G. Chappells    :LGRS1   0.00
+:Lake Murray Dam    :MURS1   0.00
+:Long Cane          :LCRS1   0.00
+:McTier Cr. Monetta :MCTS1   0.00
+:Mcbee Precip       :MBES1   0.00
+:Newberry           :NEWS1   0.00
+:Pageland           :PAGS1   0.00
+:SC Dot Saluda      :SRGS1   0.00
+:Santee St. Pauls   :SPLS1   0.10
+:Savannah Butler Crk:NSLG1   0.00
+:USFS near Jackson  :SRSS1   0.04
+:Waynesb. Girard    :GIRG1   0.04
+:
+.END
+:
+: NWS precipitation only stations from midnight to midnight
+:
+.BR CAE  1011 ES DH12/PPP
+:Lake Wateree       :WATS1   0.00
+.END
+
+$$

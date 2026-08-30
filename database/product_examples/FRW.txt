@@ -1,0 +1,35 @@
+
+WWUS84 KAMA 272300
+FRWAMA
+
+BULLETIN - IMMEDIATE BROADCAST REQUESTED
+FIRE WARNING
+National Weather Service Amarillo TX
+600 PM CST Tue Feb 27 2024
+
+TXC375-381-280000-
+/O.NEW.KAMA.FR.W.0001.240227T2300Z-240228T0000Z/
+
+The National Weather Service in Amarillo has issued a
+
+* **Fire Warning for...**
+  Northern Potter County in the Panhandle of Texas...
+  Southern Moore County in the Panhandle of Texas...
+
+* **Until 6 PM CST.**
+
+* **AT 558 PM CST**, emergency management reported a fast-moving wildfire near State Highway 287 between Dumas and Amarillo. Strong winds are pushing the fire southeast toward the community of Masterson.
+
+* **HAZARDS...** Rapidly spreading wildfire producing extreme heat, smoke, and poor visibility.
+
+* **SOURCE...** Emergency management and Texas Forest Service.
+
+* **IMPACT...** Residents in the warned area should evacuate immediately. Do not delay leaving if you are in the path of this fire.
+
+**PRECAUTIONARY/PREPAREDNESS ACTIONS...**
+This is a life-threatening situation. Follow the directions of local officials. Leave immediately if ordered. If you are caught by fire, seek shelter in a structure away from vegetation, or in an area clear of fuel.
+
+LAT...LON 3588 10199 3565 10186 3565 10210 3585 10217
+TIME...MOT...LOC 2258Z 240DEG 40KT 3578 10205
+
+$$

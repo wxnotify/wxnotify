@@ -1,0 +1,50 @@
+
+Flood Statement
+National Weather Service Grand Junction CO
+1259 PM MDT Mon Oct 13 2025
+
+COC007-053-067-111-150600-
+/O.CON.KGJT.FA.W.0005.000000T0000Z-251015T0600Z/
+/00000.0.ER.000000T0000Z.000000T0000Z.000000T0000Z.OO/
+Archuleta CO-Hinsdale CO-La Plata CO-San Juan CO-
+1259 PM MDT Mon Oct 13 2025
+
+...FLOOD WARNING REMAINS IN EFFECT UNTIL MIDNIGHT MDT TUESDAY
+NIGHT...
+
+* WHAT...Flooding caused by excessive rainfall continues.
+
+* WHERE...A portion of southwest Colorado, including the following
+  counties, Archuleta, Hinsdale, La Plata and San Juan. North of
+  Vallecito Reservoir.
+
+* WHEN...Until midnight MDT Tuesday Night.
+
+* IMPACTS...Flooding of rivers, creeks, streams, and other low-lying
+  and flood-prone locations is imminent.
+
+* ADDITIONAL DETAILS...
+  - At 1259 PM MDT, Emergency management reported flooding north
+    of Vallecito Reservoir. River gauges above the reservoir are
+    beginning to respond upward with the recent rainfall and they
+    should peak during the late evening to early morning hours.
+  - Additional rainfall amounts of 1.5 to 2.5 inches are possible
+    in the warned area.
+  - Some locations that will experience flooding include...
+    Vallecito.
+  - http://www.weather.gov/safety/flood
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Stay away or be swept away. River banks and culverts can become
+unstable and unsafe.
+
+&&
+
+LAT...LON 3770 10749 3766 10747 3764 10743 3762 10736
+      3754 10735 3746 10738 3737 10749 3736 10758
+      3737 10762 3740 10768 3749 10771 3761 10763
+      3770 10757
+
+
+$$
