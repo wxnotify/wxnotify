@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Spatie\Activitylog\Support\CauserResolver;
+use STS\FilamentImpersonate\ImpersonateManager;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +21,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Without this, activity logged while an admin impersonates a
+        // subscriber attributes to the subscriber (Auth::user() during
+        // impersonation), not the admin who is actually acting — defeating
+        // the audit log's whole point of keeping impersonated actions
+        // accountable.
+        $this->app->make(CauserResolver::class)->resolveUsing(function () {
+            $impersonate = $this->app->make(ImpersonateManager::class);
+
+            return $impersonate->isImpersonating()
+                ? $impersonate->getImpersonator()
+                : auth()->user();
+        });
     }
 }

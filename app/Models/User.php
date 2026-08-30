@@ -16,13 +16,23 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token', 'app_authentication_secret'])]
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, InteractsWithAppAuthentication, Notifiable;
+    use HasFactory, InteractsWithAppAuthentication, LogsActivity, Notifiable;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['is_staff', 'tier_override', 'tier_override_reason'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
+    }
 
     public function canAccessPanel(Panel $panel): bool
     {
@@ -30,6 +40,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'admin' => $this->is_staff,
             default => true,
         };
+    }
+
+    public function canBeImpersonated(): bool
+    {
+        return ! $this->is_staff;
     }
 
     public function locations(): HasMany

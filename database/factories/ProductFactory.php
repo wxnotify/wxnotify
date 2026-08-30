@@ -20,7 +20,9 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         return [
-            'code' => strtoupper(fake()->unique()->lexify('??.?')),
+            // Prefixed with "ZZ" (not a real WFO/state prefix) so factory-generated
+            // codes can't collide with the real seeded NWS catalog.
+            'code' => 'ZZ.'.strtoupper(fake()->unique()->lexify('???')),
             'name' => fake()->words(3, true),
             'family' => ProductFamily::Warning,
             'has_polygon' => false,

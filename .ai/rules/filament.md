@@ -17,3 +17,12 @@ Found while building Notification Channels (ConnectChannel.php) and My Alerts (A
 Inside a single Select::createOptionForm() modal, a field whose ->required() (or presence) is gated on another field in that SAME schema (e.g. a type picker with `->required(fn (Get $get) => $get('type') === 'x')`) does not validate reliably — Filament rejects the correct, present value as missing, confirmed via a failing test where $get() showed the right values but validation still failed. This is a variant of the dynamically-built-Wizard-step bug already recorded above, but happening inside an Action's modal schema instead of a Wizard step.
 
 Workaround: don't put a type-picker + type-specific fields in one createOptionForm(). Instead give the Select one ->suffixActions() entry per type (via Filament\Actions\Action, each with its own fixed, unconditional ->schema() and ->action() that does the create and appends the new id into the Select's state with Set $set / Get $get). See AlertRuleForm::channelsSelect()/connectChannelAction() for the working pattern.
+
+## EditRecord's default save bypasses non-Fillable fields — override handleRecordUpdate() for legitimate admin writes
+A model attribute deliberately excluded from `#[Fillable(...)]` (e.g. `User::tier_override` — kept out so a subscriber can't self-grant a tier) also gets silently dropped by an ADMIN's own legitimate edit form, because `EditRecord`'s default `handleRecordUpdate()` calls `$record->update($data)` — plain mass assignment, same guard either way. No error; the field just doesn't save. Caught by a browser test (saved a value, reloaded, field was still null), not by anything sooner.
+
+Fix: override `handleRecordUpdate(Model $record, array $data): Model` on that specific Edit page to `$record->forceFill($data)->save(); return $record;` — bypasses the guard only on that one intentional, staff-only path. Every other write path to the field stays blocked.
+
+Also: testing a resource that lives on a non-default panel (this app's default is `dashboard`; `admin` is not) needs `Filament::setCurrentPanel('admin')` in the test's `beforeEach()` — without it, `livewire()` throws `RouteNotFoundException` for `filament.dashboard.resources.*` since Filament resolves nav/breadcrumb URLs against the default panel unless told otherwise.
+
+Found while building the Admin Tools UserResource (Support/impersonation).

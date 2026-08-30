@@ -7,12 +7,25 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable(['user_id', 'channel_type', 'label', 'apprise_url'])]
 class NotificationChannel extends Model
 {
     /** @use HasFactory<NotificationChannelFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        // Deliberately excludes apprise_url: it's an encrypted column that can
+        // carry webhook secrets/tokens, and activitylog logs the decrypted
+        // attribute value into a plain-text properties column.
+        return LogOptions::defaults()
+            ->logOnly(['channel_type', 'label', 'verified_at'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
+    }
 
     protected function casts(): array
     {
