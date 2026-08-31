@@ -2,6 +2,7 @@
 
 @source '../../../../app/Filament/Dashboard/**/*';
 @source '../../../../resources/views/filament/dashboard/**/*';
+@source '../../../../resources/views/vendor/filament-toggle-list/**/*';
 
 @plugin "@tailwindcss/typography";
 @source '../../../../vendor/guava/filament-knowledge-base/src/**/*';
