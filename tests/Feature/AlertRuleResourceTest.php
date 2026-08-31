@@ -100,6 +100,31 @@ test('creating a nationwide weather alerts rule does not require a location', fu
         ->and($rule->location_id)->toBeNull();
 });
 
+test('a weather alerts rule can select products outside the graduated warning/watch/advisory/statement families', function () {
+    // Regression: the product-picker sections used to filter by family
+    // (warning/watch/advisory/statement only), which silently excluded
+    // every administrative/informational/aviation product — entire
+    // category sections (Airport-related, most of Other Forecasts...)
+    // never appeared, and others (Non-Meteorological Hazards...) showed
+    // only a handful of their products.
+    $civilDanger = Product::where('code', 'CDW')->sole();
+    expect($civilDanger->family->value)->toBe('administrative');
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            'product_ids' => [$civilDanger->category->value => [$civilDanger->id]],
+            'matching_mode' => 'nationwide',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($rule->products->pluck('id')->all())->toBe([$civilDanger->id]);
+});
+
 test('creating an spc wpc rule persists the chosen risk levels', function () {
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
 

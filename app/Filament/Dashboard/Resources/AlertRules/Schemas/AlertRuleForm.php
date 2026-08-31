@@ -176,7 +176,7 @@ class AlertRuleForm
     {
         return [
             ...self::productSections(Product::query()
-                ->whereIn('family', ['warning', 'watch', 'advisory', 'statement'])
+                ->whereIn('family', ['warning', 'watch', 'advisory', 'statement', 'informational', 'administrative', 'aviation'])
                 ->where('status', 'active')),
             ...self::matchingModeFields(),
         ];

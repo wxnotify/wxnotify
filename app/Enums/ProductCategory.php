@@ -34,11 +34,9 @@ enum ProductCategory: string
     }
 
     /**
-     * A blade-fontawesome (solid style) icon name. Null for categories the
-     * product catalog never surfaces as a My Alerts product-picker section
-     * (Airport-related) or that weren't assigned one.
+     * A blade-fontawesome (solid style) icon name.
      */
-    public function icon(): ?string
+    public function icon(): string
     {
         return match ($this) {
             self::TornadoAndSevereThunderstorm => 'fas-tornado',
@@ -50,7 +48,8 @@ enum ProductCategory: string
             self::Coastal => 'fas-umbrella-beach',
             self::Marine => 'fas-ship',
             self::NonMeteorologicalHazardsAndAdministrativeMessages => 'fas-house-tsunami',
-            self::OtherForecastsOutlooksDiscussionsAndReports, self::AirportRelated => null,
+            self::OtherForecastsOutlooksDiscussionsAndReports => 'fas-temperature-high',
+            self::AirportRelated => 'fas-plane',
         };
     }
 }
