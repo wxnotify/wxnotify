@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "cf44481a116d3d39fa4be18393d2e583",
+    "content-hash": "2d8beca79a79b5d17bafc4a4fdd088ea",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -2537,6 +2537,80 @@
                 }
             ],
             "time": "2026-08-24T17:13:02+00:00"
+        },
+        {
+            "name": "jbuitt/filament-toggle-list",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jbuitt/filament-toggle-list.git",
+                "reference": "f00fdc53fe3f3e5cb560f9af36f99dc3d940b80f"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jbuitt/filament-toggle-list/zipball/f00fdc53fe3f3e5cb560f9af36f99dc3d940b80f",
+                "reference": "f00fdc53fe3f3e5cb560f9af36f99dc3d940b80f",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^4.0|^5.0",
+                "php": "^8.2",
+                "spatie/laravel-package-tools": "^1.16"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.20",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^3.0|^5.1",
+                "pestphp/pest-plugin-laravel": "^3.0|^5.0",
+                "pestphp/pest-plugin-livewire": "^3.0|^5.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Jbuitt\\FilamentToggleList\\ToggleListServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Jbuitt\\FilamentToggleList\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Jbuitt\\FilamentToggleList\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "vendor/bin/pest"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "jbuitt",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A Filament form field that renders CheckboxList-equivalent option selection as Toggle switches.",
+            "homepage": "https://github.com/jbuitt/filament-toggle-list",
+            "keywords": [
+                "checkbox-list",
+                "filament",
+                "form-field",
+                "plugin",
+                "toggle"
+            ],
+            "support": {
+                "source": "https://github.com/jbuitt/filament-toggle-list/tree/main",
+                "issues": "https://github.com/jbuitt/filament-toggle-list/issues"
+            },
+            "time": "2026-08-31T02:37:58+00:00"
         },
         {
             "name": "kirschbaum-development/eloquent-power-joins",
@@ -13591,7 +13665,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "jbuitt/filament-toggle-list": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

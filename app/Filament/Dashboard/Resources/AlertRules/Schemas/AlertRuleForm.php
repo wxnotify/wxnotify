@@ -30,6 +30,7 @@ use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rules\Exists;
+use Jbuitt\FilamentToggleList\ToggleList;
 
 class AlertRuleForm
 {
@@ -95,7 +96,7 @@ class AlertRuleForm
      * lives in a STATIC step schema (channelsStep() above is a plain array,
      * not a Step::schema(fn (Get $get) => ...) closure) — it exists on every
      * render from the wizard's first mount onward, so it doesn't hit the
-     * entangle bug documented on locationSelect()/productCheckboxList().
+     * entangle bug documented on locationSelect()/productSections().
      * That's what makes it safe to use Select::multiple() here.
      *
      * One suffix action per channel type, not a single createOptionForm()
@@ -213,13 +214,15 @@ class AlertRuleForm
 
     /**
      * Renders the given product query as one collapsible Section per
-     * ProductCategory present in the results, each holding a CheckboxList
-     * (deliberately not Select::multiple() — see locationSelect()'s note on
-     * the dynamic-Wizard-step entangle bug; CheckboxList uses plain
-     * wire:model instead) of that category's products with their
-     * descriptions shown inline.
+     * ProductCategory present in the results, each holding a ToggleList
+     * (jbuitt/filament-toggle-list — a CheckboxList-alike that renders
+     * genuine toggle switches instead of checkboxes, right down to using
+     * plain wire:model on a real <input type="checkbox">, same as
+     * CheckboxList — see locationSelect()'s note on the dynamic-Wizard-step
+     * entangle bug; that's what makes it safe here too) of that category's
+     * products with their descriptions shown inline.
      *
-     * Each CheckboxList is named `product_ids.{category}` rather than a
+     * Each ToggleList is named `product_ids.{category}` rather than a
      * single flat `product_ids` — Filament stores this as a nested array
      * (`product_ids => ['warning' => [1, 2], 'watch' => [3]]`), so every
      * category keeps its own field/state without a manual merge step. Callers
@@ -240,7 +243,7 @@ class AlertRuleForm
                 $fieldName = "product_ids.{$category->value}";
                 $products = $productsByCategory->get($category->value);
 
-                $checkboxList = CheckboxList::make($fieldName)
+                $toggleList = ToggleList::make($fieldName)
                     ->hiddenLabel()
                     ->searchable()
                     ->columns(1)
@@ -253,7 +256,7 @@ class AlertRuleForm
                 // section, so attaching it to each one would just repeat the
                 // same error under every category.
                 if ($index === 0) {
-                    $checkboxList = $checkboxList->rules([
+                    $toggleList = $toggleList->rules([
                         fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
                             if (self::selectedProductIds($get) === []) {
                                 $fail('Select at least one product.');
@@ -265,7 +268,7 @@ class AlertRuleForm
                 return Section::make($category->label())
                     ->collapsible()
                     ->collapsed(fn (Get $get): bool => self::selectedProductIds($get, $fieldName) === [])
-                    ->schema([$checkboxList]);
+                    ->schema([$toggleList]);
             })
             ->all();
     }
