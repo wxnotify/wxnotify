@@ -27,4 +27,8 @@
             }
         }
     }
+
+    & .fi-fo-toggle-list-option-description {
+        @apply mt-1;
+    }
 }
