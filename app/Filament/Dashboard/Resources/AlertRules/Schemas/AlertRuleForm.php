@@ -246,6 +246,7 @@ class AlertRuleForm
                 $toggleList = ToggleList::make($fieldName)
                     ->hiddenLabel()
                     ->searchable()
+                    ->bulkToggleable()
                     ->columns(1)
                     ->live()
                     ->options($products->pluck('name', 'id'))

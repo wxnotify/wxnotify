@@ -8,6 +8,14 @@
  * Filament's usual trick for that).
  */
 .fi-fo-toggle-list {
+    & .fi-fo-toggle-list-search-input-wrp {
+        @apply mb-4;
+    }
+
+    & .fi-fo-toggle-list-actions {
+        @apply mb-2;
+    }
+
     & .fi-fo-toggle-list-options {
         @apply gap-4;
 
