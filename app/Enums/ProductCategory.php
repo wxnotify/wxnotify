@@ -32,4 +32,25 @@ enum ProductCategory: string
             self::AirportRelated => 'Airport-related',
         };
     }
+
+    /**
+     * A blade-fontawesome (solid style) icon name. Null for categories the
+     * product catalog never surfaces as a My Alerts product-picker section
+     * (Airport-related) or that weren't assigned one.
+     */
+    public function icon(): ?string
+    {
+        return match ($this) {
+            self::TornadoAndSevereThunderstorm => 'fas-tornado',
+            self::FloodingAndHydrological => 'fas-house-flood-water',
+            self::WinterWeather => 'fas-snowflake',
+            self::NonPrecipitation => 'fas-wind',
+            self::FireWeather => 'fas-fire',
+            self::HurricaneAndTropicalStorm => 'fas-hurricane',
+            self::Coastal => 'fas-umbrella-beach',
+            self::Marine => 'fas-ship',
+            self::NonMeteorologicalHazardsAndAdministrativeMessages => 'fas-house-tsunami',
+            self::OtherForecastsOutlooksDiscussionsAndReports, self::AirportRelated => null,
+        };
+    }
 }

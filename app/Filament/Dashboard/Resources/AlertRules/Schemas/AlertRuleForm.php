@@ -273,6 +273,7 @@ class AlertRuleForm
                 }
 
                 return Section::make($category->label())
+                    ->icon($category->icon())
                     ->collapsible()
                     ->collapsed(fn (Get $get): bool => $category !== ProductCategory::TornadoAndSevereThunderstorm
                         && self::selectedProductIds($get, $fieldName) === [])
