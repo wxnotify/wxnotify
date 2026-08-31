@@ -229,6 +229,12 @@ class AlertRuleForm
      * needing the flat list of selected IDs (risk_levels above, and the
      * Create/Edit pages' pivot sync) use selectedProductIds()/flattening.
      *
+     * Sections start collapsed unless they already hold a selection (so
+     * editing an existing rule doesn't hide what's checked), except Tornado
+     * and Severe Thunderstorm, which always starts expanded — it's the most
+     * commonly used category, so it shouldn't need an extra click on a
+     * fresh Create.
+     *
      * @return array<Section>
      */
     protected static function productSections(Builder $query): array
@@ -268,7 +274,8 @@ class AlertRuleForm
 
                 return Section::make($category->label())
                     ->collapsible()
-                    ->collapsed(fn (Get $get): bool => self::selectedProductIds($get, $fieldName) === [])
+                    ->collapsed(fn (Get $get): bool => $category !== ProductCategory::TornadoAndSevereThunderstorm
+                        && self::selectedProductIds($get, $fieldName) === [])
                     ->schema([$toggleList]);
             })
             ->all();
