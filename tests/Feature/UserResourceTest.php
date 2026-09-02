@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Admin\Resources\Users\Pages\EditUser;
+use App\Filament\Admin\Resources\Users\Pages\ListUsers;
 use App\Filament\Admin\Resources\Users\RelationManagers\LocationsRelationManager;
 use App\Models\Location;
 use App\Models\User;
@@ -64,4 +65,20 @@ test('a subscriber can be impersonated', function () {
     $subscriber = User::factory()->create();
 
     expect($subscriber->canBeImpersonated())->toBeTrue();
+});
+
+test('staff can delete a subscriber', function () {
+    $subscriber = User::factory()->create();
+
+    livewire(ListUsers::class)
+        ->callTableAction('delete', $subscriber);
+
+    expect(User::find($subscriber->id))->toBeNull();
+});
+
+test('staff cannot delete their own account', function () {
+    livewire(ListUsers::class)
+        ->assertTableActionHidden('delete', $this->staff);
+
+    expect(User::find($this->staff->id))->not->toBeNull();
 });

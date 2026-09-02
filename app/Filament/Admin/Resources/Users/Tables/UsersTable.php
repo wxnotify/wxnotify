@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources\Users\Tables;
 
 use App\Enums\Tier;
 use App\Models\User;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -50,6 +51,11 @@ class UsersTable
             ->recordActions([
                 EditAction::make(),
                 Impersonate::make()->redirectTo('/dashboard'),
+                // A staff member can't delete their own account — self-delete
+                // would leave them locked out of /admin (canAccessPanel gates
+                // on is_staff) with no in-app path back in.
+                DeleteAction::make()
+                    ->visible(fn (User $record): bool => $record->isNot(auth()->user())),
             ]);
     }
 }
