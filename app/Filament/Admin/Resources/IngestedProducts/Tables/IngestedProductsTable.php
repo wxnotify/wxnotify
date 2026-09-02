@@ -23,6 +23,7 @@ class IngestedProductsTable
                     ->sortable()
                     ->formatStateUsing(fn (?string $state): string => $state ?? '—'),
                 TextColumn::make('ttaaii')
+                    ->label('TTAAII')
                     ->searchable()
                     ->toggleable(),
                 TextColumn::make('awipsid')

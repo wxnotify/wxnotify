@@ -13,7 +13,7 @@ class IngestedProductInfolist
             ->columns(1)
             ->components([
                 TextEntry::make('cccc')->label('Office')->formatStateUsing(fn (?string $state): string => $state ?? '—'),
-                TextEntry::make('ttaaii')->formatStateUsing(fn (?string $state): string => $state ?? '—'),
+                TextEntry::make('ttaaii')->label('TTAAII')->formatStateUsing(fn (?string $state): string => $state ?? '—'),
                 TextEntry::make('awipsid')->label('AWIPS ID')->formatStateUsing(fn (?string $state): string => $state ?? '—'),
                 TextEntry::make('wmo_ddhhmm')->label('Issued (DDHHMM)')->formatStateUsing(fn (?string $state): string => $state ?? '—'),
                 TextEntry::make('received_at')->dateTime(),
