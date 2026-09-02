@@ -34,6 +34,13 @@ class IngestedProduct extends Model
      * doesn't match the expected shape — an unparseable filename still gets
      * ingested with its raw text, just without decoded metadata.
      *
+     * cccc/ttaaii/awipsid may theoretically contain '.', '_', or '-' since
+     * the upstream Go client's sanitizeID() doesn't strip those — real-world
+     * NWS product identifiers never do, so this is accepted as a non-issue
+     * in practice, not silently guaranteed by this regex. If one of them
+     * ever did, the greedy pattern below would silently mis-split the three
+     * fields rather than fail.
+     *
      * @return array{cccc: ?string, ttaaii: ?string, awipsid: ?string, wmo_ddhhmm: ?string, nwws_id: ?string}
      */
     public static function parseFilename(string $filename): array

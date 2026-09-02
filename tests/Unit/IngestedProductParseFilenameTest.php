@@ -43,3 +43,15 @@ test('handles an nwws_id containing dots and hyphens, since only the delimiters 
 
     expect($result['nwws_id'])->toBe('nwws.processor-0000');
 });
+
+test('pins the current greedy mis-split when cccc contains an underscore, since this is undetectable and unfixed by design', function () {
+    $result = IngestedProduct::parseFilename('kk_ci_ftus21-tafkord.221432_1.txt');
+
+    expect($result)->toBe([
+        'cccc' => 'kk_ci',
+        'ttaaii' => 'ftus21',
+        'awipsid' => 'tafkord',
+        'wmo_ddhhmm' => '221432',
+        'nwws_id' => '1',
+    ]);
+});
