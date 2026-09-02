@@ -7,7 +7,7 @@ set -eu
 # configured products root, not as an absolute filesystem path.
 path="${1#/products/}"
 
-curl -sf -X POST "http://laravel.test/api/pipeline/nwws-products" \
+curl -sS -f --max-time 10 -X POST "http://laravel.test/api/pipeline/nwws-products" \
     -H "Authorization: Bearer ${PIPELINE_WEBHOOK_TOKEN}" \
     -H "Content-Type: application/json" \
     -d "{\"path\":\"${path}\"}"

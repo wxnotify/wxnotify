@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+node_modules
+vendor
+storage/logs
+storage/framework
+storage/debugbar
+.env
+.env.example
+.worktrees
+docs
+tests
+public/hot
+npm-debug.log
