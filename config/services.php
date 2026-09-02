@@ -52,4 +52,9 @@ return [
         'identity_secret' => env('CHATWOOT_IDENTITY_SECRET'),
     ],
 
+    'pipeline' => [
+        'webhook_token' => env('PIPELINE_WEBHOOK_TOKEN'),
+        'products_path' => env('PIPELINE_PRODUCTS_PATH', '/products'),
+    ],
+
 ];
