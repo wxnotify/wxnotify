@@ -21,9 +21,15 @@ services:
         volumes:
             - '.:/var/www/html'
             - 'nwws-products:/products'
-            # Unused by the current nwws service; prepped for a later feature that
-            # controls pipeline containers (start/stop/restart) via the Docker Engine API.
+            # Used by DockerEngineClient (app/Support/Pipeline) to start/stop/restart
+            # pipeline containers from the admin Pipeline Control page.
             - '/var/run/docker.sock:/var/run/docker.sock'
+        # Docker Desktop exposes the socket inside the container as root:root,
+        # mode 0660 — the app runs as the unprivileged `sail` user, so it needs
+        # group 0 (root) added as a supplementary group to read/write the socket.
+        # This is a container-local group membership, not host root access.
+        group_add:
+            - '0'
         networks:
             - sail
         depends_on:
