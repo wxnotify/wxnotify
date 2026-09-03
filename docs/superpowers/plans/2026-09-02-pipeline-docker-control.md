@@ -478,11 +478,155 @@ The full-suite run must show every test passing (Task 1's `DockerEngineClientTes
 
 ---
 
+## Task 3: `docker-socket-proxy` sidecar (added mid-implementation — see rationale below)
+
+**Why this task exists, not in the original plan:** Final Verification's real end-to-end check (see below) found that `laravel.test`'s actual web-serving process (`php artisan serve`, run as the unprivileged `sail` user via Sail's `gosu`-based entrypoint) cannot reach `/var/run/docker.sock` even after adding `group_add: ['0']` to `compose.yaml` — confirmed via direct evidence, not guessed: `docker exec --user sail ... id` shows group 0 present (a *fresh* `docker exec` does inherit Compose's `group_add`), but the actual long-running `artisan serve` process (PID 16, checked via `cat /proc/16/status`) only has group 20 — because Sail's entrypoint (`gosu $WWWUSER "$@"`) resets the process's supplementary groups from `/etc/group`'s static membership when dropping from root to `sail`, discarding whatever Docker's `group_add` added at the container-credential level. `group_add` and `docker exec --user` both bypass `/etc/group`; `gosu` does not.
+
+Two other options were considered and rejected: running the whole app as root inside the container (broadens the app's privilege far beyond what this one feature needs), and editing the sail user's `/etc/group` membership at build time via the *vendored* `laravel/sail` Dockerfile (fragile — gets silently discarded on `composer update laravel/sail`).
+
+Instead: add `tecnativa/docker-socket-proxy`, a small, purpose-built proxy container. It mounts the real socket itself (as its own minimal, single-purpose image — not `laravel.test`), and exposes a *restricted* plain-HTTP API over the internal `sail` network. `DockerEngineClient` talks to the proxy over the network instead of the raw socket — no unix-socket curl option, no container user/group permission juggling at all. This is exactly the "socket-proxy restricted to this one container's lifecycle operations" hardening step the original design doc (`docs/pipeline-nwws-filament-blueprint.md`, section 3, per-scoping-decision #3) already flagged as deferred production hardening — implementing it now to unblock verification also happens to satisfy that deferred item, not scope creep for its own sake.
+
+The proxy is configured with the minimum surface this feature needs: container inspect (`CONTAINERS=1`) and exactly three write actions (`ALLOW_START=1`/`ALLOW_STOP=1`/`ALLOW_RESTARTS=1`, gated by the global `POST=1` toggle) — no images, networks, volumes, exec, build, swarm, or anything else. This is *not* scoped to the single container name `wxnotify-nwws` specifically (the proxy image doesn't support per-container-name scoping, only per-resource-type/per-action), so in principle it could start/stop/restart any container on the host, not just this one — `DockerEngineClient` itself still only ever calls it with the fixed name `'wxnotify-nwws'`, so no *feature* exposes broader control, but this is worth knowing if the threat model here ever gets more adversarial than "trusted staff clicking a button."
+
+**Files:**
+- Modify: `compose.yaml` (add the proxy service, remove `laravel.test`'s socket bind-mount + `group_add`)
+- Modify: `app/Support/Pipeline/DockerEngineClient.php`
+- Modify: `config/services.php`
+- Modify: `.env.example`
+- Modify: `tests/Feature/DockerEngineClientTest.php` (fake URLs change host)
+
+- [ ] **Step 1: Add the proxy service to `compose.yaml`, remove the direct socket mount from `laravel.test`**
+
+Add a new service (place it alongside `nwws`/`queue`, matching the file's existing ordering/indentation style):
+
+```yaml
+    docker-socket-proxy:
+        image: tecnativa/docker-socket-proxy:0.2.0
+        container_name: wxnotify-docker-socket-proxy
+        environment:
+            CONTAINERS: 1
+            ALLOW_START: 1
+            ALLOW_STOP: 1
+            ALLOW_RESTARTS: 1
+            POST: 1
+            AUTH: 0
+            BUILD: 0
+            COMMIT: 0
+            CONFIGS: 0
+            DISTRIBUTION: 0
+            EXEC: 0
+            IMAGES: 0
+            NETWORKS: 0
+            NODES: 0
+            PLUGINS: 0
+            SECRETS: 0
+            SERVICES: 0
+            SESSION: 0
+            SWARM: 0
+            SYSTEM: 0
+            TASKS: 0
+            VOLUMES: 0
+        volumes:
+            - '/var/run/docker.sock:/var/run/docker.sock:ro'
+        networks:
+            - sail
+        restart: unless-stopped
+```
+
+In `laravel.test`'s service definition, remove these (added in the now-superseded direct-socket-access attempt):
+- The `- '/var/run/docker.sock:/var/run/docker.sock'` volume line (and its explanatory comment).
+- The `group_add: ['0']` key and its explanatory comment.
+
+`laravel.test` needs no other change — it can already reach `docker-socket-proxy` by service name over the existing `sail` network with no extra config.
+
+- [ ] **Step 2: Update `DockerEngineClient` to talk to the proxy over HTTP instead of the raw socket**
+
+Read the current file first — it was hardened in an earlier fix (config-driven socket path, 5s timeout, safe status parsing); keep all of that, only change how the request is transported.
+
+Replace the `request()` method and the config key it reads:
+
+```php
+private function request(string $method, string $path): Response
+{
+    return Http::baseUrl(config('services.docker.proxy_url'))
+        ->timeout(5)
+        ->{$method}('/'.self::API_VERSION.$path);
+}
+```
+
+Remove the now-unused `CURLOPT_UNIX_SOCKET_PATH` import/option entirely — there is no more curl-specific socket option, this is a plain HTTP call.
+
+- [ ] **Step 3: Update `config/services.php`**
+
+Replace the `docker.socket_path` key with `docker.proxy_url`:
+
+```php
+    'docker' => [
+        'proxy_url' => env('DOCKER_PROXY_URL', 'http://docker-socket-proxy:2375'),
+    ],
+```
+
+- [ ] **Step 4: Update `.env.example`**
+
+Replace the `DOCKER_SOCKET_PATH=/var/run/docker.sock` line with:
+
+```
+DOCKER_PROXY_URL=http://docker-socket-proxy:2375
+```
+
+- [ ] **Step 5: Update the fake URLs in `tests/Feature/DockerEngineClientTest.php`**
+
+All 9 existing `Http::fake([...])` calls key on `'localhost/v1.43/containers/wxnotify-nwws/...'` — since requests now go to `docker-socket-proxy:2375` instead of `localhost`, update every occurrence of `'localhost/v1.43/'` to `'docker-socket-proxy:2375/v1.43/'` (a straightforward find-and-replace across the file; the path portion after that host doesn't change). Also update the two `str_contains($request->url(), '/containers/wxnotify-nwws/start')`-style assertions if any hardcode `localhost` (check — they may only check the path suffix, which wouldn't need to change).
+
+- [ ] **Step 6: Bring up the new service, rebuild, run tests**
+
+```bash
+docker compose up -d docker-socket-proxy
+docker compose up -d laravel.test
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/DockerEngineClientTest.php --compact"
+```
+
+Expected: `Tests: 9 passed` (same count as before — this task changes *how* the client connects, not its test count).
+
+- [ ] **Step 7: Confirm the proxy actually works against the real container**
+
+```bash
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "curl -s http://docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json | head -c 200"
+```
+
+Expected: real JSON starting with something like `{"Id":"...`, not a connection error. This confirms `laravel.test` (as the unprivileged `sail` user, no special groups needed) can reach the proxy, and the proxy can reach the real socket.
+
+- [ ] **Step 8: Pint, full suite, commit**
+
+```bash
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent && vendor/bin/pest --compact"
+git add compose.yaml app/Support/Pipeline/DockerEngineClient.php config/services.php .env.example tests/Feature/DockerEngineClientTest.php
+git commit -m "Route Docker control through a socket proxy, not a raw bind mount
+
+Sail's entrypoint drops laravel.test from root to the unprivileged
+sail user via gosu, which resets supplementary groups from /etc/group
+— Compose's group_add doesn't survive that, so the app process could
+never actually reach a directly bind-mounted /var/run/docker.sock no
+matter how the mount/group config was tuned (confirmed via
+/proc/<pid>/status on the real running process, not guessed).
+
+Replaces the direct bind mount with a tecnativa/docker-socket-proxy
+sidecar, scoped to exactly what this feature needs (container inspect
++ start/stop/restart, nothing else) — this also happens to be the
+socket-proxy hardening step the original design doc already flagged
+as deferred production work.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+```
+
+The full-suite run must show every test passing.
+
+---
+
 ## Final Verification
 
 - [ ] Full Pest suite passes: `docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest --compact"`
 - [ ] Pint clean: `docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"`
 - [ ] `php artisan route:list` unaffected (this plan adds no routes — sanity check only, expect no diff in `/admin/pipeline-control`'s existing route).
-- [ ] **Real end-to-end check against the actual `wxnotify-nwws` container** (it should already be running live from Plan 1's verification): as a seeded staff user in the browser, confirm `/admin/pipeline-control`'s NWWS row shows a real "Running" badge, click Stop and confirm via `docker ps`/`docker compose logs nwws` that the container actually stopped and the badge updates to a non-running color, click Start and confirm it's running again, click Restart (confirm the modal appears) and confirm the container's start time changes.
-  - **Known risk to check for, not to pre-fix speculatively**: `laravel.test`'s container may not have permission to read/write `/var/run/docker.sock` depending on the host's socket ownership/permissions and which user Sail's `www` user maps to. If the first real click in this step fails with a connection/permission error (not a 404 or a normal Docker API error body), diagnose the actual permission error before doing anything — check `docker exec wxnotify-dashboard-laravel.test-1 ls -la /var/run/docker.sock` and compare against the container's running user (`docker exec wxnotify-dashboard-laravel.test-1 id`). Don't guess a fix (e.g. blindly `chmod 666` the host socket) before confirming this is actually the failure mode.
+- [ ] **Real end-to-end check against the actual `wxnotify-nwws` container**, now that Task 3's proxy is in place: as a seeded staff user in the browser, confirm `/admin/pipeline-control`'s NWWS row shows a real "Running" badge, click Stop and confirm via `docker ps`/`docker compose logs nwws` that the container actually stopped and the badge updates to a non-running color, click Start and confirm it's running again, click Restart (confirm the modal appears) and confirm the container's start time changes.
 - [ ] `import/nwws-go-client/` — no change from this plan; still the user's call whether to delete it.
