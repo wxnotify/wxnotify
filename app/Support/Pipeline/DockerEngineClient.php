@@ -7,9 +7,11 @@ use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 /**
- * Talks to the local Docker Engine API over the host's unix socket
- * (bind-mounted into this container — see compose.yaml) to control one
- * fixed, known sidecar container. Not a general-purpose Docker client.
+ * Talks to the local Docker Engine API through a docker-socket-proxy
+ * sidecar (see compose.yaml) that mounts the real socket itself and
+ * exposes a restricted HTTP API — laravel.test never touches the raw
+ * socket directly. Controls one fixed, known sidecar container. Not a
+ * general-purpose Docker client.
  */
 class DockerEngineClient
 {

@@ -23,6 +23,7 @@ services:
             - 'nwws-products:/products'
         networks:
             - sail
+            - docker-proxy
         depends_on:
             - pgsql
             - redis
@@ -68,7 +69,7 @@ services:
         depends_on:
             - laravel.test
     docker-socket-proxy:
-        image: tecnativa/docker-socket-proxy:0.2.0
+        image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
         container_name: wxnotify-docker-socket-proxy
         environment:
             CONTAINERS: 1
@@ -96,7 +97,7 @@ services:
         volumes:
             - '/var/run/docker.sock:/var/run/docker.sock:ro'
         networks:
-            - sail
+            - docker-proxy
         restart: unless-stopped
     pgsql:
         image: 'postgres:18-alpine'
@@ -175,6 +176,9 @@ services:
 networks:
     sail:
         driver: bridge
+    docker-proxy:
+        driver: bridge
+        internal: true
 volumes:
     sail-pgsql:
         driver: local
