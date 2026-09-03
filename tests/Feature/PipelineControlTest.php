@@ -109,6 +109,16 @@ test('the page degrades gracefully when the docker status check fails', function
         ->assertActionHidden('stop');
 });
 
+test('the hidden action is genuinely absent from the rendered page, not just disabled', function () {
+    Http::fake([
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+    ]);
+
+    livewire(PipelineControl::class)
+        ->assertDontSeeHtml("mountAction('start')")
+        ->assertSeeHtml("mountAction('stop')");
+});
+
 test('the emwin rows remain static placeholders', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),

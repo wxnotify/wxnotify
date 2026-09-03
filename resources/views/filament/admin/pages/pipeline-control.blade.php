@@ -8,8 +8,12 @@
                 </x-filament::badge>
             </div>
             <div class="flex items-center gap-2">
-                {{ $this->startAction }}
-                {{ $this->stopAction }}
+                @if ($this->startAction->isVisible())
+                    {{ $this->startAction }}
+                @endif
+                @if ($this->stopAction->isVisible())
+                    {{ $this->stopAction }}
+                @endif
                 {{ $this->restartAction }}
             </div>
         </div>
