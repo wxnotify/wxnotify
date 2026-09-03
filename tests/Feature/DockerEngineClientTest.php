@@ -3,6 +3,7 @@
 use App\Support\Pipeline\DockerEngineClient;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 
 test('status returns the container state when the container exists', function () {
     Http::fake([
@@ -67,4 +68,20 @@ test('start throws when the docker daemon returns an error', function () {
     ]);
 
     (new DockerEngineClient)->start('wxnotify-nwws');
+})->throws(RequestException::class);
+
+test('status throws a clear error when the docker response is missing a usable status', function () {
+    Http::fake([
+        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => []], 200),
+    ]);
+
+    (new DockerEngineClient)->status('wxnotify-nwws');
+})->throws(RuntimeException::class);
+
+test('stop throws when the docker daemon returns an error', function () {
+    Http::fake([
+        'localhost/v1.43/containers/wxnotify-nwws/stop' => Http::response([], 500),
+    ]);
+
+    (new DockerEngineClient)->stop('wxnotify-nwws');
 })->throws(RequestException::class);

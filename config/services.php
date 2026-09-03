@@ -57,4 +57,8 @@ return [
         'products_path' => env('PIPELINE_PRODUCTS_PATH', '/products'),
     ],
 
+    'docker' => [
+        'socket_path' => env('DOCKER_SOCKET_PATH', '/var/run/docker.sock'),
+    ],
+
 ];
