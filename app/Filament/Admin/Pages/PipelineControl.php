@@ -23,9 +23,20 @@ class PipelineControl extends Page
 
     private const NWWS_CONTAINER = 'wxnotify-nwws';
 
+    private ?string $nwwsStatusCache = null;
+
     public function nwwsStatus(): string
     {
-        return app(DockerEngineClient::class)->status(self::NWWS_CONTAINER);
+        return $this->nwwsStatusCache ??= $this->resolveNwwsStatus();
+    }
+
+    private function resolveNwwsStatus(): string
+    {
+        try {
+            return app(DockerEngineClient::class)->status(self::NWWS_CONTAINER);
+        } catch (Throwable) {
+            return 'unknown';
+        }
     }
 
     public function nwwsStatusColor(): string
@@ -60,6 +71,8 @@ class PipelineControl extends Page
         return Action::make('stop')
             ->label('Stop')
             ->color('danger')
+            ->requiresConfirmation()
+            ->modalDescription('This stops the live NWWS-OI feed connection until it is started again.')
             ->visible(fn (): bool => $this->nwwsStatus() === 'running')
             ->action(fn () => $this->runDockerAction('stop', fn () => app(DockerEngineClient::class)->stop(self::NWWS_CONTAINER)));
     }

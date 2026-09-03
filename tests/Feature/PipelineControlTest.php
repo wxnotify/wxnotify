@@ -72,6 +72,43 @@ test('a failed docker call shows a failure notification instead of erroring', fu
         ->assertNotified('Failed to start NWWS');
 });
 
+test('calling the stop action stops the nwws container and notifies success', function () {
+    Http::fake([
+        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'localhost/v1.43/containers/wxnotify-nwws/stop' => Http::response('', 204),
+    ]);
+
+    livewire(PipelineControl::class)
+        ->callAction('stop')
+        ->assertNotified('NWWS stop succeeded');
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_contains($request->url(), '/containers/wxnotify-nwws/stop'));
+});
+
+test('a failed stop shows a failure notification instead of erroring', function () {
+    Http::fake([
+        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'localhost/v1.43/containers/wxnotify-nwws/stop' => Http::response([], 500),
+    ]);
+
+    livewire(PipelineControl::class)
+        ->callAction('stop')
+        ->assertNotified('Failed to stop NWWS');
+});
+
+test('the page degrades gracefully when the docker status check fails', function () {
+    Http::fake([
+        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => []], 200),
+    ]);
+
+    livewire(PipelineControl::class)
+        ->assertSuccessful()
+        ->assertSee('Unknown')
+        ->assertActionVisible('start')
+        ->assertActionHidden('stop');
+});
+
 test('the emwin rows remain static placeholders', function () {
     Http::fake([
         'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
