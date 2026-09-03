@@ -15,7 +15,7 @@ beforeEach(function () {
 
 test('the start action is visible and the stop action is hidden when nwws is not running', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
     ]);
 
     livewire(PipelineControl::class)
@@ -25,7 +25,7 @@ test('the start action is visible and the stop action is hidden when nwws is not
 
 test('the stop action is visible and the start action is hidden when nwws is running', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
     ]);
 
     livewire(PipelineControl::class)
@@ -35,8 +35,8 @@ test('the stop action is visible and the start action is hidden when nwws is run
 
 test('calling the start action starts the nwws container and notifies success', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
-        'localhost/v1.43/containers/wxnotify-nwws/start' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/start' => Http::response('', 204),
     ]);
 
     livewire(PipelineControl::class)
@@ -49,8 +49,8 @@ test('calling the start action starts the nwws container and notifies success', 
 
 test('calling the restart action restarts the nwws container and notifies success', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'localhost/v1.43/containers/wxnotify-nwws/restart' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/restart' => Http::response('', 204),
     ]);
 
     livewire(PipelineControl::class)
@@ -63,8 +63,8 @@ test('calling the restart action restarts the nwws container and notifies succes
 
 test('a failed docker call shows a failure notification instead of erroring', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
-        'localhost/v1.43/containers/wxnotify-nwws/start' => Http::response([], 500),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/start' => Http::response([], 500),
     ]);
 
     livewire(PipelineControl::class)
@@ -74,8 +74,8 @@ test('a failed docker call shows a failure notification instead of erroring', fu
 
 test('calling the stop action stops the nwws container and notifies success', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'localhost/v1.43/containers/wxnotify-nwws/stop' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/stop' => Http::response('', 204),
     ]);
 
     livewire(PipelineControl::class)
@@ -88,8 +88,8 @@ test('calling the stop action stops the nwws container and notifies success', fu
 
 test('a failed stop shows a failure notification instead of erroring', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'localhost/v1.43/containers/wxnotify-nwws/stop' => Http::response([], 500),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/stop' => Http::response([], 500),
     ]);
 
     livewire(PipelineControl::class)
@@ -99,7 +99,7 @@ test('a failed stop shows a failure notification instead of erroring', function 
 
 test('the page degrades gracefully when the docker status check fails', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => []], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => []], 200),
     ]);
 
     livewire(PipelineControl::class)
@@ -111,7 +111,7 @@ test('the page degrades gracefully when the docker status check fails', function
 
 test('the emwin rows remain static placeholders', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
     ]);
 
     livewire(PipelineControl::class)

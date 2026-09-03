@@ -58,7 +58,7 @@ return [
     ],
 
     'docker' => [
-        'socket_path' => env('DOCKER_SOCKET_PATH', '/var/run/docker.sock'),
+        'proxy_url' => env('DOCKER_PROXY_URL', 'http://docker-socket-proxy:2375'),
     ],
 
 ];

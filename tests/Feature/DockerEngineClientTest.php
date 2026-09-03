@@ -7,7 +7,7 @@ use RuntimeException;
 
 test('status returns the container state when the container exists', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
     ]);
 
     expect((new DockerEngineClient)->status('wxnotify-nwws'))->toBe('running');
@@ -15,7 +15,7 @@ test('status returns the container state when the container exists', function ()
 
 test('status returns not_found when the container does not exist', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response([], 404),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response([], 404),
     ]);
 
     expect((new DockerEngineClient)->status('wxnotify-nwws'))->toBe('not_found');
@@ -23,7 +23,7 @@ test('status returns not_found when the container does not exist', function () {
 
 test('status throws when the docker daemon returns an unexpected error', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response([], 500),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response([], 500),
     ]);
 
     (new DockerEngineClient)->status('wxnotify-nwws');
@@ -31,7 +31,7 @@ test('status throws when the docker daemon returns an unexpected error', functio
 
 test('start posts to the start endpoint', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/start' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/start' => Http::response('', 204),
     ]);
 
     (new DockerEngineClient)->start('wxnotify-nwws');
@@ -42,7 +42,7 @@ test('start posts to the start endpoint', function () {
 
 test('stop posts to the stop endpoint', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/stop' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/stop' => Http::response('', 204),
     ]);
 
     (new DockerEngineClient)->stop('wxnotify-nwws');
@@ -53,7 +53,7 @@ test('stop posts to the stop endpoint', function () {
 
 test('restart posts to the restart endpoint', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/restart' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/restart' => Http::response('', 204),
     ]);
 
     (new DockerEngineClient)->restart('wxnotify-nwws');
@@ -64,7 +64,7 @@ test('restart posts to the restart endpoint', function () {
 
 test('start throws when the docker daemon returns an error', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/start' => Http::response([], 500),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/start' => Http::response([], 500),
     ]);
 
     (new DockerEngineClient)->start('wxnotify-nwws');
@@ -72,7 +72,7 @@ test('start throws when the docker daemon returns an error', function () {
 
 test('status throws a clear error when the docker response is missing a usable status', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => []], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => []], 200),
     ]);
 
     (new DockerEngineClient)->status('wxnotify-nwws');
@@ -80,7 +80,7 @@ test('status throws a clear error when the docker response is missing a usable s
 
 test('stop throws when the docker daemon returns an error', function () {
     Http::fake([
-        'localhost/v1.43/containers/wxnotify-nwws/stop' => Http::response([], 500),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/stop' => Http::response([], 500),
     ]);
 
     (new DockerEngineClient)->stop('wxnotify-nwws');

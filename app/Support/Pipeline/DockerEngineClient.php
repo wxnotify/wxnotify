@@ -17,9 +17,9 @@ class DockerEngineClient
 
     private function request(string $method, string $path): Response
     {
-        return Http::timeout(5)
-            ->withOptions(['curl' => [CURLOPT_UNIX_SOCKET_PATH => config('services.docker.socket_path')]])
-            ->{$method}('http://localhost/'.self::API_VERSION.$path);
+        return Http::baseUrl(config('services.docker.proxy_url'))
+            ->timeout(5)
+            ->{$method}('/'.self::API_VERSION.$path);
     }
 
     /**
