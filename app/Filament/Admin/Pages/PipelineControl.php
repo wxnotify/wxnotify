@@ -92,6 +92,12 @@ class PipelineControl extends Page
         try {
             $callback();
 
+            // The action's own ->visible() closures already populated the
+            // per-request status cache from before this call ran (Filament
+            // re-checks visibility as part of authorizing the action) — the
+            // subsequent re-render needs a fresh read, not that stale value.
+            $this->nwwsStatusCache = null;
+
             Notification::make()
                 ->title("NWWS {$verb} succeeded")
                 ->success()

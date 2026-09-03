@@ -109,6 +109,21 @@ test('the page degrades gracefully when the docker status check fails', function
         ->assertActionHidden('stop');
 });
 
+test('the status shown after a successful action reflects the new state, not a stale cached read', function () {
+    Http::fake([
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::sequence()
+            ->push(['State' => ['Status' => 'running']], 200)
+            ->push(['State' => ['Status' => 'exited']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/stop' => Http::response('', 204),
+    ]);
+
+    livewire(PipelineControl::class)
+        ->callAction('stop')
+        ->assertSee('Exited')
+        ->assertActionVisible('start')
+        ->assertActionHidden('stop');
+});
+
 test('the hidden action is genuinely absent from the rendered page, not just disabled', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
