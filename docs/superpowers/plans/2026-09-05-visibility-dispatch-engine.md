@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make `ActivityAlertRule` actually fire — a real-time engine that watches for 14 of the 23 `ActivityAlertType` cases (the ones with a genuine signal today) and dispatches a queued Apprise notification per matching active rule.
+**Goal:** Make `ActivityAlertRule` actually fire — a real-time engine that watches for 17 of the 23 `ActivityAlertType` cases (the ones with a genuine signal today) and dispatches a queued Apprise notification per matching active rule.
 
 **Architecture:** Three signal sources (a Laravel auth-event subscriber for sign-in/out/registration; an Eloquent observer on `User` for name/email/password/MFA-secret changes and deletion; an Eloquent observer on Spatie's `Activity` model reacting to already-logged `AlertRule`/`Location`/`NotificationChannel` CRUD) all call one shared action that queries active `ActivityAlertRule`s and dispatches one queued job per match. The job calls the existing `AppriseApiClient`.
 
@@ -12,7 +12,7 @@
 
 ## Context (read this first — do not re-derive)
 
-This implements the dispatch half of `docs/admin-tools-filament-blueprint.md`'s "Visibility" tool. The config surface (`ActivityAlertRuleResource`, the `ActivityAlertRule` model + migration + `activity_alert_rule_user` pivot, `App\Enums\ActivityAlertType`, `App\Enums\ActivityAlertScope`) already exists and is fully working — this plan adds nothing to that surface except updating one notice string (Task 6). The full design rationale, including why 9 of 23 enum cases are deliberately left unreachable and three specific technical findings (properties-snapshot structure on Spatie deletion events, the `NotificationChannel` `logOnly` gap, the Google-SSO `Registered`-event gap), is in `docs/superpowers/specs/2026-09-05-visibility-dispatch-engine-design.md` — read it if anything below needs more rationale than what's repeated here.
+This implements the dispatch half of `docs/admin-tools-filament-blueprint.md`'s "Visibility" tool. The config surface (`ActivityAlertRuleResource`, the `ActivityAlertRule` model + migration + `activity_alert_rule_user` pivot, `App\Enums\ActivityAlertType`, `App\Enums\ActivityAlertScope`) already exists and is fully working — this plan adds nothing to that surface except updating one notice string (Task 6). The full design rationale, including why 6 of 23 enum cases are deliberately left unreachable and three specific technical findings (properties-snapshot structure on Spatie deletion events, the `NotificationChannel` `logOnly` gap, the Google-SSO `Registered`-event gap), is in `docs/superpowers/specs/2026-09-05-visibility-dispatch-engine-design.md` — read it if anything below needs more rationale than what's repeated here.
 
 **Key facts already verified, don't re-verify:**
 - `User::getActivitylogOptions()` only logs `['is_staff', 'tier_override', 'tier_override_reason']` — the existing `activity_log` rows for `User` are useless for this feature (different concern, the staff Audit Log). Name/email/password/MFA changes need their own dedicated observer.
@@ -1016,7 +1016,7 @@ signups but likely miss SSO ones.
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```
 
-The full-suite run must show every test passing. This is also the last task that adds new dispatch logic — after this, all 14 real `ActivityAlertType` cases are wired.
+The full-suite run must show every test passing. This is also the last task that adds new dispatch logic — after this, all 17 real `ActivityAlertType` cases are wired.
 
 ---
 
@@ -1076,7 +1076,7 @@ docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vend
 git add app/Filament/Admin/Resources/ActivityAlertRules/Pages/ListActivityAlertRules.php tests/Feature/ActivityAlertRuleResourceTest.php
 git commit -m "Name the still-inert activity types on the Activity Alert Rules list
 
-Now that dispatch is live for 14 of 23 types, the blanket 'not yet
+Now that dispatch is live for 17 of 23 types, the blanket 'not yet
 enforced' notice would be actively misleading. Names the four still
 waiting on features that don't exist (Schedule, product-list pivot
 logging, settings, Daily Forecast).
