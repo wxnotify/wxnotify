@@ -100,6 +100,34 @@ test('creating a nationwide weather alerts rule does not require a location', fu
         ->and($rule->location_id)->toBeNull();
 });
 
+test('a corrupted product_ids shape is rejected by validation instead of crashing or silently creating an empty rule', function () {
+    // Regression: a real browser session hit a Livewire quirk where a
+    // dynamically-appearing ToggleList field (only entering the schema
+    // after `category` is picked — see
+    // AlertRuleForm::seedProductIdsDefaults()'s docblock) started out
+    // `null` instead of `[]`, causing the checkbox to bind as a single
+    // boolean rather than a checkbox-group array. This reproduces the
+    // exact corrupted shape captured from that real network request —
+    // one touched category holding `true`, untouched siblings holding
+    // `null` — and confirms it's now caught by validation, not left to
+    // crash sync() with a Postgres bigint cast error on an empty string.
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            'product_ids' => [
+                'tornado_and_severe_thunderstorm' => true,
+                'flooding_and_hydrological' => null,
+                'winter_weather' => null,
+            ],
+            'matching_mode' => 'nationwide',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors();
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+});
+
 test('a weather alerts rule can select products outside the graduated warning/watch/advisory/statement families', function () {
     // Regression: the product-picker sections used to filter by family
     // (warning/watch/advisory/statement only), which silently excluded

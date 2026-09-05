@@ -65,8 +65,35 @@ class AlertRuleForm
                     ->options(collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [$c->value => $c->label()]))
                     ->descriptions(collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [$c->value => $c->description()]))
                     ->required()
-                    ->live(),
+                    ->live()
+                    ->afterStateUpdated(self::seedProductIdsDefaults(...)),
             ]);
+    }
+
+    /**
+     * `product_ids.{category}` fields only enter the schema once `category`
+     * is picked (detailsStep()'s schema is a `fn (Get $get) => match(...)`
+     * closure) — they don't exist at the wizard's initial mount, so
+     * Filament's normal fill()-time default() application never runs for
+     * them. Left alone, each starts out `null` rather than `[]` the first
+     * time its ToggleList renders, and multiple checkboxes sharing one
+     * wire:model path whose current value is `null` (not an array) get
+     * bound by Livewire as a single boolean toggle instead of a
+     * checkbox-group array — confirmed via a real browser network capture:
+     * checking one box produced `product_ids.tornado_and_severe_thunderstorm
+     * = true`, not `[<id>]`, with every untouched sibling category left as
+     * `null`. Explicitly seeding every category to a real `[]` here, before
+     * the checkboxes ever render for the first time, fixes the binding at
+     * its source. Guarded on the current value already being `null` so
+     * switching categories back and forth never wipes a real selection.
+     */
+    protected static function seedProductIdsDefaults(Set $set, Get $get): void
+    {
+        foreach (ProductCategory::cases() as $category) {
+            if ($get("product_ids.{$category->value}") === null) {
+                $set("product_ids.{$category->value}", []);
+            }
+        }
     }
 
     protected static function detailsStep(): Step
@@ -288,10 +315,10 @@ class AlertRuleForm
     protected static function selectedProductIds(Get $get, ?string $onlyPath = null): array
     {
         if ($onlyPath !== null) {
-            return collect($get($onlyPath))->values()->all();
+            return collect($get($onlyPath))->filter(fn ($id): bool => is_numeric($id))->values()->all();
         }
 
-        return collect($get('product_ids'))->flatten()->unique()->values()->all();
+        return collect($get('product_ids'))->flatten()->filter(fn ($id): bool => is_numeric($id))->unique()->values()->all();
     }
 
     /**

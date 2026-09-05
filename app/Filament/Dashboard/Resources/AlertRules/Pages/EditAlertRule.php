@@ -44,7 +44,12 @@ class EditAlertRule extends EditRecord
 
     protected function afterSave(): void
     {
-        $this->record->products()->sync(collect($this->data['product_ids'] ?? [])->flatten()->all());
+        // ->filter(is_numeric(...)) is defense-in-depth — see
+        // AlertRuleForm::seedProductIdsDefaults()'s docblock and
+        // CreateAlertRule::afterCreate()'s matching comment for why.
+        $this->record->products()->sync(
+            collect($this->data['product_ids'] ?? [])->flatten()->filter(fn ($id): bool => is_numeric($id))->values()->all()
+        );
         $this->record->notificationChannels()->sync($this->data['channel_ids'] ?? []);
     }
 }
