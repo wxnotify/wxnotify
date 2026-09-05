@@ -66,6 +66,16 @@ class DashboardPanelProvider extends PanelProvider
                 AccountWidget::class,
                 FilamentInfoWidget::class,
             ])
+            ->renderHook(
+                // Registered before ->plugins() below: Filament renders
+                // multiple hooks on the same name in registration order, and
+                // KnowledgeBaseCompanionPlugin registers its own
+                // SIDEBAR_FOOTER hook ("Documentation") the moment
+                // ->plugins() runs. Registering this one first puts "Did You
+                // Know?" above "Documentation" in the sidebar.
+                PanelsRenderHook::SIDEBAR_FOOTER,
+                fn (): View => view('filament.dashboard.did-you-know'),
+            )
             ->plugins([
                 FilamentSocialitePlugin::make()
                     ->providers([
@@ -98,10 +108,6 @@ class DashboardPanelProvider extends PanelProvider
                             ->directory('images/backgrounds/weather_wallpapers')
                     ),
             ])
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_FOOTER,
-                fn (): View => view('filament.dashboard.did-you-know'),
-            )
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): ?string => (auth()->check() && config('wxnotify.mode') === 'cloud')
