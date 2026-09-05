@@ -110,7 +110,11 @@ test('an unrelated field change dispatches nothing, even when every type is conf
     ]);
 
     $user = User::factory()->create();
-    $user->update(['is_staff' => true]);
+    // update() silently discards is_staff (excluded from User's #[Fillable]),
+    // so the updated event would never fire regardless of the observer's
+    // logic — forceFill() is needed to genuinely dirty and save the column
+    // and actually exercise the observer's field-filtering.
+    $user->forceFill(['is_staff' => true])->save();
 
     Queue::assertNotPushed(SendActivityAlert::class);
 });
