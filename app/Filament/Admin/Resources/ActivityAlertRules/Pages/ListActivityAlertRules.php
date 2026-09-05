@@ -23,7 +23,7 @@ class ListActivityAlertRules extends ListRecords
     public function content(Schema $schema): Schema
     {
         return $schema->components([
-            Text::make('Rules are configured but not yet enforced — real-time dispatch requires a separate activity-observer engine, planned separately.')
+            Text::make('Real-time dispatch is live for most activity types below. Schedule changes, product list updates, settings changes, and Daily Forecast enablement are not yet enforced — those need features that don\'t exist in the app yet.')
                 ->color('warning'),
             EmbeddedTable::make(),
         ]);

@@ -15,9 +15,10 @@ beforeEach(function () {
     $this->actingAs($this->staff);
 });
 
-test('the list page shows the not-yet-enforced notice', function () {
+test('the list page discloses which activity types are still not enforced', function () {
     livewire(ListActivityAlertRules::class)
-        ->assertSee('not yet enforced');
+        ->assertSee('not yet enforced')
+        ->assertSee('Schedule changes');
 });
 
 test('a specific_users rule persists its attached users through the pivot', function () {
