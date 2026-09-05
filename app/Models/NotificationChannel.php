@@ -22,7 +22,7 @@ class NotificationChannel extends Model
         // carry webhook secrets/tokens, and activitylog logs the decrypted
         // attribute value into a plain-text properties column.
         return LogOptions::defaults()
-            ->logOnly(['channel_type', 'label', 'verified_at'])
+            ->logOnly(['user_id', 'channel_type', 'label', 'verified_at'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }

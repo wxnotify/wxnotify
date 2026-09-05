@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Observers\ActivityLogObserver;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Support\CauserResolver;
 use STS\FilamentImpersonate\ImpersonateManager;
 
@@ -33,5 +35,7 @@ class AppServiceProvider extends ServiceProvider
                 ? $impersonate->getImpersonator()
                 : auth()->user();
         });
+
+        Activity::observe(ActivityLogObserver::class);
     }
 }
