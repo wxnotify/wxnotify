@@ -8,6 +8,7 @@ use App\Jobs\SendActivityAlert;
 use App\Models\ActivityAlertRule;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Throwable;
 
 class MatchActivityAlertRules
 {
@@ -26,11 +27,17 @@ class MatchActivityAlertRules
                     });
             })
             ->get()
-            ->each(fn (ActivityAlertRule $rule) => SendActivityAlert::dispatch(
-                $rule->id,
-                $type,
-                $user->id,
-                $occurredAt,
-            ));
+            ->each(function (ActivityAlertRule $rule) use ($type, $user, $occurredAt) {
+                try {
+                    SendActivityAlert::dispatch($rule->id, $type, $user->id, $occurredAt);
+                } catch (Throwable $e) {
+                    logger()->error('Failed to dispatch SendActivityAlert', [
+                        'rule_id' => $rule->id,
+                        'type' => $type->value,
+                        'user_id' => $user->id,
+                        'exception' => $e->getMessage(),
+                    ]);
+                }
+            });
     }
 }
