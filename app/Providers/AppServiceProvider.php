@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Listeners\ActivityAlertEventSubscriber;
 use App\Models\User;
 use App\Observers\ActivityLogObserver;
 use App\Observers\UserActivityObserver;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Support\CauserResolver;
@@ -40,5 +42,6 @@ class AppServiceProvider extends ServiceProvider
 
         Activity::observe(ActivityLogObserver::class);
         User::observe(UserActivityObserver::class);
+        Event::subscribe(ActivityAlertEventSubscriber::class);
     }
 }
