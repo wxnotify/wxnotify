@@ -20,6 +20,7 @@ test('creating an alert rule dispatches AlertCreated for its owner', function ()
 
     $alertRule = AlertRule::factory()->create();
 
+    Queue::assertPushed(SendActivityAlert::class, 1);
     Queue::assertPushed(SendActivityAlert::class, fn ($job) => $job->type === ActivityAlertType::AlertCreated
         && $job->userId === $alertRule->user_id);
 });

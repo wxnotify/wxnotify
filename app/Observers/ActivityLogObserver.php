@@ -8,6 +8,7 @@ use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Arr;
 use Spatie\Activitylog\Models\Activity;
 
@@ -36,7 +37,14 @@ class ActivityLogObserver
 
     public function created(Activity $activity): void
     {
-        $type = self::TYPE_MAP[$activity->subject_type][$activity->event] ?? null;
+        // Resolves an alias back to the real FQCN if a Relation::morphMap()
+        // is ever registered (none is today, confirmed — subject_type is
+        // currently always the raw FQCN) — without this, TYPE_MAP's lookup
+        // would silently and permanently stop matching the moment one is
+        // added, with no error, just alerts quietly no longer firing.
+        $subjectClass = Relation::getMorphedModel($activity->subject_type) ?? $activity->subject_type;
+
+        $type = self::TYPE_MAP[$subjectClass][$activity->event] ?? null;
 
         if ($type === null) {
             return;
@@ -57,9 +65,19 @@ class ActivityLogObserver
             : $activity->subject?->user_id;
 
         if ($userId === null) {
+            logger()->warning('ActivityLogObserver could not resolve an owning user for a mapped activity row', [
+                'activity_id' => $activity->id,
+                'subject_type' => $activity->subject_type,
+                'event' => $activity->event,
+            ]);
+
             return;
         }
 
+        // Belt-and-suspenders, not a currently-reachable case: all three
+        // subject models' user_id FKs are cascadeOnDelete() with no
+        // SoftDeletes anywhere, so an orphaned user_id can't exist today.
+        // Kept in case that changes later.
         $user = User::find($userId);
 
         if ($user === null) {
