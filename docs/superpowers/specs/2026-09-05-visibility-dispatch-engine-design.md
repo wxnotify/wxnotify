@@ -136,4 +136,4 @@ A failed Apprise call fails the job normally (visible via `failed_jobs`/queue to
 
 ## Out of scope (unchanged from the original Blueprint decision)
 
-`ScheduleCreated/Updated/Deleted`, `ProductListUpdated`, `SettingsChanged`, `DailyForecastEnabled` remain selectable in the rule form's `CheckboxList` but dispatch nothing — no underlying feature exists yet to observe. `ListActivityAlertRules`'s notice is updated to name these nine specifically as still inert, rather than the current blanket "not yet enforced" covering everything.
+`ScheduleCreated/Updated/Deleted`, `ProductListUpdated`, `SettingsChanged`, `DailyForecastEnabled` remain selectable in the rule form's `CheckboxList` but dispatch nothing — no underlying feature exists yet to observe. `ListActivityAlertRules`'s notice is updated to name these six specifically as still inert, rather than the current blanket "not yet enforced" covering everything.
