@@ -6,6 +6,21 @@ use App\Models\ActivityAlertRule;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 
+test('creating a user dispatches AccountCreated', function () {
+    Queue::fake();
+
+    ActivityAlertRule::factory()->create([
+        'scope' => 'all_subscribers',
+        'activity_types' => [ActivityAlertType::AccountCreated->value],
+        'is_active' => true,
+    ]);
+
+    $user = User::factory()->create();
+
+    Queue::assertPushed(SendActivityAlert::class, fn ($job) => $job->type === ActivityAlertType::AccountCreated
+        && $job->userId === $user->id);
+});
+
 test('changing a user\'s name dispatches NameChanged', function () {
     Queue::fake();
 
@@ -105,7 +120,14 @@ test('an unrelated field change dispatches nothing, even when every type is conf
 
     ActivityAlertRule::factory()->create([
         'scope' => 'all_subscribers',
-        'activity_types' => array_column(ActivityAlertType::cases(), 'value'),
+        // AccountCreated is excluded here: this test targets the updated()
+        // field-filtering logic, and including it would make the
+        // User::factory()->create() call below dispatch a job of its own
+        // (via created()), unrelated to what this test is checking.
+        'activity_types' => array_diff(
+            array_column(ActivityAlertType::cases(), 'value'),
+            [ActivityAlertType::AccountCreated->value]
+        ),
         'is_active' => true,
     ]);
 

@@ -16,28 +16,39 @@ class MatchActivityAlertRules
     {
         $occurredAt = now();
 
-        ActivityAlertRule::query()
-            ->where('is_active', true)
-            ->whereJsonContains('activity_types', $type->value)
-            ->where(function (Builder $query) use ($user) {
-                $query->where('scope', ActivityAlertScope::AllSubscribers)
-                    ->orWhere(function (Builder $query) use ($user) {
-                        $query->where('scope', ActivityAlertScope::SpecificUsers)
-                            ->whereHas('users', fn (Builder $q) => $q->whereKey($user->getKey()));
-                    });
-            })
-            ->get()
-            ->each(function (ActivityAlertRule $rule) use ($type, $user, $occurredAt) {
-                try {
-                    SendActivityAlert::dispatch($rule->id, $type, $user->id, $occurredAt);
-                } catch (Throwable $e) {
-                    logger()->error('Failed to dispatch SendActivityAlert', [
-                        'rule_id' => $rule->id,
-                        'type' => $type->value,
-                        'user_id' => $user->id,
-                        'exception' => $e->getMessage(),
-                    ]);
-                }
-            });
+        try {
+            $rules = ActivityAlertRule::query()
+                ->where('is_active', true)
+                ->whereJsonContains('activity_types', $type->value)
+                ->where(function (Builder $query) use ($user) {
+                    $query->where('scope', ActivityAlertScope::AllSubscribers)
+                        ->orWhere(function (Builder $query) use ($user) {
+                            $query->where('scope', ActivityAlertScope::SpecificUsers)
+                                ->whereHas('users', fn (Builder $q) => $q->whereKey($user->getKey()));
+                        });
+                })
+                ->get();
+        } catch (Throwable $e) {
+            logger()->error('Failed to query matching ActivityAlertRules', [
+                'type' => $type->value,
+                'user_id' => $user->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        $rules->each(function (ActivityAlertRule $rule) use ($type, $user, $occurredAt) {
+            try {
+                SendActivityAlert::dispatch($rule->id, $type, $user->id, $occurredAt);
+            } catch (Throwable $e) {
+                logger()->error('Failed to dispatch SendActivityAlert', [
+                    'rule_id' => $rule->id,
+                    'type' => $type->value,
+                    'user_id' => $user->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        });
     }
 }

@@ -8,6 +8,11 @@ use App\Models\User;
 
 class UserActivityObserver
 {
+    public function created(User $user): void
+    {
+        app(MatchActivityAlertRules::class)($user, ActivityAlertType::AccountCreated);
+    }
+
     public function updated(User $user): void
     {
         $match = app(MatchActivityAlertRules::class);

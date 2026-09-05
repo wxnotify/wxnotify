@@ -6,7 +6,6 @@ use App\Actions\Visibility\MatchActivityAlertRules;
 use App\Enums\ActivityAlertType;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Events\Dispatcher;
 
 class ActivityAlertEventSubscriber
@@ -25,15 +24,9 @@ class ActivityAlertEventSubscriber
         app(MatchActivityAlertRules::class)($event->user, ActivityAlertType::SignedOut);
     }
 
-    public function handleRegistered(Registered $event): void
-    {
-        app(MatchActivityAlertRules::class)($event->user, ActivityAlertType::AccountCreated);
-    }
-
     public function subscribe(Dispatcher $events): void
     {
         $events->listen(Login::class, [self::class, 'handleLogin']);
         $events->listen(Logout::class, [self::class, 'handleLogout']);
-        $events->listen(Registered::class, [self::class, 'handleRegistered']);
     }
 }

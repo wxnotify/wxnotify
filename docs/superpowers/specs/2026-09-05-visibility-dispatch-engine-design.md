@@ -24,14 +24,15 @@ Signal sources                         Matching & dispatch                    De
 ───────────────                        ────────────────────                    ────────
 
 Illuminate\Auth\Events\Login    ─┐
-Illuminate\Auth\Events\Logout    ├─► ActivityAlertEventSubscriber
-Illuminate\Auth\Events\Registered┘    (app/Listeners/)
+Illuminate\Auth\Events\Logout    ┘─► ActivityAlertEventSubscriber
+                                       (app/Listeners/)
                                               │
 UserActivityObserver              ───────────┤──► MatchActivityAlertRules   ──► SendActivityAlert (queued Job)
 (app/Observers/, on User:                    │     (app/Actions/Visibility/)         │
- updated → diff name/email/                  │      - queries active rules            ▼
- password/app_authentication_secret;         │        matching type + scope    AppriseApiClient::notify()
- deleted)                                    │      - one job dispatch per match
+ created → AccountCreated;                   │      - queries active rules            ▼
+ updated → diff name/email/                  │        matching type + scope    AppriseApiClient::notify()
+ password/app_authentication_secret;         │      - one job dispatch per match
+ deleted)                                    │
                                               │
 ActivityLogObserver                ──────────┘
 (app/Observers/, on
@@ -46,16 +47,16 @@ New directories: `app/Listeners/`, `app/Observers/` — first use of both in thi
 
 ### `App\Listeners\ActivityAlertEventSubscriber`
 
-One class using Laravel's event-subscriber pattern (three small, related handlers together, rather than three near-empty single-event listener classes):
+One class using Laravel's event-subscriber pattern (two small, related handlers together, rather than two near-empty single-event listener classes):
 
 - `handleLogin(Login $event)` → dispatch match for `$event->user`, `ActivityAlertType::SignedIn`
 - `handleLogout(Logout $event)` → `SignedOut` (guard against `$event->user` being `null`, which Laravel's `Logout` event allows)
-- `handleRegistered(Registered $event)` → `AccountCreated`
-
-  **Known gap, accepted**: Google SSO registration (`DashboardPanelProvider`'s `FilamentSocialitePlugin`, Phase 0) creates the `User` directly in a `createUserUsing()` closure — it doesn't go through Filament's `Register` page at all, so it almost certainly never fires `Registered`. `AccountCreated` will reliably fire for the normal email/password registration path but likely miss SSO signups. Not fixed in this pass (would mean either firing `Registered` manually from that closure, or watching `User`'s `created` Eloquent event instead — the latter is more robust but was not chosen here to avoid double-firing for the normal path, since Filament's `Register` page itself creates the model via `Registered`'s own listener chain). Worth revisiting if SSO signup volume matters for this tool's purpose.
 
 ### `App\Observers\UserActivityObserver` (registered on `User`)
 
+- `created(User $user)` → `AccountCreated`.
+
+  **Correction from what was originally assumed here**: neither registration path actually fires `Illuminate\Auth\Events\Registered` — the normal Filament `Register` page fires `Filament\Auth\Events\Registered`, and Google SSO fires `DutchCodingCompany\FilamentSocialite\Events\Registered`, both different classes entirely (confirmed by reading the actual vendor source). Subscribing to the wrong event meant `AccountCreated` never fired for *either* path, not just SSO as originally assumed. Fixed by moving `AccountCreated` off the auth-event subscriber entirely and onto `UserActivityObserver::created()` (an Eloquent `created` hook on `User` itself) — this fires reliably regardless of which vendor flow created the row, sidestepping the event-class fragmentation problem rather than chasing every vendor's own event class.
 - `updated(User $user)`: independently checks `$user->wasChanged('name')` → `NameChanged`, `wasChanged('email')` → `EmailChanged`, `wasChanged('password')` → `PasswordChanged`, `wasChanged('app_authentication_secret')` → `MfaChanged`. More than one can fire from a single save (e.g. changing both name and email at once) — each is matched/dispatched independently.
 - `deleted(User $user)` → `AccountDeleted`.
 
@@ -126,8 +127,8 @@ A failed Apprise call fails the job normally (visible via `failed_jobs`/queue to
 
 ## Testing plan
 
-- `ActivityAlertEventSubscriberTest` (or folded into a broader feature test): firing `Login`/`Logout`/`Registered` dispatches `SendActivityAlert` for a matching active rule (`Queue::fake()` + `Queue::assertPushed`).
-- `UserActivityObserverTest`: updating a user's name/email/password/`app_authentication_secret` independently each dispatch the right type (and a save touching two of them dispatches both); deleting a user dispatches `AccountDeleted`.
+- `ActivityAlertEventSubscriberTest` (or folded into a broader feature test): firing `Login`/`Logout` dispatches `SendActivityAlert` for a matching active rule (`Queue::fake()` + `Queue::assertPushed`).
+- `UserActivityObserverTest`: creating a user dispatches `AccountCreated`; updating a user's name/email/password/`app_authentication_secret` independently each dispatch the right type (and a save touching two of them dispatches both); deleting a user dispatches `AccountDeleted`.
 - `ActivityLogObserverTest`: creating/updating/deleting an `AlertRule`, `Location`, and `NotificationChannel` each dispatch the right type with the correct owning user resolved; an activity row for `Product`/`User` (the staff-facing audit fields) dispatches nothing.
 - `MatchActivityAlertRulesTest`: an `all_subscribers` rule matches any user; a `specific_users` rule matches only pivoted users; an inactive rule never matches; a rule whose `activity_types` doesn't include the type never matches.
 - `SendActivityAlertTest`: calls `AppriseApiClient::notify()` with the expected url/body/title (`Http::fake()`); silently no-ops if the rule or user no longer exists by the time the job runs.
