@@ -3445,6 +3445,8 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - Create: `app/Actions/Shapefiles/ActivateShapefileVersion.php`
 - Test: `tests/Feature/ActivateShapefileVersionTest.php`
 
+**Bug caught during execution, fixed below**: the constructor originally had no default for `$applyRecordOverrides`, but every test in this plan that touches `ActivateShapefileVersion` — including Task 26's rollback test, which activates twice to set up its scenario — instantiates it via a bare `new ActivateShapefileVersion` with zero arguments, which would throw `ArgumentCountError`. Fixed using PHP 8.1's "new in initializers" feature (this app targets PHP 8.5, so it's available): the promoted property defaults to `new ApplyRecordOverrides` directly in the signature. This keeps container-based DI working unchanged (Laravel still injects a resolved instance when the class is built through the container, e.g. from a Filament action) while making every bare `new ActivateShapefileVersion()` call in this plan's tests work correctly too.
+
 Runs the 3-step `ALTER TABLE ... RENAME` dance inside a transaction, flips version statuses, updates `active_version_id`, then reapplies standing overrides. Because every layer (Marine's 3 sub-layers included, per Task 10's correction) has its own dedicated table pair, this one method works identically for all 9 layers — no special-casing needed.
 
 - [ ] **Step 1: Write the failing tests**
@@ -3555,7 +3557,7 @@ use Illuminate\Support\Facades\DB;
 
 class ActivateShapefileVersion
 {
-    public function __construct(private ApplyRecordOverrides $applyRecordOverrides) {}
+    public function __construct(private ApplyRecordOverrides $applyRecordOverrides = new ApplyRecordOverrides) {}
 
     public function __invoke(ShapefileLayerVersion $version): void
     {
