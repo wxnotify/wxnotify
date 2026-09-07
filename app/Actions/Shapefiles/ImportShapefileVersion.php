@@ -3,6 +3,8 @@
 namespace App\Actions\Shapefiles;
 
 use App\Models\ShapefileLayerVersion;
+use App\Models\User;
+use App\Notifications\ShapefileLayerUpdateAvailableNotification;
 use App\Support\Shapefiles\ShapefileLayerDefinition;
 use App\Support\Shapefiles\ShapefileLayerDefinitions;
 use App\Support\Shapefiles\ShapefilePolygonAssembler;
@@ -30,6 +32,10 @@ class ImportShapefileVersion
 
         $diff = (new ComputeShapefileLayerDiff)($layer, $definition);
         $version->update(['diff_summary' => $diff]);
+
+        User::where('is_staff', true)->get()->each(
+            fn (User $staff) => $staff->notify(new ShapefileLayerUpdateAvailableNotification($version)),
+        );
     }
 
     private function importShapefile(ShapefileLayerVersion $version, ShapefileLayerDefinition $definition): void

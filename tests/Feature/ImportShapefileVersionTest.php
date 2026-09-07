@@ -4,9 +4,12 @@ use App\Actions\Shapefiles\ImportShapefileVersion;
 use App\Enums\ShapefileVersionStatus;
 use App\Models\ShapefileLayer;
 use App\Models\ShapefileLayerVersion;
+use App\Models\User;
+use App\Notifications\ShapefileLayerUpdateAvailableNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use PhpMyAdmin\ShapeFile\ShapeFile;
 use PhpMyAdmin\ShapeFile\ShapeRecord;
 use PhpMyAdmin\ShapeFile\ShapeType;
@@ -129,4 +132,26 @@ test('it stores the computed diff summary on the version after importing', funct
     expect($version->fresh()->diff_summary)->toBe([
         'added' => 2, 'removed' => 0, 'changed' => 0, 'override_conflicts' => [],
     ]);
+});
+
+test('it notifies every staff user, and no one else, once the diff is computed', function () {
+    Notification::fake();
+
+    $staff = User::factory()->create(['is_staff' => true]);
+    $subscriber = User::factory()->create(['is_staff' => false]);
+
+    $zipPath = buildFixtureZip('z_test04');
+    Http::fake(['weather.gov/fixture4.zip' => Http::response(file_get_contents($zipPath))]);
+
+    $layer = ShapefileLayer::factory()->create(['key' => 'public_zones']);
+    $version = ShapefileLayerVersion::factory()->create([
+        'shapefile_layer_id' => $layer->id,
+        'source_url' => 'https://www.weather.gov/fixture4.zip',
+        'status' => ShapefileVersionStatus::Staged,
+    ]);
+
+    (new ImportShapefileVersion)($version);
+
+    Notification::assertSentTo($staff, ShapefileLayerUpdateAvailableNotification::class);
+    Notification::assertNotSentTo($subscriber, ShapefileLayerUpdateAvailableNotification::class);
 });
