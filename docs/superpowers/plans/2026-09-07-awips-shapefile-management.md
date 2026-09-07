@@ -6,7 +6,7 @@
 
 **Architecture:** PostGIS replaces plain Postgres. One code-level registry (`ShapefileLayerDefinitions`) holds the per-layer scraping/parsing/table config; three small DB tables (`shapefile_layers`, `shapefile_layer_versions`, `shapefile_record_overrides`) track state; one generic pipeline (`ScanShapefileLayer` → `ImportShapefileVersion` → `ActivateShapefileVersion`/`RollbackShapefileLayer`/`DismissShapefileVersion`) drives all 9 layers through per-geography live/staging table pairs swapped with `ALTER TABLE ... RENAME`. One `ShapefileLayerResource` in the `admin` Filament panel exposes it.
 
-**Tech Stack:** Laravel 13 / PHP 8.5, PostgreSQL via `postgis/postgis:18-3.6`, `clickbar/laravel-magellan` (Eloquent geometry casts), `symfony/dom-crawler` + `symfony/css-selector` (HTML scraping), `phpmyadmin/shapefile` (`.shp`/`.dbf` parsing), Filament v5, Pest.
+**Tech Stack:** Laravel 13 / PHP 8.5, PostgreSQL via `imresamu/postgis:18-3.6` (a multi-arch fork of `postgis/postgis` — the official image has no arm64 build, which fails outright on Apple Silicon dev machines; corrected during Task 1's execution), `clickbar/laravel-magellan` (Eloquent geometry casts), `symfony/dom-crawler` + `symfony/css-selector` (HTML scraping), `phpmyadmin/shapefile` (`.shp`/`.dbf` parsing), Filament v5, Pest.
 
 ---
 
@@ -33,6 +33,7 @@ Full rationale lives in `docs/superpowers/specs/2026-09-07-awips-shapefile-manag
 - `app/Filament/Admin/Resources` is auto-discovered by `AdminPanelProvider` — a new `ShapefileLayerResource` under that path needs no manual registration.
 - No scheduler exists yet anywhere in this app (`routes/console.php` only has the stock `inspire` command; `bootstrap/app.php` has no `->withSchedule()` call). Task 18 adds the first one.
 - Tests run inside the Sail container: `docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && <command>"`. `vendor/bin/pest` / `php artisan` fail with a DNS error if run on the bare host (Docker-internal hostnames like `pgsql` don't resolve there).
+- **`tests/Pest.php` only binds `RefreshDatabase` to `tests/Feature`, not `tests/Unit`** — confirmed by reading it directly. Any test that touches Eloquent/factories/the database belongs in `tests/Feature`, matching this project's own stated convention ("Write a unit test only for logic that does not use the framework"). This was caught (and fixed, via `git mv`) after Task 3 was originally executed with its DB-backed test misplaced under `tests/Unit/` — every `tests/Unit/...` path named below has already been corrected to `tests/Feature/...` wherever the test actually needs the database (Tasks 3, 5, and 14); the genuinely framework-independent ones (Task 6's registry test, Task 15/16's HTML scrapers, Task 19's polygon math, Task 21's pipe-delimited parser) correctly stay under `tests/Unit/`.
 
 **Marine gets 3 separate physical table pairs, not one shared table** — a correction made while writing this plan (caught during Task 25's design, before any code was written, not after). The design doc's original sketch had Coastal/Offshore/High Seas sharing one `marine_zones` table with a `zone_type` discriminator. That breaks the atomic-swap activation model: `ALTER TABLE ... RENAME` swaps an entire physical table, and the 3 Marine sub-layers scan/import/activate independently (NOAA can update Coastal without touching Offshore) — activating Coastal alone would swap Offshore's and High Seas's live rows out from under them too, since all three would live in the same physical table. Giving each sub-layer its own table pair (`marine_zones_coastal`/`_staging`, `marine_zones_offshore`/`_staging`, `marine_zones_high_seas`/`_staging`) makes Marine behave exactly like every other layer — one table pair, one independent swap. Each table still carries a `zone_type` column (constant per table) for labeling/future-UNION convenience, but it's no longer part of the natural key. No consumer in this plan queries "all marine zones" as one set — that's left for whenever the future Alert Engine needs it (YAGNI: don't build a cross-table view with no current reader, especially since a naive `VIEW` over these tables would itself go stale across a rename-swap, needing its own recreate-after-swap step that has no user yet).
 
@@ -70,8 +71,10 @@ to:
 
 ```yaml
     pgsql:
-        image: 'postgis/postgis:18-3.6'
+        image: 'imresamu/postgis:18-3.6'
 ```
+
+**Correction made during execution**: the official `postgis/postgis:18-3.6` image publishes no `arm64` manifest (confirmed via `docker manifest inspect postgis/postgis:18-3.6` — `amd64` only) and fails to pull outright on Apple Silicon. `imresamu/postgis:18-3.6` is a well-known, actively-maintained multi-arch fork covering exactly this gap — verified via `docker manifest inspect imresamu/postgis:18-3.6` to publish both `amd64` and `arm64` manifests. Use this image, not the official one.
 
 - [ ] **Step 2: Recreate the container and verify PostGIS is installable**
 
@@ -86,7 +89,7 @@ Expected: one row returned (no longer zero rows) confirming the extension is now
 
 ```bash
 git add compose.yaml
-git commit -m "Swap pgsql image to postgis/postgis:18-3.6 for PostGIS support
+git commit -m "Swap pgsql image to imresamu/postgis:18-3.6 for PostGIS support
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```
@@ -159,7 +162,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - Create: `database/migrations/2026_09_07_100001_create_shapefile_layers_table.php`
 - Create: `app/Models/ShapefileLayer.php`
 - Create: `database/factories/ShapefileLayerFactory.php`
-- Test: `tests/Unit/ShapefileLayerTest.php`
+- Test: `tests/Feature/ShapefileLayerTest.php`
 
 - [ ] **Step 1: Write the migration**
 
@@ -271,7 +274,7 @@ class ShapefileLayerFactory extends Factory
 - [ ] **Step 4: Write the failing test**
 
 ```bash
-docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php artisan make:test --pest ShapefileLayerTest --unit --no-interaction"
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php artisan make:test --pest ShapefileLayerTest --no-interaction"
 ```
 
 ```php
@@ -294,7 +297,7 @@ test('a layer has many versions and an active version', function () {
 
 ```bash
 docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php artisan migrate --no-interaction"
-docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Unit/ShapefileLayerTest.php --compact"
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ShapefileLayerTest.php --compact"
 ```
 
 Expected: FAILS at this point (`ShapefileLayerVersion` doesn't exist yet) — that's correct, Task 4 creates it. Move on.
@@ -302,7 +305,7 @@ Expected: FAILS at this point (`ShapefileLayerVersion` doesn't exist yet) — th
 - [ ] **Step 6: Commit**
 
 ```bash
-git add database/migrations/2026_09_07_100001_create_shapefile_layers_table.php app/Models/ShapefileLayer.php database/factories/ShapefileLayerFactory.php tests/Unit/ShapefileLayerTest.php
+git add database/migrations/2026_09_07_100001_create_shapefile_layers_table.php app/Models/ShapefileLayer.php database/factories/ShapefileLayerFactory.php tests/Feature/ShapefileLayerTest.php
 git commit -m "Add shapefile_layers tracking table and model
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
@@ -317,7 +320,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - Create: `database/migrations/2026_09_07_100002_create_shapefile_layer_versions_table.php`
 - Create: `app/Models/ShapefileLayerVersion.php`
 - Create: `database/factories/ShapefileLayerVersionFactory.php`
-- Test: `tests/Unit/ShapefileLayerTest.php` (from Task 3, now passes)
+- Test: `tests/Feature/ShapefileLayerTest.php` (from Task 3, now passes)
 
 - [ ] **Step 1: Enum**
 
@@ -454,7 +457,7 @@ class ShapefileLayerVersionFactory extends Factory
 
 ```bash
 docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php artisan migrate --no-interaction"
-docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Unit/ShapefileLayerTest.php --compact"
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ShapefileLayerTest.php --compact"
 ```
 
 Expected: PASS.
@@ -476,7 +479,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - Create: `database/migrations/2026_09_07_100003_create_shapefile_record_overrides_table.php`
 - Create: `app/Models/ShapefileRecordOverride.php`
 - Create: `database/factories/ShapefileRecordOverrideFactory.php`
-- Test: `tests/Unit/ShapefileRecordOverrideTest.php`
+- Test: `tests/Feature/ShapefileRecordOverrideTest.php`
 
 - [ ] **Step 1: Migration**
 
@@ -586,7 +589,7 @@ class ShapefileRecordOverrideFactory extends Factory
 - [ ] **Step 4: Write the failing test**
 
 ```bash
-docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php artisan make:test --pest ShapefileRecordOverrideTest --unit --no-interaction"
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php artisan make:test --pest ShapefileRecordOverrideTest --no-interaction"
 ```
 
 ```php
@@ -632,7 +635,7 @@ test('the same field cannot be overridden twice for the same record on the same 
 
 ```bash
 docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php artisan migrate --no-interaction"
-docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Unit/ShapefileRecordOverrideTest.php --compact"
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ShapefileRecordOverrideTest.php --compact"
 ```
 
 Expected: PASS.
@@ -640,7 +643,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add database/migrations/2026_09_07_100003_create_shapefile_record_overrides_table.php app/Models/ShapefileRecordOverride.php database/factories/ShapefileRecordOverrideFactory.php tests/Unit/ShapefileRecordOverrideTest.php
+git add database/migrations/2026_09_07_100003_create_shapefile_record_overrides_table.php app/Models/ShapefileRecordOverride.php database/factories/ShapefileRecordOverrideFactory.php tests/Feature/ShapefileRecordOverrideTest.php
 git commit -m "Add shapefile_record_overrides table and model
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
@@ -1398,12 +1401,12 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 **Files:**
 - Create: `database/seeders/ShapefileLayerSeeder.php`
 - Modify: `database/seeders/DatabaseSeeder.php`
-- Test: `tests/Unit/ShapefileLayerSeederTest.php`
+- Test: `tests/Feature/ShapefileLayerSeederTest.php`
 
 - [ ] **Step 1: Write the failing test**
 
 ```bash
-docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php artisan make:test --pest ShapefileLayerSeederTest --unit --no-interaction"
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php artisan make:test --pest ShapefileLayerSeederTest --no-interaction"
 ```
 
 ```php
@@ -1438,7 +1441,7 @@ test('running it twice does not duplicate rows', function () {
 - [ ] **Step 2: Run it, confirm it fails**
 
 ```bash
-docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Unit/ShapefileLayerSeederTest.php --compact"
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ShapefileLayerSeederTest.php --compact"
 ```
 
 Expected: FAIL — `Class "Database\Seeders\ShapefileLayerSeeder" not found`.
@@ -1481,7 +1484,7 @@ In `database/seeders/DatabaseSeeder.php`, add to the `run()` method:
 - [ ] **Step 5: Run the test**
 
 ```bash
-docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Unit/ShapefileLayerSeederTest.php --compact"
+docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ShapefileLayerSeederTest.php --compact"
 ```
 
 Expected: PASS.
@@ -1489,7 +1492,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add database/seeders/ShapefileLayerSeeder.php database/seeders/DatabaseSeeder.php tests/Unit/ShapefileLayerSeederTest.php
+git add database/seeders/ShapefileLayerSeeder.php database/seeders/DatabaseSeeder.php tests/Feature/ShapefileLayerSeederTest.php
 git commit -m "Seed the 9 tracked shapefile_layers rows from the registry
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
