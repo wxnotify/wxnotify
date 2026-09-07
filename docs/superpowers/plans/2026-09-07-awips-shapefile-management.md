@@ -44,12 +44,14 @@ Full rationale lives in `docs/superpowers/specs/2026-09-07-awips-shapefile-manag
 | `public_zones` | `public_zones` | shapefile | `state_zone` |
 | `counties` | `counties` | shapefile | `fips` |
 | `cwa_boundaries` | `cwa_boundaries` | shapefile | `cwa` |
-| `marine_zones_coastal` | `marine_zones_coastal` | shapefile | `id` |
-| `marine_zones_offshore` | `marine_zones_offshore` | shapefile | `id` |
-| `marine_zones_high_seas` | `marine_zones_high_seas` | shapefile | `id` |
+| `marine_zones_coastal` | `marine_zones_coastal` | shapefile | `zone_id` |
+| `marine_zones_offshore` | `marine_zones_offshore` | shapefile | `zone_id` |
+| `marine_zones_high_seas` | `marine_zones_high_seas` | shapefile | `zone_id` |
 | `fire_zones` | `fire_zones` | shapefile | `state_zone` |
 | `us_states` | `us_states` | shapefile | `state` |
 | `zone_county_correlation` | `zone_county_correlations` | correlation | `state_zone`+`fips` |
+
+**Correction made during execution (Task 10)**: NOAA's real Marine Zones DBF schema names its zone-identifier field `ID` — the original plan mapped this straight to a db column also named `id`, which collides with Laravel's own auto-increment primary key column (`$table->id()`), also named `id`, on the same table. Postgres rejects a `CREATE TABLE` with two columns sharing a name. Fixed by renaming the mapped column to `zone_id` everywhere it appears: the 3 Marine `ShapefileLayerDefinition` entries' `naturalKeyColumns` and `attributeMap` (Task 6 — already committed at that point, patched directly), the 3 Marine table migrations (Task 10), and every later reference to it in diff/override/test code below.
 
 ---
 
@@ -518,7 +520,7 @@ return new class extends Migration
 };
 ```
 
-`record_key` is the natural key serialized as a single string (single-column keys stored as-is, e.g. `"NM201"`; composite keys pipe-joined, e.g. `"coastal|MZ001"`) — see `ShapefileLayerDefinition::serializeNaturalKey()` in Task 6.
+`record_key` is the natural key serialized as a single string (single-column keys stored as-is, e.g. `"NM201"`; composite keys pipe-joined, e.g. the Zone–County Correlation layer's `"NM201|35031"`) — see `ShapefileLayerDefinition::serializeNaturalKey()` in Task 6.
 
 - [ ] **Step 2: Model**
 
@@ -768,7 +770,7 @@ final class ShapefileLayerDefinitions
                 format: 'shapefile',
                 liveTable: 'marine_zones_coastal',
                 stagingTable: 'marine_zones_coastal_staging',
-                naturalKeyColumns: ['id'],
+                naturalKeyColumns: ['zone_id'],
                 attributeMap: self::marineAttributeMap(),
                 zoneType: 'coastal',
                 groupMatchText: 'Coastal',
@@ -780,7 +782,7 @@ final class ShapefileLayerDefinitions
                 format: 'shapefile',
                 liveTable: 'marine_zones_offshore',
                 stagingTable: 'marine_zones_offshore_staging',
-                naturalKeyColumns: ['id'],
+                naturalKeyColumns: ['zone_id'],
                 attributeMap: self::marineAttributeMap(),
                 zoneType: 'offshore',
                 groupMatchText: 'Offshore',
@@ -792,7 +794,7 @@ final class ShapefileLayerDefinitions
                 format: 'shapefile',
                 liveTable: 'marine_zones_high_seas',
                 stagingTable: 'marine_zones_high_seas_staging',
-                naturalKeyColumns: ['id'],
+                naturalKeyColumns: ['zone_id'],
                 attributeMap: self::marineAttributeMap(),
                 zoneType: 'high_seas',
                 groupMatchText: 'High Seas',
@@ -858,7 +860,7 @@ final class ShapefileLayerDefinitions
     private static function marineAttributeMap(): array
     {
         return [
-            'ID' => 'id', 'WFO' => 'wfo', 'GL_WFO' => 'gl_wfo', 'NAME' => 'name',
+            'ID' => 'zone_id', 'WFO' => 'wfo', 'GL_WFO' => 'gl_wfo', 'NAME' => 'name',
             'AJOIN0' => 'ajoin0', 'AJOIN1' => 'ajoin1', 'LON' => 'lon', 'LAT' => 'lat',
         ];
     }
@@ -1132,6 +1134,8 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 Each of the 3 Marine sub-layers gets its own live/staging table pair — **not** one shared table — so each can be scanned/imported/activated independently without one sub-layer's atomic swap clobbering another's live data (see the Context section's note above for why). All 3 share the identical attribute schema; `zone_type` is kept as a column on each table (a constant value per table) purely for labeling/future convenience, not as part of the natural key.
 
+**Bug caught during execution, fixed here**: the AWIPS zone-identifier column is named `zone_id`, not `id` — NOAA's DBF field is literally called `ID`, but mapping it straight to a db column named `id` collides with Laravel's own auto-increment primary key (`$table->id()`), also named `id`, causing Postgres to reject the `CREATE TABLE` outright with "column \"id\" specified more than once". `zone_id` (below) is correct; Task 6's registry (already committed by the time this was caught) was patched directly to match.
+
 - [ ] **Step 1: Migration**
 
 ```bash
@@ -1156,7 +1160,7 @@ return new class extends Migration
                 Schema::create($table, function (Blueprint $t) {
                     $t->id();
                     $t->string('zone_type', 20);
-                    $t->string('id', 6)->unique();
+                    $t->string('zone_id', 6)->unique();
                     $t->string('wfo', 3)->nullable();
                     $t->string('gl_wfo', 3)->nullable();
                     $t->string('name', 250);
@@ -2420,7 +2424,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - Create: `app/Actions/Shapefiles/ImportShapefileVersion.php`
 - Test: `tests/Feature/ImportShapefileVersionTest.php`
 
-Downloads the version's zip, unzips it, parses it with `phpmyadmin/shapefile`, and repopulates the layer's staging table. For Marine's shared `marine_zones_staging` table, only that sub-layer's own `zone_type` rows are cleared first — the other two sub-layers import independently on their own schedule and must not be wiped by each other.
+Downloads the version's zip, unzips it, parses it with `phpmyadmin/shapefile`, and repopulates the layer's own staging table. Since each layer — Marine's 3 sub-layers included, per Task 10's corrected schema — has its own dedicated table pair, the staging table is always fully truncated and repopulated on each import; there's no cross-sub-layer scoping to worry about.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2952,17 +2956,17 @@ test('a marine sub-layer diffs against its own dedicated table, independent of t
     $definition = ShapefileLayerDefinitions::forKey('marine_zones_offshore');
 
     DB::table('marine_zones_offshore')->insert([
-        'zone_type' => 'offshore', 'id' => 'OZ001', 'name' => 'Offshore Zone',
+        'zone_type' => 'offshore', 'zone_id' => 'OZ001', 'name' => 'Offshore Zone',
         'lon' => 0, 'lat' => 0, 'boundary' => DB::raw("ST_SetSRID(ST_GeomFromText('MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)))'), 4269)"),
         'created_at' => now(), 'updated_at' => now(),
     ]);
     DB::table('marine_zones_offshore_staging')->insert([
-        'zone_type' => 'offshore', 'id' => 'OZ999', 'name' => 'Different Offshore Zone',
+        'zone_type' => 'offshore', 'zone_id' => 'OZ999', 'name' => 'Different Offshore Zone',
         'lon' => 0, 'lat' => 0, 'boundary' => DB::raw("ST_SetSRID(ST_GeomFromText('MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)))'), 4269)"),
         'created_at' => now(), 'updated_at' => now(),
     ]);
     DB::table('marine_zones_coastal')->insert([
-        'zone_type' => 'coastal', 'id' => 'OZ001', 'name' => 'Coincidentally same id, different table/layer',
+        'zone_type' => 'coastal', 'zone_id' => 'OZ001', 'name' => 'Coincidentally same zone_id, different table/layer',
         'lon' => 0, 'lat' => 0, 'boundary' => DB::raw("ST_SetSRID(ST_GeomFromText('MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)))'), 4269)"),
         'created_at' => now(), 'updated_at' => now(),
     ]);
