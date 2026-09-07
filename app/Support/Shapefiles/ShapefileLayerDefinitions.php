@@ -60,7 +60,7 @@ final class ShapefileLayerDefinitions
                 format: 'shapefile',
                 liveTable: 'marine_zones_coastal',
                 stagingTable: 'marine_zones_coastal_staging',
-                naturalKeyColumns: ['id'],
+                naturalKeyColumns: ['zone_id'],
                 attributeMap: self::marineAttributeMap(),
                 zoneType: 'coastal',
                 groupMatchText: 'Coastal',
@@ -72,7 +72,7 @@ final class ShapefileLayerDefinitions
                 format: 'shapefile',
                 liveTable: 'marine_zones_offshore',
                 stagingTable: 'marine_zones_offshore_staging',
-                naturalKeyColumns: ['id'],
+                naturalKeyColumns: ['zone_id'],
                 attributeMap: self::marineAttributeMap(),
                 zoneType: 'offshore',
                 groupMatchText: 'Offshore',
@@ -84,7 +84,7 @@ final class ShapefileLayerDefinitions
                 format: 'shapefile',
                 liveTable: 'marine_zones_high_seas',
                 stagingTable: 'marine_zones_high_seas_staging',
-                naturalKeyColumns: ['id'],
+                naturalKeyColumns: ['zone_id'],
                 attributeMap: self::marineAttributeMap(),
                 zoneType: 'high_seas',
                 groupMatchText: 'High Seas',
@@ -150,7 +150,7 @@ final class ShapefileLayerDefinitions
     private static function marineAttributeMap(): array
     {
         return [
-            'ID' => 'id', 'WFO' => 'wfo', 'GL_WFO' => 'gl_wfo', 'NAME' => 'name',
+            'ID' => 'zone_id', 'WFO' => 'wfo', 'GL_WFO' => 'gl_wfo', 'NAME' => 'name',
             'AJOIN0' => 'ajoin0', 'AJOIN1' => 'ajoin1', 'LON' => 'lon', 'LAT' => 'lat',
         ];
     }
