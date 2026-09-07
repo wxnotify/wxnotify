@@ -100,7 +100,7 @@ services:
             - docker-proxy
         restart: unless-stopped
     pgsql:
-        image: 'postgres:18-alpine'
+        image: 'imresamu/postgis:18-3.6'
         ports:
             - '${FORWARD_DB_PORT:-5432}:5432'
         environment:
