@@ -27,6 +27,11 @@ class ShapefileLayer extends Model
         return $this->hasMany(ShapefileLayerVersion::class);
     }
 
+    public function recordOverrides(): HasMany
+    {
+        return $this->hasMany(ShapefileRecordOverride::class);
+    }
+
     public function activeVersion(): BelongsTo
     {
         return $this->belongsTo(ShapefileLayerVersion::class, 'active_version_id');
