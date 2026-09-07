@@ -2,10 +2,6 @@
 
 use App\Models\ShapefileLayer;
 use App\Models\ShapefileLayerVersion;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
 
 test('a layer has many versions and an active version', function () {
     $layer = ShapefileLayer::factory()->create();

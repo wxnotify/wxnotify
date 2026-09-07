@@ -24,6 +24,7 @@ Full rationale lives in `docs/superpowers/specs/2026-09-07-awips-shapefile-manag
 - Every shapefile's `.prj` sidecar declares **NAD83 (GCS_North_American_1983)**, i.e. **EPSG:4269** — not WGS84/4326. All geometry columns in this plan use SRID 4269 to match the source data exactly, avoiding an unnecessary reprojection. (Downstream consumers doing `ST_Contains`/`ST_DWithin` against WGS84 points will need `ST_Transform` — that's the Alert Engine's future concern, not this plan's.)
 - **`fahiem/filament-pinpoint` (this app's existing Leaflet convention) cannot render the boundary map** — verified by reading its source (`Pinpoint`/`PinpointEntry` are single-point marker pickers/viewers only, no GeoJSON/MultiPolygon layer support). Task 31 instead writes a small custom Leaflet view loading Leaflet 1.9.4 from the same public CDN (`unpkg.com/leaflet@1.9.4`) Pinpoint already uses, guarded by the same element ids so it won't double-load.
 - `clickbar/laravel-magellan` v2.2.0 is the real, current, actively-maintained package (`clickbar/laravel-eloquent-spatial` is dead — a 404). Verified real class names: `Clickbar\Magellan\Data\Geometries\MultiPolygon` (Eloquent cast target), and this app's target Laravel version already ships native `Blueprint::geometry($column, $subtype = null, $srid = 0)` — verified by reading `vendor/laravel/framework/src/Illuminate/Database/Schema/Blueprint.php:1516`. This plan uses that native method (Magellan's own docs recommend it over its bespoke helpers) rather than Magellan-specific migration helpers.
+- **Foundational fix made during Task 20's execution — the `dbase` PHP extension is required and was missing**: `phpmyadmin/shapefile` only reads/writes `.dbf` attribute data through PHP's `dbase_*` functions (confirmed by reading `ShapeFile.php`'s `createDBFFile()`/`openDBFFile()` directly) — without the `dbase` extension loaded, those methods silently no-op (`return true` with no file written/read) rather than erroring, so the failure surfaced downstream as a missing `.dbf` file, not a clear error. The stock Sail 8.5 image doesn't ship this extension, and it isn't available via apt (only PECL). Verified it *does* compile cleanly against PHP 8.5 (`pecl install dbase` succeeds, produces a working `dbase.so`). Fixed by publishing Sail's runtime Dockerfile into a project-owned copy — `docker/8.5/` (copied from `vendor/laravel/sail/runtimes/8.5/`, plus `RUN pecl install dbase && echo "extension=dbase.so" > /etc/php/8.5/cli/conf.d/99-dbase.ini` inserted after the main package-install block) — and repointing both `compose.yaml` build contexts (`laravel.test` and `queue`, which share the `sail-8.5/app` image) from the vendor path to `./docker/8.5`. This is now a **prerequisite step before Task 20 can run**: rebuild with `docker compose build laravel.test && docker compose up -d laravel.test queue`, then confirm with `docker exec wxnotify-dashboard-laravel.test-1 php -m | grep dbase`.
 - `phpmyadmin/shapefile` v4.0.1's real, verified (read from its own source and official examples) write/read API:
   - Read: `(new ShapeFile(ShapeType::Polygon))->loadFromFile($globPath)` (`$globPath` like `/tmp/xyz/z_18mr25.*`) then iterate `$shp->records` — each `$record->dbfData` is an associative array of DBF fields (e.g. `$record->dbfData['STATE']`), and `$record->shpData['parts']` is a list of `['points' => [['x' => float, 'y' => float], ...]]` per ring.
   - Write (used to build small test fixtures — no giant national files get committed): `new ShapeFile(ShapeType::Polygon, ['xmin'=>.., 'ymin'=>.., 'xmax'=>.., 'ymax'=>..])`, `new ShapeRecord(ShapeType::Polygon)`, `$record->addPoint(['x'=>.., 'y'=>..], $partIndex)` per ring point, `$shp->addRecord($record)`, `$shp->setDBFHeader([['FIELDNAME', 'C', $width, $decimals], ...])`, `$shp->records[$i]->dbfData['FIELD'] = $value`, `$shp->saveToFile($globPath)`.
@@ -2416,6 +2417,24 @@ git commit -m "Add ShapefilePolygonAssembler for correct hole-aware WKT construc
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```
+
+---
+
+### Prerequisite for Task 20: enable the `dbase` PHP extension (already done — reference only)
+
+Before Task 20 can run, the Docker image needs the `dbase` extension — `phpmyadmin/shapefile` silently no-ops all `.dbf` I/O without it (see the Context section's note above). This was already done once, as a real correction during execution, not part of the original plan:
+
+1. `mkdir -p docker/8.5 && cp vendor/laravel/sail/runtimes/8.5/{Dockerfile,start-container,supervisord.conf,php.ini} docker/8.5/`
+2. In `docker/8.5/Dockerfile`, after the main `apt-get install ... postgresql-client-$POSTGRES_VERSION ...` block and before the `$PHP_EXTENSIONS` conditional block, add:
+   ```dockerfile
+   RUN pecl install dbase \
+       && echo "extension=dbase.so" > /etc/php/8.5/cli/conf.d/99-dbase.ini
+   ```
+3. In `compose.yaml`, change both `laravel.test` and `queue` services' `build.context` from `./vendor/laravel/sail/runtimes/8.5` to `./docker/8.5` (they share the `sail-8.5/app` image tag).
+4. `docker compose build laravel.test && docker compose up -d laravel.test queue`
+5. Verify: `docker exec wxnotify-dashboard-laravel.test-1 php -m | grep dbase` → `dbase`.
+
+If executing this plan fresh (not continuing from where this session left off), do this before Task 20's steps.
 
 ---
 
