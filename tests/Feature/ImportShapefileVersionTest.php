@@ -112,3 +112,21 @@ test('re-importing replaces the whole staging table (each layer, including each 
     expect(DB::table('public_zones_staging')->count())->toBe(2)
         ->and(DB::table('public_zones_staging')->where('state_zone', 'AZ001')->exists())->toBeFalse();
 });
+
+test('it stores the computed diff summary on the version after importing', function () {
+    $zipPath = buildFixtureZip('z_test02');
+    Http::fake(['weather.gov/fixture2.zip' => Http::response(file_get_contents($zipPath))]);
+
+    $layer = ShapefileLayer::factory()->create(['key' => 'public_zones']);
+    $version = ShapefileLayerVersion::factory()->create([
+        'shapefile_layer_id' => $layer->id,
+        'source_url' => 'https://www.weather.gov/fixture2.zip',
+        'status' => ShapefileVersionStatus::Staged,
+    ]);
+
+    (new ImportShapefileVersion)($version);
+
+    expect($version->fresh()->diff_summary)->toBe([
+        'added' => 2, 'removed' => 0, 'changed' => 0, 'override_conflicts' => [],
+    ]);
+});

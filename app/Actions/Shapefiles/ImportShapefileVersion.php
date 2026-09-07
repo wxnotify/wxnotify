@@ -27,6 +27,9 @@ class ImportShapefileVersion
         } else {
             $this->importCorrelation($version, $definition);
         }
+
+        $diff = (new ComputeShapefileLayerDiff)($layer, $definition);
+        $version->update(['diff_summary' => $diff]);
     }
 
     private function importShapefile(ShapefileLayerVersion $version, ShapefileLayerDefinition $definition): void
