@@ -34,6 +34,7 @@ Full rationale lives in `docs/superpowers/specs/2026-09-07-awips-shapefile-manag
 - No scheduler exists yet anywhere in this app (`routes/console.php` only has the stock `inspire` command; `bootstrap/app.php` has no `->withSchedule()` call). Task 18 adds the first one.
 - Tests run inside the Sail container: `docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && <command>"`. `vendor/bin/pest` / `php artisan` fail with a DNS error if run on the bare host (Docker-internal hostnames like `pgsql` don't resolve there).
 - **`tests/Pest.php` only binds `RefreshDatabase` to `tests/Feature`, not `tests/Unit`** — confirmed by reading it directly. Any test that touches Eloquent/factories/the database belongs in `tests/Feature`, matching this project's own stated convention ("Write a unit test only for logic that does not use the framework"). This was caught (and fixed, via `git mv`) after Task 3 was originally executed with its DB-backed test misplaced under `tests/Unit/` — every `tests/Unit/...` path named below has already been corrected to `tests/Feature/...` wherever the test actually needs the database (Tasks 3, 5, and 14); the genuinely framework-independent ones (Task 6's registry test, Task 15/16's HTML scrapers, Task 19's polygon math, Task 21's pipe-delimited parser) correctly stay under `tests/Unit/`.
+- **Related, separate gotcha in the same area — `base_path()` also fails inside `tests/Unit/`**: since `tests/Unit/` never boots the Laravel app container (only `tests/Feature/` does, per the point above), `app()` there returns a bare `Illuminate\Container\Container`, not `Illuminate\Foundation\Application`, so `basePath()` doesn't exist and any Unit test calling the `base_path()` helper fails with `Call to undefined method Container::basePath()`. Tasks 15 and 16's Unit tests read fixture HTML from `tests/Fixtures/awips-shapefiles/` and originally used `base_path('tests/Fixtures/...')` like a Feature test would — both were corrected in-flight to `file_get_contents(dirname(__DIR__).'/Fixtures/awips-shapefiles/<file>.html')` instead (portable, no framework dependency; `dirname(__DIR__)` from `tests/Unit/SomeTest.php` resolves to `tests/`). The code below already reflects this fix. Task 17's `tests/Feature/ScanShapefileLayerTest.php` reads the same fixture files via plain `base_path(...)` further down — that one is correct as written, since it's a Feature test.
 
 **Marine gets 3 separate physical table pairs, not one shared table** — a correction made while writing this plan (caught during Task 25's design, before any code was written, not after). The design doc's original sketch had Coastal/Offshore/High Seas sharing one `marine_zones` table with a `zone_type` discriminator. That breaks the atomic-swap activation model: `ALTER TABLE ... RENAME` swaps an entire physical table, and the 3 Marine sub-layers scan/import/activate independently (NOAA can update Coastal without touching Offshore) — activating Coastal alone would swap Offshore's and High Seas's live rows out from under them too, since all three would live in the same physical table. Giving each sub-layer its own table pair (`marine_zones_coastal`/`_staging`, `marine_zones_offshore`/`_staging`, `marine_zones_high_seas`/`_staging`) makes Marine behave exactly like every other layer — one table pair, one independent swap. Each table still carries a `zone_type` column (constant per table) for labeling/future-UNION convenience, but it's no longer part of the natural key. No consumer in this plan queries "all marine zones" as one set — that's left for whenever the future Alert Engine needs it (YAGNI: don't build a cross-table view with no current reader, especially since a naive `VIEW` over these tables would itself go stale across a rename-swap, needing its own recreate-after-swap step that has no user yet).
 
@@ -1634,7 +1635,7 @@ use App\Support\Shapefiles\ShapefilePageScraper;
 use Illuminate\Support\Carbon;
 
 test('it scans a single-group page and takes the latest version', function () {
-    $html = file_get_contents(base_path('tests/Fixtures/awips-shapefiles/public-zones-page.html'));
+    $html = file_get_contents(dirname(__DIR__).'/Fixtures/awips-shapefiles/public-zones-page.html');
 
     $groups = (new ShapefilePageScraper)->scan($html);
 
@@ -1651,7 +1652,7 @@ test('it scans a single-group page and takes the latest version', function () {
 });
 
 test('it scans a 3-group page (Marine Zones) into 3 separate version groups', function () {
-    $html = file_get_contents(base_path('tests/Fixtures/awips-shapefiles/marine-zones-page.html'));
+    $html = file_get_contents(dirname(__DIR__).'/Fixtures/awips-shapefiles/marine-zones-page.html');
 
     $groups = (new ShapefilePageScraper)->scan($html);
 
@@ -1814,7 +1815,7 @@ docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && php 
 use App\Support\Shapefiles\ZoneCountyCorrelationPageScraper;
 
 test('it scans the correlation page, skips the header row, and finds the latest version', function () {
-    $html = file_get_contents(base_path('tests/Fixtures/awips-shapefiles/zone-county-page.html'));
+    $html = file_get_contents(dirname(__DIR__).'/Fixtures/awips-shapefiles/zone-county-page.html');
 
     $groups = (new ZoneCountyCorrelationPageScraper)->scan($html);
 
