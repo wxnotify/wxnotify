@@ -23,5 +23,6 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call(ProductCatalogSeeder::class);
+        $this->call(ShapefileLayerSeeder::class);
     }
 }
