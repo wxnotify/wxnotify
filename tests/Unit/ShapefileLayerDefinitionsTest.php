@@ -1,0 +1,34 @@
+<?php
+
+use App\Support\Shapefiles\ShapefileLayerDefinitions;
+
+test('there are exactly 9 layer definitions with unique keys', function () {
+    $definitions = ShapefileLayerDefinitions::all();
+
+    expect($definitions)->toHaveCount(9)
+        ->and(collect($definitions)->pluck('key')->unique())->toHaveCount(9);
+});
+
+test('the 3 marine sub-layers each have their own table pair and distinct zone type', function () {
+    $marine = collect(ShapefileLayerDefinitions::all())->filter(
+        fn ($d) => str_starts_with($d->key, 'marine_zones_')
+    );
+
+    expect($marine)->toHaveCount(3)
+        ->and($marine->pluck('liveTable')->unique())->toHaveCount(3)
+        ->and($marine->pluck('zoneType')->unique()->sort()->values()->all())
+        ->toBe(['coastal', 'high_seas', 'offshore']);
+});
+
+test('forKey resolves a known key and throws for an unknown one', function () {
+    expect(ShapefileLayerDefinitions::forKey('public_zones')->name)->toBe('Public Zones');
+
+    ShapefileLayerDefinitions::forKey('does_not_exist');
+})->throws(InvalidArgumentException::class);
+
+test('serializeNaturalKey joins composite keys with a pipe', function () {
+    $definition = ShapefileLayerDefinitions::forKey('zone_county_correlation');
+
+    expect($definition->serializeNaturalKey(['state_zone' => 'NM201', 'fips' => '35031']))
+        ->toBe('NM201|35031');
+});
