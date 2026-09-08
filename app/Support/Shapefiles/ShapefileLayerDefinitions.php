@@ -2,6 +2,16 @@
 
 namespace App\Support\Shapefiles;
 
+use App\Models\Shapefiles\CountyBoundary;
+use App\Models\Shapefiles\CwaBoundary;
+use App\Models\Shapefiles\FireZone;
+use App\Models\Shapefiles\MarineZoneCoastal;
+use App\Models\Shapefiles\MarineZoneHighSeas;
+use App\Models\Shapefiles\MarineZoneOffshore;
+use App\Models\Shapefiles\PublicZone;
+use App\Models\Shapefiles\UsStateBoundary;
+use App\Models\Shapefiles\ZoneCountyCorrelation;
+
 final class ShapefileLayerDefinitions
 {
     /**
@@ -24,6 +34,7 @@ final class ShapefileLayerDefinitions
                     'STATE_ZONE' => 'state_zone', 'LON' => 'lon', 'LAT' => 'lat',
                     'SHORTNAME' => 'shortname',
                 ],
+                modelClass: PublicZone::class,
             ),
             new ShapefileLayerDefinition(
                 key: 'counties',
@@ -38,6 +49,7 @@ final class ShapefileLayerDefinitions
                     'FIPS' => 'fips', 'TIME_ZONE' => 'time_zone', 'FE_AREA' => 'fe_area',
                     'LON' => 'lon', 'LAT' => 'lat',
                 ],
+                modelClass: CountyBoundary::class,
             ),
             new ShapefileLayerDefinition(
                 key: 'cwa_boundaries',
@@ -52,6 +64,7 @@ final class ShapefileLayerDefinitions
                     'REGION' => 'region', 'FULLSTAID' => 'fullstaid', 'CITYSTATE' => 'citystate',
                     'CITY' => 'city', 'STATE' => 'state', 'ST' => 'st',
                 ],
+                modelClass: CwaBoundary::class,
             ),
             new ShapefileLayerDefinition(
                 key: 'marine_zones_coastal',
@@ -62,6 +75,7 @@ final class ShapefileLayerDefinitions
                 stagingTable: 'marine_zones_coastal_staging',
                 naturalKeyColumns: ['zone_id'],
                 attributeMap: self::marineAttributeMap(),
+                modelClass: MarineZoneCoastal::class,
                 zoneType: 'coastal',
                 groupMatchText: 'Coastal',
             ),
@@ -74,6 +88,7 @@ final class ShapefileLayerDefinitions
                 stagingTable: 'marine_zones_offshore_staging',
                 naturalKeyColumns: ['zone_id'],
                 attributeMap: self::marineAttributeMap(),
+                modelClass: MarineZoneOffshore::class,
                 zoneType: 'offshore',
                 groupMatchText: 'Offshore',
             ),
@@ -86,6 +101,7 @@ final class ShapefileLayerDefinitions
                 stagingTable: 'marine_zones_high_seas_staging',
                 naturalKeyColumns: ['zone_id'],
                 attributeMap: self::marineAttributeMap(),
+                modelClass: MarineZoneHighSeas::class,
                 zoneType: 'high_seas',
                 groupMatchText: 'High Seas',
             ),
@@ -102,6 +118,7 @@ final class ShapefileLayerDefinitions
                     'STATE_ZONE' => 'state_zone', 'TIME_ZONE' => 'time_zone',
                     'FE_AREA' => 'fe_area', 'LON' => 'lon', 'LAT' => 'lat',
                 ],
+                modelClass: FireZone::class,
             ),
             new ShapefileLayerDefinition(
                 key: 'us_states',
@@ -115,6 +132,7 @@ final class ShapefileLayerDefinitions
                     'STATE' => 'state', 'NAME' => 'name', 'FIPS' => 'fips',
                     'LON' => 'lon', 'LAT' => 'lat',
                 ],
+                modelClass: UsStateBoundary::class,
             ),
             new ShapefileLayerDefinition(
                 key: 'zone_county_correlation',
@@ -129,6 +147,7 @@ final class ShapefileLayerDefinitions
                     'STATE_ZONE' => 'state_zone', 'COUNTY' => 'county', 'FIPS' => 'fips',
                     'TIME_ZONE' => 'time_zone', 'FE_AREA' => 'fe_area', 'LAT' => 'lat', 'LON' => 'lon',
                 ],
+                modelClass: ZoneCountyCorrelation::class,
             ),
         ];
     }

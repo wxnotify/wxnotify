@@ -17,6 +17,7 @@ final class ShapefileLayerDefinition
         public readonly string $stagingTable,
         public readonly array $naturalKeyColumns,
         public readonly array $attributeMap,
+        public readonly string $modelClass,
         public readonly ?string $zoneType = null,
         public readonly ?string $groupMatchText = null,
     ) {}

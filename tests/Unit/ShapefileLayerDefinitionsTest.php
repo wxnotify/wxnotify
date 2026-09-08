@@ -32,3 +32,9 @@ test('serializeNaturalKey joins composite keys with a pipe', function () {
     expect($definition->serializeNaturalKey(['state_zone' => 'NM201', 'fips' => '35031']))
         ->toBe('NM201|35031');
 });
+
+test('every definition has a real, existing model class', function () {
+    foreach (ShapefileLayerDefinitions::all() as $definition) {
+        expect(class_exists($definition->modelClass))->toBeTrue("Missing model class for {$definition->key}: {$definition->modelClass}");
+    }
+});
