@@ -2772,6 +2772,8 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 The correlation file is plain pipe-delimited text with no header row: `STATE|ZONE|CWA|NAME|STATE_ZONE|COUNTY|FIPS|TIME_ZONE|FE_AREA|LAT|LON` — verified against a real downloaded file.
 
+**Bug found post-implementation (via a real import against live NOAA data) and fixed**: the same root cause as Task 20's split-record bug, a different shape. NOAA's real correlation file has 27 of 4,875 lines sharing a duplicate `(state_zone, fips)` pair — the same zone-county overlap split into two disjoint areas (identical attributes, different centroid), same as the shapefile-record splitting but in plain-text form. This table carries no geometry column to merge into, so the fix is simpler: `ImportShapefileVersion::importCorrelation()` now deduplicates parsed rows by natural key before inserting, keeping the first occurrence — see `deduplicateByNaturalKey()` in `app/Actions/Shapefiles/ImportShapefileVersion.php`.
+
 - [ ] **Step 1: Write the failing parser test**
 
 ```bash
