@@ -81,6 +81,14 @@ test('a UGC line with a range and a repeated-prefix code expands into individual
     expect($metadata['ugc_codes'])->toBe(['NYZ069', 'NYZ070', 'NYZ071', 'NYZ072', 'NYZ073', 'NYZ074', 'NYZ075']);
 });
 
+test('a UGC line with plain bare-digit continuations (no range) parses each one under the current prefix', function () {
+    $text = "NYZ069-070-071-081200-\n";
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['ugc_codes'])->toBe(['NYZ069', 'NYZ070', 'NYZ071']);
+});
+
 test('a UGC line mixing a county code and a zone code with a shared purge time parses both', function () {
     $text = "NYC061-NJZ103-081200-\n";
 
