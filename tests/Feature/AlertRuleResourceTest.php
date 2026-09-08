@@ -402,3 +402,16 @@ test('editing a CountyZone rule preserves its stored codes without requiring the
 
     expect($rule->fresh()->county_zone_codes)->toBe('NYZ072,NYC061');
 });
+
+test('the forecast discussion wfo field defaults to the subscriber\'s most recent location\'s CWA', function () {
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'OKX', 'cwa' => 'OKX', 'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $this->location->update(['lat' => 40.5, 'lng' => -72.5]);
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'forecast_discussion'])
+        ->assertFormSet(['wfo' => 'OKX']);
+});

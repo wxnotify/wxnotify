@@ -67,7 +67,10 @@ class AlertRuleForm
                     ->descriptions(collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [$c->value => $c->description()]))
                     ->required()
                     ->live()
-                    ->afterStateUpdated(self::seedProductIdsDefaults(...)),
+                    ->afterStateUpdated(function (Set $set, Get $get): void {
+                        self::seedProductIdsDefaults($set, $get);
+                        self::seedForecastDiscussionWfoDefault($set, $get);
+                    }),
             ]);
     }
 
@@ -94,6 +97,23 @@ class AlertRuleForm
             if ($get("product_ids.{$category->value}") === null) {
                 $set("product_ids.{$category->value}", []);
             }
+        }
+    }
+
+    /**
+     * `wfo` (forecastDiscussionFields()'s field) hits the exact same timing
+     * issue as product_ids above: it only enters the schema once `category`
+     * is picked, so a plain ->default() on the field itself never fires
+     * (confirmed via a control test: radius_miles's pre-existing
+     * ->default(15) in lightningFields() — same dynamic-step context —
+     * also never applies). Seeded here the same way instead, guarded on
+     * the field currently being blank so switching categories away and
+     * back, or typing over the suggestion, never clobbers a real value.
+     */
+    protected static function seedForecastDiscussionWfoDefault(Set $set, Get $get): void
+    {
+        if ($get('category') === AlertCategory::ForecastDiscussion->value && blank($get('wfo'))) {
+            $set('wfo', self::suggestedWfo());
         }
     }
 
@@ -410,9 +430,36 @@ class AlertRuleForm
     protected static function forecastDiscussionFields(): array
     {
         return [
+            // No ->default() here: this field only enters the schema once
+            // category is picked, so a bare default() never fires -- see
+            // seedForecastDiscussionWfoDefault(), which sets it eagerly
+            // from categoryStep()'s afterStateUpdated() hook instead.
             self::wfoField()
                 ->helperText('Your local NWS office\'s 3-letter identifier. Look yours up at weather.gov if you\'re not sure.'),
         ];
+    }
+
+    /**
+     * Suggests a WFO from the subscriber's most recently added Location via
+     * a real ST_Contains lookup against cwa_boundaries -- a convenience
+     * default only (the subscriber can still type over it), since this
+     * wizard step has no location picker of its own for ForecastDiscussion
+     * rules.
+     */
+    protected static function suggestedWfo(): ?string
+    {
+        $location = auth()->user()->locations()->latest()->first();
+
+        if ($location === null) {
+            return null;
+        }
+
+        $row = DB::selectOne(
+            'SELECT cwa FROM cwa_boundaries WHERE ST_Contains(boundary, ST_SetSRID(ST_MakePoint(?, ?), 4269)) LIMIT 1',
+            [(float) $location->lng, (float) $location->lat],
+        );
+
+        return $row?->cwa;
     }
 
     /**
