@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['user_id', 'label', 'type', 'address', 'lat', 'lng'])]
+#[Fillable(['user_id', 'label', 'type', 'address', 'lat', 'lng', 'timezone'])]
 class Location extends Model
 {
     /** @use HasFactory<LocationFactory> */

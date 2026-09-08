@@ -6,8 +6,9 @@ use Database\Factories\IngestedProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['cccc', 'ttaaii', 'awipsid', 'nwws_id', 'wmo_ddhhmm', 'text', 'file_path', 'received_at'])]
+#[Fillable(['cccc', 'ttaaii', 'awipsid', 'nwws_id', 'wmo_ddhhmm', 'text', 'file_path', 'received_at', 'product_id', 'ugc_codes', 'polygon'])]
 class IngestedProduct extends Model
 {
     /** @use HasFactory<IngestedProductFactory> */
@@ -17,7 +18,14 @@ class IngestedProduct extends Model
     {
         return [
             'received_at' => 'datetime',
+            'ugc_codes' => 'array',
+            'polygon' => 'array',
         ];
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 
     /**
