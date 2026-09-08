@@ -249,6 +249,10 @@ test('creating a location inline from the location field attaches it to the aler
             'lat' => 38.8976,
             'lng' => -77.0365,
             'address' => '1600 Pennsylvania Ave NW, Washington, DC',
+            // In production, TimezoneSelect's browser-JS auto-detect fills this
+            // before submit; Pest's headless Livewire test environment never
+            // runs that JS, so it must be supplied explicitly here.
+            'timezone' => 'America/New_York',
         ]);
 
     $location = Location::where('user_id', $this->user->id)->where('label', 'Office')->sole();

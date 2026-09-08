@@ -8,6 +8,7 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
+use Tapp\FilamentTimezoneField\Forms\Components\TimezoneSelect;
 
 class LocationForm
 {
@@ -46,6 +47,12 @@ class LocationForm
                 ->label('Resolved address')
                 ->readOnly()
                 ->helperText('Filled in automatically from the map above — search, drag the marker, or use your current location.'),
+            TimezoneSelect::make('timezone')
+                ->label('Timezone')
+                ->searchable()
+                ->getTimezoneFromBrowser()
+                ->required()
+                ->helperText('Defaults to your browser\'s detected timezone — change it if this location is somewhere else (e.g. a relative\'s house). Used for this location\'s quiet hours.'),
         ];
     }
 }

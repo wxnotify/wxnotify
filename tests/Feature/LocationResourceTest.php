@@ -29,6 +29,10 @@ test('creating a location attaches it to the authenticated user', function () {
             'lat' => 39.8283,
             'lng' => -98.5795,
             'address' => 'Somewhere, KS',
+            // In production, TimezoneSelect's browser-JS auto-detect fills this
+            // before submit; Pest's headless Livewire test environment never
+            // runs that JS, so it must be supplied explicitly here.
+            'timezone' => 'America/Chicago',
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -70,4 +74,32 @@ test('a Pro subscriber has no location limit', function () {
     Location::factory(20)->for($this->user)->create();
 
     expect($this->user->canCreateLocation())->toBeTrue();
+});
+
+test('creating a location persists an explicitly chosen timezone', function () {
+    livewire(CreateLocation::class)
+        ->fillForm([
+            'label' => 'Home',
+            'lat' => 39.8283,
+            'lng' => -98.5795,
+            'address' => 'Somewhere, KS',
+            'timezone' => 'America/Chicago',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $location = Location::where('label', 'Home')->sole();
+
+    expect($location->timezone)->toBe('America/Chicago');
+});
+
+test('creating a location without a timezone is rejected', function () {
+    livewire(CreateLocation::class)
+        ->fillForm([
+            'label' => 'Home',
+            'lat' => 39.8283,
+            'lng' => -98.5795,
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['timezone']);
 });
