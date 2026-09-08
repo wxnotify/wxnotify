@@ -29,6 +29,9 @@ class ViewShapefileLayer extends ViewRecord
             Action::make('viewRecords')
                 ->label('View records')
                 ->url(fn (): string => static::getResource()::getUrl('records', ['record' => $this->record])),
+            Action::make('viewMap')
+                ->label('View map')
+                ->url(fn (): string => static::getResource()::getUrl('map', ['record' => $this->record])),
             Action::make('activate')
                 ->visible(fn (): bool => $this->record->pendingVersion !== null)
                 ->requiresConfirmation()

@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\ShapefileLayers;
 
 use App\Filament\Admin\Resources\ShapefileLayers\Pages\ListShapefileLayers;
+use App\Filament\Admin\Resources\ShapefileLayers\Pages\ShapefileLayerMap;
 use App\Filament\Admin\Resources\ShapefileLayers\Pages\ShapefileLayerRecords;
 use App\Filament\Admin\Resources\ShapefileLayers\Pages\ViewShapefileLayer;
 use App\Filament\Admin\Resources\ShapefileLayers\Tables\ShapefileLayersTable;
@@ -36,6 +37,7 @@ class ShapefileLayerResource extends Resource
             'index' => ListShapefileLayers::route('/'),
             'view' => ViewShapefileLayer::route('/{record}'),
             'records' => ShapefileLayerRecords::route('/{record}/records'),
+            'map' => ShapefileLayerMap::route('/{record}/map'),
         ];
     }
 }
