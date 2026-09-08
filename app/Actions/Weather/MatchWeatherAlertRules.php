@@ -41,8 +41,7 @@ class MatchWeatherAlertRules
                         ->orWhere(fn (Builder $q) => $q->where('category', AlertCategory::WeatherAlerts)
                             ->whereHas('products', fn (Builder $q) => $q->whereKey($product->product_id)));
                 })
-                ->get()
-                ->filter(fn (AlertRule $rule): bool => $this->matchesGeography($rule, $product));
+                ->get();
         } catch (Throwable $e) {
             logger()->error('Failed to query matching AlertRules', [
                 'ingested_product_id' => $product->id,
@@ -53,8 +52,42 @@ class MatchWeatherAlertRules
         }
 
         $rules->each(function (AlertRule $rule) use ($product): void {
-            $this->dispatchOrSuppress($rule, $product);
+            if ($this->matchesGeographySafely($rule, $product)) {
+                $this->dispatchOrSuppress($rule, $product);
+            }
         });
+    }
+
+    /**
+     * Evaluates matchesGeography() for a single rule in isolation, so a
+     * genuinely bad rule/product combination (e.g. malformed polygon data
+     * reaching ST_GeomFromText) can't abort matching for every other active
+     * rule against this same product — mirrors dispatchOrSuppress()'s
+     * per-channel error isolation below, just one level up.
+     *
+     * The DB::transaction() wrapper isn't just belt-and-suspenders: a raw
+     * SQL error (e.g. a Postgres parse error from ST_GeomFromText) leaves
+     * the current transaction unusable for any further statement until it's
+     * rolled back — a plain try/catch alone catches the PHP exception but
+     * would still poison every subsequent rule's queries in this same
+     * batch. DB::transaction() automatically becomes a SAVEPOINT when
+     * called inside an already-open outer transaction (as in this app's own
+     * test suite, or any caller that wraps the whole request), so a failure
+     * here only rolls back this one rule's work, not the batch.
+     */
+    private function matchesGeographySafely(AlertRule $rule, IngestedProduct $product): bool
+    {
+        try {
+            return DB::transaction(fn (): bool => $this->matchesGeography($rule, $product));
+        } catch (Throwable $e) {
+            logger()->error('Failed to evaluate geography match for AlertRule', [
+                'rule_id' => $rule->id,
+                'ingested_product_id' => $product->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function dispatchOrSuppress(AlertRule $rule, IngestedProduct $product): void

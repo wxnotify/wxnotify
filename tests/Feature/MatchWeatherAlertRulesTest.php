@@ -8,6 +8,7 @@ use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
 /**
@@ -283,4 +284,35 @@ test('a Polygon-mode rule falls back to Location-style zone matching when the pr
     (new MatchWeatherAlertRules)($ingested);
 
     Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('an exception evaluating one rule\'s geography does not prevent a second, valid rule from matching', function () {
+    // A malformed (empty) polygon on the product forces matchesPolygon()'s
+    // ST_GeomFromText('POLYGON(())') to throw a real Postgres parse error --
+    // confirmed directly against this database, not assumed. Without
+    // per-rule isolation, this would abort the whole ->filter() pass and
+    // silently suppress delivery to $validRule too.
+    Queue::fake();
+    Log::spy();
+    $product = Product::where('code', 'TO.W')->sole();
+
+    $badLocation = Location::factory()->create();
+    $throwingRule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $badLocation->id]);
+    $throwingRule->products()->attach($product);
+    $throwingRule->notificationChannels()->attach(NotificationChannel::factory()->for($throwingRule->user)->create());
+
+    $validRule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $validRule->products()->attach($product);
+    $validChannel = NotificationChannel::factory()->for($validRule->user)->create();
+    $validRule->notificationChannels()->attach($validChannel);
+
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'polygon' => []]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->ruleId === $validRule->id && $job->channelId === $validChannel->id);
+    Queue::assertNotPushed(DeliverWeatherAlert::class, fn ($job) => $job->ruleId === $throwingRule->id);
+    Log::shouldHaveReceived('error')
+        ->once()
+        ->withArgs(fn ($message, $context) => $context['rule_id'] === $throwingRule->id && $context['ingested_product_id'] === $ingested->id);
 });
