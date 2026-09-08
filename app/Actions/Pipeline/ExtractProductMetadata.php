@@ -31,7 +31,7 @@ class ExtractProductMetadata
     {
         return [
             'product_id' => $this->resolveProductId($text, $awipsid),
-            'ugc_codes' => null,
+            'ugc_codes' => $this->parseUgcCodes($text),
             'polygon' => null,
         ];
     }
@@ -60,5 +60,39 @@ class ExtractProductMetadata
         $code = $prefix !== null ? (self::AWIPS_PREFIX_CROSSWALK[$prefix] ?? null) : null;
 
         return $code !== null ? Product::where('code', $code)->first()?->id : null;
+    }
+
+    /**
+     * Standard NWS UGC line: dash-separated zone/county codes, immediately
+     * before the VTEC line, terminated by a 6-digit DDHHMM purge timestamp
+     * (e.g. "NYZ069-070>075-081200-"). A bare 3-digit token continues the
+     * most recently seen state+type prefix; a "070>075" token expands to
+     * every code in that numeric range under the current prefix.
+     *
+     * @return ?array<int, string>
+     */
+    private function parseUgcCodes(string $text): ?array
+    {
+        if (! preg_match('/^((?:[A-Z]{2}[CZ]\d{3}|\d{3}(?:>\d{3})?)(?:-(?:[A-Z]{2}[CZ]\d{3}|\d{3}(?:>\d{3})?))*)-\d{6}-\s*$/m', $text, $matches)) {
+            return null;
+        }
+
+        $codes = [];
+        $prefix = null;
+
+        foreach (explode('-', $matches[1]) as $token) {
+            if (preg_match('/^([A-Z]{2}[CZ])(\d{3})$/', $token, $m)) {
+                $prefix = $m[1];
+                $codes[] = "{$prefix}{$m[2]}";
+            } elseif ($prefix !== null && preg_match('/^(\d{3})>(\d{3})$/', $token, $m)) {
+                foreach (range((int) $m[1], (int) $m[2]) as $n) {
+                    $codes[] = $prefix.str_pad((string) $n, 3, '0', STR_PAD_LEFT);
+                }
+            } elseif ($prefix !== null && preg_match('/^\d{3}$/', $token)) {
+                $codes[] = $prefix.$token;
+            }
+        }
+
+        return $codes === [] ? null : $codes;
     }
 }

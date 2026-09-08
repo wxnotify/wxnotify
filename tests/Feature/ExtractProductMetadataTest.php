@@ -69,3 +69,28 @@ test('a VTEC phenomena+significance with no matching catalog product resolves no
 
     expect($metadata['product_id'])->toBeNull();
 });
+
+test('a UGC line with a range and a repeated-prefix code expands into individual zone codes', function () {
+    $text = <<<'TEXT'
+    NYZ069-070>075-081200-
+    /O.NEW.KOKX.TO.W.0042.260906T1800Z-260906T1900Z/
+    TEXT;
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['ugc_codes'])->toBe(['NYZ069', 'NYZ070', 'NYZ071', 'NYZ072', 'NYZ073', 'NYZ074', 'NYZ075']);
+});
+
+test('a UGC line mixing a county code and a zone code with a shared purge time parses both', function () {
+    $text = "NYC061-NJZ103-081200-\n";
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['ugc_codes'])->toBe(['NYC061', 'NJZ103']);
+});
+
+test('a product with no UGC line resolves no ugc_codes', function () {
+    $metadata = (new ExtractProductMetadata)("AREA FORECAST DISCUSSION\nNo UGC line here.", null);
+
+    expect($metadata['ugc_codes'])->toBeNull();
+});
