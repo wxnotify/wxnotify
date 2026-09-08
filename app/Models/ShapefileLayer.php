@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\ShapefileVersionStatus;
 use Database\Factories\ShapefileLayerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['key', 'name', 'source_url', 'last_seen_filename', 'last_seen_checksum', 'last_seen_effective_at', 'active_version_id'])]
 class ShapefileLayer extends Model
@@ -35,5 +37,12 @@ class ShapefileLayer extends Model
     public function activeVersion(): BelongsTo
     {
         return $this->belongsTo(ShapefileLayerVersion::class, 'active_version_id');
+    }
+
+    public function pendingVersion(): HasOne
+    {
+        return $this->hasOne(ShapefileLayerVersion::class)
+            ->where('status', ShapefileVersionStatus::Staged)
+            ->latestOfMany();
     }
 }
