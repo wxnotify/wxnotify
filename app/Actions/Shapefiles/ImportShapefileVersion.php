@@ -61,8 +61,8 @@ class ImportShapefileVersion
             DB::transaction(function () use ($shp, $definition): void {
                 DB::table($definition->stagingTable)->delete();
 
-                foreach ($shp->records as $record) {
-                    $this->insertShapefileRecord($record, $definition);
+                foreach ($this->groupRecordsByNaturalKey($shp->records, $definition) as $group) {
+                    $this->insertShapefileRecordGroup($group, $definition);
                 }
             });
         } finally {
@@ -70,19 +70,49 @@ class ImportShapefileVersion
         }
     }
 
-    private function insertShapefileRecord(ShapeRecord $record, ShapefileLayerDefinition $definition): void
+    /**
+     * NOAA sometimes splits one logical zone/entity across multiple physical shapefile
+     * records that share the same natural key and attributes but hold different,
+     * disjoint geometry (verified against a real download: 77 of Public Zones' 4,157
+     * records are such splits, e.g. Calvert County, MD's zone is two separate records
+     * for its two water-separated land areas). Group them here so each natural key
+     * becomes exactly one row with a combined MultiPolygon, matching this table's
+     * unique constraint on the natural key — inserting them separately would violate
+     * that constraint (or, without it, silently produce duplicate rows for one zone).
+     *
+     * @param  array<int, ShapeRecord>  $records
+     * @return array<string, array<int, ShapeRecord>>
+     */
+    private function groupRecordsByNaturalKey(array $records, ShapefileLayerDefinition $definition): array
     {
-        $attributes = [];
+        $groups = [];
 
-        foreach ($definition->attributeMap as $sourceField => $column) {
-            $attributes[$column] = trim((string) ($record->dbfData[$sourceField] ?? ''));
+        foreach ($records as $record) {
+            $key = $definition->serializeNaturalKey($this->mapAttributes($record, $definition));
+            $groups[$key][] = $record;
         }
+
+        return $groups;
+    }
+
+    /**
+     * @param  array<int, ShapeRecord>  $group
+     */
+    private function insertShapefileRecordGroup(array $group, ShapefileLayerDefinition $definition): void
+    {
+        $attributes = $this->mapAttributes($group[0], $definition);
 
         if ($definition->zoneType !== null) {
             $attributes['zone_type'] = $definition->zoneType;
         }
 
-        $wkt = ShapefilePolygonAssembler::toMultiPolygonWkt($record->shpData['parts'] ?? []);
+        $allParts = [];
+
+        foreach ($group as $record) {
+            array_push($allParts, ...($record->shpData['parts'] ?? []));
+        }
+
+        $wkt = ShapefilePolygonAssembler::toMultiPolygonWkt($allParts);
 
         $columns = array_keys($attributes);
         $sql = sprintf(
@@ -93,6 +123,20 @@ class ImportShapefileVersion
         );
 
         DB::insert($sql, [...array_values($attributes), $wkt]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function mapAttributes(ShapeRecord $record, ShapefileLayerDefinition $definition): array
+    {
+        $attributes = [];
+
+        foreach ($definition->attributeMap as $sourceField => $column) {
+            $attributes[$column] = trim((string) ($record->dbfData[$sourceField] ?? ''));
+        }
+
+        return $attributes;
     }
 
     private function importCorrelation(ShapefileLayerVersion $version, ShapefileLayerDefinition $definition): void

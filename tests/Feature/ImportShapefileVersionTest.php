@@ -134,6 +134,91 @@ test('it stores the computed diff summary on the version after importing', funct
     ]);
 });
 
+function buildSplitZoneFixtureZip(string $basename): string
+{
+    // NOAA sometimes stores one logical zone as two separate shapefile records
+    // sharing the same STATE_ZONE and attributes but different, disjoint geometry
+    // -- verified against a real download (77 of Public Zones' 4,157 records are
+    // such splits, e.g. Calvert County, MD). This fixture reproduces that shape.
+    $dir = storage_path('app/test-fixtures/'.$basename);
+    File::ensureDirectoryExists($dir);
+    $base = $dir.'/'.$basename;
+
+    $shp = new ShapeFile(ShapeType::Polygon, ['xmin' => 0, 'ymin' => 0, 'xmax' => 10, 'ymax' => 10]);
+
+    $recordA = new ShapeRecord(ShapeType::Polygon);
+    $recordA->addPoint(['x' => 0, 'y' => 0], 0);
+    $recordA->addPoint(['x' => 0, 'y' => 1], 0);
+    $recordA->addPoint(['x' => 1, 'y' => 1], 0);
+    $recordA->addPoint(['x' => 1, 'y' => 0], 0);
+    $recordA->addPoint(['x' => 0, 'y' => 0], 0);
+    $shp->addRecord($recordA);
+
+    $recordB = new ShapeRecord(ShapeType::Polygon);
+    $recordB->addPoint(['x' => 5, 'y' => 5], 0);
+    $recordB->addPoint(['x' => 5, 'y' => 6], 0);
+    $recordB->addPoint(['x' => 6, 'y' => 6], 0);
+    $recordB->addPoint(['x' => 6, 'y' => 5], 0);
+    $recordB->addPoint(['x' => 5, 'y' => 5], 0);
+    $shp->addRecord($recordB);
+
+    $shp->setDBFHeader([
+        ['STATE', 'C', 2, 0], ['CWA', 'C', 9, 0], ['TIME_ZONE', 'C', 2, 0],
+        ['FE_AREA', 'C', 2, 0], ['ZONE', 'C', 3, 0], ['NAME', 'C', 254, 0],
+        ['STATE_ZONE', 'C', 5, 0], ['LON', 'N', 12, 7], ['LAT', 'N', 12, 7],
+        ['SHORTNAME', 'C', 32, 0],
+    ]);
+
+    $shp->records[0]->dbfData = [
+        'STATE' => 'MD', 'CWA' => 'LWX', 'TIME_ZONE' => 'E', 'FE_AREA' => 'ss',
+        'ZONE' => '018', 'NAME' => 'Calvert', 'STATE_ZONE' => 'MD018',
+        'LON' => -76.48, 'LAT' => 38.38, 'SHORTNAME' => 'Calvert',
+    ];
+    $shp->records[1]->dbfData = [
+        'STATE' => 'MD', 'CWA' => 'LWX', 'TIME_ZONE' => 'E', 'FE_AREA' => 'ss',
+        'ZONE' => '018', 'NAME' => 'Calvert', 'STATE_ZONE' => 'MD018',
+        'LON' => -76.57, 'LAT' => 38.55, 'SHORTNAME' => 'Calvert',
+    ];
+
+    $shp->saveToFile($base.'.*');
+
+    $zipPath = $dir.'/'.$basename.'.zip';
+    $zip = new ZipArchive;
+    $zip->open($zipPath, ZipArchive::CREATE);
+    foreach (['shp', 'shx', 'dbf'] as $ext) {
+        $zip->addFile($base.'.'.$ext, $basename.'.'.$ext);
+    }
+    $zip->close();
+
+    return $zipPath;
+}
+
+test('two shapefile records sharing the same natural key merge into one row with a combined MultiPolygon', function () {
+    $zipPath = buildSplitZoneFixtureZip('z_split_test');
+    Http::fake(['weather.gov/split-fixture.zip' => Http::response(file_get_contents($zipPath))]);
+
+    $layer = ShapefileLayer::factory()->create(['key' => 'public_zones']);
+    $version = ShapefileLayerVersion::factory()->create([
+        'shapefile_layer_id' => $layer->id,
+        'source_url' => 'https://www.weather.gov/split-fixture.zip',
+        'status' => ShapefileVersionStatus::Staged,
+    ]);
+
+    (new ImportShapefileVersion)($version);
+
+    // One row, not two -- the unique constraint on state_zone would otherwise fail.
+    expect(DB::table('public_zones_staging')->count())->toBe(1);
+
+    $row = DB::table('public_zones_staging')->where('state_zone', 'MD018')->first();
+    expect($row)->not->toBeNull()
+        ->and($row->name)->toBe('Calvert');
+
+    // The combined geometry contains both disjoint squares as separate polygons
+    // within one MultiPolygon, not just one of them.
+    $geometry = DB::selectOne('SELECT ST_AsText(boundary) as wkt FROM public_zones_staging WHERE state_zone = ?', ['MD018']);
+    expect($geometry->wkt)->toBe('MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)),((5 5,5 6,6 6,6 5,5 5)))');
+});
+
 test('it notifies every staff user, and no one else, once the diff is computed', function () {
     Notification::fake();
 
