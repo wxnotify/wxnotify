@@ -12,6 +12,7 @@ use App\Models\Location;
 use App\Models\NotificationChannel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
@@ -98,9 +99,47 @@ class MatchWeatherAlertRules
             MatchingMode::Wfo => $this->matchesWfo($rule->wfo, $product->cccc),
             MatchingMode::Location => $this->matchesLocationZones($rule, $product),
             MatchingMode::CountyZone => $this->matchesCountyZone($rule, $product),
-            MatchingMode::Polygon => false, // implemented in a later task
+            MatchingMode::Polygon => $this->matchesPolygon($rule, $product) ?? $this->matchesLocationZones($rule, $product),
             null => false,
         };
+    }
+
+    /**
+     * Returns null (not false) when the product has no polygon, so the
+     * caller can fall back to matchesLocationZones() — most VTEC products
+     * don't carry a polygon, and a subscriber in Polygon mode shouldn't be
+     * silently missed on a warning type that's UGC-only.
+     */
+    private function matchesPolygon(AlertRule $rule, IngestedProduct $product): ?bool
+    {
+        if ($product->polygon === null || $rule->location === null) {
+            return null;
+        }
+
+        $wkt = $this->polygonToWkt($product->polygon);
+        $lng = (float) $rule->location->lng;
+        $lat = (float) $rule->location->lat;
+
+        $result = DB::selectOne(
+            'SELECT ST_Contains(ST_SetSRID(ST_GeomFromText(?), 4269), ST_SetSRID(ST_MakePoint(?, ?), 4269)) AS contains',
+            [$wkt, $lng, $lat],
+        );
+
+        return $result !== null && filter_var($result->contains, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * @param  array<int, array{lat: float, lon: float}>  $points
+     */
+    private function polygonToWkt(array $points): string
+    {
+        $coords = collect($points)->map(fn (array $p): string => "{$p['lon']} {$p['lat']}");
+
+        if ($coords->first() !== $coords->last()) {
+            $coords->push($coords->first()); // WKT polygons must be closed rings
+        }
+
+        return 'POLYGON(('.$coords->join(', ').'))';
     }
 
     private function matchesLocationZones(AlertRule $rule, IngestedProduct $product): bool

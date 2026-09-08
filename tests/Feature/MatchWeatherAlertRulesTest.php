@@ -230,3 +230,57 @@ test('a CountyZone-mode rule with no overlap never matches', function () {
 
     Queue::assertNotPushed(DeliverWeatherAlert::class);
 });
+
+test('a Polygon-mode rule matches when the location falls inside the product\'s parsed polygon', function () {
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $location = Location::factory()->create(['lat' => 40.5, 'lng' => -74.0]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $product->id,
+        'polygon' => [
+            ['lat' => 40.0, 'lon' => -74.5], ['lat' => 41.0, 'lon' => -74.5],
+            ['lat' => 41.0, 'lon' => -73.5], ['lat' => 40.0, 'lon' => -73.5],
+        ],
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a Polygon-mode rule does not match a location outside the product\'s parsed polygon', function () {
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $location = Location::factory()->create(['lat' => 10.0, 'lng' => -10.0]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $product->id,
+        'polygon' => [
+            ['lat' => 40.0, 'lon' => -74.5], ['lat' => 41.0, 'lon' => -74.5],
+            ['lat' => 41.0, 'lon' => -73.5], ['lat' => 40.0, 'lon' => -73.5],
+        ],
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('a Polygon-mode rule falls back to Location-style zone matching when the product has no polygon', function () {
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $location = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'polygon' => null, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
