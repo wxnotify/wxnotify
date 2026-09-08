@@ -9,6 +9,8 @@ Phase 1's subscriber-facing config (`AlertRuleResource`, `LocationResource`, `No
 - **`Threshold`, `DailySummary`** — scheduled/periodic, driven by the NWS forecast API (`App\Actions\Weather\GetSevenDayForecast` already exists and works). A separate, later design.
 - **`Lightning`** — has no data source of any kind in this app yet. Needs its own ingestion project (comparable in scope to the NWWS pipe) before any matching logic is meaningful. Not touched here.
 
+**Revision note (2026-09-07)**: this spec originally assumed no local geometry existed anywhere in the app, so `Location`/`Polygon`/`CountyZone` matching was designed entirely around UGC-string overlap sourced from the external `api.weather.gov/points` NWS API. The AWIPS Shapefile Management feature has since shipped: real PostGIS geometry for `public_zones`, `counties`, `fire_zones`, `cwa_boundaries`, and the marine zone layers is now live in this database. The sections below (`Location & timezone resolution`, `MatchWeatherAlertRules`'s geography rules, the `CountyZone` wizard step) have been revised to use that data directly. Everything else in this document — ingest-time enrichment, delivery/`DeliveryLog`, the two known gaps — is unaffected and unchanged.
+
 ## Architecture
 
 ```
@@ -79,9 +81,32 @@ ingested_products:
 
 ## Location & timezone resolution
 
-`App\Actions\Weather\GetSevenDayForecast::resolveForecastUrl()` already calls `https://api.weather.gov/points/{lat},{lng}` and caches the result **forever**, keyed by coordinate — but only extracts `properties.forecast`. The same response also carries `properties.county`, `properties.forecastZone`, `properties.fireWeatherZone` (each a URL whose last path segment is a UGC code, e.g. `.../zones/county/NYC061` → `NYC061`) and `properties.timeZone` (e.g. `"America/New_York"`) — everything `MatchingMode::Location`/`CountyZone` and quiet-hours need, from a call this app already makes and caches.
+This splits into two independent resolutions, sourced differently:
 
-**Plan**: broaden that cached value from a bare forecast-URL string to a small structure (`{forecastUrl, countyUgc, forecastZoneUgc, fireWeatherZoneUgc, timeZone}`), so there's still exactly one HTTP call per unique coordinate, not two. Add `locations.timezone` (nullable string), populated from this the first time a location's zones are resolved (e.g. lazily, the first time it's needed for matching or quiet-hours — not from a Location-creation hook, since a `Threshold`/`DailySummary` rule at that same location already needs the same cached call anyway).
+### Zone/county codes — resolved locally via PostGIS
+
+`counties`, `public_zones`, and `fire_zones` are now real, populated tables (from the AWIPS Shapefile Management feature), each with real geometry and a natural-key UGC-shaped column (`state_zone` / `fips`). A subscriber's `Location.lat`/`Location.lng` can be tested directly against these with `ST_Contains`, replacing the external API for this specific purpose — no HTTP call, no forever-cache staleness risk if a zone boundary is ever redrawn, and it stays correct automatically as the AWIPS feature's own scan/import pipeline keeps these tables current.
+
+**SRID note**: shapefile geometry is stored SRID 4269 (NAD83, confirmed via the AWIPS feature's real `.prj` files); `Location.lat`/`lng` have no SRID of their own (plain `decimal(10,7)` columns). Construct the query point directly as SRID 4269 (e.g. `ST::point($lng, $lat)->setSrid(4269)` via the `Clickbar\Magellan` facade, or raw `ST_SetSRID(ST_MakePoint(lng, lat), 4269)`) rather than transforming from 4326 — the NAD83/WGS84 datum difference is sub-meter, irrelevant at the scale of a zone polygon boundary, and skipping `ST_Transform` keeps the query simpler.
+
+**New Action**: `App\Actions\Weather\ResolveLocationZones` — given a `Location`, runs one `ST_Contains` query per layer (`public_zones`, `counties`, `fire_zones`) and writes the results onto three new nullable columns on `locations`:
+
+```
+locations:
+  county_ugc              — nullable string (e.g. "NYC061")
+  forecast_zone_ugc       — nullable string (e.g. "NYZ072")
+  fire_weather_zone_ugc   — nullable string (e.g. "NYZ072")
+```
+
+Called lazily — the first time a location's zones are needed for matching or quiet-hours — same trigger point as the original design's cached API call, not from a `Location`-creation hook.
+
+### `timeZone` / `forecastUrl` — still the external API
+
+NOAA's local `time_zone` shapefile column is an abbreviated code (`E`/`C`/`M`/`P`), not an IANA identifier — it can't feed quiet-hours delivery logic, which needs a real timezone for time-of-day comparison. `App\Actions\Weather\GetSevenDayForecast::resolveForecastUrl()` already calls `https://api.weather.gov/points/{lat},{lng}` and caches the result forever, keyed by coordinate; this stays, narrowed to extracting only `properties.forecast` and `properties.timeZone` (e.g. `"America/New_York"`) — `properties.county`/`forecastZone`/`fireWeatherZone` are no longer needed from this response now that `ResolveLocationZones` provides the same codes locally. Add `locations.timezone` (nullable string), populated from this call the same lazily-triggered way as before.
+
+### WFO auto-suggestion (`ForecastDiscussion` category)
+
+Not part of the original design but now trivial: `ST_Contains` against `cwa_boundaries` for the subscriber's `Location` resolves a suggested WFO (`cwa` column) to pre-fill `forecastDiscussionFields()`'s `wfo` `TextInput` — a small UX addition, not a matching-engine change (the subscriber can still override it).
 
 ## `MatchWeatherAlertRules`
 
@@ -117,11 +142,18 @@ AlertRule::query()
 **`WeatherAlerts`/`SpcWpc` geography matching, per `MatchingMode`:**
 - `Nationwide` — always matches (the product filter already narrowed it).
 - `Wfo` — same direct comparison as `ForecastDiscussion` above. No new lookup needed; `cccc` is already captured at ingestion.
-- `Location` — resolve the rule's `Location` to its cached `forecastZoneUgc`/`countyUgc`, check for overlap with `$product->ugc_codes`.
-- `Polygon` — if `$product->polygon` is set, a real point-in-polygon test against the rule's `Location` coordinates; **falls back to the `Location` behavior above if the product has no polygon** (most VTEC products don't carry one), so a subscriber in `Polygon` mode isn't silently missed on a warning type that's UGC-only.
-- `CountyZone` — direct overlap between the rule's stored `county_zone_codes` and `$product->ugc_codes`.
+- `Location` — check the rule's `Location.forecast_zone_ugc`/`county_ugc` (resolved locally by `ResolveLocationZones`, see above) for overlap with `$product->ugc_codes`.
+- `Polygon` — if `$product->polygon` is set, a real `ST_Contains`/Magellan point-in-polygon test between the parsed polygon (as WKT) and the rule's `Location` point (SRID 4269, per the SRID note above) — no more hand-rolled ray-casting math; **falls back to the `Location` behavior above if the product has no polygon** (most VTEC products don't carry one), so a subscriber in `Polygon` mode isn't silently missed on a warning type that's UGC-only.
+- `CountyZone` — direct overlap between the rule's stored `county_zone_codes` and `$product->ugc_codes`. The codes themselves now come from a real State → County/Zone picker (see below) instead of hand-typed text, but the comparison logic is unchanged.
 
 **Risk level** (`SpcWpc` only): if the rule has `risk_levels` set, the ingested product's text must be checked for a matching risk level string — this needs its own small extractor (SPC outlook/MD text has a documented risk-level line) not detailed further here; flagged as an implementation-time detail, not a design blocker.
+
+## `CountyZone` wizard step — real picker, not free text
+
+`AlertRuleForm.php`'s `countyZoneField()` is currently a plain `TextInput::make('county_zone_codes')` — a subscriber hand-types comma-separated UGC codes (e.g. `TXZ211, TXC201`), validated only by a regex, with no guarantee the code actually exists. This was a reasonable placeholder before any zone data existed in the app; `counties` and `public_zones` are now real, populated tables, so this step is revised to a real picker:
+
+- A `Select::make('state')` (US state abbreviations), then a `Select::make('county_zone_codes')->multiple()` populated live (via `->options(fn (Get $get) => ...)`, keyed on the chosen state) from `counties`/`public_zones` — one merged option list, county and forecast-zone entries both shown (labeled to distinguish them, e.g. `"NYC061 — Suffolk County"` vs `"NYZ072 — Suffolk"`), matching what a real VTEC product's `ugc_codes` can contain.
+- The column and stored format are unchanged — `county_zone_codes` stays the same comma-joined string on `alert_rules`, dehydrated the same way. Only the input mechanism changes, so `MatchWeatherAlertRules`'s comparison logic (above) needs no changes at all for this.
 
 ## Delivery & `DeliveryLog`
 
@@ -144,8 +176,10 @@ Quiet hours themselves: `quiet_hours_start`/`quiet_hours_end` are plain `TimePic
 ## Testing plan
 
 - `ExtractProductMetadataTest`: real sample product texts (a tornado warning with a polygon, a severe thunderstorm warning with UGC codes only, an AFD, a product with two VTEC lines) each resolve to the right `product_id`/`ugc_codes`/`polygon`.
-- `MatchWeatherAlertRulesTest`: one test per `MatchingMode` confirming a match and a non-match; `SpcWpc` risk-level filtering; `ForecastDiscussion`'s WFO-only matching; quiet-hours suppression writing a `suppressed` `DeliveryLog` row instead of dispatching.
+- `ResolveLocationZonesTest`: a real coordinate known to fall inside a specific `public_zones`/`counties`/`fire_zones` polygon resolves to the correct UGC code on each of the three new `Location` columns; a coordinate outside US coverage resolves all three to `null` without erroring.
+- `MatchWeatherAlertRulesTest`: one test per `MatchingMode` confirming a match and a non-match (`Polygon`'s real point-in-polygon test needs both a point clearly inside and clearly outside the product's polygon, plus the no-polygon fallback-to-`Location` case); `SpcWpc` risk-level filtering; `ForecastDiscussion`'s WFO-only matching; quiet-hours suppression writing a `suppressed` `DeliveryLog` row instead of dispatching.
 - `DeliverWeatherAlertTest`: mirrors `SendActivityAlertTest`'s shape — success writes a `success` log row, a failed Apprise call writes `failure` with `error_detail`, a deleted rule/channel/product no-ops.
+- `AlertRuleForm`'s `CountyZone` step (Filament test): selecting a state populates the county/zone options from real data; selecting one or more stores the expected comma-joined `county_zone_codes` string, unchanged from the current schema-level test coverage.
 
 ## Known gaps / open items for the planning pass
 
