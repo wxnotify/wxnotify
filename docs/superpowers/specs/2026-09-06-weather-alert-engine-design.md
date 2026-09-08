@@ -81,7 +81,7 @@ ingested_products:
 
 ## Location & timezone resolution
 
-This splits into two independent resolutions, sourced differently:
+This splits into two independent resolutions, sourced differently — zone/county codes locally via PostGIS, timezone directly from the subscriber:
 
 ### Zone/county codes — resolved locally via PostGIS
 
@@ -98,11 +98,22 @@ locations:
   fire_weather_zone_ugc   — nullable string (e.g. "NYZ072")
 ```
 
-Called lazily — the first time a location's zones are needed for matching or quiet-hours — same trigger point as the original design's cached API call, not from a `Location`-creation hook.
+Called lazily — the first time a location's zones are needed for matching — not from a `Location`-creation hook, since a rule may never reference `Location`/`Polygon`/`CountyZone` matching for that location at all.
 
-### `timeZone` / `forecastUrl` — still the external API
+### `timezone` — subscriber-supplied, not the external API
 
-NOAA's local `time_zone` shapefile column is an abbreviated code (`E`/`C`/`M`/`P`), not an IANA identifier — it can't feed quiet-hours delivery logic, which needs a real timezone for time-of-day comparison. `App\Actions\Weather\GetSevenDayForecast::resolveForecastUrl()` already calls `https://api.weather.gov/points/{lat},{lng}` and caches the result forever, keyed by coordinate; this stays, narrowed to extracting only `properties.forecast` and `properties.timeZone` (e.g. `"America/New_York"`) — `properties.county`/`forecastZone`/`fireWeatherZone` are no longer needed from this response now that `ResolveLocationZones` provides the same codes locally. Add `locations.timezone` (nullable string), populated from this call the same lazily-triggered way as before.
+**Revision (2026-09-07, second pass)**: the original plan to source `locations.timezone` from the NWS API's `properties.timeZone` is dropped in favor of a real, subscriber-editable field. NOAA's local `time_zone` shapefile column is an abbreviated code (`E`/`C`/`M`/`P`), not an IANA identifier, so it was never a candidate here either way — but a geography-derived timezone (from either source) isn't actually what quiet hours need: quiet hours are about the subscriber's own sense of "my nighttime," which a subscriber-entered value expresses more directly than a reverse lookup off their coordinate.
+
+Add `Tapp\FilamentTimezoneField\Forms\Components\TimezoneSelect` (`composer require tapp/filament-timezone-field`) to `LocationForm`'s schema:
+
+```php
+TimezoneSelect::make('timezone')
+    ->searchable()
+    ->getTimezoneFromBrowser()
+    ->required(),
+```
+
+`->getTimezoneFromBrowser()` auto-populates the field from the browser's detected IANA timezone (via its own client-side JS) when a subscriber first opens the create form — a convenient default, not an authoritative geographic fact, since it reflects whatever device is currently browsing rather than necessarily the location being configured (e.g., a subscriber setting up an alert for a relative's house in a different timezone). The subscriber can freely search and override it. `locations.timezone` (nullable string, IANA identifier) is populated directly by this field at Location create/edit time — no lazy resolution, no external call, and this removes the NWS `points` API from this spec entirely (it's used elsewhere, by `GetSevenDayForecast`, for `forecastUrl` — unrelated to this document's scope).
 
 ### WFO auto-suggestion (`ForecastDiscussion` category)
 
@@ -180,6 +191,7 @@ Quiet hours themselves: `quiet_hours_start`/`quiet_hours_end` are plain `TimePic
 - `MatchWeatherAlertRulesTest`: one test per `MatchingMode` confirming a match and a non-match (`Polygon`'s real point-in-polygon test needs both a point clearly inside and clearly outside the product's polygon, plus the no-polygon fallback-to-`Location` case); `SpcWpc` risk-level filtering; `ForecastDiscussion`'s WFO-only matching; quiet-hours suppression writing a `suppressed` `DeliveryLog` row instead of dispatching.
 - `DeliverWeatherAlertTest`: mirrors `SendActivityAlertTest`'s shape — success writes a `success` log row, a failed Apprise call writes `failure` with `error_detail`, a deleted rule/channel/product no-ops.
 - `AlertRuleForm`'s `CountyZone` step (Filament test): selecting a state populates the county/zone options from real data; selecting one or more stores the expected comma-joined `county_zone_codes` string, unchanged from the current schema-level test coverage.
+- `LocationForm`'s `timezone` field (Filament test): submitting the form with an explicit IANA value persists it to `locations.timezone`; the field is `required` (no silent-null path that would later break quiet-hours resolution). Browser auto-detect itself is the plugin's own client-side behavior and isn't re-tested here.
 
 ## Known gaps / open items for the planning pass
 
