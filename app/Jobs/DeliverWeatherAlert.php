@@ -2,19 +2,27 @@
 
 namespace App\Jobs;
 
+use App\Models\AlertRule;
+use App\Models\DeliveryLog;
+use App\Models\IngestedProduct;
+use App\Models\NotificationChannel;
+use App\Support\Apprise\AppriseApiClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 
 /**
  * Dispatched once per AlertRule x NotificationChannel matched by
  * App\Actions\Weather\MatchWeatherAlertRules. Takes ids rather than model
  * instances so a rule/channel/product deleted between dispatch and
- * processing is a silent, intentional no-op — not a failed job.
+ * processing is a silent, intentional no-op.
  *
- * This is a minimal stub: handle() is implemented in a later task.
+ * Unlike App\Jobs\SendActivityAlert, a delivery failure here is a terminal
+ * outcome recorded in DeliveryLog, not a retried job — the design doc
+ * specifies writing a failure row, not retry-and-throw.
  */
 class DeliverWeatherAlert implements ShouldQueue
 {
@@ -26,8 +34,30 @@ class DeliverWeatherAlert implements ShouldQueue
         public readonly int $ingestedProductId,
     ) {}
 
-    public function handle(): void
+    public function handle(AppriseApiClient $client): void
     {
-        // Implemented in a later task.
+        $rule = AlertRule::find($this->ruleId);
+        $channel = NotificationChannel::find($this->channelId);
+        $product = IngestedProduct::find($this->ingestedProductId);
+
+        if ($rule === null || $channel === null || $product === null || ! $rule->is_active) {
+            return;
+        }
+
+        $delivered = $client->notify(
+            url: $channel->apprise_url,
+            body: Str::limit($product->text, 1500),
+            title: $rule->displayName(),
+        );
+
+        DeliveryLog::create([
+            'alert_rule_id' => $rule->id,
+            'notification_channel_id' => $channel->id,
+            'user_id' => $rule->user_id,
+            'channel_type' => $channel->channel_type,
+            'status' => $delivered ? 'success' : 'failure',
+            'error_detail' => $delivered ? null : 'Apprise reported non-delivery.',
+            'dispatched_at' => now(),
+        ]);
     }
 }
