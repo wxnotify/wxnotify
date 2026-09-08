@@ -70,10 +70,15 @@ class MatchWeatherAlertRules
      * the current transaction unusable for any further statement until it's
      * rolled back — a plain try/catch alone catches the PHP exception but
      * would still poison every subsequent rule's queries in this same
-     * batch. DB::transaction() automatically becomes a SAVEPOINT when
-     * called inside an already-open outer transaction (as in this app's own
-     * test suite, or any caller that wraps the whole request), so a failure
-     * here only rolls back this one rule's work, not the batch.
+     * batch (confirmed directly against this database: a follow-up query
+     * inside the same open transaction fails with "current transaction is
+     * aborted" after an uncaught SQL error). In production there's no
+     * ambient outer transaction around this call today (IngestedProductObserver
+     * invokes this synchronously with nothing wrapping it), so this opens a
+     * fresh top-level transaction per rule; inside this app's own test
+     * suite, which does wrap each test in one, it becomes a SAVEPOINT
+     * instead. Either way, a failure here only rolls back this one rule's
+     * work, not the batch.
      */
     private function matchesGeographySafely(AlertRule $rule, IngestedProduct $product): bool
     {
