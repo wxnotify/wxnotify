@@ -32,7 +32,7 @@ class ExtractProductMetadata
         return [
             'product_id' => $this->resolveProductId($text, $awipsid),
             'ugc_codes' => $this->parseUgcCodes($text),
-            'polygon' => null,
+            'polygon' => $this->parsePolygon($text),
         ];
     }
 
@@ -94,5 +94,66 @@ class ExtractProductMetadata
         }
 
         return $codes === [] ? null : $codes;
+    }
+
+    /**
+     * Finds a "LAT...LON" line, collects wrapped continuation lines until a
+     * blank line or a "TIME..." line, and decodes each 4-or-5-digit
+     * coordinate pair. Doesn't pre-filter by product type (the legacy
+     * reference implementation gates this on a fixed list of AWIPS product
+     * types) — scanning every product's text for the line and returning
+     * null when absent is simpler and has the same practical effect, since
+     * most VTEC products never carry one.
+     *
+     * @return ?array<int, array{lat: float, lon: float}>
+     */
+    private function parsePolygon(string $text): ?array
+    {
+        $lines = preg_split('/\r\n|\r|\n/', $text);
+        $collecting = false;
+        $numbers = [];
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+
+            if (! $collecting) {
+                if (! str_starts_with($trimmed, 'LAT...LON')) {
+                    continue;
+                }
+
+                $collecting = true;
+                $trimmed = trim(substr($trimmed, strlen('LAT...LON')));
+            } elseif ($trimmed === '' || str_starts_with($trimmed, 'TIME...')) {
+                break;
+            }
+
+            if (preg_match_all('/\d{4,5}/', $trimmed, $matches)) {
+                array_push($numbers, ...$matches[0]);
+            }
+        }
+
+        if (count($numbers) < 6 || count($numbers) % 2 !== 0) {
+            return null;
+        }
+
+        return collect(array_chunk($numbers, 2))
+            ->map(fn (array $pair): array => [
+                'lat' => self::decodeCoordinatePart($pair[0]),
+                'lon' => -self::decodeCoordinatePart($pair[1]),
+            ])
+            ->all();
+    }
+
+    /**
+     * Mirrors App\Libraries\AwipsProduct::getAffectedAreaCoords()'s real
+     * decode math: a 4-digit value inserts the decimal after 2 digits
+     * (e.g. "3982" -> 39.82), a 5-digit value inserts it after 3 (e.g.
+     * "10066" -> 100.66 -- needed for longitudes >= 100 degrees).
+     */
+    private static function decodeCoordinatePart(string $raw): float
+    {
+        return strlen($raw) === 5
+            ? (float) (substr($raw, 0, 3).'.'.substr($raw, 3))
+            : (float) (substr($raw, 0, 2).'.'.substr($raw, 2));
     }
 }

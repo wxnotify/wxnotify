@@ -102,3 +102,45 @@ test('a product with no UGC line resolves no ugc_codes', function () {
 
     expect($metadata['ugc_codes'])->toBeNull();
 });
+
+test('a LAT...LON polygon line decodes 4-digit coordinate pairs into real lat/lon', function () {
+    $text = <<<'TEXT'
+    LAT...LON 3982 8066 3989 8064 3992 8047 3978 8050
+    TIME...MOT...LOC 1800Z 123 456
+    TEXT;
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['polygon'])->toBe([
+        ['lat' => 39.82, 'lon' => -80.66],
+        ['lat' => 39.89, 'lon' => -80.64],
+        ['lat' => 39.92, 'lon' => -80.47],
+        ['lat' => 39.78, 'lon' => -80.50],
+    ]);
+});
+
+test('a LAT...LON line wrapping onto a continuation line is fully collected', function () {
+    $text = <<<'TEXT'
+    LAT...LON 3982 8066 3989 8064
+    3992 8047 3978 8050
+
+    TEXT;
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['polygon'])->toHaveCount(4);
+});
+
+test('a 5-digit coordinate part decodes with the decimal after 3 digits, for longitudes past 100 degrees', function () {
+    $text = "LAT...LON 4046 10066 4050 10070 4048 10040\n";
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['polygon'][0])->toBe(['lat' => 40.46, 'lon' => -100.66]);
+});
+
+test('a product with no LAT...LON line resolves no polygon', function () {
+    $metadata = (new ExtractProductMetadata)("AREA FORECAST DISCUSSION\nNo polygon here.", null);
+
+    expect($metadata['polygon'])->toBeNull();
+});
