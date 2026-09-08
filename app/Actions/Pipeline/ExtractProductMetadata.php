@@ -125,6 +125,13 @@ class ExtractProductMetadata
                 $trimmed = trim(substr($trimmed, strlen('LAT...LON')));
             } elseif ($trimmed === '' || str_starts_with($trimmed, 'TIME...')) {
                 break;
+            } elseif (! preg_match('/^\d/', $trimmed)) {
+                // Mirrors the legacy reference's ^\s*\d+ gate on continuation
+                // lines: a non-digit-leading line (e.g. stray remarks text
+                // before TIME...) is skipped, not appended -- otherwise a
+                // preg_match_all() scanning the whole line could splice
+                // unrelated digits into the polygon instead of failing safe.
+                continue;
             }
 
             if (preg_match_all('/\d{4,5}/', $trimmed, $matches)) {
