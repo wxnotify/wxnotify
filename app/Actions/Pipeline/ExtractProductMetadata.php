@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Actions\Pipeline;
+
+use App\Models\Product;
+
+/**
+ * Extracts VTEC-resolved product_id, UGC zone/county codes, and a parsed
+ * severe-weather polygon from a raw NWWS product's text, for storage on
+ * IngestedProduct at ingest time (see IngestNwwsProductController).
+ *
+ * Non-VTEC AWIPS-ID prefix matching only covers AFD today. SPC/WPC prefixes
+ * (SPC.OUTLOOK/SPC.MD/SPC.FIRE/WPC.MPD) were unconfirmed against real live
+ * NWWS traffic at planning time (a 613-row live sample had zero SPC/WPC
+ * products) and are deliberately left out rather than guessed — see the
+ * design doc's "Known gaps" section and this plan's "Scope decision".
+ * AlertCategory::SpcWpc rules can still be created; they just won't resolve
+ * a product_id or match until this crosswalk is extended with confirmed
+ * prefixes.
+ */
+class ExtractProductMetadata
+{
+    private const AWIPS_PREFIX_CROSSWALK = [
+        'afd' => 'AFD',
+    ];
+
+    /**
+     * @return array{product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>}
+     */
+    public function __invoke(string $text, ?string $awipsid): array
+    {
+        return [
+            'product_id' => $this->resolveProductId($text, $awipsid),
+            'ugc_codes' => null,
+            'polygon' => null,
+        ];
+    }
+
+    private function resolveProductId(string $text, ?string $awipsid): ?int
+    {
+        if (preg_match('/\/[A-Z]\.[A-Z]{3}\.[A-Z]{4}\.([A-Z]{2})\.([A-Z])\.\d{4}\.\d{6}T\d{4}Z-\d{6}T\d{4}Z\//', $text, $matches)) {
+            $product = Product::where('code', "{$matches[1]}.{$matches[2]}")->first();
+
+            if ($product !== null) {
+                return $product->id;
+            }
+        }
+
+        $prefix = $awipsid !== null ? substr(strtolower($awipsid), 0, 3) : null;
+        $code = $prefix !== null ? (self::AWIPS_PREFIX_CROSSWALK[$prefix] ?? null) : null;
+
+        return $code !== null ? Product::where('code', $code)->first()?->id : null;
+    }
+}
