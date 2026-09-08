@@ -3962,6 +3962,8 @@ class ShapefileLayerResource extends Resource
 
 - [ ] **Step 5: Implement the table**
 
+**Bug caught during execution, fixed in the code below**: the original snippet derived the status badge via `TextColumn::make('pendingVersion.filename')->formatStateUsing(...)`. Filament's `getState()` (confirmed by reading `vendor/filament/support/src/Concerns/HasCellState.php`) substitutes the column's default state whenever the raw dot-relation value is blank — which it is whenever there's no pending version — *before* `formatStateUsing()` ever runs, so the "Up to date" branch never rendered. Fixed by computing the state from the record via `->state(fn (ShapefileLayer $record) => ...)` instead of a dot-relation path, which is never blank. This is now also recorded in `.ai/rules/filament.md` for future resources with the same pattern (a badge/label derived from whether a nullable relation exists).
+
 ```php
 <?php
 
@@ -3983,11 +3985,12 @@ class ShapefileLayersTable
                     ->label('Active version')
                     ->date()
                     ->placeholder('Never activated'),
-                TextColumn::make('pendingVersion.filename')
+                TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state): string => $state !== null ? 'Pending review' : 'Up to date')
-                    ->color(fn (ShapefileLayer $record): string => $record->pendingVersion !== null ? 'warning' : 'success'),
+                    ->state(fn (ShapefileLayer $record): bool => $record->pendingVersion !== null)
+                    ->formatStateUsing(fn (bool $state): string => $state ? 'Pending review' : 'Up to date')
+                    ->color(fn (bool $state): string => $state ? 'warning' : 'success'),
             ])
             ->defaultSort('name');
     }
@@ -4255,7 +4258,7 @@ test('the Dismiss action rejects a staged version without activating it', functi
 docker exec wxnotify-dashboard-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ShapefileLayerResourceTest.php --compact"
 ```
 
-Expected: PASS (all 6 tests: List, list→view link, Activate, Dismiss, Rollback hidden, Rollback visible).
+Expected: PASS (5 `test()` blocks: List, list→view link, Activate, Dismiss, and Rollback — which itself checks both the hidden and visible cases in one test).
 
 - [ ] **Step 7: Commit**
 
