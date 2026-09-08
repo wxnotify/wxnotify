@@ -454,6 +454,20 @@ class AlertRuleForm
             ->dehydrateStateUsing(fn (?string $state): ?string => $state ? strtoupper($state) : null);
     }
 
+    /**
+     * These two fields use ->searchable()/->multiple() inside this same
+     * dynamic Step::schema(fn (Get $get) => ...) context that
+     * locationSelect()/wfoField() deliberately avoid those on, per this
+     * file's own documented Livewire entangle bug (see .ai/rules/filament.md).
+     * That bug doesn't apply here: options() below is a plain closure
+     * resolved and embedded server-side at render time (no relationship()/
+     * live AJAX round-trip), which is what the entangle failure mode
+     * actually depends on. Verified directly in a real browser (not just
+     * Pest's fillForm(), which sets Livewire state directly and can't
+     * detect an entangle desync): Create, and Edit-then-Save on an existing
+     * CountyZone rule, both hydrate and persist the real stored codes
+     * correctly with no console errors.
+     */
     protected static function countyZoneStateField(): Select
     {
         return Select::make('county_zone_state')
