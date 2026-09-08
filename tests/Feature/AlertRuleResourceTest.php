@@ -206,11 +206,18 @@ test('creating a lightning alert at the minimum radius succeeds', function () {
         ->and($rule->displayName())->toBe('Lightning within 5 mi of Home');
 });
 
-test('creating a forecast discussion rule uppercases the office code', function () {
+test('creating a forecast discussion rule picks a real office from the WFO picker', function () {
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'OKX', 'cwa' => 'OKX', 'city' => 'Upton', 'st' => 'NY', 'citystate' => 'Upton NY',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'forecast_discussion',
-            'wfo' => 'okx',
+            'wfo' => 'OKX',
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -219,6 +226,43 @@ test('creating a forecast discussion rule uppercases the office code', function 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
     expect($rule->wfo)->toBe('OKX');
+});
+
+test('the WFO picker rejects an office not in the real cwa_boundaries table', function () {
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'forecast_discussion',
+            'wfo' => 'ZZZ',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['wfo']);
+});
+
+test('a Wfo-mode weather alerts rule persists the office selected from the picker', function () {
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'BUF', 'cwa' => 'BUF', 'city' => 'Buffalo', 'st' => 'NY', 'citystate' => 'Buffalo NY',
+        'lon' => -78.7, 'lat' => 42.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-79 42, -78 42, -78 43, -79 43, -79 42))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
+            'matching_mode' => 'wfo',
+            'wfo' => 'BUF',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($rule->wfo)->toBe('BUF')
+        ->and($rule->matching_mode->value)->toBe('wfo');
 });
 
 test('a subscriber cannot point an alert rule at another subscriber\'s location', function () {

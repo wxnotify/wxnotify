@@ -491,29 +491,42 @@ class AlertRuleForm
             });
     }
 
-    protected static function wfoField(): TextInput
+    /**
+     * A real picker, not free text: options come from cwa_boundaries (125
+     * real rows, one per WFO, from the AWIPS Shapefile Management feature),
+     * keyed on the natural `cwa` code (already the exact 3-letter identifier
+     * this app compares against IngestedProduct.cccc elsewhere) and labeled
+     * with the office's real city/state for a subscriber who doesn't have
+     * their local office's code memorized. Shared by both call sites (the
+     * Wfo matching-mode field and Forecast Discussion's office field) --
+     * this is the same field as locationSelect()'s note below now describes
+     * an exception for; see that docblock for why ->searchable() is safe
+     * here despite this file's documented dynamic-step entangle bug.
+     */
+    protected static function wfoField(): Select
     {
-        return TextInput::make('wfo')
+        return Select::make('wfo')
             ->label('NWS office (WFO)')
+            ->searchable()
             ->required()
-            ->length(3)
-            ->rule('alpha')
-            ->dehydrateStateUsing(fn (?string $state): ?string => $state ? strtoupper($state) : null);
+            ->options(fn (): array => DB::table('cwa_boundaries')->orderBy('cwa')->get(['cwa', 'citystate'])
+                ->mapWithKeys(fn ($row): array => [$row->cwa => "{$row->cwa} — {$row->citystate}"])
+                ->all());
     }
 
     /**
-     * These two fields use ->searchable()/->multiple() inside this same
-     * dynamic Step::schema(fn (Get $get) => ...) context that
-     * locationSelect()/wfoField() deliberately avoid those on, per this
-     * file's own documented Livewire entangle bug (see .ai/rules/filament.md).
-     * That bug doesn't apply here: options() below is a plain closure
-     * resolved and embedded server-side at render time (no relationship()/
-     * live AJAX round-trip), which is what the entangle failure mode
-     * actually depends on. Verified directly in a real browser (not just
-     * Pest's fillForm(), which sets Livewire state directly and can't
-     * detect an entangle desync): Create, and Edit-then-Save on an existing
-     * CountyZone rule, both hydrate and persist the real stored codes
-     * correctly with no console errors.
+     * These fields use ->searchable()/->multiple() inside this same dynamic
+     * Step::schema(fn (Get $get) => ...) context that locationSelect()
+     * deliberately avoids those on, per this file's own documented Livewire
+     * entangle bug (see .ai/rules/filament.md). That bug doesn't apply here
+     * (or to wfoField() above): options() is a plain closure resolved and
+     * embedded server-side at render time (no relationship()/live AJAX
+     * round-trip), which is what the entangle failure mode actually depends
+     * on. Verified directly in a real browser (not just Pest's fillForm(),
+     * which sets Livewire state directly and can't detect an entangle
+     * desync): Create, and Edit-then-Save on an existing CountyZone rule,
+     * both hydrate and persist the real stored codes correctly with no
+     * console errors.
      */
     protected static function countyZoneStateField(): Select
     {
