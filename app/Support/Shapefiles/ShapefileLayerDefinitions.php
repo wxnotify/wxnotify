@@ -99,8 +99,8 @@ final class ShapefileLayerDefinitions
                 format: 'shapefile',
                 liveTable: 'marine_zones_high_seas',
                 stagingTable: 'marine_zones_high_seas_staging',
-                naturalKeyColumns: ['zone_id'],
-                attributeMap: self::marineAttributeMap(),
+                naturalKeyColumns: ['name'],
+                attributeMap: self::highSeasAttributeMap(),
                 modelClass: MarineZoneHighSeas::class,
                 zoneType: 'high_seas',
                 groupMatchText: 'High Seas',
@@ -171,6 +171,25 @@ final class ShapefileLayerDefinitions
         return [
             'ID' => 'zone_id', 'WFO' => 'wfo', 'GL_WFO' => 'gl_wfo', 'NAME' => 'name',
             'AJOIN0' => 'ajoin0', 'AJOIN1' => 'ajoin1', 'LON' => 'lon', 'LAT' => 'lat',
+        ];
+    }
+
+    /**
+     * High Seas Marine Zones is genuinely a different real DBF schema than
+     * Coastal/Offshore (verified against a real download): fields are
+     * `WFO`, `NAME`, `LAT`, `LON`, a lowercase `id` that's empty for every
+     * real record, and a `URL` field this app doesn't currently capture.
+     * `zone_id` is mapped from that empty `id` field purely to satisfy the
+     * live/staging tables' NOT NULL constraint on the column — it carries no
+     * real data for this layer and is not part of the natural key (see the
+     * migration that moved this table's unique constraint to `name`).
+     *
+     * @return array<string, string>
+     */
+    private static function highSeasAttributeMap(): array
+    {
+        return [
+            'id' => 'zone_id', 'WFO' => 'wfo', 'NAME' => 'name', 'LON' => 'lon', 'LAT' => 'lat',
         ];
     }
 }

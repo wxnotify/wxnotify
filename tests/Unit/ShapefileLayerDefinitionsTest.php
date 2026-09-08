@@ -38,3 +38,18 @@ test('every definition has a real, existing model class', function () {
         expect(class_exists($definition->modelClass))->toBeTrue("Missing model class for {$definition->key}: {$definition->modelClass}");
     }
 });
+
+test('High Seas has its own real attribute schema, distinct from Coastal/Offshore, keyed on name not zone_id', function () {
+    // High Seas' real DBF has no usable ID field at all (verified against a real
+    // download: the closest field, lowercase `id`, is empty for every record) --
+    // unlike Coastal/Offshore, which have a real, populated, unique `ID` field.
+    $highSeas = ShapefileLayerDefinitions::forKey('marine_zones_high_seas');
+    $coastal = ShapefileLayerDefinitions::forKey('marine_zones_coastal');
+
+    expect($highSeas->naturalKeyColumns)->toBe(['name'])
+        ->and($coastal->naturalKeyColumns)->toBe(['zone_id'])
+        ->and($highSeas->attributeMap)->not->toBe($coastal->attributeMap)
+        ->and($highSeas->attributeMap)->toHaveKey('id')
+        ->and($highSeas->attributeMap)->not->toHaveKey('ID')
+        ->and($highSeas->attributeMap)->not->toHaveKey('GL_WFO');
+});
