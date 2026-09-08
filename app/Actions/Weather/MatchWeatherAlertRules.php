@@ -8,6 +8,7 @@ use App\Jobs\DeliverWeatherAlert;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
+use App\Models\Location;
 use App\Models\NotificationChannel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -95,9 +96,45 @@ class MatchWeatherAlertRules
         return match ($rule->matching_mode) {
             MatchingMode::Nationwide => true,
             MatchingMode::Wfo => $this->matchesWfo($rule->wfo, $product->cccc),
-            MatchingMode::Location, MatchingMode::CountyZone, MatchingMode::Polygon => false, // implemented in later tasks
+            MatchingMode::Location => $this->matchesLocationZones($rule, $product),
+            MatchingMode::CountyZone => $this->matchesCountyZone($rule, $product),
+            MatchingMode::Polygon => false, // implemented in a later task
             null => false,
         };
+    }
+
+    private function matchesLocationZones(AlertRule $rule, IngestedProduct $product): bool
+    {
+        if ($rule->location === null || $product->ugc_codes === null) {
+            return false;
+        }
+
+        $location = $this->ensureZonesResolved($rule->location);
+        $zones = array_filter([$location->forecast_zone_ugc, $location->county_ugc]);
+
+        return array_intersect($zones, $product->ugc_codes) !== [];
+    }
+
+    private function matchesCountyZone(AlertRule $rule, IngestedProduct $product): bool
+    {
+        if ($rule->county_zone_codes === null || $product->ugc_codes === null) {
+            return false;
+        }
+
+        $ruleCodes = explode(',', $rule->county_zone_codes);
+
+        return array_intersect($ruleCodes, $product->ugc_codes) !== [];
+    }
+
+    private function ensureZonesResolved(Location $location): Location
+    {
+        if ($location->forecast_zone_ugc !== null || $location->county_ugc !== null) {
+            return $location;
+        }
+
+        app(ResolveLocationZones::class)($location);
+
+        return $location->refresh();
     }
 
     private function matchesWfo(?string $wfo, ?string $cccc): bool
