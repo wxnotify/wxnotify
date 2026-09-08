@@ -10,6 +10,20 @@ use App\Models\NotificationChannel;
 use App\Models\Product;
 use Illuminate\Support\Facades\Queue;
 
+/**
+ * IngestedProductObserver (registered in AppServiceProvider) invokes the
+ * real MatchWeatherAlertRules automatically on IngestedProduct::created --
+ * so a plain IngestedProduct::factory()->create() below would silently
+ * double-dispatch alongside every test's own explicit `(new
+ * MatchWeatherAlertRules)($ingested)` call. withoutEvents() suppresses that
+ * observer during fixture setup so each test controls exactly one
+ * invocation, matching what it actually asserts on.
+ */
+function createIngestedProductWithoutMatching(array $attributes = []): IngestedProduct
+{
+    return IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create($attributes));
+}
+
 test('a nationwide weather alerts rule matches any product referencing its product', function () {
     Queue::fake();
     // TO.W is part of the real catalog seeded by the products table migration
@@ -22,7 +36,7 @@ test('a nationwide weather alerts rule matches any product referencing its produ
     $rule->products()->attach($product);
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $rule->notificationChannels()->attach($channel);
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id]);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id]);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -38,7 +52,7 @@ test('a weather alerts rule for a different product never matches', function () 
     $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
     $rule->products()->attach($flood);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $tornado->id]);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $tornado->id]);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -53,7 +67,7 @@ test('a Wfo-mode rule matches on the issuing office, not the product', function 
     ]);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id, 'cccc' => 'KOKX']);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'cccc' => 'KOKX']);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -66,7 +80,7 @@ test('a Wfo-mode rule for a different office never matches', function () {
     $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'BUF', 'location_id' => null]);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id, 'cccc' => 'KOKX']);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'cccc' => 'KOKX']);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -79,7 +93,7 @@ test('a forecast discussion rule matches by wfo alone, with no product filter', 
         'category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'OKX', 'location_id' => null,
     ]);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => null, 'cccc' => 'KOKX']);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => null, 'cccc' => 'KOKX']);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -92,7 +106,7 @@ test('an inactive rule never matches', function () {
     $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null, 'is_active' => false]);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id]);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id]);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -107,7 +121,7 @@ test('an spc_wpc rule never matches, since no product resolves that category yet
     $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null]);
     $rule->products()->attach($outlook);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $outlook->id]);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $outlook->id]);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -130,17 +144,9 @@ test('a matched rule within its quiet hours window is suppressed and logged, not
     // real geometry path; here the rule matches trivially because both the
     // location's forecast_zone_ugc and the product's ugc_codes already agree.
     $location->forceFill(['forecast_zone_ugc' => 'NYZ072'])->save();
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
 
-    // Deliberately no explicit (new MatchWeatherAlertRules)($ingested) call
-    // here, unlike every other test in this file: IngestedProductObserver
-    // (registered in AppServiceProvider) already invokes the real action on
-    // IngestedProduct::created, so factory()->create() below fires matching
-    // for real. Calling it a second time would double the suppressed
-    // DeliveryLog write DeliveryLog::sole() below strictly requires exactly
-    // one of -- every other test in this file only asserts via
-    // Queue::assertPushed/assertNotPushed, which are insensitive to that
-    // duplication, so it stayed invisible there.
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
+    (new MatchWeatherAlertRules)($ingested);
 
     Queue::assertNotPushed(DeliverWeatherAlert::class);
     $log = DeliveryLog::sole();
@@ -158,7 +164,7 @@ test('a nationwide rule with quiet hours set always delivers, since it has no lo
     ]);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id]);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id]);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -172,7 +178,7 @@ test('a Location-mode rule matches when the location\'s resolved zone overlaps t
     $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => $location->id]);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -186,7 +192,7 @@ test('a Location-mode rule with no zone overlap never matches', function () {
     $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => $location->id]);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -202,7 +208,7 @@ test('a CountyZone-mode rule matches on direct UGC overlap with the stored codes
     ]);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id, 'ugc_codes' => ['NYC061']]);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYC061']]);
 
     (new MatchWeatherAlertRules)($ingested);
 
@@ -218,7 +224,7 @@ test('a CountyZone-mode rule with no overlap never matches', function () {
     ]);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id, 'ugc_codes' => ['NJZ103']]);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NJZ103']]);
 
     (new MatchWeatherAlertRules)($ingested);
 
