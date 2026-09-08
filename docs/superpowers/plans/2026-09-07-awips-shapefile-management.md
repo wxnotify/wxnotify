@@ -2126,6 +2126,55 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 Runs `ScanShapefileLayer` across all 9 rows. Per the design's confirmed cadence decision, a single daily check is cheap enough not to need per-layer scheduling.
 
+**Bug found post-implementation (via real manual testing, after all 33 tasks were believed complete) and fixed**: this task's original command only called `ScanShapefileLayer` — it never called `ImportShapefileVersion` (Tasks 20-21), even though that class had full standalone test coverage. The result: `shapefile:scan` staged new `ShapefileLayerVersion` rows but left every staging table empty, and activating a layer in that state swapped an empty table into the live slot. Fixed by injecting `ImportShapefileVersion` into the command and calling it immediately after a successful scan, wrapped in a per-layer `try`/`catch` so one layer's download/parse failure against the real NOAA site doesn't abort the other 8 layers' scans. The corrected command:
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use App\Actions\Shapefiles\ImportShapefileVersion;
+use App\Actions\Shapefiles\ScanShapefileLayer;
+use App\Models\ShapefileLayer;
+use Illuminate\Console\Command;
+use Throwable;
+
+class ScanShapefileLayers extends Command
+{
+    protected $signature = 'shapefile:scan';
+
+    protected $description = 'Poll every tracked AWIPS shapefile layer for a new NOAA version and import it into staging';
+
+    public function handle(ScanShapefileLayer $scan, ImportShapefileVersion $import): int
+    {
+        $staged = 0;
+
+        foreach (ShapefileLayer::all() as $layer) {
+            $version = $scan($layer);
+
+            if ($version === null) {
+                continue;
+            }
+
+            $staged++;
+
+            try {
+                $import($version);
+                $this->info("New version staged and imported for {$layer->name}");
+            } catch (Throwable $e) {
+                $this->error("New version staged for {$layer->name}, but import failed: {$e->getMessage()}");
+            }
+        }
+
+        $this->info("Scan complete: {$staged} layer(s) staged a new version.");
+
+        return self::SUCCESS;
+    }
+}
+```
+
+A real regression test for this exact bug (using the real `public-zones-page.html` fixture and a real built zip, confirming `public_zones_staging` actually gets populated by running the command, not just that a version row gets created) was added to `tests/Feature/ScanShapefileLayersCommandTest.php` alongside the original test — see that file for the exact assertions.
+
 - [ ] **Step 1: Write the failing test**
 
 ```bash
