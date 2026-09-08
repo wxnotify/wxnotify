@@ -143,6 +143,7 @@ class ImportShapefileVersion
     {
         $response = Http::withHeaders(['User-Agent' => $this->userAgent()])->get($version->source_url);
         $rows = (new ZoneCountyCorrelationParser)->parse($response->body());
+        $rows = $this->deduplicateByNaturalKey($rows, $definition);
 
         DB::transaction(function () use ($rows, $definition): void {
             DB::table($definition->stagingTable)->delete();
@@ -154,6 +155,36 @@ class ImportShapefileVersion
                 ));
             }
         });
+    }
+
+    /**
+     * NOAA's real correlation file has a handful of duplicate (state_zone, fips)
+     * pairs (verified against a real download: 27 of 4,875 lines) -- the same
+     * zone-county overlap split into two disjoint areas by a geographic feature,
+     * with identical attributes but a different centroid. Unlike the shapefile
+     * branch there's no geometry to combine here (this table carries no boundary
+     * column), so the fix is simply to keep the first occurrence per natural key.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function deduplicateByNaturalKey(array $rows, ShapefileLayerDefinition $definition): array
+    {
+        $seen = [];
+        $deduplicated = [];
+
+        foreach ($rows as $row) {
+            $key = $definition->serializeNaturalKey($row);
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $deduplicated[] = $row;
+        }
+
+        return $deduplicated;
     }
 
     private function userAgent(): string

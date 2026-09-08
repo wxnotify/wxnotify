@@ -30,6 +30,33 @@ test('it imports a real correlation-file fixture into the staging table', functi
         ->and($row->fips)->toBe('35031');
 });
 
+test('duplicate zone-county pairs (same natural key, different centroid) keep only the first occurrence', function () {
+    // Reproduces a real duplicate from NOAA's own correlation file: the same
+    // zone-county overlap split into two disjoint areas, same state_zone/fips,
+    // different lat/lon.
+    $content = "VA|075|AKQ|Westmoreland|VA075|Westmoreland|51193|E|ec|38.1108|-76.8052\n"
+        .'VA|075|AKQ|Westmoreland|VA075|Westmoreland|51193|E|ec|38.1366|-76.7253';
+
+    Http::fake(['weather.gov/fixture.dbx' => Http::response($content)]);
+
+    $layer = ShapefileLayer::factory()->create(['key' => 'zone_county_correlation']);
+    $version = ShapefileLayerVersion::factory()->create([
+        'shapefile_layer_id' => $layer->id,
+        'source_url' => 'https://www.weather.gov/fixture.dbx',
+        'status' => ShapefileVersionStatus::Staged,
+    ]);
+
+    (new ImportShapefileVersion)($version);
+
+    // One row, not two -- the unique constraint on (state_zone, fips) would otherwise fail.
+    expect(DB::table('zone_county_correlations_staging')->count())->toBe(1);
+
+    $row = DB::table('zone_county_correlations_staging')->where('state_zone', 'VA075')->first();
+    expect($row)->not->toBeNull()
+        ->and($row->fips)->toBe('51193')
+        ->and((float) $row->lat)->toBe(38.1108);
+});
+
 test('re-importing replaces the whole correlation staging table', function () {
     DB::table('zone_county_correlations_staging')->insert([
         'state' => 'AZ', 'zone' => '001', 'cwa' => 'PSR', 'name' => 'Stale', 'state_zone' => 'AZ001',
