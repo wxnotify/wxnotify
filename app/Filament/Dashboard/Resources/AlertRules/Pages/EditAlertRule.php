@@ -39,6 +39,19 @@ class EditAlertRule extends EditRecord
             ->all();
         $data['channel_ids'] = $this->record->notificationChannels->pluck('id')->all();
 
+        // county_zone_codes is a multi-select over a plain comma-joined
+        // string column (not an array/JSON-cast one like product_ids), so
+        // Filament's default OptionsArrayStateCast for multiple() selects
+        // runs json_decode() on it during hydration -- a non-JSON string
+        // like "NYZ072,NYC061" fails to decode and silently becomes [],
+        // wiping the field and blocking save with a false "required" error.
+        // Pre-splitting into a real array here, the same way product_ids
+        // and channel_ids are already pre-shaped above, sidesteps the cast
+        // entirely since is_array() is already true by the time it runs.
+        $data['county_zone_codes'] = filled($data['county_zone_codes'] ?? null)
+            ? explode(',', $data['county_zone_codes'])
+            : [];
+
         return $data;
     }
 

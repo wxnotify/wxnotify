@@ -2,6 +2,7 @@
 
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
+use App\Filament\Dashboard\Resources\AlertRules\Pages\EditAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Models\AlertRule;
 use App\Models\Location;
@@ -358,4 +359,46 @@ test('the CountyZone picker requires at least one code', function () {
         ])
         ->call('create')
         ->assertHasFormErrors(['county_zone_codes']);
+});
+
+test('editing a CountyZone rule preserves its stored codes without requiring them to be re-picked', function () {
+    // Regression: county_zone_codes is a multi-select over a plain
+    // comma-joined string column, not an array/JSON-cast one -- Filament's
+    // default multiple() state cast runs json_decode() on the stored value
+    // during hydration, which silently turns a real string like
+    // "NYZ072,NYC061" into [] (not valid JSON), wiping the field and
+    // blocking save with a false "required" error. See
+    // EditAlertRule::mutateFormDataBeforeFill() for the fix.
+    //
+    // The picker's Select validates submitted values against its live
+    // options() list, so the stored codes need matching real shapefile
+    // rows to be considered valid on save -- not just for display.
+    DB::table('public_zones')->insert([
+        'state' => 'NY', 'cwa' => 'OKX', 'zone' => '072', 'name' => 'Suffolk', 'state_zone' => 'NY072',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('counties')->insert([
+        'state' => 'NY', 'cwa' => 'OKX', 'countyname' => 'Suffolk', 'fips' => '36061',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $rule = AlertRule::factory()->for($this->user)->create([
+        'category' => 'weather_alerts',
+        'matching_mode' => 'county_zone',
+        'location_id' => null,
+        'county_zone_codes' => 'NYZ072,NYC061',
+    ]);
+    $rule->products()->attach($tornadoWarning);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet(['county_zone_codes' => ['NYZ072', 'NYC061']])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->county_zone_codes)->toBe('NYZ072,NYC061');
 });
