@@ -4013,14 +4013,18 @@ class ShapefileLayerResource extends Resource
 
 **Bug caught during execution, fixed in the code below**: the original snippet derived the status badge via `TextColumn::make('pendingVersion.filename')->formatStateUsing(...)`. Filament's `getState()` (confirmed by reading `vendor/filament/support/src/Concerns/HasCellState.php`) substitutes the column's default state whenever the raw dot-relation value is blank — which it is whenever there's no pending version — *before* `formatStateUsing()` ever runs, so the "Up to date" branch never rendered. Fixed by computing the state from the record via `->state(fn (ShapefileLayer $record) => ...)` instead of a dot-relation path, which is never blank. This is now also recorded in `.ai/rules/filament.md` for future resources with the same pattern (a badge/label derived from whether a nullable relation exists).
 
+**Added post-implementation, per user feedback after manually reviewing the running admin UI**: a "Records" column showing each layer's actual current live-table row count, not a value derived from version metadata — real ground truth via a direct query against the layer's own live table (resolved through the registry), so it stays honest even if a past import ever diverged from what NOAA's page claimed.
+
 ```php
 <?php
 
 namespace App\Filament\Admin\Resources\ShapefileLayers\Tables;
 
 use App\Models\ShapefileLayer;
+use App\Support\Shapefiles\ShapefileLayerDefinitions;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
 
 class ShapefileLayersTable
 {
@@ -4034,6 +4038,12 @@ class ShapefileLayersTable
                     ->label('Active version')
                     ->date()
                     ->placeholder('Never activated'),
+                TextColumn::make('records')
+                    ->label('Records')
+                    ->state(fn (ShapefileLayer $record): int => DB::table(
+                        ShapefileLayerDefinitions::forKey($record->key)->liveTable
+                    )->count())
+                    ->numeric(),
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
@@ -4045,6 +4055,8 @@ class ShapefileLayersTable
     }
 }
 ```
+
+Note: this column calls `ShapefileLayerDefinitions::forKey($record->key)` for every rendered row, which throws if `$record->key` isn't one of the 9 real registry keys — fine for real usage (every `ShapefileLayer` row only ever comes from `ShapefileLayerSeeder`, always with a real key), but any test rendering this table needs `ShapefileLayer::factory()->create(['key' => '<a real key>'])`, not a bare `factory()->create()` (whose default `key` is a random fake slug).
 
 - [ ] **Step 6: Implement the List page**
 
