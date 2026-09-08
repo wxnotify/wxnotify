@@ -36,6 +36,16 @@ class ExtractProductMetadata
         ];
     }
 
+    /**
+     * A product can carry multiple VTEC lines (e.g. canceling one warning
+     * while issuing another). preg_match() (not preg_match_all()) returns
+     * the leftmost match deliberately: whichever VTEC line appears first in
+     * the raw text wins, regardless of its action code (NEW/CON/CAN/EXP/...)
+     * — a canceled hazard's line is NOT filtered out or deprioritized. Do
+     * not "fix" this into an action-code-aware filter; that would silently
+     * change matching behavior on multi-VTEC bulletins (see the "two VTEC
+     * lines" test in ExtractProductMetadataTest).
+     */
     private function resolveProductId(string $text, ?string $awipsid): ?int
     {
         if (preg_match('/\/[A-Z]\.[A-Z]{3}\.[A-Z]{4}\.([A-Z]{2})\.([A-Z])\.\d{4}\.\d{6}T\d{4}Z-\d{6}T\d{4}Z\//', $text, $matches)) {
