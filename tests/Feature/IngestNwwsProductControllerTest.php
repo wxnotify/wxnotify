@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\Weather\MatchWeatherAlertRules;
 use App\Models\IngestedProduct;
+use App\Models\Product;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 
@@ -114,4 +116,58 @@ test('is idempotent for the same path', function () {
 
     expect(IngestedProduct::count())->toBe(1)
         ->and(IngestedProduct::sole()->text)->toBe('updated text');
+});
+
+test('ingesting a VTEC product enriches product_id/ugc_codes/polygon before the row is written', function () {
+    // TO.W is part of the real catalog seeded by the products table
+    // migration (see ExtractProductMetadataTest) — no need to create it.
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    File::ensureDirectoryExists($this->productsRoot.'/kokx');
+    $text = "NYZ069-081200-\n/O.NEW.KOKX.TO.W.0042.260906T1800Z-260906T1900Z/\nLAT...LON 3982 8066 3989 8064 3992 8047\n";
+    File::put($this->productsRoot.'/kokx/kokx_wfus51-torokx.061800_1.txt', $text);
+
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'kokx/kokx_wfus51-torokx.061800_1.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    $product = IngestedProduct::sole();
+
+    expect($product->product_id)->toBe($tornadoWarning->id)
+        ->and($product->ugc_codes)->toBe(['NYZ069'])
+        ->and($product->polygon)->toHaveCount(3);
+});
+
+test('a newly ingested product dispatches MatchWeatherAlertRules exactly once', function () {
+    // MatchWeatherAlertRules itself is synchronous (see Task 8) — asserting
+    // its effect here would require real AlertRule fixtures, which belongs
+    // in MatchWeatherAlertRulesTest. This test only proves the observer
+    // wiring fires on create — not on the later `updateOrCreate` update
+    // path — by spying on the action itself.
+    $spy = Mockery::spy(MatchWeatherAlertRules::class);
+    app()->instance(MatchWeatherAlertRules::class, $spy);
+
+    File::ensureDirectoryExists($this->productsRoot.'/okx');
+    $text = "AREA FORECAST DISCUSSION\n";
+    File::put($this->productsRoot.'/okx/okx_fxus61-afdokx.061800_1.txt', $text);
+
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'okx/okx_fxus61-afdokx.061800_1.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    $spy->shouldHaveReceived('__invoke')->once();
+
+    // Re-posting the same path hits updateOrCreate's update branch, not
+    // create — confirms the observer is bound to `created`, not a generic
+    // save hook, matching the design's "only fires once per real product".
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'okx/okx_fxus61-afdokx.061800_1.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    $spy->shouldHaveReceived('__invoke')->once();
 });

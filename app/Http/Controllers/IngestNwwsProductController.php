@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Pipeline\ExtractProductMetadata;
 use App\Models\IngestedProduct;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Log;
 
 class IngestNwwsProductController extends Controller
 {
+    public function __construct(private readonly ExtractProductMetadata $extractProductMetadata) {}
+
     public function __invoke(Request $request): Response
     {
         $validated = $request->validate([
@@ -32,11 +35,15 @@ class IngestNwwsProductController extends Controller
             ]);
         }
 
+        $text = file_get_contents($absolutePath);
+        $metadata = ($this->extractProductMetadata)($text, $parsed['awipsid']);
+
         IngestedProduct::updateOrCreate(
             ['file_path' => $validated['path']],
             [
                 ...$parsed,
-                'text' => file_get_contents($absolutePath),
+                ...$metadata,
+                'text' => $text,
                 'received_at' => now(),
             ],
         );
