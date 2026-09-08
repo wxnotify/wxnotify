@@ -3,8 +3,10 @@
 namespace App\Filament\Admin\Resources\ShapefileLayers\Tables;
 
 use App\Models\ShapefileLayer;
+use App\Support\Shapefiles\ShapefileLayerDefinitions;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
 
 class ShapefileLayersTable
 {
@@ -18,6 +20,12 @@ class ShapefileLayersTable
                     ->label('Active version')
                     ->date()
                     ->placeholder('Never activated'),
+                TextColumn::make('records')
+                    ->label('Records')
+                    ->state(fn (ShapefileLayer $record): int => DB::table(
+                        ShapefileLayerDefinitions::forKey($record->key)->liveTable
+                    )->count())
+                    ->numeric(),
                 TextColumn::make('status')
                     ->label('Status')
                     ->state(fn (ShapefileLayer $record): string => $record->pendingVersion !== null ? 'pending' : 'up_to_date')

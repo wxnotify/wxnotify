@@ -8,6 +8,7 @@ use App\Models\ShapefileLayer;
 use App\Models\ShapefileLayerVersion;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -17,8 +18,8 @@ beforeEach(function () {
 });
 
 test('the list page shows every tracked layer and flags one with a pending review', function () {
-    $upToDate = ShapefileLayer::factory()->create(['name' => 'Up To Date Layer']);
-    $pending = ShapefileLayer::factory()->create(['name' => 'Pending Layer']);
+    $upToDate = ShapefileLayer::factory()->create(['key' => 'us_states', 'name' => 'Up To Date Layer']);
+    $pending = ShapefileLayer::factory()->create(['key' => 'counties', 'name' => 'Pending Layer']);
     ShapefileLayerVersion::factory()->create([
         'shapefile_layer_id' => $pending->id,
         'status' => ShapefileVersionStatus::Staged,
@@ -30,8 +31,27 @@ test('the list page shows every tracked layer and flags one with a pending revie
         ->assertSee('Pending review');
 });
 
+test('the list page shows the live table\'s actual record count, not a stale published count', function () {
+    DB::insert(
+        'INSERT INTO us_states (state, name, fips, lon, lat, boundary, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ST_SetSRID(ST_GeomFromText(?), 4269), now(), now())',
+        ['NM', 'New Mexico', '35', -106.0, 34.5, 'MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)))'],
+    );
+    DB::insert(
+        'INSERT INTO us_states (state, name, fips, lon, lat, boundary, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ST_SetSRID(ST_GeomFromText(?), 4269), now(), now())',
+        ['AZ', 'Arizona', '04', -111.0, 34.0, 'MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)))'],
+    );
+
+    $layer = ShapefileLayer::factory()->create(['key' => 'us_states', 'name' => 'US States']);
+
+    livewire(ListShapefileLayers::class)
+        ->assertCanSeeTableRecords([$layer])
+        ->assertSee('2');
+});
+
 test('the list page links through to the view page', function () {
-    $layer = ShapefileLayer::factory()->create();
+    $layer = ShapefileLayer::factory()->create(['key' => 'fire_zones']);
 
     livewire(ListShapefileLayers::class)
         ->assertCanSeeTableRecords([$layer]);
