@@ -9,6 +9,7 @@ use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\ProductCatalogSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 use function Pest\Livewire\livewire;
@@ -311,4 +312,50 @@ test('the inline channel action for a no-cost type is hidden once a Free subscri
         ->fillForm(['category' => 'lightning'])
         ->assertFormComponentActionHidden('channel_ids', 'connect_slack')
         ->assertFormComponentActionVisible('channel_ids', 'connect_email');
+});
+
+test('the CountyZone picker options include real counties and zones for the filtered state', function () {
+    DB::table('counties')->insert([
+        'state' => 'NY', 'cwa' => 'OKX', 'countyname' => 'Suffolk', 'fips' => '36103',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('public_zones')->insert([
+        'state' => 'NY', 'cwa' => 'OKX', 'zone' => '072', 'name' => 'Suffolk', 'state_zone' => 'NY072',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
+            'matching_mode' => 'county_zone',
+            'county_zone_state' => 'NY',
+            'county_zone_codes' => ['NYC103', 'NYZ072'],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($rule->county_zone_codes)->toBe('NYC103,NYZ072');
+});
+
+test('the CountyZone picker requires at least one code', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
+            'matching_mode' => 'county_zone',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['county_zone_codes']);
 });

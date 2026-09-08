@@ -29,6 +29,7 @@ use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Exists;
 use Jbuitt\FilamentToggleList\ToggleList;
 
@@ -337,6 +338,8 @@ class AlertRuleForm
                 ->visible(fn (Get $get): bool => in_array($get('matching_mode'), [MatchingMode::Location->value, MatchingMode::Polygon->value], true)),
             self::wfoField()
                 ->visible(fn (Get $get): bool => $get('matching_mode') === MatchingMode::Wfo->value),
+            self::countyZoneStateField()
+                ->visible(fn (Get $get): bool => $get('matching_mode') === MatchingMode::CountyZone->value),
             self::countyZoneField()
                 ->visible(fn (Get $get): bool => $get('matching_mode') === MatchingMode::CountyZone->value),
         ];
@@ -451,14 +454,78 @@ class AlertRuleForm
             ->dehydrateStateUsing(fn (?string $state): ?string => $state ? strtoupper($state) : null);
     }
 
-    protected static function countyZoneField(): TextInput
+    protected static function countyZoneStateField(): Select
     {
-        return TextInput::make('county_zone_codes')
-            ->label('County/zone codes (UGC)')
+        return Select::make('county_zone_state')
+            ->label('Filter by state')
+            ->dehydrated(false)
+            ->live()
+            ->searchable()
+            ->options(fn (): array => DB::table('public_zones')->distinct()->orderBy('state')->pluck('state', 'state')->all())
+            ->helperText('Narrows the list below to one state at a time — the codes you pick can still span multiple states.');
+    }
+
+    protected static function countyZoneField(): Select
+    {
+        return Select::make('county_zone_codes')
+            ->label('Counties / zones (UGC)')
+            ->multiple()
+            ->searchable()
             ->required()
-            ->placeholder('TXZ211, TXC201')
-            ->helperText('Comma-separated NWS UGC codes, e.g. TXZ211 for a forecast zone or TXC201 for a county.')
-            ->rule('regex:/^[A-Za-z]{2}[CZ]\d{3}(\s*,\s*[A-Za-z]{2}[CZ]\d{3})*$/')
-            ->dehydrateStateUsing(fn (?string $state): ?string => $state ? strtoupper(str_replace(' ', '', $state)) : null);
+            ->options(fn (Get $get): array => self::countyZoneOptions($get('county_zone_state'), self::currentCountyZoneCodes($get)))
+            ->afterStateHydrated(function (Select $component, mixed $state): void {
+                $component->state(is_string($state) && $state !== '' ? explode(',', $state) : ($state ?? []));
+            })
+            ->dehydrateStateUsing(fn (?array $state): ?string => filled($state) ? implode(',', $state) : null)
+            ->helperText('Pick the counties/forecast zones this alert should watch.');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected static function currentCountyZoneCodes(Get $get): array
+    {
+        $codes = $get('county_zone_codes');
+
+        return is_array($codes) ? $codes : [];
+    }
+
+    /**
+     * counties.fips is a raw 5-digit FIPS code and public_zones.state_zone
+     * omits the type letter (e.g. "NY001", not "NYZ001") -- neither is
+     * itself a real UGC code, so both are derived here from state + the
+     * zone/fips columns, matching ResolveLocationZones's derivation.
+     *
+     * @return array<string, string>
+     */
+    protected static function countyZoneOptions(?string $state, array $currentCodes): array
+    {
+        $states = collect($currentCodes)
+            ->map(fn (string $code): string => substr($code, 0, 2))
+            ->push($state)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($states === []) {
+            return [];
+        }
+
+        $countyOptions = DB::table('counties')->whereIn('state', $states)->get(['fips', 'state', 'countyname'])
+            ->mapWithKeys(function ($c): array {
+                $code = strtoupper($c->state).'C'.substr($c->fips, -3);
+
+                return [$code => "{$code} — {$c->countyname} County, {$c->state}"];
+            });
+
+        $zoneOptions = DB::table('public_zones')->whereIn('state', $states)->get(['state_zone', 'state', 'zone', 'name'])
+            ->mapWithKeys(function ($z): array {
+                $code = strtoupper($z->state).'Z'.$z->zone;
+
+                return [$code => "{$code} — {$z->name}, {$z->state}"];
+            });
+
+        return $countyOptions->union($zoneOptions)->all();
     }
 }
