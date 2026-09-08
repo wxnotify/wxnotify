@@ -26,3 +26,10 @@ Fix: override `handleRecordUpdate(Model $record, array $data): Model` on that sp
 Also: testing a resource that lives on a non-default panel (this app's default is `dashboard`; `admin` is not) needs `Filament::setCurrentPanel('admin')` in the test's `beforeEach()` — without it, `livewire()` throws `RouteNotFoundException` for `filament.dashboard.resources.*` since Filament resolves nav/breadcrumb URLs against the default panel unless told otherwise.
 
 Found while building the Admin Tools UserResource (Support/impersonation).
+
+## A TextColumn deriving a label from a nullable dot-relation attribute needs ->state(), not ->formatStateUsing() alone
+`TextColumn::make('someRelation.attribute')->formatStateUsing(fn (?string $state) => $state !== null ? 'A' : 'B')`, intended to render one of two labels depending on whether a related row exists, silently never shows the "null" branch's label. Root cause, confirmed by reading `vendor/filament/support/src/Concerns/HasCellState.php`'s `getState()`: when the raw state resolved from the record (here, a `null` because the relation doesn't exist) is `blank()`, Filament substitutes `getDefaultState()` (the `->default()` value, or `null` if none was set) *before* `formatStateUsing()` ever runs — the formatter closure is never invoked for a blank raw state, only for a non-blank one.
+
+Fix: compute the label from the record instead of a dot-relation path — `TextColumn::make('status')->state(fn (Model $record) => $record->someRelation !== null)->formatStateUsing(fn (bool $state) => $state ? 'A' : 'B')`. `->state()` supplies a state that's never blank in the "false" case (a real boolean), so the formatter always runs.
+
+Found while building the ShapefileLayerResource list page (`Status` column showing "Pending review" vs "Up to date" based on whether a `pendingVersion` relation exists).
