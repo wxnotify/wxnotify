@@ -26,6 +26,9 @@ class ViewShapefileLayer extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('viewRecords')
+                ->label('View records')
+                ->url(fn (): string => static::getResource()::getUrl('records', ['record' => $this->record])),
             Action::make('activate')
                 ->visible(fn (): bool => $this->record->pendingVersion !== null)
                 ->requiresConfirmation()
