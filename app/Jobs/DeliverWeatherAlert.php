@@ -46,7 +46,7 @@ class DeliverWeatherAlert implements ShouldQueue
 
         $delivered = $client->notify(
             url: $channel->apprise_url,
-            body: Str::limit($product->text, 1500),
+            body: Str::limit($product->text, 1500, preserveWords: true),
             title: $rule->displayName(),
         );
 
