@@ -869,6 +869,12 @@ final class ShapefileLayerDefinitions
 }
 ```
 
+**Bug found post-implementation (via a user report — High Seas showed 1 imported record when NOAA's page said 5) and fixed**: `marineAttributeMap()` above is only correct for Coastal and Offshore. Downloading High Seas' real current file directly showed a genuinely different schema — `WFO`, `NAME`, `LAT`, `LON`, a **lowercase** `id` (not `ID`) that is **empty for every real record**, and a `URL` field this app doesn't capture. Coastal and Offshore really do have a populated, unique, uppercase `ID` field (verified directly too — their imports exactly match their real total record counts, 569 and 130), so `marineAttributeMap()` stays correct for those two. High Seas needed its own `highSeasAttributeMap()` (mapping lowercase `id` → `zone_id`, purely to satisfy the column's NOT NULL constraint — it carries no real data for this layer), and — since `zone_id` is always empty here — its `naturalKeyColumns` changed from `['zone_id']` to `['name']` (the only field genuinely distinct per real record for this layer; NOAA gives High Seas zones no formal zone code the way Coastal/Offshore's numbered zones have one).
+
+This also required a new migration moving the `marine_zones_high_seas`/`_staging` tables' unique constraint from `zone_id` to `name`. That migration looks the existing constraint up by column rather than assuming a hardcoded name, because of a related discovery: `ActivateShapefileVersion`'s atomic swap renames tables via `ALTER TABLE ... RENAME TO`, which Postgres does **not** propagate to a table's own constraint/index names — after even one activation, a table's real constraint name no longer necessarily matches what its current table name would suggest (harmless for normal reads/writes, since constraint names don't affect enforcement, but it means any *later* migration touching a swapped table's named constraints can't assume the naming convention still holds).
+
+Verified every other layer directly against real downloaded files while investigating this: Counties (3,352 real records → 3,269 distinct FIPS) and Fire Zones (3,683 real records → 3,603 distinct STATE_ZONE) both differ from their real total record counts for the same legitimate reason as Public Zones — real split records sharing one natural key, correctly merged — not a bug. CWA Boundaries (125) and US States (59) match their real record counts exactly with no merging at all.
+
 - [ ] **Step 3: Write the test**
 
 ```bash
