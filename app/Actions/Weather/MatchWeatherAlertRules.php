@@ -125,7 +125,14 @@ class MatchWeatherAlertRules
             [$wkt, $lng, $lat],
         );
 
-        return $result !== null && filter_var($result->contains, FILTER_VALIDATE_BOOLEAN);
+        // Not filter_var(..., FILTER_VALIDATE_BOOLEAN): it doesn't recognize
+        // Postgres's own 't'/'f' text encoding for a boolean column ('f' is
+        // non-empty, so a naive (bool) cast is equally wrong) -- the pgsql
+        // PDO driver happens to hand back a native bool today, but a driver
+        // or connection-option change silently turning a real match into a
+        // dropped alert is the worst failure mode for this system, so both
+        // representations are checked explicitly.
+        return $result !== null && ($result->contains === true || $result->contains === 't');
     }
 
     /**
