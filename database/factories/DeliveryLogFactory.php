@@ -34,4 +34,12 @@ class DeliveryLogFactory extends Factory
             'error_detail' => 'Connection timed out.',
         ]);
     }
+
+    public function skipped(): static
+    {
+        return $this->state(fn () => [
+            'status' => 'skipped',
+            'error_detail' => 'The rule was deactivated after this delivery was dispatched.',
+        ]);
+    }
 }

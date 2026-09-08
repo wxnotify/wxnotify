@@ -25,14 +25,24 @@ class DeliveryLogsTable
                     ->getStateUsing(fn (DeliveryLog $record): ?string => $record->alertRule?->displayName()),
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => $state === 'success' ? 'success' : 'danger'),
+                    ->color(fn (string $state): string => match ($state) {
+                        'success' => 'success',
+                        'failure' => 'danger',
+                        'suppressed', 'skipped' => 'warning',
+                        default => 'gray',
+                    }),
                 TextColumn::make('error_detail')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('dispatched_at', 'desc')
             ->filters([
                 SelectFilter::make('status')
-                    ->options(['success' => 'Success', 'failure' => 'Failure']),
+                    ->options([
+                        'success' => 'Success',
+                        'failure' => 'Failure',
+                        'suppressed' => 'Suppressed (quiet hours)',
+                        'skipped' => 'Skipped',
+                    ]),
                 SelectFilter::make('channel_type')
                     ->options(fn (): array => DeliveryLog::query()->distinct()->pluck('channel_type', 'channel_type')->all()),
             ])

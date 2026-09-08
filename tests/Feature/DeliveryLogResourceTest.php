@@ -29,6 +29,17 @@ test('seeded delivery logs are visible and filterable by status', function () {
         ->assertCanNotSeeTableRecords([$success]);
 });
 
+test('skipped delivery logs are visible and filterable, distinct from failures', function () {
+    $success = DeliveryLog::factory()->create();
+    $skipped = DeliveryLog::factory()->skipped()->create();
+
+    livewire(ListDeliveryLogs::class)
+        ->assertCanSeeTableRecords([$success, $skipped])
+        ->filterTable('status', 'skipped')
+        ->assertCanSeeTableRecords([$skipped])
+        ->assertCanNotSeeTableRecords([$success]);
+});
+
 test('no create, edit, or delete actions are exposed', function () {
     DeliveryLog::factory()->create();
 

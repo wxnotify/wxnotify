@@ -7,6 +7,7 @@ use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
 use App\Support\Apprise\AppriseApiClient;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 test('it delivers via apprise and writes a success DeliveryLog row', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
@@ -41,8 +42,9 @@ test('a non-delivery from apprise writes a failure DeliveryLog row instead of th
         ->and($log->error_detail)->not->toBeNull();
 });
 
-test('it does nothing if the rule no longer exists', function () {
+test('a missing rule sends nothing and logs a warning, since no channel_type is available for a DeliveryLog row', function () {
     Http::fake();
+    Log::spy();
     $channel = NotificationChannel::factory()->create();
     $product = IngestedProduct::factory()->create();
 
@@ -50,19 +52,27 @@ test('it does nothing if the rule no longer exists', function () {
 
     Http::assertNothingSent();
     expect(DeliveryLog::count())->toBe(0);
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn ($message, $context) => $context['rule_id'] === 999999 && $context['channel_id'] === $channel->id);
 });
 
-test('it does nothing if the channel no longer exists', function () {
+test('a missing channel sends nothing and logs a warning, since no channel_type is available for a DeliveryLog row', function () {
     Http::fake();
+    Log::spy();
     $rule = AlertRule::factory()->create();
     $product = IngestedProduct::factory()->create();
 
     (new DeliverWeatherAlert($rule->id, 999999, $product->id))->handle(app(AppriseApiClient::class));
 
     Http::assertNothingSent();
+    expect(DeliveryLog::count())->toBe(0);
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn ($message, $context) => $context['rule_id'] === $rule->id && $context['channel_id'] === 999999);
 });
 
-test('it does nothing if the product no longer exists', function () {
+test('a missing product sends nothing but writes a skipped DeliveryLog row', function () {
     Http::fake();
     $rule = AlertRule::factory()->create();
     $channel = NotificationChannel::factory()->for($rule->user)->create();
@@ -70,9 +80,15 @@ test('it does nothing if the product no longer exists', function () {
     (new DeliverWeatherAlert($rule->id, $channel->id, 999999))->handle(app(AppriseApiClient::class));
 
     Http::assertNothingSent();
+    $log = DeliveryLog::sole();
+    expect($log->status)->toBe('skipped')
+        ->and($log->error_detail)->not->toBeNull()
+        ->and($log->alert_rule_id)->toBe($rule->id)
+        ->and($log->notification_channel_id)->toBe($channel->id)
+        ->and($log->channel_type)->toBe($channel->channel_type);
 });
 
-test('it does nothing if the rule has since been deactivated', function () {
+test('a deactivated rule sends nothing but writes a skipped DeliveryLog row', function () {
     Http::fake();
     $rule = AlertRule::factory()->create(['is_active' => false]);
     $channel = NotificationChannel::factory()->for($rule->user)->create();
@@ -81,4 +97,10 @@ test('it does nothing if the rule has since been deactivated', function () {
     (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
 
     Http::assertNothingSent();
+    $log = DeliveryLog::sole();
+    expect($log->status)->toBe('skipped')
+        ->and($log->error_detail)->not->toBeNull()
+        ->and($log->alert_rule_id)->toBe($rule->id)
+        ->and($log->notification_channel_id)->toBe($channel->id)
+        ->and($log->channel_type)->toBe($channel->channel_type);
 });
