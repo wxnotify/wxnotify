@@ -33,3 +33,10 @@ Found while building the Admin Tools UserResource (Support/impersonation).
 Fix: compute the label from the record instead of a dot-relation path — `TextColumn::make('status')->state(fn (Model $record) => $record->someRelation !== null)->formatStateUsing(fn (bool $state) => $state ? 'A' : 'B')`. `->state()` supplies a state that's never blank in the "false" case (a real boolean), so the formatter always runs.
 
 Found while building the ShapefileLayerResource list page (`Status` column showing "Pending review" vs "Up to date" based on whether a `pendingVersion` relation exists).
+
+## tonegabes/filament-better-options v1.4's Heroicons fallback indicator icon doesn't exist
+`RadioCards`/`RadioList`'s default (unconfigured) radio "idle" indicator resolves to `heroicon-o-circle` (`ToneGabes\BetterOptions\Services\IconResolverService::heroiconDefault()`), which isn't a real Heroicons icon — confirmed no outline or solid `circle.svg` ships in the installed `blade-ui-kit`/heroicons set. Every unselected card throws `Svg by name "o-circle" from set "heroicons" not found` the moment the component renders (i.e. immediately, not just on interaction) — only affects the default; the selected-state default (`heroicon-s-check-circle`) is real and unaffected. Only triggers when the optional `tonegabes/filament-phosphor-icons` package (which has its own defaults) isn't installed.
+
+Fix: call `->hiddenIndicator()` on the field, or set explicit `->idleIndicator('heroicon-...')`/`->selectedIndicator(...)` values with icons that actually exist — don't rely on this package's unconfigured default.
+
+Found while swapping `ConnectChannel.php`'s channel-type `ToggleButtons` for `RadioCards` (Better Options plugin).

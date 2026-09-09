@@ -9,7 +9,6 @@ use App\Support\ChannelTypes\ChannelTypeRegistry;
 use BackedEnum;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
@@ -21,6 +20,7 @@ use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
+use ToneGabes\BetterOptions\Forms\Components\RadioCards;
 use UnitEnum;
 
 class ConnectChannel extends Page implements HasForms
@@ -58,11 +58,20 @@ class ConnectChannel extends Page implements HasForms
                 Wizard::make([
                     Step::make('Choose a channel')
                         ->schema([
-                            ToggleButtons::make('channel_type')
+                            RadioCards::make('channel_type')
                                 ->hiddenLabel()
                                 ->options($picker->mapWithKeys(fn (array $row) => [$row['type']->slug() => $row['type']->label()]))
                                 ->icons($picker->mapWithKeys(fn (array $row) => [$row['type']->slug() => $row['type']->icon()]))
                                 ->disableOptionWhen(fn (string $value): bool => ! auth()->user()->canAddChannel($value))
+                                // tonegabes/filament-better-options v1.4's Heroicons fallback for the
+                                // radio idle indicator is 'heroicon-o-circle', which doesn't exist in
+                                // Heroicons (confirmed: no outline or solid "circle" icon ships in the
+                                // installed heroicons set) — every unselected card throws
+                                // Svg by name "o-circle" from set "heroicons" not found. Hiding the
+                                // indicator sidesteps the broken default entirely; the channel icon
+                                // itself plus the card's selected-state styling already communicate
+                                // selection without it.
+                                ->hiddenIndicator()
                                 ->columns(3)
                                 ->required()
                                 ->live(),
