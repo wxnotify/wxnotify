@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "703b89bc21151989df2056468bdaffe6",
+    "content-hash": "2be8d3ea65afd0eebccfaac199b6c42c",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -9644,6 +9644,66 @@
                 }
             ],
             "time": "2026-08-21T12:16:08+00:00"
+        },
+        {
+            "name": "tapp/filament-footer",
+            "version": "v1.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/TappNetwork/filament-footer-package.git",
+                "reference": "e28a993f5bb17f979d345febf3ef0cbd3a2b1e29"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/TappNetwork/filament-footer-package/zipball/e28a993f5bb17f979d345febf3ef0cbd3a2b1e29",
+                "reference": "e28a993f5bb17f979d345febf3ef0cbd3a2b1e29",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^5.0|^4.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "pestphp/pest": "^4.0|^5.0"
+            },
+            "type": "filament-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Tapp\\FilamentFooter\\FooterServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Tapp\\FilamentFooter\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Tapp Network",
+                    "email": "dev@tappnetwork.com"
+                }
+            ],
+            "description": "A Filament plugin to add a customizable copyright footer to all panels",
+            "keywords": [
+                "configurable",
+                "copyright",
+                "filament",
+                "footer",
+                "i18n",
+                "laravel",
+                "multilingual"
+            ],
+            "support": {
+                "issues": "https://github.com/TappNetwork/filament-footer-package/issues",
+                "source": "https://github.com/TappNetwork/filament-footer-package/tree/v1.0.3"
+            },
+            "time": "2026-07-04T20:40:15+00:00"
         },
         {
             "name": "tapp/filament-timezone-field",
