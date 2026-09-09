@@ -5,6 +5,7 @@ use App\Filament\Dashboard\Resources\Locations\Pages\CreateLocation;
 use App\Filament\Dashboard\Resources\Locations\Pages\ListLocations;
 use App\Models\Location;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -93,13 +94,60 @@ test('creating a location persists an explicitly chosen timezone', function () {
     expect($location->timezone)->toBe('America/Chicago');
 });
 
-test('creating a location without a timezone is rejected', function () {
+test('creating a location without a timezone is rejected when coordinates resolve no state', function () {
     livewire(CreateLocation::class)
         ->fillForm([
             'label' => 'Home',
-            'lat' => 39.8283,
-            'lng' => -98.5795,
+            'lat' => 0.0,
+            'lng' => 0.0,
         ])
         ->call('create')
         ->assertHasFormErrors(['timezone']);
+});
+
+test('placing coordinates fills a blank timezone from the state they fall within', function () {
+    DB::table('us_states')->insert([
+        'state' => 'NY', 'name' => 'New York', 'fips' => '36', 'lon' => -73.5, 'lat' => 42.5,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-74 42, -73 42, -73 43, -74 43, -74 42))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    livewire(CreateLocation::class)
+        ->fillForm(['lat' => 42.5, 'lng' => -73.5])
+        ->assertFormSet(['timezone' => 'America/New_York']);
+});
+
+test('creating a location with coordinates but no explicit timezone persists the derived fallback', function () {
+    DB::table('us_states')->insert([
+        'state' => 'NY', 'name' => 'New York', 'fips' => '36', 'lon' => -73.5, 'lat' => 42.5,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-74 42, -73 42, -73 43, -74 43, -74 42))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    livewire(CreateLocation::class)
+        ->fillForm([
+            'label' => 'Home',
+            'lat' => 42.5,
+            'lng' => -73.5,
+            'address' => 'Somewhere, NY',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $location = Location::where('label', 'Home')->sole();
+
+    expect($location->timezone)->toBe('America/New_York');
+});
+
+test('the coordinate fallback never overwrites an explicitly chosen timezone', function () {
+    DB::table('us_states')->insert([
+        'state' => 'NY', 'name' => 'New York', 'fips' => '36', 'lon' => -73.5, 'lat' => 42.5,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-74 42, -73 42, -73 43, -74 43, -74 42))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    livewire(CreateLocation::class)
+        ->fillForm(['timezone' => 'America/Chicago'])
+        ->fillForm(['lat' => 42.5, 'lng' => -73.5])
+        ->assertFormSet(['timezone' => 'America/Chicago']);
 });
