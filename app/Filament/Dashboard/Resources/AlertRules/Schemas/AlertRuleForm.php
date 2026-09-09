@@ -435,7 +435,7 @@ class AlertRuleForm
             // seedForecastDiscussionWfoDefault(), which sets it eagerly
             // from categoryStep()'s afterStateUpdated() hook instead.
             self::wfoField()
-                ->helperText('Your local NWS office\'s 3-letter identifier. Look yours up at weather.gov if you\'re not sure.'),
+                ->helperText('Search by office code or by city/state if you\'re not sure which is yours.'),
         ];
     }
 

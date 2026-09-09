@@ -229,6 +229,15 @@ test('creating a forecast discussion rule picks a real office from the WFO picke
 });
 
 test('the WFO picker rejects an office not in the real cwa_boundaries table', function () {
+    // A real row exists (OKX) so this proves "valid table, invalid value" --
+    // not just "empty table, any value would fail."
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'OKX', 'cwa' => 'OKX', 'city' => 'Upton', 'st' => 'NY', 'citystate' => 'Upton NY',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'forecast_discussion',
