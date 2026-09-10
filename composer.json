@@ -16,6 +16,7 @@
         "jbuitt/filament-toggle-list": "dev-main",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
+        "marcelodelgado/filament-announcements": "^1.0",
         "owenvoke/blade-fontawesome": "^3.3",
         "phpmyadmin/shapefile": "^4.0",
         "spatie/laravel-activitylog": "^5.1",

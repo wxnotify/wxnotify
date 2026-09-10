@@ -30,7 +30,13 @@ class SystemNotificationsTable
                         : null),
                 TextColumn::make('data')
                     ->label('Message')
-                    ->getStateUsing(fn (DatabaseNotification $record): string => Str::limit($record->data['message'] ?? '', 60)),
+                    ->getStateUsing(fn (DatabaseNotification $record): string => Str::limit(
+                        // Filament-format notifications (format => filament, e.g.
+                        // ShapefileLayerUpdateAvailableNotification) carry title/body
+                        // instead of the plain 'message' key other notifications use.
+                        $record->data['message'] ?? $record->data['title'] ?? '',
+                        60,
+                    )),
                 IconColumn::make('read_at')
                     ->label('Read')
                     ->boolean()

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2be8d3ea65afd0eebccfaac199b6c42c",
+    "content-hash": "01b08365f8e9914415919aecbf918c29",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -4133,6 +4133,70 @@
                 }
             ],
             "time": "2026-08-24T15:02:06+00:00"
+        },
+        {
+            "name": "marcelodelgado/filament-announcements",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/MarceloDelgadoDev/filament-announcements.git",
+                "reference": "d2a60021fe98888455400ce41fe00ad125105f41"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/MarceloDelgadoDev/filament-announcements/zipball/d2a60021fe98888455400ce41fe00ad125105f41",
+                "reference": "d2a60021fe98888455400ce41fe00ad125105f41",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^5.0",
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "php": "^8.2",
+                "spatie/laravel-package-tools": "^1.16"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "orchestra/testbench": "^11.0",
+                "phpunit/phpunit": "^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Marcelodelgado\\Announcements\\AnnouncementsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Marcelodelgado\\Announcements\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Marcelo Delgado",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Filament v5 plugin for institutional announcements on the admin dashboard",
+            "keywords": [
+                "alerts",
+                "announcements",
+                "dashboard",
+                "filament",
+                "filament-plugin",
+                "filament-v5",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/MarceloDelgadoDev/filament-announcements/issues",
+                "source": "https://github.com/MarceloDelgadoDev/filament-announcements/tree/v1.0.0"
+            },
+            "time": "2026-05-14T22:29:05+00:00"
         },
         {
             "name": "monolog/monolog",
