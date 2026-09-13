@@ -11,6 +11,7 @@ use App\Observers\IngestedProductObserver;
 use App\Observers\LocationZoneObserver;
 use App\Observers\UserActivityObserver;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Support\CauserResolver;
@@ -49,5 +50,9 @@ class AppServiceProvider extends ServiceProvider
         IngestedProduct::observe(IngestedProductObserver::class);
         Location::observe(LocationZoneObserver::class);
         Event::subscribe(ActivityAlertEventSubscriber::class);
+
+        Gate::define('command-center:access', fn ($user) => $user->is_staff);
+        Gate::define('command-center:manage-commands', fn ($user) => $user->is_staff);
+        Gate::define('command-center:prune-history', fn ($user) => $user->is_staff);
     }
 }
