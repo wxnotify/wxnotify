@@ -56,3 +56,20 @@ test('the dashboard sidebar shows an active fact and not an inactive one', funct
         ->assertSee('Active fact shown on the dashboard')
         ->assertDontSee('Inactive fact hidden from the dashboard');
 });
+
+test('the dashboard sidebar rotates through more than one fact', function () {
+    // Distinct sort_order per row reproduces the real bug: active()'s own
+    // ->orderBy('sort_order') previously outranked a later ->inRandomOrder(),
+    // so the same lowest-sort_order row won every single time.
+    foreach (range(1, 10) as $i) {
+        DidYouKnow::factory()->create(['body' => "Fact number {$i}", 'sort_order' => $i]);
+    }
+
+    $seen = [];
+
+    foreach (range(1, 15) as $attempt) {
+        $seen[] = DidYouKnow::active()->inRandomOrder()->first()->body;
+    }
+
+    expect(count(array_unique($seen)))->toBeGreaterThan(1);
+});

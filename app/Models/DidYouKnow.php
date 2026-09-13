@@ -21,8 +21,16 @@ class DidYouKnow extends Model
         ];
     }
 
+    /**
+     * Deliberately no ->orderBy('sort_order') here: this scope's only
+     * consumer (the dashboard sidebar's render hook) chains ->inRandomOrder()
+     * onto it, and an ORDER BY already applied by the scope takes priority
+     * over one appended afterwards — with every row's sort_order distinct,
+     * that made the random order a no-op tiebreaker that never won,
+     * confirmed directly: repeated calls returned the same row every time.
+     */
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('is_active', true)->orderBy('sort_order');
+        return $query->where('is_active', true);
     }
 }
