@@ -4,9 +4,20 @@ namespace App\Actions\Channels;
 
 use App\Models\NotificationChannel;
 use App\Support\Apprise\AppriseApiClient;
+use Illuminate\Http\Client\ConnectionException;
 
 class DispatchChannelConfirmationCode
 {
+    /**
+     * Returns false both when Apprise reports the message wasn't delivered
+     * and when the Apprise API itself is unreachable. The two are kept
+     * distinguishable only via the log: AppriseApiClient::notify() isn't
+     * changed to swallow ConnectionException itself, since
+     * DeliverWeatherAlert/SendActivityAlert share it and rely on that
+     * exception surfacing so the queue's own retry-with-backoff handles a
+     * transient outage — this synchronous, in-wizard call has no such
+     * retry mechanism, so it's the one that needs to catch it.
+     */
     public function __invoke(NotificationChannel $channel): bool
     {
         $code = (string) random_int(100000, 999999);
@@ -16,10 +27,19 @@ class DispatchChannelConfirmationCode
             'confirmation_code_expires_at' => now()->addMinutes(15),
         ])->save();
 
-        return app(AppriseApiClient::class)->notify(
-            url: $channel->apprise_url,
-            body: "Your WxNotify confirmation code is: {$code}\n\nEnter this code in the dashboard to finish connecting this channel. It expires in 15 minutes.",
-            title: 'Confirm your WxNotify channel',
-        );
+        try {
+            return app(AppriseApiClient::class)->notify(
+                url: $channel->apprise_url,
+                body: "Your WxNotify confirmation code is: {$code}\n\nEnter this code in the dashboard to finish connecting this channel. It expires in 15 minutes.",
+                title: 'Confirm your WxNotify channel',
+            );
+        } catch (ConnectionException $e) {
+            logger()->error('Could not reach the Apprise API to dispatch a channel confirmation code', [
+                'notification_channel_id' => $channel->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 }

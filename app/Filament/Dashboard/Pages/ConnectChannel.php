@@ -18,6 +18,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
 use ToneGabes\BetterOptions\Forms\Components\RadioCards;
@@ -91,7 +92,24 @@ class ConnectChannel extends Page implements HasForms
                                 'apprise_url' => $appriseUrl,
                             ]);
 
-                            app(DispatchChannelConfirmationCode::class)($channel);
+                            $dispatched = app(DispatchChannelConfirmationCode::class)($channel);
+
+                            if (! $dispatched) {
+                                // Delete rather than leave a permanently-pending
+                                // channel behind: nothing else can retry it, and
+                                // an unqualified retry (clicking Next again)
+                                // would otherwise create a duplicate row on
+                                // every attempt.
+                                $channel->delete();
+
+                                Notification::make()
+                                    ->title('Couldn\'t send your confirmation code')
+                                    ->body('The notification service is temporarily unavailable. Please try again in a moment.')
+                                    ->danger()
+                                    ->send();
+
+                                throw new Halt;
+                            }
 
                             $set('channel_id', $channel->id);
                         }),

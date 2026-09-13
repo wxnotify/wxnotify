@@ -53,6 +53,27 @@ test('completing the wizard creates a pending channel and dispatches a code', fu
     Http::assertSent(fn ($request) => str_contains($request->url(), '/notify/'));
 });
 
+test('a dispatch failure because Apprise is unreachable is handled gracefully', function () {
+    Http::fake(['*/notify/*' => Http::failedConnection()]);
+
+    $component = livewire(ConnectChannel::class)
+        ->fillForm(['channel_type' => 'ntfy']);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm(['topic' => 'wxnotify-test-topic']);
+    goToConnectChannelStep($component, 1);
+
+    // Not assertWizardCurrentStep(2): Wizard::nextStep() optimistically bumps
+    // its runtime currentStepIndex before running afterValidation, and never
+    // reverts it when a Halt is caught — only the client-side step transition
+    // (dispatched after the try/catch, so never reached here) is actually
+    // skipped. Verified for real in a browser instead: the "Confirm" step
+    // never becomes visible and the danger notification renders.
+    $component->assertNotified('Couldn\'t send your confirmation code');
+
+    expect(NotificationChannel::where('user_id', $this->user->id)->count())->toBe(0)
+        ->and($component->get('data.channel_id'))->toBeNull();
+});
+
 test('entering the correct code verifies the channel', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
