@@ -7,6 +7,8 @@ use App\Filament\Dashboard\Pages\Auth\EditProfile;
 use App\Filament\Dashboard\Pages\Auth\Register;
 use App\Http\Middleware\RedirectAdmins;
 use App\Models\User;
+use Awcodes\Gravatar\GravatarPlugin;
+use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
@@ -65,8 +67,8 @@ class DashboardPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Dashboard/Widgets'), for: 'App\Filament\Dashboard\Widgets')
             ->widgets([
                 AnnouncementsWidget::class,
-                AccountWidget::class,
-                FilamentInfoWidget::class,
+                // AccountWidget::class,
+                // FilamentInfoWidget::class,
             ])
             ->renderHook(
                 // Registered before ->plugins() below: Filament renders
@@ -109,6 +111,13 @@ class DashboardPanelProvider extends PanelProvider
                         MyImages::make()
                             ->directory('images/backgrounds/weather_wallpapers')
                     ),
+                GravatarPlugin::make(),
+                FilamentDeveloperLoginsPlugin::make()
+                    ->enabled(app()->environment('local'))
+                    ->users([
+                        'Admin' => 'admin@host.com',
+                        'User' => 'user@host.com',
+                    ]),
             ])
             ->renderHook(
                 PanelsRenderHook::BODY_END,
