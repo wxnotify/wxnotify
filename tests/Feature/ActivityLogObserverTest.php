@@ -83,29 +83,45 @@ test('creating, updating, and deleting a location dispatch the matching Location
         && $job->userId === $ownerId);
 });
 
-test('creating, updating, and deleting a notification channel dispatch the matching Contact types', function () {
+test('creating and deleting a notification channel dispatch the matching Channel types', function () {
     Queue::fake();
 
     ActivityAlertRule::factory()->create([
         'scope' => 'all_subscribers',
         'activity_types' => [
-            ActivityAlertType::ContactCreated->value,
-            ActivityAlertType::ContactUpdated->value,
-            ActivityAlertType::ContactDeleted->value,
+            ActivityAlertType::ChannelCreated->value,
+            ActivityAlertType::ChannelDeleted->value,
         ],
         'is_active' => true,
     ]);
 
     $channel = NotificationChannel::factory()->create();
-    Queue::assertPushed(SendActivityAlert::class, fn ($job) => $job->type === ActivityAlertType::ContactCreated);
-
-    $channel->update(['label' => 'New label']);
-    Queue::assertPushed(SendActivityAlert::class, fn ($job) => $job->type === ActivityAlertType::ContactUpdated);
+    Queue::assertPushed(SendActivityAlert::class, fn ($job) => $job->type === ActivityAlertType::ChannelCreated);
 
     $ownerId = $channel->user_id;
     $channel->delete();
-    Queue::assertPushed(SendActivityAlert::class, fn ($job) => $job->type === ActivityAlertType::ContactDeleted
+    Queue::assertPushed(SendActivityAlert::class, fn ($job) => $job->type === ActivityAlertType::ChannelDeleted
         && $job->userId === $ownerId);
+});
+
+test('updating a notification channel is not a mapped activity type and dispatches nothing', function () {
+    Queue::fake();
+
+    ActivityAlertRule::factory()->create([
+        'scope' => 'all_subscribers',
+        'activity_types' => [
+            ActivityAlertType::ChannelCreated->value,
+            ActivityAlertType::ChannelDeleted->value,
+        ],
+        'is_active' => true,
+    ]);
+
+    $channel = NotificationChannel::factory()->create();
+    Queue::fake(); // reset after the create() above already dispatched one
+
+    $channel->update(['label' => 'New label']);
+
+    Queue::assertNotPushed(SendActivityAlert::class);
 });
 
 test('activity for an unmapped subject type dispatches nothing, even when every type is configured', function () {

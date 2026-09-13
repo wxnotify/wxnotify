@@ -29,9 +29,8 @@ class ActivityLogObserver
             'deleted' => ActivityAlertType::LocationDeleted,
         ],
         NotificationChannel::class => [
-            'created' => ActivityAlertType::ContactCreated,
-            'updated' => ActivityAlertType::ContactUpdated,
-            'deleted' => ActivityAlertType::ContactDeleted,
+            'created' => ActivityAlertType::ChannelCreated,
+            'deleted' => ActivityAlertType::ChannelDeleted,
         ],
     ];
 

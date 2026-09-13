@@ -15,10 +15,9 @@ beforeEach(function () {
     $this->actingAs($this->staff);
 });
 
-test('the list page discloses which activity types are still not enforced', function () {
+test('the list page no longer discloses unenforced activity types, since every remaining type is now wired', function () {
     livewire(ListActivityAlertRules::class)
-        ->assertSee('not yet enforced')
-        ->assertSee('Schedule changes');
+        ->assertDontSee('not yet enforced');
 });
 
 test('a specific_users rule persists its attached users through the pivot', function () {

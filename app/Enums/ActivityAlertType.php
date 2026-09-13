@@ -15,18 +15,11 @@ enum ActivityAlertType: string
     case AlertCreated = 'alert_created';
     case AlertUpdated = 'alert_updated';
     case AlertDeleted = 'alert_deleted';
-    case ContactCreated = 'contact_created';
-    case ContactUpdated = 'contact_updated';
-    case ContactDeleted = 'contact_deleted';
+    case ChannelCreated = 'channel_created';
+    case ChannelDeleted = 'channel_deleted';
     case LocationCreated = 'location_created';
     case LocationUpdated = 'location_updated';
     case LocationDeleted = 'location_deleted';
-    case ScheduleCreated = 'schedule_created';
-    case ScheduleUpdated = 'schedule_updated';
-    case ScheduleDeleted = 'schedule_deleted';
-    case ProductListUpdated = 'product_list_updated';
-    case SettingsChanged = 'settings_changed';
-    case DailyForecastEnabled = 'daily_forecast_enabled';
 
     public function label(): string
     {
@@ -42,18 +35,11 @@ enum ActivityAlertType: string
             self::AlertCreated => 'Alert created',
             self::AlertUpdated => 'Alert updated',
             self::AlertDeleted => 'Alert deleted',
-            self::ContactCreated => 'Contact created',
-            self::ContactUpdated => 'Contact updated',
-            self::ContactDeleted => 'Contact deleted',
+            self::ChannelCreated => 'Channel created',
+            self::ChannelDeleted => 'Channel deleted',
             self::LocationCreated => 'Location created',
             self::LocationUpdated => 'Location updated',
             self::LocationDeleted => 'Location deleted',
-            self::ScheduleCreated => 'Schedule created',
-            self::ScheduleUpdated => 'Schedule updated',
-            self::ScheduleDeleted => 'Schedule deleted',
-            self::ProductListUpdated => 'Product list updated',
-            self::SettingsChanged => 'Settings changed',
-            self::DailyForecastEnabled => 'Daily forecast enabled',
         };
     }
 }
