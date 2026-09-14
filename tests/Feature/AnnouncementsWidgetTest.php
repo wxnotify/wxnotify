@@ -1,9 +1,9 @@
 <?php
 
+use App\Filament\Dashboard\Widgets\AnnouncementsWidget;
+use App\Models\Announcement;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Marcelodelgado\Announcements\Filament\Widgets\AnnouncementsWidget;
-use Marcelodelgado\Announcements\Models\Announcement;
 
 use function Pest\Livewire\livewire;
 
@@ -82,4 +82,35 @@ test('a non-dismissible announcement cannot be dismissed', function () {
     expect(
         livewire(AnnouncementsWidget::class)->instance()->getAnnouncements()->pluck('id')
     )->toContain($announcement->id);
+});
+
+test('a tier-targeted announcement is only visible to subscribers in that tier', function () {
+    $announcement = makeAnnouncement(['scope' => 'specific_tiers', 'tiers' => ['plus']]);
+
+    expect(
+        livewire(AnnouncementsWidget::class)->instance()->getAnnouncements()->pluck('id')
+    )->not->toContain($announcement->id);
+
+    $this->subscriber->forceFill(['tier_override' => 'plus'])->save();
+
+    expect(
+        livewire(AnnouncementsWidget::class)->instance()->getAnnouncements()->pluck('id')
+    )->toContain($announcement->id);
+});
+
+test('a user-targeted announcement is only visible to the targeted subscribers', function () {
+    $announcement = makeAnnouncement(['scope' => 'specific_users']);
+    $announcement->targetedUsers()->attach($this->subscriber->id);
+
+    $otherSubscriber = User::factory()->create();
+
+    expect(
+        livewire(AnnouncementsWidget::class)->instance()->getAnnouncements()->pluck('id')
+    )->toContain($announcement->id);
+
+    $this->actingAs($otherSubscriber);
+
+    expect(
+        livewire(AnnouncementsWidget::class)->instance()->getAnnouncements()->pluck('id')
+    )->not->toContain($announcement->id);
 });

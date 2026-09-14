@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Actions\Support\GenerateChatwootIdentityHash;
 use App\Filament\Dashboard\Pages\Auth\EditProfile;
 use App\Filament\Dashboard\Pages\Auth\Register;
+use App\Filament\Dashboard\Widgets\AnnouncementsWidget;
 use App\Http\Middleware\RedirectAdmins;
 use App\Models\User;
 use Awcodes\Gravatar\GravatarPlugin;
@@ -35,7 +36,6 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Str;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Socialite\Contracts\User as SocialiteUserContract;
-use Marcelodelgado\Announcements\Filament\Widgets\AnnouncementsWidget;
 use Swis\Filament\Backgrounds\FilamentBackgroundsPlugin;
 use Swis\Filament\Backgrounds\ImageProviders\MyImages;
 

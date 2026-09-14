@@ -20,7 +20,6 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Marcelodelgado\Announcements\Filament\Resources\AnnouncementResource;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -35,9 +34,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->databaseNotifications()
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\Filament\Admin\Resources')
-            ->resources([
-                AnnouncementResource::class,
-            ])
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\Filament\Admin\Pages')
             ->pages([
                 Dashboard::class,

@@ -1,11 +1,12 @@
 <?php
 
+use App\Enums\AnnouncementScope;
+use App\Filament\Admin\Resources\Announcements\Pages\CreateAnnouncement;
+use App\Filament\Admin\Resources\Announcements\Pages\EditAnnouncement;
+use App\Filament\Admin\Resources\Announcements\Pages\ListAnnouncements;
+use App\Models\Announcement;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Marcelodelgado\Announcements\Filament\Resources\AnnouncementResource\Pages\CreateAnnouncement;
-use Marcelodelgado\Announcements\Filament\Resources\AnnouncementResource\Pages\EditAnnouncement;
-use Marcelodelgado\Announcements\Filament\Resources\AnnouncementResource\Pages\ListAnnouncements;
-use Marcelodelgado\Announcements\Models\Announcement;
 
 use function Pest\Laravel\assertDatabaseHas;
 use function Pest\Livewire\livewire;
@@ -71,4 +72,54 @@ test('a non-staff user cannot reach the announcements resource', function () {
     $this->actingAs($subscriber)
         ->get('/admin/announcements')
         ->assertForbidden();
+});
+
+test('a staff member can create a tier-targeted announcement', function () {
+    livewire(CreateAnnouncement::class)
+        ->fillForm([
+            'title' => 'Upgrade to Plus',
+            'body' => 'Unlock more locations with Plus.',
+            'type' => 'info',
+            'scope' => 'specific_tiers',
+            'tiers' => ['free'],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $announcement = Announcement::where('title', 'Upgrade to Plus')->sole();
+
+    expect($announcement->scope)->toBe(AnnouncementScope::SpecificTiers)
+        ->and($announcement->tiers)->toBe(['free']);
+});
+
+test('tiers is required when the scope is specific_tiers', function () {
+    livewire(CreateAnnouncement::class)
+        ->fillForm([
+            'title' => 'Upgrade to Plus',
+            'body' => 'Unlock more locations with Plus.',
+            'type' => 'info',
+            'scope' => 'specific_tiers',
+            'tiers' => [],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['tiers']);
+});
+
+test('a staff member can create a user-targeted announcement', function () {
+    $subscriber = User::factory()->create();
+
+    livewire(CreateAnnouncement::class)
+        ->fillForm([
+            'title' => 'Your feedback needed',
+            'body' => 'We would love to hear from you.',
+            'type' => 'info',
+            'scope' => 'specific_users',
+            'targetedUsers' => [$subscriber->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $announcement = Announcement::where('title', 'Your feedback needed')->sole();
+
+    expect($announcement->targetedUsers->pluck('id')->all())->toBe([$subscriber->id]);
 });
