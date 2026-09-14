@@ -94,6 +94,49 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             ->contains(fn (NotificationChannel $channel) => $registry->find($channel->channel_type)?->countsTowardFreeSlot() ?? false);
     }
 
+    public function traccarServers(): HasMany
+    {
+        return $this->hasMany(TraccarServer::class);
+    }
+
+    /**
+     * Maximum number of Traccar servers this user's tier allows, or null for unlimited.
+     */
+    public function traccarServerLimit(): ?int
+    {
+        return match ($this->tier()) {
+            Tier::Free => 0,
+            Tier::Plus => 1,
+            Tier::Pro => 3,
+        };
+    }
+
+    public function canCreateTraccarServer(): bool
+    {
+        $limit = $this->traccarServerLimit();
+
+        return $limit === null || $this->traccarServers()->count() < $limit;
+    }
+
+    /**
+     * Maximum number of devices allowed per Traccar server this user's tier allows, or null for unlimited.
+     */
+    public function traccarDeviceLimitPerServer(): ?int
+    {
+        return match ($this->tier()) {
+            Tier::Free => 0,
+            Tier::Plus => 5,
+            Tier::Pro => 10,
+        };
+    }
+
+    public function canAddTraccarDevice(int $traccarServerId): bool
+    {
+        $limit = $this->traccarDeviceLimitPerServer();
+
+        return $limit === null || $this->locations()->where('traccar_server_id', $traccarServerId)->count() < $limit;
+    }
+
     public function alertRules(): HasMany
     {
         return $this->hasMany(AlertRule::class);
