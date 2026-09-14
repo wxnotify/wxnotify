@@ -360,12 +360,21 @@ class Location extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        // Excludes lat/lng/mobile_position_updated_at: a polled mobile
-        // location's position changes every 5-30 minutes forever, and
-        // logging that as "activity" would drown out everything else about
-        // this model in noise. Everything else still logs normally.
+        // Excludes only mobile_position_updated_at, a bookkeeping timestamp
+        // that changes every poll cycle (5-30 minutes, forever) purely from
+        // polling -- everything else, including lat/lng, stays logged, so a
+        // subscriber's own manual repositioning of a stationary location is
+        // still fully audited. (An earlier version of this method excluded
+        // lat/lng entirely via logOnly([...]), which silently broke that
+        // auditing for stationary locations too -- caught in Task 3's code
+        // review and fixed here. The poller's own write still needs its own
+        // disableLogging()/enableLogging() wrap around just that one save()
+        // call -- see Task 7 -- since a model-level field exclusion can't
+        // tell "the poller wrote this" apart from "the subscriber corrected
+        // their pin".)
         return LogOptions::defaults()
-            ->logOnly(['user_id', 'label', 'type', 'address', 'timezone', 'mobile_source', 'traccar_server_id', 'traccar_device_id', 'traccar_device_name'])
+            ->logAll()
+            ->logExcept(['mobile_position_updated_at'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -912,7 +921,17 @@ class PollTraccarServer
         $result = [];
 
         foreach ($positions as $position) {
-            if (! is_array($position) || ! isset($position['deviceId'], $position['latitude'], $position['longitude'])) {
+            // is_numeric() on latitude/longitude (not just isset()) was
+            // added after Task 6's code review found isset() alone doesn't
+            // prove the values are actually numeric -- a bogus string like
+            // "not-a-number" would silently (float)-cast to 0.0, reopening
+            // the exact Null Island failure mode this whole file exists to
+            // close.
+            if (! is_array($position)
+                || ! isset($position['deviceId'], $position['latitude'], $position['longitude'])
+                || ! is_numeric($position['latitude'])
+                || ! is_numeric($position['longitude'])
+            ) {
                 Log::warning('Traccar server returned a malformed position entry', [
                     'traccar_server_id' => $server->id,
                 ]);
@@ -938,7 +957,7 @@ class PollTraccarServer
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/PollTraccarServerTest.php --compact"
 ```
 
-Expected: PASS (7 tests).
+Expected: PASS (8 tests -- includes a non-numeric-latitude case added during Task 6's own code review, on top of the 7 originally listed above).
 
 - [ ] **Step 5: Run Pint and commit**
 
@@ -1127,6 +1146,13 @@ class PollTraccarPositions extends Command
         $dueLocations = Location::query()
             ->whereNotNull('traccar_server_id')
             ->whereNotNull('traccar_device_id')
+            // Added after Task 7's own code review: without this, a
+            // location whose mobile_update_interval_minutes was somehow
+            // ever null would poll once (caught by the first OR-branch
+            // below) then silently never poll again, since NULL <= NULL in
+            // the raw-SQL interval comparison is neither true nor false --
+            // no error, no log, just permanent staleness.
+            ->whereNotNull('mobile_update_interval_minutes')
             ->where(function ($query) {
                 $query->whereNull('mobile_position_updated_at')
                     ->orWhereRaw(
@@ -1232,8 +1258,10 @@ In `bootstrap/app.php`, inside the existing `->withSchedule(function (Schedule $
 ```php
         $schedule->command('shapefile:scan')->daily();
         $schedule->command('alerts:dispatch-scheduled')->everyFifteenMinutes();
-        $schedule->command('traccar:poll-positions')->everyFiveMinutes();
+        $schedule->command('traccar:poll-positions')->everyFiveMinutes()->withoutOverlapping();
 ```
+
+`->withoutOverlapping()` was added after Task 7's own code review: HTTP calls to Traccar servers happen sequentially, so enough due/slow servers could push one run past 5 minutes, letting the next scheduled tick start a second, overlapping process that duplicates work. This app's default cache driver (`CACHE_STORE=database` in `.env`) implements `LockProvider`, so `withoutOverlapping()`'s atomic lock genuinely works here, not a silent no-op.
 
 - [ ] **Step 6: Verify the schedule registered**
 
@@ -1908,6 +1936,7 @@ use App\Enums\LocationType;
 use App\Enums\MobileSource;
 use Fahiem\FilamentPinpoint\Pinpoint;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -2047,8 +2076,22 @@ class LocationForm
                 ->required($visible)
                 ->visible($visible)
                 ->helperText('Tighter intervals sharpen how current this location is, at the cost of more Traccar/device battery use.'),
-            Hidden::make('lat')->visible($visible),
-            Hidden::make('lng')->visible($visible),
+            // Replaces an earlier pair of Hidden::make('lat')/Hidden::make('lng')
+            // here -- Task 10's own code review found those dead: they did
+            // nothing stationaryFields()'s own lat/lng Hidden fields didn't
+            // already cover (exactly one pair is ever active, per whichever
+            // branch is visible). This Placeholder is the real fix for a
+            // different issue the same review found: a mobile location never
+            // gets a timezone (TimezoneSelect is stationary-only, and a
+            // hidden field with no dehydratedWhenHidden(true) is excluded
+            // from both validation and submission), so
+            // MatchWeatherAlertRules::isWithinQuietHours() silently never
+            // suppresses for it (safe default -- an alert still delivers --
+            // but previously undisclosed anywhere in the UI).
+            Placeholder::make('mobile_quiet_hours_note')
+                ->label('')
+                ->content('Mobile locations don\'t have a fixed timezone, so quiet hours on alert rules tied to this location won\'t take effect.')
+                ->visible($visible),
         ];
     }
 
@@ -2233,3 +2276,11 @@ git commit -m "Fix issues found during manual verification of Traccar Servers"
 ```
 
 (Skip this step entirely if step 3 found nothing to fix.)
+
+---
+
+## Post-implementation: final holistic review
+
+After all 11 tasks were individually reviewed and merged, a final holistic review (scoped to catch integration-level issues no single task's narrow diff could see) found one real functional gap outside the feature's own file list: `app/Filament/Dashboard/Widgets/LocationForecastWidget.php` — the footer widget on every `Location`'s View page, mobile included — called `GetSevenDayForecast` unconditionally. A fixless mobile location's `(float) null` lat/lng casts to `0.0`, so viewing that location's page silently queried the real NWS API at `0,0` every time — exactly the Null Island failure mode this whole feature exists to close, just in a file no per-task review had reason to open. Fixed with the same `hasFix()` guard used everywhere else, plus a regression test (`tests/Feature/LocationForecastWidgetTest.php`) proving both that a fixless mobile location's forecast call is skipped entirely and that a fixed one still fetches normally. Committed as `12f5142`.
+
+Also found and fixed as part of that same pass: `399704c` ("Add Traccar server/device tier limits to User") carries an incorrect `Co-Authored-By` trailer (a different Claude model than the one this repository's attribution convention requires). Left uncorrected rather than rewriting history: it sits under ~14 later commits, and rebasing that stack to fix a purely cosmetic trailer carried more risk than the fix was worth. Flagged to the repository owner instead.
