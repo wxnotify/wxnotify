@@ -2,15 +2,21 @@
 
 namespace App\Filament\Dashboard\Resources\Locations\Schemas;
 
+use App\Actions\Traccar\ListTraccarDevices;
 use App\Actions\Weather\ResolveTimezoneFromCoordinates;
 use App\Enums\LocationType;
+use App\Enums\MobileSource;
 use Fahiem\FilamentPinpoint\Pinpoint;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rules\Exists;
 use Tapp\FilamentTimezoneField\Forms\Components\TimezoneSelect;
 
 class LocationForm
@@ -27,40 +33,151 @@ class LocationForm
      */
     public static function fields(): array
     {
+        $isStationary = fn (Get $get): bool => $get('type') === LocationType::Stationary->value;
+
         return [
             TextInput::make('label')
                 ->label('Name this location')
                 ->placeholder("Home, Work, Mom's house…")
                 ->required()
                 ->maxLength(255),
-            Hidden::make('type')
-                ->default(LocationType::Stationary),
+            Radio::make('type')
+                ->label('Location type')
+                ->options([
+                    LocationType::Stationary->value => 'Stationary',
+                    LocationType::Mobile->value => 'Mobile (tracked live)',
+                ])
+                ->default(LocationType::Stationary)
+                ->required()
+                ->live(),
+            ...self::stationaryFields(),
+            ...self::mobileFields(),
+            TimezoneSelect::make('timezone')
+                ->label('Timezone')
+                ->searchable()
+                ->getTimezoneFromBrowser()
+                ->required()
+                ->visible($isStationary)
+                ->helperText('Defaults to your browser\'s detected timezone — change it if this location is somewhere else (e.g. a relative\'s house). Used for this location\'s quiet hours.'),
+        ];
+    }
+
+    /**
+     * @return array<Component>
+     */
+    private static function stationaryFields(): array
+    {
+        $visible = fn (Get $get): bool => $get('type') === LocationType::Stationary->value;
+
+        return [
             Pinpoint::make('coordinates')
                 ->label('Location')
                 ->provider('leaflet')
                 ->latField('lat')
                 ->lngField('lng')
                 ->addressField('address')
-                ->dehydrated(false),
+                ->dehydrated(false)
+                ->visible($visible),
             Hidden::make('lat')
-                ->required()
                 ->live()
-                ->afterStateUpdated(fn (Set $set, Get $get) => self::seedTimezoneFallback($set, $get)),
+                ->afterStateUpdated(fn (Set $set, Get $get) => self::seedTimezoneFallback($set, $get))
+                ->required($visible)
+                ->visible($visible),
             Hidden::make('lng')
-                ->required()
                 ->live()
-                ->afterStateUpdated(fn (Set $set, Get $get) => self::seedTimezoneFallback($set, $get)),
+                ->afterStateUpdated(fn (Set $set, Get $get) => self::seedTimezoneFallback($set, $get))
+                ->required($visible)
+                ->visible($visible),
             TextInput::make('address')
                 ->label('Resolved address')
                 ->readOnly()
+                ->visible($visible)
                 ->helperText('Filled in automatically from the map above — search, drag the marker, or use your current location.'),
-            TimezoneSelect::make('timezone')
-                ->label('Timezone')
-                ->searchable()
-                ->getTimezoneFromBrowser()
-                ->required()
-                ->helperText('Defaults to your browser\'s detected timezone — change it if this location is somewhere else (e.g. a relative\'s house). Used for this location\'s quiet hours.'),
         ];
+    }
+
+    /**
+     * @return array<Component>
+     */
+    private static function mobileFields(): array
+    {
+        $visible = fn (Get $get): bool => $get('type') === LocationType::Mobile->value;
+
+        return [
+            Hidden::make('mobile_source')
+                ->default(MobileSource::Traccar)
+                ->visible($visible),
+            Select::make('traccar_server_id')
+                ->label('Traccar server')
+                ->options(fn (): array => auth()->user()->traccarServers()->pluck('label', 'id')->all())
+                ->exists('traccar_servers', 'id', fn (Exists $rule): Exists => $rule->where('user_id', auth()->id()))
+                ->required($visible)
+                ->live()
+                ->afterStateUpdated(fn (Set $set) => $set('traccar_device_id', null))
+                ->visible($visible)
+                ->helperText(fn (): ?string => auth()->user()->traccarServers()->exists()
+                    ? null
+                    : 'No Traccar servers yet — add one under Tools → Traccar Servers first.'),
+            Select::make('traccar_device_id')
+                ->label('Device')
+                ->options(fn (Get $get): array => self::deviceOptions($get('traccar_server_id')))
+                ->required($visible)
+                ->live()
+                ->afterStateUpdated(function (Set $set, Get $get): void {
+                    $devices = self::deviceOptions($get('traccar_server_id'));
+                    $set('traccar_device_name', $devices[$get('traccar_device_id')] ?? null);
+                })
+                ->visible($visible)
+                ->helperText(fn (Get $get): ?string => $get('traccar_server_id') !== null && self::deviceOptions($get('traccar_server_id')) === []
+                    ? 'Couldn\'t reach this server, or it has no devices — check its URL and token under Tools → Traccar Servers.'
+                    : null),
+            Hidden::make('traccar_device_name')
+                ->visible($visible),
+            Select::make('mobile_update_interval_minutes')
+                ->label('Update every')
+                ->options([
+                    5 => '5 minutes',
+                    10 => '10 minutes',
+                    15 => '15 minutes',
+                    20 => '20 minutes',
+                    25 => '25 minutes',
+                    30 => '30 minutes',
+                ])
+                ->default(15)
+                ->required($visible)
+                ->visible($visible)
+                ->helperText('Tighter intervals sharpen how current this location is, at the cost of more Traccar/device battery use.'),
+            Hidden::make('lat')->visible($visible),
+            Hidden::make('lng')->visible($visible),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function deviceOptions(?int $traccarServerId): array
+    {
+        if ($traccarServerId === null) {
+            return [];
+        }
+
+        $server = auth()->user()->traccarServers()->find($traccarServerId);
+
+        if ($server === null) {
+            return [];
+        }
+
+        $devices = Cache::remember(
+            "traccar-devices:{$server->id}",
+            now()->addSeconds(30),
+            fn (): ?array => app(ListTraccarDevices::class)($server),
+        );
+
+        if ($devices === null) {
+            return [];
+        }
+
+        return collect($devices)->pluck('name', 'id')->all();
     }
 
     /**

@@ -20,6 +20,11 @@ class LocationsTable
                     ->weight('medium'),
                 TextColumn::make('type')
                     ->badge(),
+                TextColumn::make('mobile_position_updated_at')
+                    ->label('Position updated')
+                    ->since()
+                    ->placeholder('—')
+                    ->toggleable(),
                 TextColumn::make('address')
                     ->limit(50)
                     ->searchable(),

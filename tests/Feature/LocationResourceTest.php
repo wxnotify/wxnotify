@@ -4,9 +4,12 @@ use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\Locations\Pages\CreateLocation;
 use App\Filament\Dashboard\Resources\Locations\Pages\ListLocations;
 use App\Models\Location;
+use App\Models\TraccarServer;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
+use function Pest\Laravel\assertDatabaseHas;
 use function Pest\Livewire\livewire;
 
 beforeEach(function () {
@@ -150,4 +153,72 @@ test('the coordinate fallback never overwrites an explicitly chosen timezone', f
         ->fillForm(['timezone' => 'America/Chicago'])
         ->fillForm(['lat' => 42.5, 'lng' => -73.5])
         ->assertFormSet(['timezone' => 'America/Chicago']);
+});
+
+test('creating a mobile location requires a Traccar server and device', function () {
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $server = TraccarServer::factory()->for($user)->create(['base_url' => 'https://traccar.example.com']);
+    $this->actingAs($user);
+
+    // The device Select's options() calls ListTraccarDevices live -- fake
+    // the HTTP layer so this test never makes a real network request
+    // (this suite has no global Http::preventStrayRequests(), so an
+    // unfaked call here would actually try to reach the network).
+    Http::fake([
+        'traccar.example.com/api/devices' => Http::response([
+            ['id' => 7, 'name' => 'Truck', 'uniqueId' => 'abc'],
+        ]),
+    ]);
+
+    livewire(CreateLocation::class)
+        ->fillForm([
+            'label' => 'My Truck',
+            'type' => 'mobile',
+            'mobile_source' => 'traccar',
+            'traccar_server_id' => $server->id,
+            'traccar_device_id' => 7,
+            'traccar_device_name' => 'Truck',
+            'mobile_update_interval_minutes' => 15,
+        ])
+        ->call('create')
+        ->assertNotified()
+        ->assertHasNoFormErrors();
+
+    assertDatabaseHas(Location::class, [
+        'user_id' => $user->id,
+        'type' => 'mobile',
+        'traccar_server_id' => $server->id,
+        'traccar_device_id' => 7,
+    ]);
+
+    $location = Location::where('user_id', $user->id)->where('type', 'mobile')->sole();
+    expect($location->lat)->toBeNull();
+    expect($location->lng)->toBeNull();
+});
+
+test('a Plus subscriber is blocked from attaching a 6th device to one server', function () {
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $server = TraccarServer::factory()->for($user)->create(['base_url' => 'https://traccar.example.com']);
+    Location::factory()->count(5)->mobile()->for($user)->create(['traccar_server_id' => $server->id]);
+    $this->actingAs($user);
+
+    Http::fake([
+        'traccar.example.com/api/devices' => Http::response([
+            ['id' => 99, 'name' => 'Extra Device', 'uniqueId' => 'xyz'],
+        ]),
+    ]);
+
+    livewire(CreateLocation::class)
+        ->fillForm([
+            'label' => 'One Too Many',
+            'type' => 'mobile',
+            'mobile_source' => 'traccar',
+            'traccar_server_id' => $server->id,
+            'traccar_device_id' => 99,
+            'mobile_update_interval_minutes' => 15,
+        ])
+        ->call('create')
+        ->assertNotified();
+
+    expect(Location::where('traccar_server_id', $server->id)->count())->toBe(5);
 });
