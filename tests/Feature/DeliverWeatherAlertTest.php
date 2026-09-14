@@ -5,6 +5,7 @@ use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
+use App\Models\Product;
 use App\Support\Apprise\AppriseApiClient;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -103,4 +104,52 @@ test('a deactivated rule sends nothing but writes a skipped DeliveryLog row', fu
         ->and($log->alert_rule_id)->toBe($rule->id)
         ->and($log->notification_channel_id)->toBe($channel->id)
         ->and($log->channel_type)->toBe($channel->channel_type);
+});
+
+test('a custom subject template is used as the Apprise title instead of displayName()', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $product = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'custom_subject_template' => 'Alert: {product}',
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $ingested->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['title'] === 'Alert: Tornado Warning');
+});
+
+test('message_body_style Brief truncates the body to 280 characters', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'message_body_style' => 'brief',
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $longText = str_repeat('Tornado Warning issued for the area. ', 30);
+    $product = IngestedProduct::factory()->create(['text' => $longText]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => strlen($request['body']) <= 280);
+});
+
+test('message_body_style Full (or null) preserves today\'s 1500-character behavior', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'message_body_style' => null,
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $longText = str_repeat('Tornado Warning issued for the area. ', 60);
+    $product = IngestedProduct::factory()->create(['text' => $longText]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => strlen($request['body']) > 280 && strlen($request['body']) <= 1500);
 });

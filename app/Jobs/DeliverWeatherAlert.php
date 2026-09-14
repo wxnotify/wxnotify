@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Actions\Weather\RenderAlertSubject;
+use App\Enums\MessageBodyStyle;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
@@ -85,8 +87,8 @@ class DeliverWeatherAlert implements ShouldQueue
 
         $delivered = $client->notify(
             url: $channel->apprise_url,
-            body: Str::limit($product->text, 1500, preserveWords: true),
-            title: $rule->displayName(),
+            body: Str::limit($product->text, $rule->message_body_style === MessageBodyStyle::Brief ? 280 : 1500, preserveWords: true),
+            title: app(RenderAlertSubject::class)($rule, $product->product),
         );
 
         DeliveryLog::create([
