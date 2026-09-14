@@ -78,3 +78,40 @@ test('a missing channel sends nothing and logs a warning', function () {
     Log::shouldHaveReceived('warning')->once()
         ->withArgs(fn ($message, $context) => $context['rule_id'] === $rule->id && $context['channel_id'] === 999999);
 });
+
+test('a custom subject template is used as the Apprise title instead of the passed-in title', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->dailySummary()->create(['custom_subject_template' => 'My custom title']);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Ignored default title', 'Today: Sunny, high 88.'))
+        ->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['title'] === 'My custom title');
+});
+
+test('message_body_style Brief truncates the passed-in body to 280 characters', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->dailySummary()->create(['message_body_style' => 'brief']);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $longBody = str_repeat('Sunny with a high of 88 degrees. ', 30);
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', $longBody))
+        ->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => strlen($request['body']) <= 280);
+});
+
+test('message_body_style Full (or null) preserves the passed-in body unchanged', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->dailySummary()->create(['message_body_style' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'Today: Sunny, high 88.'))
+        ->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['body'] === 'Today: Sunny, high 88.');
+});

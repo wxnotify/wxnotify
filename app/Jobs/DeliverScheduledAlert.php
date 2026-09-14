@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Actions\Weather\RenderAlertSubject;
+use App\Enums\MessageBodyStyle;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
@@ -11,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 
 /**
  * Dispatched once per AlertRule x NotificationChannel by
@@ -69,10 +72,15 @@ class DeliverScheduledAlert implements ShouldQueue
             return;
         }
 
+        $title = app(RenderAlertSubject::class)($rule);
+        $body = $rule->message_body_style === MessageBodyStyle::Brief
+            ? Str::limit($this->body, 280, preserveWords: true)
+            : $this->body;
+
         $delivered = $client->notify(
             url: $channel->apprise_url,
-            body: $this->body,
-            title: $this->title,
+            body: $body,
+            title: $title,
         );
 
         DeliveryLog::create([
