@@ -222,3 +222,45 @@ test('a Plus subscriber is blocked from attaching a 6th device to one server', f
 
     expect(Location::where('traccar_server_id', $server->id)->count())->toBe(5);
 });
+
+test('creating a mobile location without a Traccar server is rejected', function () {
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $this->actingAs($user);
+
+    livewire(CreateLocation::class)
+        ->fillForm([
+            'label' => 'My Truck',
+            'type' => 'mobile',
+            'mobile_source' => 'traccar',
+            'mobile_update_interval_minutes' => 15,
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['traccar_server_id']);
+
+    expect(Location::where('user_id', $user->id)->exists())->toBeFalse();
+});
+
+test('creating a mobile location without a device is rejected', function () {
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $server = TraccarServer::factory()->for($user)->create(['base_url' => 'https://traccar.example.com']);
+    $this->actingAs($user);
+
+    Http::fake([
+        'traccar.example.com/api/devices' => Http::response([
+            ['id' => 7, 'name' => 'Truck', 'uniqueId' => 'abc'],
+        ]),
+    ]);
+
+    livewire(CreateLocation::class)
+        ->fillForm([
+            'label' => 'My Truck',
+            'type' => 'mobile',
+            'mobile_source' => 'traccar',
+            'traccar_server_id' => $server->id,
+            'mobile_update_interval_minutes' => 15,
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['traccar_device_id']);
+
+    expect(Location::where('user_id', $user->id)->exists())->toBeFalse();
+});

@@ -8,6 +8,7 @@ use App\Enums\LocationType;
 use App\Enums\MobileSource;
 use Fahiem\FilamentPinpoint\Pinpoint;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -147,8 +148,10 @@ class LocationForm
                 ->required($visible)
                 ->visible($visible)
                 ->helperText('Tighter intervals sharpen how current this location is, at the cost of more Traccar/device battery use.'),
-            Hidden::make('lat')->visible($visible),
-            Hidden::make('lng')->visible($visible),
+            Placeholder::make('mobile_quiet_hours_note')
+                ->label('')
+                ->content('Mobile locations don\'t have a fixed timezone, so quiet hours on alert rules tied to this location won\'t take effect.')
+                ->visible($visible),
         ];
     }
 
