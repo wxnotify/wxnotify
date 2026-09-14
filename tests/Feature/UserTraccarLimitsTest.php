@@ -29,6 +29,20 @@ test('Pro tier can create up to 3 Traccar servers', function () {
     expect($user->canCreateTraccarServer())->toBeFalse();
 });
 
+test('Free tier cannot add any Traccar devices', function () {
+    $user = User::factory()->create(['tier_override' => Tier::Free]);
+
+    expect($user->traccarDeviceLimitPerServer())->toBe(0);
+});
+
+test('canAddTraccarDevice returns false for a server the user does not own', function () {
+    $owner = User::factory()->create(['tier_override' => Tier::Pro]);
+    $otherUser = User::factory()->create(['tier_override' => Tier::Pro]);
+    $server = TraccarServer::factory()->for($owner)->create();
+
+    expect($otherUser->canAddTraccarDevice($server->id))->toBeFalse();
+});
+
 test('Plus tier can attach up to 5 devices per server', function () {
     $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $server = TraccarServer::factory()->for($user)->create();

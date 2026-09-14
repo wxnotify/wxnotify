@@ -100,7 +100,10 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Maximum number of Traccar servers this user's tier allows, or null for unlimited.
+     * Maximum number of Traccar servers this user's tier allows. Currently
+     * always a concrete number for every tier -- ?int/null-for-unlimited is
+     * kept for consistency with locationLimit()'s pattern in case a future
+     * tier ever becomes unlimited here too.
      */
     public function traccarServerLimit(): ?int
     {
@@ -119,7 +122,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Maximum number of devices allowed per Traccar server this user's tier allows, or null for unlimited.
+     * Maximum number of devices allowed per Traccar server this user's tier
+     * allows. Currently always a concrete number for every tier --
+     * ?int/null-for-unlimited is kept for consistency with
+     * locationLimit()'s pattern in case a future tier ever becomes
+     * unlimited here too.
      */
     public function traccarDeviceLimitPerServer(): ?int
     {
@@ -132,6 +139,10 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     public function canAddTraccarDevice(int $traccarServerId): bool
     {
+        if (! $this->traccarServers()->whereKey($traccarServerId)->exists()) {
+            return false;
+        }
+
         $limit = $this->traccarDeviceLimitPerServer();
 
         return $limit === null || $this->locations()->where('traccar_server_id', $traccarServerId)->count() < $limit;
