@@ -59,6 +59,7 @@ class DashboardPanelProvider extends PanelProvider
             ->passwordReset()
             ->emailVerification()
             ->profile(EditProfile::class)
+            ->brandName(generateBrandName())
             ->multiFactorAuthentication([
                 AppAuthentication::make(),
             ])
