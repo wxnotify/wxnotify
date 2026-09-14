@@ -17,7 +17,7 @@ class LocationForecastWidget extends Widget
      */
     public function getPeriods(): array
     {
-        if (! $this->record) {
+        if (! $this->record || ! $this->record->hasFix()) {
             return [];
         }
 
