@@ -47,7 +47,7 @@ class DispatchScheduledAlerts extends Command
         $dispatched = 0;
 
         foreach ($rules as $rule) {
-            if ($rule->location === null) {
+            if ($rule->location === null || ! $rule->location->hasFix()) {
                 continue;
             }
 

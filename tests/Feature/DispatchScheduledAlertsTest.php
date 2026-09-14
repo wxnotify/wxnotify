@@ -126,6 +126,24 @@ test('a gridpoint data failure leaves last_scheduled_run_on unset so the next ti
     expect($rule->fresh()->last_scheduled_run_on)->toBeNull();
 });
 
+test('a Threshold rule against a fixless mobile location is skipped, not crashed', function () {
+    $location = Location::factory()->mobile()->create();
+    $rule = AlertRule::factory()->create([
+        'category' => 'threshold', 'location_id' => $location->id, 'delivery_time' => '06:00',
+        'variable' => 'temperature', 'direction' => 'above', 'threshold_value' => 90, 'timeframe' => 'day',
+    ]);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+
+    Http::fake();
+    Bus::fake();
+
+    $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
+
+    Bus::assertNothingDispatched();
+    Http::assertNothingSent();
+    expect($rule->fresh()->last_scheduled_run_on)->toBeNull();
+});
+
 test('a daily summary rule dispatches an unconditional message', function () {
     Bus::fake();
     Http::fake([

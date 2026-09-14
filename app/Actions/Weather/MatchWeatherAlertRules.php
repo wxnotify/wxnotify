@@ -182,7 +182,7 @@ class MatchWeatherAlertRules
      */
     private function matchesPolygon(AlertRule $rule, IngestedProduct $product): ?bool
     {
-        if ($product->polygon === null || $rule->location === null) {
+        if ($product->polygon === null || $rule->location === null || ! $rule->location->hasFix()) {
             return null;
         }
 
@@ -221,7 +221,7 @@ class MatchWeatherAlertRules
 
     private function matchesLocationZones(AlertRule $rule, IngestedProduct $product): bool
     {
-        if ($rule->location === null || $product->ugc_codes === null) {
+        if ($rule->location === null || ! $rule->location->hasFix() || $product->ugc_codes === null) {
             return false;
         }
 

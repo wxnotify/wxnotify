@@ -75,6 +75,19 @@ test('an inactive rule is never matched', function () {
     Bus::assertNotDispatched(DeliverScheduledAlert::class);
 });
 
+test('a flash near a fixless mobile location never matches (raw SQL, not a PHP guard)', function () {
+    Bus::fake();
+    $user = User::factory()->create();
+    $location = Location::factory()->mobile()->for($user)->create();
+    $rule = AlertRule::factory()->lightning()->for($user)->for($location)->create(['radius_miles' => 15]);
+    $channel = NotificationChannel::factory()->for($user)->create();
+    $rule->notificationChannels()->attach($channel);
+
+    (new MatchLightningFlashes)([['id' => '1', 'lat' => 0.0, 'lon' => 0.0]]);
+
+    Bus::assertNotDispatched(DeliverScheduledAlert::class);
+});
+
 test('multiple flashes in one batch only alert a matched rule once, respecting its own cooldown', function () {
     $user = User::factory()->create();
     $location = Location::factory()->for($user)->create(['lat' => 39.0, 'lng' => -95.0]);

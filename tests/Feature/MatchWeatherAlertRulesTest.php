@@ -354,6 +354,37 @@ test('a Polygon-mode rule falls back to Location-style zone matching when the pr
     Queue::assertPushed(DeliverWeatherAlert::class);
 });
 
+test('a Location-mode rule against a fixless mobile location never matches', function () {
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $location = Location::factory()->mobile()->create();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => $location->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ069']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('a Polygon-mode rule against a fixless mobile location falls back to Location matching and still never matches', function () {
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $location = Location::factory()->mobile()->create();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $product->id,
+        'polygon' => [['lat' => 39.0, 'lon' => -95.0], ['lat' => 39.2, 'lon' => -95.0], ['lat' => 39.2, 'lon' => -94.8], ['lat' => 39.0, 'lon' => -94.8]],
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
 test('an exception evaluating one rule\'s geography does not prevent a second, valid rule from matching', function () {
     // A malformed (empty) polygon on the product forces matchesPolygon()'s
     // ST_GeomFromText('POLYGON(())') to throw a real Postgres parse error --
