@@ -1001,9 +1001,17 @@ test('a successful poll does not spam the activity log', function () {
         ['deviceId' => 1, 'latitude' => 39.0997, 'longitude' => -94.5786, 'fixTime' => null],
     ])]);
 
+    // The Location::factory()->mobile()->create() call above already logs
+    // its own 'created' Activity row (Location's activitylog options log
+    // every event, only mobile_position_updated_at is excluded) -- that row
+    // is unrelated to the poll and would make an exists() check meaningless.
+    // Compare a before/after count instead, so this only proves what it's
+    // meant to: the poll's own lat/lng write doesn't add a new row.
+    $activityCountBefore = \Spatie\Activitylog\Models\Activity::where('subject_type', Location::class)->where('subject_id', $location->id)->count();
+
     $this->artisan('traccar:poll-positions')->assertSuccessful();
 
-    expect(\Spatie\Activitylog\Models\Activity::where('subject_type', Location::class)->where('subject_id', $location->id)->exists())->toBeFalse();
+    expect(\Spatie\Activitylog\Models\Activity::where('subject_type', Location::class)->where('subject_id', $location->id)->count())->toBe($activityCountBefore);
 });
 
 test('a location polled more recently than its own interval is left alone', function () {
@@ -1215,7 +1223,7 @@ class PollTraccarPositions extends Command
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/PollTraccarPositionsTest.php --compact"
 ```
 
-Expected: PASS (5 tests).
+Expected: PASS (6 tests).
 
 - [ ] **Step 5: Register the schedule**
 
