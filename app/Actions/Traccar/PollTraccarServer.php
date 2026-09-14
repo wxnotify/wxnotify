@@ -65,7 +65,11 @@ class PollTraccarServer
         $result = [];
 
         foreach ($positions as $position) {
-            if (! is_array($position) || ! isset($position['deviceId'], $position['latitude'], $position['longitude'])) {
+            if (! is_array($position)
+                || ! isset($position['deviceId'], $position['latitude'], $position['longitude'])
+                || ! is_numeric($position['latitude'])
+                || ! is_numeric($position['longitude'])
+            ) {
                 Log::warning('Traccar server returned a malformed position entry', [
                     'traccar_server_id' => $server->id,
                 ]);

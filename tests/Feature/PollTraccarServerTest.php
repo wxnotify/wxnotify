@@ -77,3 +77,15 @@ test('a genuinely empty position list (a valid JSON array with zero entries) res
 
     expect((new PollTraccarServer)($server))->toBe([]);
 });
+
+test('a position entry with a non-numeric latitude resolves the whole response to null', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake([
+        'traccar.example.com/api/positions' => Http::response([
+            ['deviceId' => 1, 'latitude' => 'not-a-number', 'longitude' => -94.5786],
+        ]),
+    ]);
+
+    expect((new PollTraccarServer)($server))->toBeNull();
+});
