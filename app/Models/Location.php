@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\LocationType;
+use App\Enums\MobileSource;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,7 +12,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['user_id', 'label', 'type', 'address', 'lat', 'lng', 'timezone'])]
+#[Fillable([
+    'user_id', 'label', 'type', 'address', 'lat', 'lng', 'timezone',
+    'mobile_source', 'mobile_update_interval_minutes',
+    'traccar_server_id', 'traccar_device_id', 'traccar_device_name',
+])]
 class Location extends Model
 {
     /** @use HasFactory<LocationFactory> */
@@ -19,7 +24,14 @@ class Location extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logAll()->logOnlyDirty()->dontLogEmptyChanges();
+        // Excludes lat/lng/mobile_position_updated_at: a polled mobile
+        // location's position changes every 5-30 minutes forever, and
+        // logging that as "activity" would drown out everything else about
+        // this model in noise. Everything else still logs normally.
+        return LogOptions::defaults()
+            ->logOnly(['user_id', 'label', 'type', 'address', 'timezone', 'mobile_source', 'traccar_server_id', 'traccar_device_id', 'traccar_device_name'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
     }
 
     protected function casts(): array
@@ -28,11 +40,29 @@ class Location extends Model
             'type' => LocationType::class,
             'lat' => 'decimal:7',
             'lng' => 'decimal:7',
+            'mobile_source' => MobileSource::class,
+            'mobile_position_updated_at' => 'datetime',
         ];
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function traccarServer(): BelongsTo
+    {
+        return $this->belongsTo(TraccarServer::class);
+    }
+
+    /**
+     * A mobile location has no coordinates until its first successful
+     * Traccar poll. Every call site that dereferences lat/lng for matching
+     * must check this first -- a plain (float) cast on null silently
+     * becomes 0.0 ("Null Island"), not a safe "no data" signal.
+     */
+    public function hasFix(): bool
+    {
+        return $this->lat !== null && $this->lng !== null;
     }
 }
