@@ -4,7 +4,6 @@ namespace App\Filament\Dashboard\Resources\Locations\Pages;
 
 use App\Filament\Dashboard\Resources\Locations\LocationResource;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditLocation extends EditRecord
@@ -14,7 +13,6 @@ class EditLocation extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            ViewAction::make(),
             DeleteAction::make(),
         ];
     }

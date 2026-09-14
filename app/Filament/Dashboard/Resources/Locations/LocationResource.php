@@ -5,9 +5,7 @@ namespace App\Filament\Dashboard\Resources\Locations;
 use App\Filament\Dashboard\Resources\Locations\Pages\CreateLocation;
 use App\Filament\Dashboard\Resources\Locations\Pages\EditLocation;
 use App\Filament\Dashboard\Resources\Locations\Pages\ListLocations;
-use App\Filament\Dashboard\Resources\Locations\Pages\ViewLocation;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
-use App\Filament\Dashboard\Resources\Locations\Schemas\LocationInfolist;
 use App\Filament\Dashboard\Resources\Locations\Tables\LocationsTable;
 use App\Models\Location;
 use BackedEnum;
@@ -40,11 +38,6 @@ class LocationResource extends Resource
         return LocationForm::configure($schema);
     }
 
-    public static function infolist(Schema $schema): Schema
-    {
-        return LocationInfolist::configure($schema);
-    }
-
     public static function table(Table $table): Table
     {
         return LocationsTable::configure($table);
@@ -62,7 +55,6 @@ class LocationResource extends Resource
         return [
             'index' => ListLocations::route('/'),
             'create' => CreateLocation::route('/create'),
-            'view' => ViewLocation::route('/{record}'),
             'edit' => EditLocation::route('/{record}/edit'),
         ];
     }
