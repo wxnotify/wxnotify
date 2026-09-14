@@ -932,6 +932,24 @@ test('a due mobile location is updated with its server\'s reported position', fu
     expect($location->mobile_position_updated_at)->not->toBeNull();
 });
 
+test('a successful poll does not spam the activity log', function () {
+    // Location's activity log doesn't exclude lat/lng (they're real,
+    // audit-worthy data for a subscriber's own stationary-location edits),
+    // so without disableLogging() around the poll's write, this exact
+    // command would create a fresh Activity row every 5-30 minutes forever
+    // per mobile location. This proves that doesn't happen.
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = Location::factory()->mobile()->create(['traccar_server_id' => $server->id, 'traccar_device_id' => 1]);
+
+    Http::fake(['traccar.example.com/api/positions' => Http::response([
+        ['deviceId' => 1, 'latitude' => 39.0997, 'longitude' => -94.5786, 'fixTime' => null],
+    ])]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect(\Spatie\Activitylog\Models\Activity::where('subject_type', Location::class)->where('subject_id', $location->id)->exists())->toBeFalse();
+});
+
 test('a location polled more recently than its own interval is left alone', function () {
     $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
     $location = Location::factory()->mobile()->withFix(10.0, 10.0)->create([
@@ -1100,11 +1118,27 @@ class PollTraccarPositions extends Command
                 continue;
             }
 
-            $location->forceFill([
-                'lat' => $position['lat'],
-                'lng' => $position['lng'],
-                'mobile_position_updated_at' => now(),
-            ])->save();
+            // Location's activity log excludes mobile_position_updated_at
+            // (see Task 3) but NOT lat/lng -- those stay logged for a
+            // subscriber's own manual repositioning of a stationary
+            // location. A poll writes lat/lng too, though, every 5-30
+            // minutes forever, so this exact write needs its own
+            // logging disabled rather than relying on a model-level field
+            // exclusion (which can't tell "the poller wrote this" apart
+            // from "the subscriber corrected their pin"). disableLogging()/
+            // enableLogging() are Spatie Activitylog instance methods
+            // (vendor/spatie/laravel-activitylog/src/Models/Concerns/LogsActivity.php).
+            $location->disableLogging();
+
+            try {
+                $location->forceFill([
+                    'lat' => $position['lat'],
+                    'lng' => $position['lng'],
+                    'mobile_position_updated_at' => now(),
+                ])->save();
+            } finally {
+                $location->enableLogging();
+            }
 
             $updated++;
         }
