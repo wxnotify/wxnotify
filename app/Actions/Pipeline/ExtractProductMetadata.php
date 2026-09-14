@@ -5,18 +5,24 @@ namespace App\Actions\Pipeline;
 use App\Models\Product;
 
 /**
- * Extracts VTEC-resolved product_id, UGC zone/county codes, and a parsed
- * severe-weather polygon from a raw NWWS product's text, for storage on
+ * Extracts VTEC-resolved product_id, UGC zone/county codes, a parsed
+ * severe-weather polygon, and (for the SPC Day 1 Convective Outlook only)
+ * categorical risk levels from a raw NWWS product's text, for storage on
  * IngestedProduct at ingest time (see IngestNwwsProductController).
  *
- * Non-VTEC AWIPS-ID prefix matching only covers AFD today. SPC/WPC prefixes
- * (SPC.OUTLOOK/SPC.MD/SPC.FIRE/WPC.MPD) were unconfirmed against real live
- * NWWS traffic at planning time (a 613-row live sample had zero SPC/WPC
- * products) and are deliberately left out rather than guessed — see the
- * design doc's "Known gaps" section and this plan's "Scope decision".
- * AlertCategory::SpcWpc rules can still be created; they just won't resolve
- * a product_id or match until this crosswalk is extended with confirmed
- * prefixes.
+ * Non-VTEC AWIPS-ID matching covers AFD (per-office prefix) plus a set of
+ * SPC/WPC products confirmed against real live NWWS traffic and NOAA
+ * service-change documentation: SWODY1/2/3 + SWOD48 (convective outlooks),
+ * SWOMCD (mesoscale discussion), FWDY1/2 (fire weather outlooks), and
+ * FFGMPD (WPC mesoscale precipitation discussion). Three catalog codes —
+ * SPC Day 3-8 Fire Weather Outlook Discussion (F38), SPC Public Severe
+ * Weather Outlook (PWO), and SPC Tornado/Severe Thunderstorm Reports (STA)
+ * — could not be confirmed against a real awipsid (PWO/STA in particular
+ * look like they may be issued with a per-office or per-state suffix, not
+ * a single fixed id) and are deliberately left out rather than guessed —
+ * matching this file's existing treatment of unconfirmed prefixes. Rules
+ * for these three can still be created; they just won't resolve a
+ * product_id or match until a confirmed id is added here.
  */
 class ExtractProductMetadata
 {
@@ -25,14 +31,42 @@ class ExtractProductMetadata
     ];
 
     /**
-     * @return array{product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>}
+     * Full, fixed AWIPS ids (not per-office prefixes) for SPC/WPC products
+     * that are centrally issued under one identifier.
+     */
+    private const AWIPS_EXACT_CROSSWALK = [
+        'swody1' => 'SPC.OUTLOOK',
+        'swody2' => 'DY2',
+        'swody3' => 'DY3',
+        'swod48' => 'D48',
+        'swomcd' => 'SPC.MD',
+        'fwdy1' => 'SPC.FIRE',
+        'fwdy2' => 'FD2',
+        'ffgmpd' => 'WPC.MPD',
+    ];
+
+    /**
+     * Only the SPC Day 1 Convective Outlook's raw text has a confirmed,
+     * stable categorical-risk phrase (see extractConvectiveOutlookRiskLevels()).
+     * SPC Fire Weather Outlook risk levels ("Elevated"/"Critical"/etc.) are
+     * stated as free-form narrative prose with no fixed sentence found in
+     * real sampled products — extraction for it is a known gap, not
+     * attempted here rather than guessed at.
+     */
+    private const CONVECTIVE_OUTLOOK_CODE = 'SPC.OUTLOOK';
+
+    /**
+     * @return array{product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>, risk_levels: ?array<int, string>}
      */
     public function __invoke(string $text, ?string $awipsid): array
     {
+        [$productId, $code] = $this->resolveProduct($text, $awipsid);
+
         return [
-            'product_id' => $this->resolveProductId($text, $awipsid),
+            'product_id' => $productId,
             'ugc_codes' => $this->parseUgcCodes($text),
             'polygon' => $this->parsePolygon($text),
+            'risk_levels' => $code === self::CONVECTIVE_OUTLOOK_CODE ? $this->extractConvectiveOutlookRiskLevels($text) : null,
         ];
     }
 
@@ -45,21 +79,63 @@ class ExtractProductMetadata
      * not "fix" this into an action-code-aware filter; that would silently
      * change matching behavior on multi-VTEC bulletins (see the "two VTEC
      * lines" test in ExtractProductMetadataTest).
+     *
+     * @return array{0: ?int, 1: ?string} the resolved product's id and catalog code
      */
-    private function resolveProductId(string $text, ?string $awipsid): ?int
+    private function resolveProduct(string $text, ?string $awipsid): array
     {
         if (preg_match('/\/[A-Z]\.[A-Z]{3}\.[A-Z]{4}\.([A-Z]{2})\.([A-Z])\.\d{4}\.\d{6}T\d{4}Z-\d{6}T\d{4}Z\//', $text, $matches)) {
             $product = Product::where('code', "{$matches[1]}.{$matches[2]}")->first();
 
             if ($product !== null) {
-                return $product->id;
+                return [$product->id, $product->code];
             }
         }
 
-        $prefix = $awipsid !== null ? substr(strtolower($awipsid), 0, 3) : null;
-        $code = $prefix !== null ? (self::AWIPS_PREFIX_CROSSWALK[$prefix] ?? null) : null;
+        $lowerAwipsid = $awipsid !== null ? strtolower($awipsid) : null;
+        $code = $lowerAwipsid !== null ? (self::AWIPS_EXACT_CROSSWALK[$lowerAwipsid] ?? null) : null;
 
-        return $code !== null ? Product::where('code', $code)->first()?->id : null;
+        if ($code === null) {
+            $prefix = $lowerAwipsid !== null ? substr($lowerAwipsid, 0, 3) : null;
+            $code = $prefix !== null ? (self::AWIPS_PREFIX_CROSSWALK[$prefix] ?? null) : null;
+        }
+
+        if ($code === null) {
+            return [null, null];
+        }
+
+        $product = Product::where('code', $code)->first();
+
+        return [$product?->id, $product !== null ? $code : null];
+    }
+
+    /**
+     * The SPC Day 1 Convective Outlook states its categorical risk(s) in a
+     * fixed, decades-old template sentence — confirmed against real
+     * archived bulletins, e.g. "...THERE IS A MODERATE RISK OF SEVERE
+     * THUNDERSTORMS FOR SOUTHWEST AND CENTRAL KANSAS..." and "...THERE IS A
+     * SLIGHT RISK OF SEVERE THUNDERSTORMS FROM EASTERN MISSISSIPPI...". A
+     * single bulletin can state more than one risk level for different
+     * areas (as in that same real example), so every occurrence is
+     * collected, not just the first. Returns an empty array (not null) when
+     * the text has no such sentence at all — a real, legitimate "no
+     * categorical risk today" result (e.g. "...NO SEVERE THUNDERSTORM AREAS
+     * FORECAST..."), distinct from null, which this class only ever returns
+     * for a product type risk-level extraction doesn't apply to.
+     *
+     * @return array<int, string>
+     */
+    private function extractConvectiveOutlookRiskLevels(string $text): array
+    {
+        if (! preg_match_all('/THERE IS A (MARGINAL|SLIGHT|ENHANCED|MODERATE|HIGH) RISK OF SEVERE (?:THUNDERSTORMS|TSTMS)/i', $text, $matches)) {
+            return [];
+        }
+
+        return collect($matches[1])
+            ->map(fn (string $level): string => ucfirst(strtolower($level)))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

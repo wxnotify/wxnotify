@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['cccc', 'ttaaii', 'awipsid', 'nwws_id', 'wmo_ddhhmm', 'text', 'file_path', 'received_at', 'product_id', 'ugc_codes', 'polygon'])]
+#[Fillable(['cccc', 'ttaaii', 'awipsid', 'nwws_id', 'wmo_ddhhmm', 'text', 'file_path', 'received_at', 'product_id', 'ugc_codes', 'polygon', 'risk_levels'])]
 class IngestedProduct extends Model
 {
     /** @use HasFactory<IngestedProductFactory> */
@@ -20,6 +20,7 @@ class IngestedProduct extends Model
             'received_at' => 'datetime',
             'ugc_codes' => 'array',
             'polygon' => 'array',
+            'risk_levels' => 'array',
         ];
     }
 

@@ -114,19 +114,87 @@ test('an inactive rule never matches', function () {
     Queue::assertNotPushed(DeliverWeatherAlert::class);
 });
 
-test('an spc_wpc rule never matches, since no product resolves that category yet', function () {
-    // Documents the deliberate v1 scope decision (see plan header) rather
-    // than leaving it an untested silent gap.
+test('a nationwide spc_wpc rule with no risk_levels filter matches any product it references', function () {
     Queue::fake();
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
-    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null, 'risk_levels' => null]);
     $rule->products()->attach($outlook);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $rule->notificationChannels()->attach($channel);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Moderate']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->ruleId === $rule->id && $job->channelId === $channel->id);
+});
+
+test('an spc_wpc rule for a different product never matches', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $fire = Product::where('code', 'SPC.FIRE')->sole();
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $rule->products()->attach($fire);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching(['product_id' => $outlook->id]);
 
     (new MatchWeatherAlertRules)($ingested);
 
     Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('an spc_wpc rule filtering on a specific risk level matches a product stating that level', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null, 'risk_levels' => ['Moderate', 'High']]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Slight', 'Moderate']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('an spc_wpc rule filtering on a specific risk level does not match a product stating only other levels', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null, 'risk_levels' => ['High']]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Marginal', 'Slight']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('an spc_wpc rule filtering on a specific risk level does not match a no-risk-today product', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null, 'risk_levels' => ['High']]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => []]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('an spc_wpc rule filtering on a specific risk level still matches a product whose type has no risk-level extraction', function () {
+    // e.g. the Fire Weather Outlook -- risk_levels is null (extraction
+    // doesn't apply), not [] (attempted, found nothing), so a risk_levels
+    // filter doesn't silently make the rule permanently unmatchable.
+    Queue::fake();
+    $fire = Product::where('code', 'SPC.FIRE')->sole();
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null, 'risk_levels' => ['Critical']]);
+    $rule->products()->attach($fire);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $fire->id, 'risk_levels' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
 });
 
 test('a matched rule within its quiet hours window is suppressed and logged, not dispatched', function () {

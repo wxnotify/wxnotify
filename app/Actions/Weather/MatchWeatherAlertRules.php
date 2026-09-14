@@ -20,16 +20,19 @@ use Throwable;
  * dispatches DeliverWeatherAlert per matched rule x notification channel.
  * Mirrors App\Actions\Visibility\MatchActivityAlertRules's shape.
  *
- * AlertCategory::SpcWpc is deliberately excluded from the category filter —
- * see this feature's plan document's "Scope decision" for why.
+ * AlertCategory::SpcWpc shares WeatherAlerts' product-based matching and
+ * geography rules (see matchesGeography()); it additionally filters on
+ * risk_levels (see matchesRiskLevel()), which WeatherAlerts doesn't have.
  */
 class MatchWeatherAlertRules
 {
+    private const PRODUCT_MATCHED_CATEGORIES = [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc];
+
     public function __invoke(IngestedProduct $product): void
     {
         $categories = [AlertCategory::ForecastDiscussion];
         if ($product->product_id !== null) {
-            $categories[] = AlertCategory::WeatherAlerts;
+            array_push($categories, ...self::PRODUCT_MATCHED_CATEGORIES);
         }
 
         try {
@@ -38,7 +41,7 @@ class MatchWeatherAlertRules
                 ->whereIn('category', $categories)
                 ->where(function (Builder $query) use ($product) {
                     $query->where('category', AlertCategory::ForecastDiscussion)
-                        ->orWhere(fn (Builder $q) => $q->where('category', AlertCategory::WeatherAlerts)
+                        ->orWhere(fn (Builder $q) => $q->whereIn('category', self::PRODUCT_MATCHED_CATEGORIES)
                             ->whereHas('products', fn (Builder $q) => $q->whereKey($product->product_id)));
                 })
                 ->get();
@@ -52,7 +55,7 @@ class MatchWeatherAlertRules
         }
 
         $rules->each(function (AlertRule $rule) use ($product): void {
-            if ($this->matchesGeographySafely($rule, $product)) {
+            if ($this->matchesGeographySafely($rule, $product) && $this->matchesRiskLevel($rule, $product)) {
                 $this->dispatchOrSuppress($rule, $product);
             }
         });
@@ -140,6 +143,35 @@ class MatchWeatherAlertRules
             MatchingMode::Polygon => $this->matchesPolygon($rule, $product) ?? $this->matchesLocationZones($rule, $product),
             null => false,
         };
+    }
+
+    /**
+     * Only AlertCategory::SpcWpc rules carry a risk_levels filter at all —
+     * every other category matches through unaffected (true).
+     *
+     * An empty/null risk_levels means "every risk level" (the wizard's own
+     * helper text: "leave all unchecked to receive every risk level"), so
+     * it always matches. When the rule *does* filter, $product->risk_levels
+     * carries three possible meanings, and only one of them is a real "no
+     * match": null means risk-level extraction doesn't apply to this
+     * product's type at all (e.g. the Fire Weather Outlook — see
+     * ExtractProductMetadata's "known gap" note), so a rule with a
+     * risk_levels filter still matches on product+geography alone rather
+     * than being silently, permanently unmatchable; [] means extraction was
+     * attempted and found no categorical risk stated today, which is a
+     * genuine non-match for any specific-level filter.
+     */
+    private function matchesRiskLevel(AlertRule $rule, IngestedProduct $product): bool
+    {
+        if ($rule->category !== AlertCategory::SpcWpc || $rule->risk_levels === null || $rule->risk_levels === []) {
+            return true;
+        }
+
+        if ($product->risk_levels === null) {
+            return true;
+        }
+
+        return array_intersect($rule->risk_levels, $product->risk_levels) !== [];
     }
 
     /**

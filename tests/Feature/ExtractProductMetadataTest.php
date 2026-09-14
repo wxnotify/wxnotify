@@ -166,3 +166,69 @@ test('a product with no LAT...LON line resolves no polygon', function () {
 
     expect($metadata['polygon'])->toBeNull();
 });
+
+test('a Day 1 Convective Outlook resolves product_id via its exact AWIPS id, not a 3-letter prefix', function () {
+    // SPC.OUTLOOK is part of the real seeded catalog (see note above).
+    // "swo" is shared by every SPC convective-outlook/mesoscale-discussion
+    // product (swody1/swody2/swody3/swod48/swomcd), so this only resolves
+    // correctly if the full id is matched, not a 3-letter prefix like AFD's.
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $text = "SPC AC 140059\n\nDay 1 Convective Outlook\nNWS Storm Prediction Center Norman OK";
+
+    $metadata = (new ExtractProductMetadata)($text, 'swody1');
+
+    expect($metadata['product_id'])->toBe($outlook->id);
+});
+
+test('a Day 2 Convective Outlook resolves to the distinct DY2 product, not SPC.OUTLOOK', function () {
+    // DY2 isn't part of the base seeded catalog (only ProductCatalogSeeder
+    // adds it, which tests don't run) -- created directly instead of
+    // fetched, per this suite's convention for non-guaranteed products.
+    $dayTwo = Product::factory()->create(['code' => 'DY2']);
+
+    $metadata = (new ExtractProductMetadata)('Day 2 Convective Outlook', 'swody2');
+
+    expect($metadata['product_id'])->toBe($dayTwo->id);
+});
+
+test('a Day 1 Convective Outlook with one categorical risk statement extracts that risk level', function () {
+    $text = <<<'TEXT'
+    ...SUMMARY...
+    ...THERE IS A MODERATE RISK OF SEVERE THUNDERSTORMS FOR SOUTHWEST AND CENTRAL KANSAS INTO FAR NORTHWEST OKLAHOMA...
+    TEXT;
+
+    $metadata = (new ExtractProductMetadata)($text, 'swody1');
+
+    expect($metadata['risk_levels'])->toBe(['Moderate']);
+});
+
+test('a Day 1 Convective Outlook stating two different risk levels extracts both, deduplicated', function () {
+    $text = <<<'TEXT'
+    ...THERE IS A MODERATE RISK OF SEVERE THUNDERSTORMS FOR SOUTHWEST AND CENTRAL KANSAS...
+    ...THERE IS A SLIGHT RISK OF SEVERE THUNDERSTORMS FROM EASTERN MISSISSIPPI...CENTRAL ALABAMA...
+    ...THERE IS A SLIGHT RISK OF SEVERE THUNDERSTORMS ACROSS THE SAME REGION LATER TODAY...
+    TEXT;
+
+    $metadata = (new ExtractProductMetadata)($text, 'swody1');
+
+    expect($metadata['risk_levels'])->toBe(['Moderate', 'Slight']);
+});
+
+test('a Day 1 Convective Outlook with no risk statement extracts an empty (not null) risk_levels array', function () {
+    $text = "...NO SEVERE THUNDERSTORM AREAS FORECAST...\n\n...SUMMARY...\nThe organized-severe threat appears low.";
+
+    $metadata = (new ExtractProductMetadata)($text, 'swody1');
+
+    expect($metadata['risk_levels'])->toBe([]);
+});
+
+test('a product other than the Day 1 Convective Outlook never attempts risk-level extraction', function () {
+    // The Fire Weather Outlook (SPC.FIRE) also has risk_level_options in the
+    // catalog, but its text format isn't a confirmed fixed sentence, so
+    // extraction is deliberately not attempted for it -- null, not [].
+    $text = 'THERE IS A MODERATE RISK OF SEVERE THUNDERSTORMS mentioned incidentally';
+
+    $metadata = (new ExtractProductMetadata)($text, 'fwdy1');
+
+    expect($metadata['risk_levels'])->toBeNull();
+});
