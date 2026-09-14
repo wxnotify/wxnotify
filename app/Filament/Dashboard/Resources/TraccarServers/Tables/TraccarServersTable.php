@@ -26,9 +26,17 @@ class TraccarServersTable
                     ->placeholder('Never'),
                 TextColumn::make('last_poll_error')
                     ->label('Polling Status')
-                    ->formatStateUsing(fn (?string $state): string => $state ?? 'OK')
+                    // Filament's TextColumn checks blank($state) on the raw
+                    // database value before formatStateUsing() ever runs --
+                    // a formatStateUsing(fn ($state) => $state ?? 'OK')
+                    // closure is never reached for a null last_poll_error,
+                    // so a healthy server rendered as a genuinely blank
+                    // cell, not "OK". ->placeholder() is Filament's actual
+                    // mechanism for this case: it's what renders when the
+                    // early blank-state check short-circuits.
+                    ->placeholder('OK')
                     ->badge()
-                    ->color(fn (?string $state): string => $state === null ? 'success' : 'danger'),
+                    ->color('danger'),
             ])
             ->recordActions([
                 EditAction::make(),

@@ -86,6 +86,29 @@ test('a Plus subscriber is blocked from creating a second server', function () {
     Http::assertNothingSent();
 });
 
+test('a healthy server (no poll error) shows "OK" in the Polling Status column, not a blank cell', function () {
+    // Regression test: Filament's TextColumn checks blank($state) on the
+    // raw database value BEFORE formatStateUsing() ever runs, so a
+    // formatStateUsing(fn ($state) => $state ?? 'OK') closure is never
+    // reached for a null last_poll_error -- the cell rendered genuinely
+    // blank until this was caught and fixed with ->placeholder('OK').
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    TraccarServer::factory()->for($user)->create(['last_poll_error' => null]);
+    $this->actingAs($user);
+
+    livewire(ListTraccarServers::class)
+        ->assertSee('OK');
+});
+
+test('a server with a poll error shows that error in the Polling Status column', function () {
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    TraccarServer::factory()->for($user)->create(['last_poll_error' => 'Traccar server unreachable or returned an error.']);
+    $this->actingAs($user);
+
+    livewire(ListTraccarServers::class)
+        ->assertSee('Traccar server unreachable or returned an error.');
+});
+
 test('the list only shows the current user\'s own servers', function () {
     $user = User::factory()->create(['tier_override' => Tier::Pro]);
     $other = User::factory()->create(['tier_override' => Tier::Pro]);
