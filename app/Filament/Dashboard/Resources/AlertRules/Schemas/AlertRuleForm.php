@@ -5,10 +5,12 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Schemas;
 use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
+use App\Enums\MessageBodyStyle;
 use App\Enums\ProductCategory;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
+use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
 use App\Models\NotificationChannel;
 use App\Models\Product;
@@ -214,6 +216,16 @@ class AlertRuleForm
                     ->label('Quiet hours end')
                     ->seconds(false)
                     ->helperText('Optional — skip notifications for this alert during a window each day.'),
+                Select::make('message_body_style')
+                    ->label('Message length')
+                    ->options(collect(MessageBodyStyle::cases())->mapWithKeys(fn (MessageBodyStyle $s) => [$s->value => $s->label()]))
+                    ->default(MessageBodyStyle::Full)
+                    ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free),
+                TextInput::make('custom_subject_template')
+                    ->label('Custom subject line (optional)')
+                    ->maxLength(255)
+                    ->helperText('Leave blank to use the default. Placeholders: {product}, {location}, {category}.')
+                    ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free),
             ]);
     }
 

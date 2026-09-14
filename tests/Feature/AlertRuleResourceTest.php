@@ -468,3 +468,51 @@ test('the forecast discussion wfo field defaults to the subscriber\'s most recen
         ->fillForm(['category' => 'forecast_discussion'])
         ->assertFormSet(['wfo' => 'OKX']);
 });
+
+test('a Free subscriber\'s wizard never shows the message customization fields', function () {
+    $this->user->forceFill(['tier_override' => Tier::Free])->save();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'threshold'])
+        ->assertFormFieldHidden('message_body_style')
+        ->assertFormFieldHidden('custom_subject_template');
+});
+
+test('a Plus subscriber can set and persist a custom subject and message length', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'threshold',
+            'variable' => 'temperature',
+            'direction' => 'below',
+            'threshold_value' => 32,
+            'timeframe' => 'overnight',
+            'location_id' => $this->location->id,
+            'delivery_time' => '06:00',
+            'channel_ids' => [$this->channel->id],
+            'custom_subject_template' => 'Cold snap near {location}',
+            'message_body_style' => 'brief',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+    expect($rule->custom_subject_template)->toBe('Cold snap near {location}')
+        ->and($rule->message_body_style->value)->toBe('brief');
+});
+
+test('editing an existing rule round-trips the custom subject and message length', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $rule = AlertRule::factory()->for($this->user)->for($this->location)->create([
+        'custom_subject_template' => 'Original subject',
+        'message_body_style' => 'brief',
+    ]);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet([
+            'custom_subject_template' => 'Original subject',
+            'message_body_style' => 'brief',
+        ]);
+});
