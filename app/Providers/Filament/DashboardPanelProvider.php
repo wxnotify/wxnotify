@@ -54,6 +54,7 @@ class DashboardPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Blue,
             ])
+            ->databaseNotifications()
             ->login()
             ->registration(Register::class)
             ->passwordReset()
