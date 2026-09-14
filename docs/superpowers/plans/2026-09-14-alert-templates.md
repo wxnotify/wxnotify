@@ -1,6 +1,6 @@
 # Alert Templates v1 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Let a Plus/Pro subscriber set a per-rule custom notification subject line (with a small set of safe placeholders) and choose between the full message body and a shorter, mechanically-truncated one.
 
@@ -32,7 +32,7 @@
 - Create: `database/migrations/2026_09_14_040000_add_message_customization_to_alert_rules_table.php`
 - Create: `app/Enums/MessageBodyStyle.php`
 
-- [ ] **Step 1: Create the migration**
+- [x] **Step 1: Create the migration**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && php artisan make:migration add_message_customization_to_alert_rules_table --no-interaction"
@@ -66,7 +66,7 @@ return new class extends Migration
 };
 ```
 
-- [ ] **Step 2: Create the enum**
+- [x] **Step 2: Create the enum**
 
 ```php
 <?php
@@ -88,7 +88,7 @@ enum MessageBodyStyle: string
 }
 ```
 
-- [ ] **Step 3: Run the migration and verify**
+- [x] **Step 3: Run the migration and verify**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && php artisan migrate --no-interaction"
@@ -102,7 +102,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && php ar
 
 Expected: `bool(true)` twice.
 
-- [ ] **Step 4: Run Pint and commit**
+- [x] **Step 4: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -117,7 +117,7 @@ git commit -m "Add message customization columns to alert_rules and MessageBodyS
 **Files:**
 - Modify: `app/Models/AlertRule.php`
 
-- [ ] **Step 1: Add the two new columns to `#[Fillable]`**
+- [x] **Step 1: Add the two new columns to `#[Fillable]`**
 
 In `app/Models/AlertRule.php`, change:
 
@@ -173,7 +173,7 @@ to:
 ])]
 ```
 
-- [ ] **Step 2: Add the cast**
+- [x] **Step 2: Add the cast**
 
 In the same file, change:
 
@@ -226,7 +226,7 @@ use App\Enums\MessageBodyStyle;
 
 (`custom_subject_template` needs no cast — it's a plain string.)
 
-- [ ] **Step 3: Verify via tinker**
+- [x] **Step 3: Verify via tinker**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && php artisan tinker --execute 'App\Models\AlertRule::factory()->create([\"custom_subject_template\" => \"test\", \"message_body_style\" => \"brief\"])->message_body_style;'"
@@ -234,7 +234,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && php ar
 
 Expected: prints `App\Enums\MessageBodyStyle Enum ( [value] => brief )` (or equivalent enum dump) — proves the cast round-trips correctly.
 
-- [ ] **Step 4: Run the full test suite and Pint, then commit**
+- [x] **Step 4: Run the full test suite and Pint, then commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest --compact"
@@ -256,7 +256,7 @@ git commit -m "Add custom_subject_template/message_body_style to AlertRule's Fil
 - Create: `app/Actions/Weather/RenderAlertSubject.php`
 - Test: `tests/Feature/RenderAlertSubjectTest.php`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -339,7 +339,7 @@ test('an unrecognized placeholder renders literally rather than erroring', funct
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/RenderAlertSubjectTest.php --compact"
@@ -347,7 +347,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: FAIL — the class doesn't exist.
 
-- [ ] **Step 3: Implement the action**
+- [x] **Step 3: Implement the action**
 
 ```php
 <?php
@@ -382,7 +382,7 @@ class RenderAlertSubject
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/RenderAlertSubjectTest.php --compact"
@@ -390,7 +390,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS (7 tests).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -406,7 +406,7 @@ git commit -m "Add RenderAlertSubject action"
 - Modify: `app/Jobs/DeliverWeatherAlert.php`
 - Test: `tests/Feature/DeliverWeatherAlertTest.php`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/Feature/DeliverWeatherAlertTest.php` (it already imports `AlertRule`, `IngestedProduct`, `NotificationChannel`, `Http`; add `use App\Models\Product;` if not already present):
 
@@ -460,7 +460,7 @@ test('message_body_style Full (or null) preserves today\'s 1500-character behavi
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/DeliverWeatherAlertTest.php --compact"
@@ -468,7 +468,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: the 3 new tests FAIL (title is still `displayName()`, body is still capped at exactly 1500 regardless of `message_body_style`); the pre-existing tests still PASS.
 
-- [ ] **Step 3: Wire in the subject/body-length override**
+- [x] **Step 3: Wire in the subject/body-length override**
 
 In `app/Jobs/DeliverWeatherAlert.php`, add these imports alongside the existing ones:
 
@@ -497,7 +497,7 @@ to:
         );
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/DeliverWeatherAlertTest.php --compact"
@@ -505,7 +505,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS, all tests in the file (the 6 pre-existing + 3 new = 9).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -521,7 +521,7 @@ git commit -m "Wire custom subject/message length into DeliverWeatherAlert"
 - Modify: `app/Jobs/DeliverScheduledAlert.php`
 - Test: `tests/Feature/DeliverScheduledAlertTest.php`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/Feature/DeliverScheduledAlertTest.php` (it already imports `AlertRule`, `NotificationChannel`, `Http`):
 
@@ -564,7 +564,7 @@ test('message_body_style Full (or null) preserves the passed-in body unchanged',
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/DeliverScheduledAlertTest.php --compact"
@@ -572,7 +572,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: the 3 new tests FAIL; the pre-existing tests still PASS.
 
-- [ ] **Step 3: Wire in the subject/body-length override**
+- [x] **Step 3: Wire in the subject/body-length override**
 
 In `app/Jobs/DeliverScheduledAlert.php`, add these imports alongside the existing ones:
 
@@ -607,7 +607,7 @@ to:
         );
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/DeliverScheduledAlertTest.php --compact"
@@ -615,7 +615,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS, all tests in the file (the 5 pre-existing + 3 new = 8).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -631,7 +631,7 @@ git commit -m "Wire custom subject/message length into DeliverScheduledAlert"
 - Modify: `app/Filament/Dashboard/Resources/AlertRules/Schemas/AlertRuleForm.php`
 - Test: `tests/Feature/AlertRuleResourceTest.php`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/Feature/AlertRuleResourceTest.php` (it already has a `beforeEach` setting up `$this->user`/`$this->location`/`$this->channel`, and already imports `Tier`, `CreateAlertRule`, `EditAlertRule`, `AlertRule`):
 
@@ -685,7 +685,7 @@ test('editing an existing rule round-trips the custom subject and message length
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/AlertRuleResourceTest.php --compact"
@@ -693,7 +693,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: the 3 new tests FAIL — `message_body_style`/`custom_subject_template` don't exist in the wizard schema yet, so `assertFormFieldHidden` fails with "field does not exist" and the other two tests fail on missing form state. The pre-existing tests still PASS.
 
-- [ ] **Step 3: Add the two fields to the wizard**
+- [x] **Step 3: Add the two fields to the wizard**
 
 In `app/Filament/Dashboard/Resources/AlertRules/Schemas/AlertRuleForm.php`, add these imports alongside the existing `use App\Enums\*` lines:
 
@@ -761,7 +761,7 @@ to:
 
 (`Select` is already imported in this file.)
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/AlertRuleResourceTest.php --compact"
@@ -769,7 +769,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS, every test in the file (existing tests included — verify none regressed).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -783,7 +783,7 @@ git commit -m "Add Plus/Pro-gated message customization fields to the alert-rule
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Run the complete test suite**
+- [x] **Step 1: Run the complete test suite**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest --compact"
@@ -791,7 +791,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: 100% pass, no regressions anywhere in the suite.
 
-- [ ] **Step 2: Run Pint across the whole diff**
+- [x] **Step 2: Run Pint across the whole diff**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -799,11 +799,11 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: `{"tool":"pint","result":"passed"}`.
 
-- [ ] **Step 3: Manual browser verification**
+- [x] **Step 3: Manual browser verification**
 
 As a Plus/Pro test user, create or edit an alert rule and confirm: the "Finishing touches" step shows "Message length" and "Custom subject line" fields; as a Free test user, confirm those two fields are absent from the same step. Trigger a real delivery (or inspect via tinker) to confirm a rendered subject actually reaches Apprise's payload as the `title`.
 
-- [ ] **Step 4: Final commit (if step 3 surfaced any fixes)**
+- [x] **Step 4: Final commit (if step 3 surfaced any fixes)**
 
 ```bash
 git add -A
@@ -811,3 +811,25 @@ git commit -m "Fix issues found during manual verification of Alert Templates"
 ```
 
 (Skip this step entirely if step 3 found nothing to fix.)
+
+Manual browser verification (Step 3) found nothing to fix: as a Plus-tier test user, the "Finishing touches" step correctly showed "Message length" (default Full) and "Custom subject line" with the expected placeholder helper text; as a Free-tier test user on the same wizard, both fields were completely absent (confirming `->visible()` gating, and incidentally confirming the "Tools" nav group — Traccar Servers — also correctly disappears for Free, a useful cross-feature sanity check). A real `AlertRule` was created with `custom_subject_template = 'Cold snap near {location}'` and `message_body_style = brief`; `RenderAlertSubject` correctly resolved it to `"Cold snap near Home"` via tinker, and a real `DeliverScheduledAlert` dispatch against the local Apprise container (`json://httpbin.org/anything`) returned `200 Sent JSON POST notification` in the Apprise container logs, confirming end-to-end delivery. Editing the same rule round-tripped both fields correctly in the wizard. All manual-verification test data was cleaned up afterward (rule/channel deleted, tier_override reset to null).
+
+---
+
+## Post-implementation: final holistic review
+
+After all 7 tasks were implemented, spec-reviewed, and code-quality-reviewed individually, a final holistic review was dispatched across the whole feature's diff (all 6 implementation commits together) — the same practice used for the Traccar Servers feature, based on the same reasoning: per-task reviews only ever see one slice of a change, and issues that only emerge from the *interaction* between tasks can slip through every individual review cleanly.
+
+This review found two real gaps (both classified as Gap, not Bug — nothing was actively broken):
+
+1. **Tier downgrade had no delivery-time enforcement and no UI escape hatch.** The wizard hides `custom_subject_template`/`message_body_style` entirely for Free-tier subscribers (matching this codebase's established "hide, don't lock" convention), but the delivery path (`RenderAlertSubject`, `DeliverWeatherAlert`, `DeliverScheduledAlert`) never checked tier at all — it read the raw columns unconditionally. A subscriber who set these fields as Plus/Pro and then downgraded to Free would have them keep applying forever, with no way to clear them (the field is invisible, and there's no "visible but locked" UI anywhere in this codebase to fall back on). The design doc never addressed this scenario.
+
+   **Resolution** (user-directed — asked directly rather than decided unilaterally, since it's a live subscriber-facing behavior change with no existing precedent to lean on): enforce tier at delivery too. `AlertRule` gained two tier-aware accessor methods, `effectiveCustomSubjectTemplate(): ?string` and `effectiveMessageBodyStyle(): ?MessageBodyStyle`, both returning `null` when the owning user's tier is Free. `RenderAlertSubject` and both delivery jobs now read through these accessors instead of the raw columns, so a downgraded owner's stored customization is silently ignored (falls back to default `displayName()`/Full-length behavior) rather than requiring the record to be edited or deleted. Shipped in commit `10caadb` (`app/Models/AlertRule.php`, `app/Actions/Weather/RenderAlertSubject.php`, `app/Jobs/DeliverWeatherAlert.php`, `app/Jobs/DeliverScheduledAlert.php`, plus test updates — see below).
+
+   One consequence worth knowing: because `AlertRule::factory()`'s default owning user has no `tier_override` (defaults to Free via `User::tier()`), every pre-existing test across `RenderAlertSubjectTest`/`DeliverWeatherAlertTest`/`DeliverScheduledAlertTest` that set a custom template/body-style and expected it to take effect was implicitly running against a Free-tier owner — harmless before this fix (tier was never checked), but would have silently broken after it. All 12 such tests were updated to explicitly attach a `User::factory()->create(['tier_override' => Tier::Plus])` owner, preserving each test's actual intent.
+
+2. **No wiring-level test pinned the *default* (no custom template) title path.** `RenderAlertSubjectTest` proved the `displayName()` fallback in isolation, but neither `DeliverWeatherAlertTest` nor `DeliverScheduledAlertTest` had a test asserting the unmodified case — every existing wiring test only exercised the custom-template override. Since `custom_subject_template` is null for the overwhelming majority of real rules (and every rule created by the shared `AlertRuleFactory`), this meant the change to 100% of deliveries' title expression was really only tested for its minority code path at the delivery-job level. Fixed in the same commit: one new test in each of `DeliverWeatherAlertTest`/`DeliverScheduledAlertTest` asserting the default title still reaches Apprise as `displayName()`.
+
+Two additional observations were surfaced as non-blocking **Notes** (pre-existing, intentional design tradeoffs, not defects — recorded here for future reference rather than fixed): `{product}` renders inconsistently for `ForecastDiscussion` rules depending on whether the ingest pipeline happened to resolve a `product_id` for that specific bulletin (falls back to the category label when it didn't); and `{location}` renders `"your area"` rather than a county/zone summary for `MatchingMode::CountyZone` rules, since `RenderAlertSubject` only consults `location`/`wfo`, not `county_zone_codes`. Both follow directly from the design doc's documented placeholder-fallback behavior and were not flagged as requiring a fix.
+
+Full suite after the fix: 411 passed (up from the pre-fix 406 — 5 new tests, 0 regressions). No other issues found; see the final review's own "What I checked that came back clean" notes for the full list of cross-cutting call sites, factory states, and nullability paths traced and confirmed sound (all four job-dispatch sites, both `Product`-bearing and `Product`-less delivery paths, the enum-cast write-time validation, hidden-field dehydration behavior, and lazy-loading safety).
