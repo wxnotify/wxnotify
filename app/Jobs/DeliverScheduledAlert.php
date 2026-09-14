@@ -73,7 +73,7 @@ class DeliverScheduledAlert implements ShouldQueue
         }
 
         $title = app(RenderAlertSubject::class)($rule);
-        $body = $rule->message_body_style === MessageBodyStyle::Brief
+        $body = $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief
             ? Str::limit($this->body, 280, preserveWords: true)
             : $this->body;
 

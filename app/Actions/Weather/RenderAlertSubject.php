@@ -17,11 +17,11 @@ class RenderAlertSubject
 {
     public function __invoke(AlertRule $rule, ?Product $product = null): string
     {
-        if (blank($rule->custom_subject_template)) {
+        if (blank($rule->effectiveCustomSubjectTemplate())) {
             return $rule->displayName();
         }
 
-        return strtr($rule->custom_subject_template, [
+        return strtr($rule->effectiveCustomSubjectTemplate(), [
             '{product}' => $product?->name ?? $rule->category->label(),
             '{location}' => $rule->location?->label ?? ($rule->wfo !== null ? "WFO {$rule->wfo}" : 'your area'),
             '{category}' => $rule->category->label(),

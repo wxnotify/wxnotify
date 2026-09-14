@@ -1,9 +1,11 @@
 <?php
 
+use App\Enums\Tier;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Support\Apprise\AppriseApiClient;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -82,7 +84,8 @@ test('a missing channel sends nothing and logs a warning', function () {
 test('a custom subject template is used as the Apprise title instead of the passed-in title', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
-    $rule = AlertRule::factory()->dailySummary()->create(['custom_subject_template' => 'My custom title']);
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['custom_subject_template' => 'My custom title']);
     $channel = NotificationChannel::factory()->for($rule->user)->create();
 
     (new DeliverScheduledAlert($rule->id, $channel->id, 'Ignored default title', 'Today: Sunny, high 88.'))
@@ -94,7 +97,8 @@ test('a custom subject template is used as the Apprise title instead of the pass
 test('message_body_style Brief truncates the passed-in body to 280 characters', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
-    $rule = AlertRule::factory()->dailySummary()->create(['message_body_style' => 'brief']);
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['message_body_style' => 'brief']);
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $longBody = str_repeat('Sunny with a high of 88 degrees. ', 30);
 
@@ -107,11 +111,42 @@ test('message_body_style Brief truncates the passed-in body to 280 characters', 
 test('message_body_style Full (or null) preserves the passed-in body unchanged', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
-    $rule = AlertRule::factory()->dailySummary()->create(['message_body_style' => null]);
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['message_body_style' => null]);
     $channel = NotificationChannel::factory()->for($rule->user)->create();
 
     (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'Today: Sunny, high 88.'))
         ->handle(app(AppriseApiClient::class));
 
     Http::assertSent(fn ($request) => $request['body'] === 'Today: Sunny, high 88.');
+});
+
+test('a Free-tier owner\'s custom subject and Brief style are ignored at delivery', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $freeUser = User::factory()->create(['tier_override' => Tier::Free]);
+    $rule = AlertRule::factory()->dailySummary()->for($freeUser)->create([
+        'custom_subject_template' => 'My custom title',
+        'message_body_style' => 'brief',
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $longBody = str_repeat('Sunny with a high of 88 degrees. ', 30);
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Ignored default title', $longBody))
+        ->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['title'] === $rule->displayName() && $request['body'] === $longBody);
+});
+
+test('the default title (no custom template) still reaches Apprise as displayName()', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['custom_subject_template' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Ignored default title', 'Today: Sunny, high 88.'))
+        ->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['title'] === $rule->displayName());
 });

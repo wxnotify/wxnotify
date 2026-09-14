@@ -1,11 +1,13 @@
 <?php
 
+use App\Enums\Tier;
 use App\Jobs\DeliverWeatherAlert;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
 use App\Models\Product;
+use App\Models\User;
 use App\Support\Apprise\AppriseApiClient;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -109,8 +111,9 @@ test('a deactivated rule sends nothing but writes a skipped DeliveryLog row', fu
 test('a custom subject template is used as the Apprise title instead of displayName()', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
     $product = Product::factory()->create(['name' => 'Tornado Warning']);
-    $rule = AlertRule::factory()->create([
+    $rule = AlertRule::factory()->for($plusUser)->create([
         'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
         'custom_subject_template' => 'Alert: {product}',
     ]);
@@ -125,7 +128,8 @@ test('a custom subject template is used as the Apprise title instead of displayN
 test('message_body_style Brief truncates the body to 280 characters', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
-    $rule = AlertRule::factory()->create([
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->for($plusUser)->create([
         'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
         'message_body_style' => 'brief',
     ]);
@@ -141,7 +145,8 @@ test('message_body_style Brief truncates the body to 280 characters', function (
 test('message_body_style Full (or null) preserves today\'s 1500-character behavior', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
-    $rule = AlertRule::factory()->create([
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->for($plusUser)->create([
         'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
         'message_body_style' => null,
     ]);
@@ -152,4 +157,39 @@ test('message_body_style Full (or null) preserves today\'s 1500-character behavi
     (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
 
     Http::assertSent(fn ($request) => strlen($request['body']) > 280 && strlen($request['body']) <= 1500);
+});
+
+test('a Free-tier owner\'s custom subject and Brief style are ignored at delivery', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $freeUser = User::factory()->create(['tier_override' => Tier::Free]);
+    $rule = AlertRule::factory()->for($freeUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'custom_subject_template' => 'Alert: {product}',
+        'message_body_style' => 'brief',
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $longText = str_repeat('Tornado Warning issued for the area. ', 60);
+    $product = IngestedProduct::factory()->create(['text' => $longText]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['title'] === $rule->displayName() && strlen($request['body']) > 280);
+});
+
+test('the default title (no custom template) still reaches Apprise as displayName()', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $product = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'custom_subject_template' => null,
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $ingested = IngestedProduct::factory()->create(['product_id' => $product->id]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $ingested->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['title'] === $rule->displayName());
 });

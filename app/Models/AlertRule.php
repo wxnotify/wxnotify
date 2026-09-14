@@ -8,6 +8,7 @@ use App\Enums\MessageBodyStyle;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
+use App\Enums\Tier;
 use Database\Factories\AlertRuleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -86,6 +87,16 @@ class AlertRule extends Model
     public function notificationChannels(): BelongsToMany
     {
         return $this->belongsToMany(NotificationChannel::class);
+    }
+
+    public function effectiveCustomSubjectTemplate(): ?string
+    {
+        return $this->user->tier() !== Tier::Free ? $this->custom_subject_template : null;
+    }
+
+    public function effectiveMessageBodyStyle(): ?MessageBodyStyle
+    {
+        return $this->user->tier() !== Tier::Free ? $this->message_body_style : null;
     }
 
     public function displayName(): string
