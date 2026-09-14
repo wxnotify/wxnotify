@@ -12,6 +12,7 @@ use Awcodes\Gravatar\GravatarPlugin;
 use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
+use EightCedars\FilamentInactivityGuard\FilamentInactivityGuardPlugin;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -20,6 +21,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Sentinel\SentinelPlugin;
 use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
@@ -35,6 +37,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Str;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use JeffersonGoncalves\FilamentServiceDesk\ServiceDeskUserPlugin;
 use Laravel\Socialite\Contracts\User as SocialiteUserContract;
 use Swis\Filament\Backgrounds\FilamentBackgroundsPlugin;
 use Swis\Filament\Backgrounds\ImageProviders\MyImages;
@@ -118,6 +121,13 @@ class DashboardPanelProvider extends PanelProvider
                         'Admin' => 'admin@host.com',
                         'User' => 'user@host.com',
                     ]),
+                SentinelPlugin::make()
+                    ->windowPosition('bottom-right')    // or ->fullPage() for a full-page 500
+                    ->email('support@wxnotify.com'),    // "Contact support" mailto:
+                FilamentInactivityGuardPlugin::make(),
+                ServiceDeskUserPlugin::make()
+                    ->knowledgeBase(false)
+                    ->serviceCatalog(false),
             ])
             ->renderHook(
                 PanelsRenderHook::BODY_END,

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ed42158090f78198827e72816a0d97c5",
+    "content-hash": "b3258966346ddd31833313c1048faa94",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -70,6 +70,74 @@
                 "source": "https://github.com/AnourValar/eloquent-serialize/tree/1.3.11"
             },
             "time": "2026-08-07T06:14:19+00:00"
+        },
+        {
+            "name": "anselmokossa/filament-sentinel",
+            "version": "v1.2.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/anselmocossa/filament-sentinel.git",
+                "reference": "515bbcc6f8c2131db36332fcdb05eed7fc50bb52"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/anselmocossa/filament-sentinel/zipball/515bbcc6f8c2131db36332fcdb05eed7fc50bb52",
+                "reference": "515bbcc6f8c2131db36332fcdb05eed7fc50bb52",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^4.0|^5.0",
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "illuminate/support": "^11.0|^12.0|^13.0",
+                "php": "^8.2",
+                "spatie/laravel-package-tools": "^1.16"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "nunomaduro/collision": "^7.0|^8.0",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^2.0|^3.0",
+                "pestphp/pest-plugin-laravel": "^2.0|^3.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Filament\\Sentinel\\SentinelServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Filament\\Sentinel\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Anselmo Kossa",
+                    "email": "anselmo.cossa@enh.co.mz",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Branded, diagnostic error pages (500, 403, 404, 419, 503) for Filament — native Filament UI, dark mode and translations out of the box.",
+            "homepage": "https://github.com/anselmocossa/filament-sentinel",
+            "keywords": [
+                "error-pages",
+                "exception-handler",
+                "filament",
+                "filament-plugin",
+                "http-errors",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/anselmocossa/filament-sentinel/issues",
+                "source": "https://github.com/anselmocossa/filament-sentinel/tree/v1.2.1"
+            },
+            "time": "2026-08-04T21:47:02+00:00"
         },
         {
             "name": "awcodes/filament-gravatar",
@@ -1057,6 +1125,54 @@
             "time": "2024-07-08T12:26:09+00:00"
         },
         {
+            "name": "doctrine/deprecations",
+            "version": "1.1.6",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/doctrine/deprecations.git",
+                "reference": "d4fe3e6fd9bb9e72557a19674f44d8ac7db4c6ca"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/doctrine/deprecations/zipball/d4fe3e6fd9bb9e72557a19674f44d8ac7db4c6ca",
+                "reference": "d4fe3e6fd9bb9e72557a19674f44d8ac7db4c6ca",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.1 || ^8.0"
+            },
+            "conflict": {
+                "phpunit/phpunit": "<=7.5 || >=14"
+            },
+            "require-dev": {
+                "doctrine/coding-standard": "^9 || ^12 || ^14",
+                "phpstan/phpstan": "1.4.10 || 2.1.30",
+                "phpstan/phpstan-phpunit": "^1.0 || ^2",
+                "phpunit/phpunit": "^7.5 || ^8.5 || ^9.6 || ^10.5 || ^11.5 || ^12.4 || ^13.0",
+                "psr/log": "^1 || ^2 || ^3"
+            },
+            "suggest": {
+                "psr/log": "Allows logging deprecations via PSR-3 logger implementation"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Doctrine\\Deprecations\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "A small layer on top of trigger_error(E_USER_DEPRECATED) or PSR-3 logging with options to disable all deprecations or selectively for packages.",
+            "homepage": "https://www.doctrine-project.org/",
+            "support": {
+                "issues": "https://github.com/doctrine/deprecations/issues",
+                "source": "https://github.com/doctrine/deprecations/tree/1.1.6"
+            },
+            "time": "2026-02-07T07:09:04+00:00"
+        },
+        {
             "name": "doctrine/inflector",
             "version": "2.1.0",
             "source": {
@@ -1510,6 +1626,80 @@
             "time": "2025-03-06T22:45:56+00:00"
         },
         {
+            "name": "eightcedars/filament-inactivity-guard",
+            "version": "1.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/eightcedars/filament-inactivity-guard.git",
+                "reference": "eb2c487dd4d2adc4de54a8a793f044aa1d2f2b0d"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/eightcedars/filament-inactivity-guard/zipball/eb2c487dd4d2adc4de54a8a793f044aa1d2f2b0d",
+                "reference": "eb2c487dd4d2adc4de54a8a793f044aa1d2f2b0d",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^4.0 || ^5.0",
+                "livewire/livewire": "^3.0 || ^4.0",
+                "php": "^8.1",
+                "spatie/laravel-package-tools": "^1.16.0"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "nunomaduro/collision": "^8.0",
+                "orchestra/testbench": "^9.0",
+                "pestphp/pest": "^3.0",
+                "pestphp/pest-plugin-arch": "^3.0",
+                "pestphp/pest-plugin-laravel": "^3.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "EightCedars\\FilamentInactivityGuard\\FilamentInactivityGuardServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "EightCedars\\FilamentInactivityGuard\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Emmanuel Nelson",
+                    "email": "emmanuel@eightcedars.dev",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Gracefully auto-logout users from idle/inactive Filament sessions",
+            "homepage": "https://github.com/eightcedars/filament-inactivity-guard",
+            "keywords": [
+                "eightcedars",
+                "filament auto logout",
+                "filament idle session",
+                "filament inactivity guard",
+                "filamentphp",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/eightcedars/filament-inactivity-guard/issues",
+                "source": "https://github.com/eightcedars/filament-inactivity-guard"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/eightcedars",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-02-16T14:19:37+00:00"
+        },
+        {
             "name": "fahiem/filament-pinpoint",
             "version": "v1.1.9",
             "source": {
@@ -1913,6 +2103,50 @@
                 "source": "https://github.com/filamentphp/filament"
             },
             "time": "2026-08-05T20:51:01+00:00"
+        },
+        {
+            "name": "filament/spatie-laravel-settings-plugin",
+            "version": "v5.7.6",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/filamentphp/spatie-laravel-settings-plugin.git",
+                "reference": "82ffb2fdc26747ca103e789e3d56252612ffad6a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/filamentphp/spatie-laravel-settings-plugin/zipball/82ffb2fdc26747ca103e789e3d56252612ffad6a",
+                "reference": "82ffb2fdc26747ca103e789e3d56252612ffad6a",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "self.version",
+                "php": "^8.2",
+                "spatie/laravel-settings": "^3.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Filament\\SpatieLaravelSettingsPluginServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Filament\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Filament support for `spatie/laravel-settings`.",
+            "homepage": "https://github.com/filamentphp/filament",
+            "support": {
+                "issues": "https://github.com/filamentphp/filament/issues",
+                "source": "https://github.com/filamentphp/filament"
+            },
+            "time": "2026-08-05T20:48:23+00:00"
         },
         {
             "name": "filament/support",
@@ -2837,6 +3071,527 @@
                 "issues": "https://github.com/jbuitt/filament-toggle-list/issues"
             },
             "time": "2026-08-31T02:37:58+00:00"
+        },
+        {
+            "name": "jeffersongoncalves/filament-cookie-consent",
+            "version": "3.3.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jeffersongoncalves/filament-cookie-consent.git",
+                "reference": "f7f37cbff416e3c0957fe95f05b95ae7ecb731d5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jeffersongoncalves/filament-cookie-consent/zipball/f7f37cbff416e3c0957fe95f05b95ae7ecb731d5",
+                "reference": "f7f37cbff416e3c0957fe95f05b95ae7ecb731d5",
+                "shasum": ""
+            },
+            "require": {
+                "filament/spatie-laravel-settings-plugin": "^5.0",
+                "jeffersongoncalves/filament-plugin-core": "^3.0",
+                "jeffersongoncalves/laravel-cookie-consent": "^3.0",
+                "php": "^8.2|^8.3"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.0",
+                "laravel/pint": "^1.26",
+                "orchestra/testbench": "^9.0|^10.0|^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "JeffersonGoncalves\\Filament\\CookieConsent\\CookieConsentServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "JeffersonGoncalves\\Filament\\CookieConsent\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jefferson Gonçalves",
+                    "email": "gerson.simao.92@gmail.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "This Filament package provides a simple and elegant way to implement cookie consent on your website, ensuring compliance with privacy regulations like GDPR and CCPA. It offers a clean and customizable interface, allowing you to easily manage and display cookie consent banners and preferences.",
+            "homepage": "https://github.com/jeffersongoncalves/filament-cookie-consent",
+            "keywords": [
+                "CCPA",
+                "Settings",
+                "cookie-consent",
+                "filament",
+                "filament-plugin",
+                "gdpr",
+                "jeffersongoncalves",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/jeffersongoncalves/filament-cookie-consent/issues",
+                "source": "https://github.com/jeffersongoncalves/filament-cookie-consent/tree/3.3.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/jeffersongoncalves",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-06-23T23:30:45+00:00"
+        },
+        {
+            "name": "jeffersongoncalves/filament-logo",
+            "version": "3.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jeffersongoncalves/filament-logo.git",
+                "reference": "81bd3f243d9163a8d13516e2cf5299fdadfe814e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jeffersongoncalves/filament-logo/zipball/81bd3f243d9163a8d13516e2cf5299fdadfe814e",
+                "reference": "81bd3f243d9163a8d13516e2cf5299fdadfe814e",
+                "shasum": ""
+            },
+            "require": {
+                "jeffersongoncalves/filament-plugin-core": "^3.0",
+                "php": "^8.2|^8.3"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.0",
+                "laravel/pint": "^1.21",
+                "orchestra/testbench": "^9.0|^10.0|^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "JeffersonGoncalves\\Filament\\Logo\\LogoServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "JeffersonGoncalves\\Filament\\Logo\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jefferson Gonçalves",
+                    "email": "gerson.simao.92@gmail.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A simple yet effective Filament plugin that automatically adds the Filament logo to your admin panel. This plugin enhances your Filament panel's user experience by displaying the logo in strategic locations.",
+            "homepage": "https://github.com/jeffersongoncalves/filament-logo",
+            "keywords": [
+                "filament",
+                "filament-logo",
+                "jeffersongoncalves",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/jeffersongoncalves/filament-logo/issues",
+                "source": "https://github.com/jeffersongoncalves/filament-logo/tree/3.1.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/jeffersongoncalves",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-06-23T23:30:57+00:00"
+        },
+        {
+            "name": "jeffersongoncalves/filament-plugin-core",
+            "version": "3.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jeffersongoncalves/filament-plugin-core.git",
+                "reference": "dbb1c29026f73762dd5c357a7b79d807d4951b7e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jeffersongoncalves/filament-plugin-core/zipball/dbb1c29026f73762dd5c357a7b79d807d4951b7e",
+                "reference": "dbb1c29026f73762dd5c357a7b79d807d4951b7e",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^5.0",
+                "filament/support": "^5.0",
+                "php": "^8.2",
+                "spatie/laravel-package-tools": "^1.14.0"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.0",
+                "laravel/pint": "^1.21",
+                "orchestra/testbench": "^9.0|^10.0|^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-1.x": "1.x-dev",
+                    "dev-2.x": "2.x-dev",
+                    "dev-3.x": "3.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "JeffersonGoncalves\\FilamentPluginCore\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jefferson Gonçalves",
+                    "email": "gerson.simao.92@gmail.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Shared base classes and helpers for jeffersongoncalves Filament plugins (Plugin skeleton, PackageServiceProvider helpers, render-hook registration).",
+            "homepage": "https://github.com/jeffersongoncalves/filament-plugin-core",
+            "keywords": [
+                "filament",
+                "filament-plugin",
+                "jeffersongoncalves",
+                "laravel",
+                "plugin-core"
+            ],
+            "support": {
+                "issues": "https://github.com/jeffersongoncalves/filament-plugin-core/issues",
+                "source": "https://github.com/jeffersongoncalves/filament-plugin-core/tree/3.0.1"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/jeffersongoncalves",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-06-23T22:30:38+00:00"
+        },
+        {
+            "name": "jeffersongoncalves/filament-service-desk",
+            "version": "3.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jeffersongoncalves/filament-service-desk.git",
+                "reference": "0eb05e274a4809eb21ff85571c5a821b57438f7a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jeffersongoncalves/filament-service-desk/zipball/0eb05e274a4809eb21ff85571c5a821b57438f7a",
+                "reference": "0eb05e274a4809eb21ff85571c5a821b57438f7a",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^5.3",
+                "jeffersongoncalves/laravel-service-desk": "^1.0",
+                "php": "^8.2",
+                "spatie/laravel-package-tools": "^1.14.0"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "nunomaduro/collision": "^8.6",
+                "orchestra/testbench": "^10.0|^11.0",
+                "pestphp/pest": "^3.0",
+                "pestphp/pest-plugin-laravel": "^3.0",
+                "phpstan/extension-installer": "^1.1",
+                "phpstan/phpstan": "^1.10",
+                "phpstan/phpstan-deprecation-rules": "^1.0",
+                "phpstan/phpstan-phpunit": "^1.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "JeffersonGoncalves\\FilamentServiceDesk\\FilamentServiceDeskServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "JeffersonGoncalves\\FilamentServiceDesk\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jefferson Goncalves",
+                    "email": "jefferson@example.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Filament plugin for jeffersongoncalves/laravel-service-desk - provides Admin, Agent, and User panels for complete service desk management.",
+            "homepage": "https://github.com/jeffersongoncalves/filament-service-desk",
+            "keywords": [
+                "filament",
+                "helpdesk",
+                "laravel",
+                "service-desk",
+                "support",
+                "tickets"
+            ],
+            "support": {
+                "issues": "https://github.com/jeffersongoncalves/filament-service-desk/issues",
+                "source": "https://github.com/jeffersongoncalves/filament-service-desk/tree/3.2.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/jeffersongoncalves",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-04-18T16:10:25+00:00"
+        },
+        {
+            "name": "jeffersongoncalves/laravel-cookie-consent",
+            "version": "v3.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jeffersongoncalves/laravel-cookie-consent.git",
+                "reference": "1868ee7b09b112f85be0fea15efcfbdb771d5ce6"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jeffersongoncalves/laravel-cookie-consent/zipball/1868ee7b09b112f85be0fea15efcfbdb771d5ce6",
+                "reference": "1868ee7b09b112f85be0fea15efcfbdb771d5ce6",
+                "shasum": ""
+            },
+            "require": {
+                "laravel/framework": "^11.0|^12.0|^13.0",
+                "php": "^8.2|^8.3",
+                "spatie/laravel-package-tools": "^1.14.0",
+                "spatie/laravel-settings": "^3.0|^4.0"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.0",
+                "laravel/pint": "^1.21",
+                "orchestra/testbench": "^9.0|^10.0|^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "JeffersonGoncalves\\CookieConsent\\CookieConsentServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "JeffersonGoncalves\\CookieConsent\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jefferson Gonçalves",
+                    "email": "gerson.simao.92@gmail.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "This Laravel package provides a simple and elegant way to implement cookie consent on your website, ensuring compliance with privacy regulations like GDPR and CCPA. It offers a clean and customizable interface, allowing you to easily manage and display cookie consent banners and preferences.",
+            "homepage": "https://github.com/jeffersongoncalves/laravel-cookie-consent",
+            "keywords": [
+                "jeffersongoncalves",
+                "laravel",
+                "laravel-cookie-consent"
+            ],
+            "support": {
+                "issues": "https://github.com/jeffersongoncalves/laravel-cookie-consent/issues",
+                "source": "https://github.com/jeffersongoncalves/laravel-cookie-consent/tree/v3.0.3"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/jeffersongoncalves",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-04-26T15:27:29+00:00"
+        },
+        {
+            "name": "jeffersongoncalves/laravel-service-desk",
+            "version": "v1.0.10",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jeffersongoncalves/laravel-service-desk.git",
+                "reference": "0ed5f942a7726bda980620baadebb9a92ea9e4f6"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jeffersongoncalves/laravel-service-desk/zipball/0ed5f942a7726bda980620baadebb9a92ea9e4f6",
+                "reference": "0ed5f942a7726bda980620baadebb9a92ea9e4f6",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "illuminate/database": "^11.0|^12.0|^13.0",
+                "illuminate/events": "^11.0|^12.0|^13.0",
+                "illuminate/notifications": "^11.0|^12.0|^13.0",
+                "illuminate/support": "^11.0|^12.0|^13.0",
+                "jeffersongoncalves/laravel-webhook-signatures": "^1.0",
+                "php": "^8.2",
+                "spatie/laravel-package-tools": "^1.14.0"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.0",
+                "laravel/pint": "^1.21",
+                "orchestra/testbench": "^10.0|^11.0",
+                "pestphp/pest": "^3.0|^4.0",
+                "pestphp/pest-plugin-laravel": "^3.0|^4.0"
+            },
+            "suggest": {
+                "webklex/php-imap": "Required for IMAP email polling (^5.0)"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "ServiceDesk": "JeffersonGoncalves\\ServiceDesk\\Facades\\ServiceDesk"
+                    },
+                    "providers": [
+                        "JeffersonGoncalves\\ServiceDesk\\ServiceDeskServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "JeffersonGoncalves\\ServiceDesk\\": "src/",
+                    "JeffersonGoncalves\\ServiceDesk\\Database\\Factories\\": "database/factories/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jefferson Gonçalves",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Complete Service Desk package for Laravel with Tickets, SLA, Knowledge Base, and Service Catalog",
+            "homepage": "https://github.com/jeffersongoncalves/laravel-service-desk",
+            "keywords": [
+                "helpdesk",
+                "knowledge-base",
+                "laravel",
+                "service-desk",
+                "sla",
+                "tickets"
+            ],
+            "support": {
+                "issues": "https://github.com/jeffersongoncalves/laravel-service-desk/issues",
+                "source": "https://github.com/jeffersongoncalves/laravel-service-desk/tree/v1.0.10"
+            },
+            "funding": [
+                {
+                    "url": "https://buymeacoffee.com/jeffersongoncalves",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/jeffersongoncalves",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-09-13T17:08:55+00:00"
+        },
+        {
+            "name": "jeffersongoncalves/laravel-webhook-signatures",
+            "version": "1.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jeffersongoncalves/laravel-webhook-signatures.git",
+                "reference": "b8ecf3b9a30e0c2492ebad86f0cf738dc2a189dd"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jeffersongoncalves/laravel-webhook-signatures/zipball/b8ecf3b9a30e0c2492ebad86f0cf738dc2a189dd",
+                "reference": "b8ecf3b9a30e0c2492ebad86f0cf738dc2a189dd",
+                "shasum": ""
+            },
+            "require": {
+                "ext-openssl": "*",
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "illuminate/http": "^11.0|^12.0|^13.0",
+                "illuminate/support": "^11.0|^12.0|^13.0",
+                "php": "^8.2|^8.3|^8.4",
+                "spatie/laravel-package-tools": "^1.14.0"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.0",
+                "laravel/pint": "^1.24",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^3.7.4|^4.0",
+                "pestphp/pest-plugin-laravel": "^3.0|^4.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "WebhookSignatures": "JeffersonGoncalves\\WebhookSignatures\\Facades\\WebhookSignatures"
+                    },
+                    "providers": [
+                        "JeffersonGoncalves\\WebhookSignatures\\WebhookSignaturesServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "JeffersonGoncalves\\WebhookSignatures\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jefferson Gonçalves",
+                    "email": "gerson.simao.92@gmail.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Verificação centralizada e fail-closed de assinaturas de webhooks de provedores de email/serviços (Mailgun, SendGrid, Postmark, Resend e AWS SNS/SES) para aplicações Laravel.",
+            "homepage": "https://github.com/jeffersongoncalves/laravel-webhook-signatures",
+            "keywords": [
+                "SNS",
+                "jeffersongoncalves",
+                "laravel",
+                "laravel-webhook-signatures",
+                "mailgun",
+                "postmark",
+                "resend",
+                "sendgrid",
+                "signature",
+                "webhook"
+            ],
+            "support": {
+                "issues": "https://github.com/jeffersongoncalves/laravel-webhook-signatures/issues",
+                "source": "https://github.com/jeffersongoncalves/laravel-webhook-signatures/tree/1.1.0"
+            },
+            "time": "2026-06-23T11:24:24+00:00"
         },
         {
             "name": "kirschbaum-development/eloquent-power-joins",
@@ -5263,6 +6018,117 @@
             "time": "2026-07-22T19:51:40+00:00"
         },
         {
+            "name": "phpdocumentor/reflection-common",
+            "version": "2.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpDocumentor/ReflectionCommon.git",
+                "reference": "1d01c49d4ed62f25aa84a747ad35d5a16924662b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpDocumentor/ReflectionCommon/zipball/1d01c49d4ed62f25aa84a747ad35d5a16924662b",
+                "reference": "1d01c49d4ed62f25aa84a747ad35d5a16924662b",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.2 || ^8.0"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-2.x": "2.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "phpDocumentor\\Reflection\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jaap van Otterdijk",
+                    "email": "opensource@ijaap.nl"
+                }
+            ],
+            "description": "Common reflection classes used by phpdocumentor to reflect the code structure",
+            "homepage": "http://www.phpdoc.org",
+            "keywords": [
+                "FQSEN",
+                "phpDocumentor",
+                "phpdoc",
+                "reflection",
+                "static analysis"
+            ],
+            "support": {
+                "issues": "https://github.com/phpDocumentor/ReflectionCommon/issues",
+                "source": "https://github.com/phpDocumentor/ReflectionCommon/tree/2.x"
+            },
+            "time": "2020-06-27T09:03:43+00:00"
+        },
+        {
+            "name": "phpdocumentor/type-resolver",
+            "version": "2.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpDocumentor/TypeResolver.git",
+                "reference": "327a05bbee54120d4786a0dc67aad30226ad4cf9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpDocumentor/TypeResolver/zipball/327a05bbee54120d4786a0dc67aad30226ad4cf9",
+                "reference": "327a05bbee54120d4786a0dc67aad30226ad4cf9",
+                "shasum": ""
+            },
+            "require": {
+                "doctrine/deprecations": "^1.0",
+                "php": "^7.4 || ^8.0",
+                "phpdocumentor/reflection-common": "^2.0",
+                "phpstan/phpdoc-parser": "^2.0"
+            },
+            "require-dev": {
+                "ext-tokenizer": "*",
+                "phpbench/phpbench": "^1.2",
+                "phpstan/extension-installer": "^1.4",
+                "phpstan/phpstan": "^2.1",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "phpunit/phpunit": "^9.5",
+                "psalm/phar": "^4"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-1.x": "1.x-dev",
+                    "dev-2.x": "2.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "phpDocumentor\\Reflection\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Mike van Riel",
+                    "email": "me@mikevanriel.com"
+                }
+            ],
+            "description": "A PSR-5 based resolver of Class names, Types and Structural Element Names",
+            "support": {
+                "issues": "https://github.com/phpDocumentor/TypeResolver/issues",
+                "source": "https://github.com/phpDocumentor/TypeResolver/tree/2.0.0"
+            },
+            "time": "2026-01-06T21:53:42+00:00"
+        },
+        {
             "name": "phpmyadmin/shapefile",
             "version": "4.0.1",
             "source": {
@@ -5526,6 +6392,53 @@
                 }
             ],
             "time": "2026-08-26T12:15:13+00:00"
+        },
+        {
+            "name": "phpstan/phpdoc-parser",
+            "version": "2.3.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpstan/phpdoc-parser.git",
+                "reference": "fb19eedd2bb67ff8cf7a5502ad329e701d6398a3"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/fb19eedd2bb67ff8cf7a5502ad329e701d6398a3",
+                "reference": "fb19eedd2bb67ff8cf7a5502ad329e701d6398a3",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.4 || ^8.0"
+            },
+            "require-dev": {
+                "doctrine/annotations": "^2.0",
+                "nikic/php-parser": "^5.3.0",
+                "php-parallel-lint/php-parallel-lint": "^1.2",
+                "phpstan/extension-installer": "^1.0",
+                "phpstan/phpstan": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "phpstan/phpstan-strict-rules": "^2.0",
+                "phpunit/phpunit": "^9.6",
+                "symfony/process": "^5.2"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "PHPStan\\PhpDocParser\\": [
+                        "src/"
+                    ]
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "PHPDoc parser with support for nullable, intersection and generic types",
+            "support": {
+                "issues": "https://github.com/phpstan/phpdoc-parser/issues",
+                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.3.3"
+            },
+            "time": "2026-07-08T07:01:06+00:00"
         },
         {
             "name": "pragmarx/google2fa",
@@ -6718,6 +7631,91 @@
             "time": "2026-08-26T09:13:25+00:00"
         },
         {
+            "name": "spatie/laravel-settings",
+            "version": "3.9.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/laravel-settings.git",
+                "reference": "6c1351cf57c4ae96cd2313ae395c6d367dfeee01"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/laravel-settings/zipball/6c1351cf57c4ae96cd2313ae395c6d367dfeee01",
+                "reference": "6c1351cf57c4ae96cd2313ae395c6d367dfeee01",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "illuminate/database": "^11.0|^12.0|^13.0",
+                "php": "^8.2",
+                "phpdocumentor/type-resolver": "^1.5|^2.0",
+                "spatie/temporary-directory": "^1.3|^2.0"
+            },
+            "require-dev": {
+                "ext-redis": "*",
+                "mockery/mockery": "^1.4",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^2.0|^3.0|^4.0",
+                "pestphp/pest-plugin-laravel": "^2.0|^3.0|^4.0",
+                "phpstan/extension-installer": "^1.1",
+                "phpstan/phpstan-deprecation-rules": "^1.0",
+                "phpstan/phpstan-phpunit": "^1.0",
+                "spatie/laravel-data": "^2.0.0|^4.0.0",
+                "spatie/pest-plugin-snapshots": "^2.0",
+                "spatie/phpunit-snapshot-assertions": "^4.2|^5.0",
+                "spatie/ray": "^1.36"
+            },
+            "suggest": {
+                "spatie/data-transfer-object": "Allows for DTO casting to settings. (deprecated)"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Spatie\\LaravelSettings\\LaravelSettingsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\LaravelSettings\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ruben Van Assche",
+                    "email": "ruben@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Store your application settings",
+            "homepage": "https://github.com/spatie/laravel-settings",
+            "keywords": [
+                "laravel-settings",
+                "spatie"
+            ],
+            "support": {
+                "issues": "https://github.com/spatie/laravel-settings/issues",
+                "source": "https://github.com/spatie/laravel-settings/tree/3.9.0"
+            },
+            "funding": [
+                {
+                    "url": "https://spatie.be/open-source/support-us",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-05-26T13:18:06+00:00"
+        },
+        {
             "name": "spatie/php-structure-discoverer",
             "version": "2.4.4",
             "source": {
@@ -6860,6 +7858,67 @@
                 }
             ],
             "time": "2026-04-27T14:27:52+00:00"
+        },
+        {
+            "name": "spatie/temporary-directory",
+            "version": "2.4.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/temporary-directory.git",
+                "reference": "32cbb9645b28839cf4f476708e99a2c70e6802c9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/temporary-directory/zipball/32cbb9645b28839cf4f476708e99a2c70e6802c9",
+                "reference": "32cbb9645b28839cf4f476708e99a2c70e6802c9",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\TemporaryDirectory\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Alex Vanderbist",
+                    "email": "alex@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Easily create, use and destroy temporary directories",
+            "homepage": "https://github.com/spatie/temporary-directory",
+            "keywords": [
+                "php",
+                "spatie",
+                "temporary-directory"
+            ],
+            "support": {
+                "issues": "https://github.com/spatie/temporary-directory/issues",
+                "source": "https://github.com/spatie/temporary-directory/tree/2.4.0"
+            },
+            "funding": [
+                {
+                    "url": "https://spatie.be/open-source/support-us",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-06-22T07:55:44+00:00"
         },
         {
             "name": "ssbityukov/filament-command-center",
@@ -10563,54 +11622,6 @@
             "time": "2025-08-20T19:15:30+00:00"
         },
         {
-            "name": "doctrine/deprecations",
-            "version": "1.1.6",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/doctrine/deprecations.git",
-                "reference": "d4fe3e6fd9bb9e72557a19674f44d8ac7db4c6ca"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/deprecations/zipball/d4fe3e6fd9bb9e72557a19674f44d8ac7db4c6ca",
-                "reference": "d4fe3e6fd9bb9e72557a19674f44d8ac7db4c6ca",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^7.1 || ^8.0"
-            },
-            "conflict": {
-                "phpunit/phpunit": "<=7.5 || >=14"
-            },
-            "require-dev": {
-                "doctrine/coding-standard": "^9 || ^12 || ^14",
-                "phpstan/phpstan": "1.4.10 || 2.1.30",
-                "phpstan/phpstan-phpunit": "^1.0 || ^2",
-                "phpunit/phpunit": "^7.5 || ^8.5 || ^9.6 || ^10.5 || ^11.5 || ^12.4 || ^13.0",
-                "psr/log": "^1 || ^2 || ^3"
-            },
-            "suggest": {
-                "psr/log": "Allows logging deprecations via PSR-3 logger implementation"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Doctrine\\Deprecations\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "description": "A small layer on top of trigger_error(E_USER_DEPRECATED) or PSR-3 logging with options to disable all deprecations or selectively for packages.",
-            "homepage": "https://www.doctrine-project.org/",
-            "support": {
-                "issues": "https://github.com/doctrine/deprecations/issues",
-                "source": "https://github.com/doctrine/deprecations/tree/1.1.6"
-            },
-            "time": "2026-02-07T07:09:04+00:00"
-        },
-        {
             "name": "fakerphp/faker",
             "version": "v1.24.1",
             "source": {
@@ -12409,59 +13420,6 @@
             "time": "2022-02-21T01:04:05+00:00"
         },
         {
-            "name": "phpdocumentor/reflection-common",
-            "version": "2.2.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/phpDocumentor/ReflectionCommon.git",
-                "reference": "1d01c49d4ed62f25aa84a747ad35d5a16924662b"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/phpDocumentor/ReflectionCommon/zipball/1d01c49d4ed62f25aa84a747ad35d5a16924662b",
-                "reference": "1d01c49d4ed62f25aa84a747ad35d5a16924662b",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^7.2 || ^8.0"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-2.x": "2.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "phpDocumentor\\Reflection\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Jaap van Otterdijk",
-                    "email": "opensource@ijaap.nl"
-                }
-            ],
-            "description": "Common reflection classes used by phpdocumentor to reflect the code structure",
-            "homepage": "http://www.phpdoc.org",
-            "keywords": [
-                "FQSEN",
-                "phpDocumentor",
-                "phpdoc",
-                "reflection",
-                "static analysis"
-            ],
-            "support": {
-                "issues": "https://github.com/phpDocumentor/ReflectionCommon/issues",
-                "source": "https://github.com/phpDocumentor/ReflectionCommon/tree/2.x"
-            },
-            "time": "2020-06-27T09:03:43+00:00"
-        },
-        {
             "name": "phpdocumentor/reflection-docblock",
             "version": "6.0.3",
             "source": {
@@ -12525,111 +13483,6 @@
                 "source": "https://github.com/phpDocumentor/ReflectionDocBlock/tree/6.0.3"
             },
             "time": "2026-03-18T20:49:53+00:00"
-        },
-        {
-            "name": "phpdocumentor/type-resolver",
-            "version": "2.0.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/phpDocumentor/TypeResolver.git",
-                "reference": "327a05bbee54120d4786a0dc67aad30226ad4cf9"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/phpDocumentor/TypeResolver/zipball/327a05bbee54120d4786a0dc67aad30226ad4cf9",
-                "reference": "327a05bbee54120d4786a0dc67aad30226ad4cf9",
-                "shasum": ""
-            },
-            "require": {
-                "doctrine/deprecations": "^1.0",
-                "php": "^7.4 || ^8.0",
-                "phpdocumentor/reflection-common": "^2.0",
-                "phpstan/phpdoc-parser": "^2.0"
-            },
-            "require-dev": {
-                "ext-tokenizer": "*",
-                "phpbench/phpbench": "^1.2",
-                "phpstan/extension-installer": "^1.4",
-                "phpstan/phpstan": "^2.1",
-                "phpstan/phpstan-phpunit": "^2.0",
-                "phpunit/phpunit": "^9.5",
-                "psalm/phar": "^4"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-1.x": "1.x-dev",
-                    "dev-2.x": "2.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "phpDocumentor\\Reflection\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Mike van Riel",
-                    "email": "me@mikevanriel.com"
-                }
-            ],
-            "description": "A PSR-5 based resolver of Class names, Types and Structural Element Names",
-            "support": {
-                "issues": "https://github.com/phpDocumentor/TypeResolver/issues",
-                "source": "https://github.com/phpDocumentor/TypeResolver/tree/2.0.0"
-            },
-            "time": "2026-01-06T21:53:42+00:00"
-        },
-        {
-            "name": "phpstan/phpdoc-parser",
-            "version": "2.3.3",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/phpstan/phpdoc-parser.git",
-                "reference": "fb19eedd2bb67ff8cf7a5502ad329e701d6398a3"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/fb19eedd2bb67ff8cf7a5502ad329e701d6398a3",
-                "reference": "fb19eedd2bb67ff8cf7a5502ad329e701d6398a3",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^7.4 || ^8.0"
-            },
-            "require-dev": {
-                "doctrine/annotations": "^2.0",
-                "nikic/php-parser": "^5.3.0",
-                "php-parallel-lint/php-parallel-lint": "^1.2",
-                "phpstan/extension-installer": "^1.0",
-                "phpstan/phpstan": "^2.0",
-                "phpstan/phpstan-phpunit": "^2.0",
-                "phpstan/phpstan-strict-rules": "^2.0",
-                "phpunit/phpunit": "^9.6",
-                "symfony/process": "^5.2"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "PHPStan\\PhpDocParser\\": [
-                        "src/"
-                    ]
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "description": "PHPDoc parser with support for nullable, intersection and generic types",
-            "support": {
-                "issues": "https://github.com/phpstan/phpdoc-parser/issues",
-                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.3.3"
-            },
-            "time": "2026-07-08T07:01:06+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
