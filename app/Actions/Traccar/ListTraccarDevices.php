@@ -47,8 +47,30 @@ class ListTraccarDevices
             return null;
         }
 
-        return collect($response->json())
-            ->map(fn (array $device): array => ['id' => $device['id'], 'name' => $device['name']])
-            ->all();
+        $devices = $response->json();
+
+        if (! is_array($devices)) {
+            Log::warning('Traccar server returned a malformed devices response', [
+                'traccar_server_id' => $server->id,
+            ]);
+
+            return null;
+        }
+
+        $result = [];
+
+        foreach ($devices as $device) {
+            if (! is_array($device) || ! isset($device['id'], $device['name'])) {
+                Log::warning('Traccar server returned a malformed device entry', [
+                    'traccar_server_id' => $server->id,
+                ]);
+
+                return null;
+            }
+
+            $result[] = ['id' => $device['id'], 'name' => $device['name']];
+        }
+
+        return $result;
     }
 }

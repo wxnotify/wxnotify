@@ -48,3 +48,40 @@ test('a connection failure resolves to null', function () {
 
     expect((new ListTraccarDevices)($server))->toBeNull();
 });
+
+test('an empty body resolves to null, not an empty device list', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake(['traccar.example.com/api/devices' => Http::response('', 200)]);
+
+    expect((new ListTraccarDevices)($server))->toBeNull();
+});
+
+test('a non-array JSON body resolves to null', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake(['traccar.example.com/api/devices' => Http::response(['unexpected' => 'object'], 200)]);
+
+    expect((new ListTraccarDevices)($server))->toBeNull();
+});
+
+test('a device entry missing required fields resolves the whole response to null', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake([
+        'traccar.example.com/api/devices' => Http::response([
+            ['id' => 1, 'name' => 'Good Device'],
+            ['id' => 2], // missing name
+        ]),
+    ]);
+
+    expect((new ListTraccarDevices)($server))->toBeNull();
+});
+
+test('a genuinely empty device list (a valid JSON array with zero entries) resolves to an empty array, not null', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake(['traccar.example.com/api/devices' => Http::response([], 200)]);
+
+    expect((new ListTraccarDevices)($server))->toBe([]);
+});
