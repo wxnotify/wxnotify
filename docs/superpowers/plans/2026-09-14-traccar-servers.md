@@ -803,6 +803,35 @@ test('a connection failure resolves to null', function () {
 
     expect((new PollTraccarServer)($server))->toBeNull();
 });
+
+test('an empty body resolves to null, not an empty position list', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake(['traccar.example.com/api/positions' => Http::response('', 200)]);
+
+    expect((new PollTraccarServer)($server))->toBeNull();
+});
+
+test('a position entry missing required fields resolves the whole response to null', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake([
+        'traccar.example.com/api/positions' => Http::response([
+            ['deviceId' => 1, 'latitude' => 39.0997, 'longitude' => -94.5786],
+            ['deviceId' => 2, 'latitude' => 41.8781], // missing longitude
+        ]),
+    ]);
+
+    expect((new PollTraccarServer)($server))->toBeNull();
+});
+
+test('a genuinely empty position list (a valid JSON array with zero entries) resolves to an empty array, not null', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake(['traccar.example.com/api/positions' => Http::response([], 200)]);
+
+    expect((new PollTraccarServer)($server))->toBe([]);
+});
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -863,15 +892,42 @@ class PollTraccarServer
             return null;
         }
 
-        return collect($response->json())
-            ->mapWithKeys(fn (array $position): array => [
-                $position['deviceId'] => [
-                    'lat' => (float) $position['latitude'],
-                    'lng' => (float) $position['longitude'],
-                    'fixTime' => $position['fixTime'] ?? null,
-                ],
-            ])
-            ->all();
+        // A malformed whole-response body or any single malformed position
+        // entry voids the WHOLE batch back to null, rather than silently
+        // building a partial result from untrustworthy data -- mirrors
+        // ListTraccarDevices's identical hardening, added after that
+        // action's own first review found the naive collect()->map(fn
+        // (array $x) => ...) shape throws an uncaught TypeError on a real
+        // (or imperfectly self-hosted) server's malformed 2xx body.
+        $positions = $response->json();
+
+        if (! is_array($positions)) {
+            Log::warning('Traccar server returned a malformed positions response', [
+                'traccar_server_id' => $server->id,
+            ]);
+
+            return null;
+        }
+
+        $result = [];
+
+        foreach ($positions as $position) {
+            if (! is_array($position) || ! isset($position['deviceId'], $position['latitude'], $position['longitude'])) {
+                Log::warning('Traccar server returned a malformed position entry', [
+                    'traccar_server_id' => $server->id,
+                ]);
+
+                return null;
+            }
+
+            $result[$position['deviceId']] = [
+                'lat' => (float) $position['latitude'],
+                'lng' => (float) $position['longitude'],
+                'fixTime' => $position['fixTime'] ?? null,
+            ];
+        }
+
+        return $result;
     }
 }
 ```
@@ -882,7 +938,7 @@ class PollTraccarServer
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/PollTraccarServerTest.php --compact"
 ```
 
-Expected: PASS (4 tests).
+Expected: PASS (7 tests).
 
 - [ ] **Step 5: Run Pint and commit**
 
