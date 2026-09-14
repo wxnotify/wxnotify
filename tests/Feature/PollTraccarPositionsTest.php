@@ -122,3 +122,18 @@ test('a subsequent successful poll clears a previous poll error', function () {
 
     expect($server->refresh()->last_poll_error)->toBeNull();
 });
+
+test('a mobile location with no update interval set is never polled', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    Location::factory()->mobile()->create([
+        'traccar_server_id' => $server->id,
+        'traccar_device_id' => 1,
+        'mobile_update_interval_minutes' => null,
+    ]);
+
+    Http::fake();
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    Http::assertNothingSent();
+});

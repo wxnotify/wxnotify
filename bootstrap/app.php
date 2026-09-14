@@ -22,7 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('shapefile:scan')->daily();
         $schedule->command('alerts:dispatch-scheduled')->everyFifteenMinutes();
-        $schedule->command('traccar:poll-positions')->everyFiveMinutes();
+        $schedule->command('traccar:poll-positions')->everyFiveMinutes()->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

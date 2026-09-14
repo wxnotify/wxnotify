@@ -29,6 +29,7 @@ class PollTraccarPositions extends Command
         $dueLocations = Location::query()
             ->whereNotNull('traccar_server_id')
             ->whereNotNull('traccar_device_id')
+            ->whereNotNull('mobile_update_interval_minutes')
             ->where(function ($query) {
                 $query->whereNull('mobile_position_updated_at')
                     ->orWhereRaw(
