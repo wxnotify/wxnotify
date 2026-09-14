@@ -32,6 +32,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'delivery_time',
     'last_scheduled_run_on',
     'radius_miles',
+    'lightning_last_alerted_at',
     'quiet_hours_start',
     'quiet_hours_end',
     'is_active',
@@ -58,6 +59,7 @@ class AlertRule extends Model
             'timeframe' => ThresholdTimeframe::class,
             'last_scheduled_run_on' => 'date',
             'radius_miles' => 'integer',
+            'lightning_last_alerted_at' => 'datetime',
             'is_active' => 'boolean',
         ];
     }

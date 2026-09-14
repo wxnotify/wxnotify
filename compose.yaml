@@ -68,6 +68,21 @@ services:
         restart: unless-stopped
         depends_on:
             - laravel.test
+    glm-decoder:
+        build:
+            context: .
+            dockerfile: docker/glm-decoder/Dockerfile
+        container_name: wxnotify-glm-decoder
+        environment:
+            GLM_WEBHOOK_URL: 'http://laravel.test/api/pipeline/glm-flashes'
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+        volumes:
+            - 'glm-state:/state'
+        networks:
+            - sail
+        restart: unless-stopped
+        depends_on:
+            - laravel.test
     docker-socket-proxy:
         image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
         container_name: wxnotify-docker-socket-proxy
@@ -187,4 +202,6 @@ volumes:
     sail-minio:
         driver: local
     nwws-products:
+        driver: local
+    glm-state:
         driver: local
