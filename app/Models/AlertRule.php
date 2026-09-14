@@ -30,6 +30,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'threshold_value',
     'timeframe',
     'delivery_time',
+    'last_scheduled_run_on',
     'radius_miles',
     'quiet_hours_start',
     'quiet_hours_end',
@@ -55,6 +56,7 @@ class AlertRule extends Model
             'direction' => ThresholdDirection::class,
             'threshold_value' => 'decimal:1',
             'timeframe' => ThresholdTimeframe::class,
+            'last_scheduled_run_on' => 'date',
             'radius_miles' => 'integer',
             'is_active' => 'boolean',
         ];

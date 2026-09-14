@@ -47,4 +47,16 @@ class AlertRuleFactory extends Factory
             'radius_miles' => 15,
         ]);
     }
+
+    public function dailySummary(): static
+    {
+        return $this->state(fn () => [
+            'category' => AlertCategory::DailySummary,
+            'variable' => null,
+            'direction' => null,
+            'threshold_value' => null,
+            'timeframe' => null,
+            'delivery_time' => '07:00',
+        ]);
+    }
 }

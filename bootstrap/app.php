@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('shapefile:scan')->daily();
+        $schedule->command('alerts:dispatch-scheduled')->everyFifteenMinutes();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
