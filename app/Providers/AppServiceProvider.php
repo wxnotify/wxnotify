@@ -10,6 +10,8 @@ use App\Observers\ActivityLogObserver;
 use App\Observers\IngestedProductObserver;
 use App\Observers\LocationZoneObserver;
 use App\Observers\UserActivityObserver;
+use App\Support\Filament\AdminLogoutResponse;
+use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -24,7 +26,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(LogoutResponse::class, AdminLogoutResponse::class);
     }
 
     /**
