@@ -24,12 +24,15 @@ class Location extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        // Excludes lat/lng/mobile_position_updated_at: a polled mobile
-        // location's position changes every 5-30 minutes forever, and
-        // logging that as "activity" would drown out everything else about
-        // this model in noise. Everything else still logs normally.
+        // logAll() preserves original behavior for every real field (including
+        // lat/lng, whether a stationary pin is repositioned or a mobile fix is
+        // manually corrected). Only mobile_position_updated_at is excluded: it's
+        // a bookkeeping timestamp that ticks every 5-30 minutes forever purely
+        // from Traccar polling, not user-meaningful data, and would otherwise
+        // drown out everything else about this model in noise.
         return LogOptions::defaults()
-            ->logOnly(['user_id', 'label', 'type', 'address', 'timezone', 'mobile_source', 'traccar_server_id', 'traccar_device_id', 'traccar_device_name'])
+            ->logAll()
+            ->logExcept(['mobile_position_updated_at'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }

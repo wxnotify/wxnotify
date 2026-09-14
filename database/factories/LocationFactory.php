@@ -33,17 +33,33 @@ class LocationFactory extends Factory
 
     public function mobile(): static
     {
-        return $this->state(fn () => [
-            'type' => LocationType::Mobile,
-            'address' => null,
-            'lat' => null,
-            'lng' => null,
-            'mobile_source' => MobileSource::Traccar,
-            'mobile_update_interval_minutes' => 15,
-            'traccar_server_id' => TraccarServer::factory(),
-            'traccar_device_id' => fake()->randomNumber(5),
-            'traccar_device_name' => fake()->word(),
-        ]);
+        return $this->state(function (array $attributes) {
+            // The base definition()'s 'user_id' is normally an unresolved
+            // User::factory() instance, not a concrete id -- resolving it
+            // twice (once for this Location, once for the TraccarServer
+            // below) would silently create two different Users. Resolve it
+            // once here so both rows end up owned by the same user.
+            $userId = $attributes['user_id'] ?? null;
+
+            if ($userId instanceof Factory) {
+                $userId = $userId->create()->id;
+            } elseif ($userId === null) {
+                $userId = User::factory()->create()->id;
+            }
+
+            return [
+                'user_id' => $userId,
+                'type' => LocationType::Mobile,
+                'address' => null,
+                'lat' => null,
+                'lng' => null,
+                'mobile_source' => MobileSource::Traccar,
+                'mobile_update_interval_minutes' => 15,
+                'traccar_server_id' => TraccarServer::factory()->state(['user_id' => $userId]),
+                'traccar_device_id' => fake()->randomNumber(5),
+                'traccar_device_name' => fake()->word(),
+            ];
+        });
     }
 
     public function withFix(float $lat, float $lng): static
