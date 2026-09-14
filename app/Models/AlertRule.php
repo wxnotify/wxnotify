@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
+use App\Enums\MessageBodyStyle;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
@@ -36,6 +37,8 @@ use Spatie\Activitylog\Support\LogOptions;
     'quiet_hours_start',
     'quiet_hours_end',
     'is_active',
+    'custom_subject_template',
+    'message_body_style',
 ])]
 class AlertRule extends Model
 {
@@ -61,6 +64,7 @@ class AlertRule extends Model
             'radius_miles' => 'integer',
             'lightning_last_alerted_at' => 'datetime',
             'is_active' => 'boolean',
+            'message_body_style' => MessageBodyStyle::class,
         ];
     }
 
