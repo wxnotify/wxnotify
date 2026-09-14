@@ -25,7 +25,7 @@ class TraccarServersTable
                     ->since()
                     ->placeholder('Never'),
                 TextColumn::make('last_poll_error')
-                    ->label('Status')
+                    ->label('Polling Status')
                     ->formatStateUsing(fn (?string $state): string => $state ?? 'OK')
                     ->badge()
                     ->color(fn (?string $state): string => $state === null ? 'success' : 'danger'),
