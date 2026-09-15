@@ -46,3 +46,17 @@ test('finds the VTEC string embedded among other text', function () {
     expect($result['office'])->toBe('KOKX')
         ->and($result['event_number'])->toBe('0042');
 });
+
+test('a text with two VTEC strings resolves the first (leftmost) one', function () {
+    $text = <<<'TEXT'
+    /O.NEW.KOKX.TO.W.0042.260906T1800Z-260906T1900Z/
+    /O.CAN.KOKX.SV.W.0041.000000T0000Z-260906T1800Z/
+    TEXT;
+
+    $result = (new ParseVtecString)($text);
+
+    expect($result['phenomenon'])->toBe('TO')
+        ->and($result['significance'])->toBe('W')
+        ->and($result['event_number'])->toBe('0042')
+        ->and($result['action'])->toBe('NEW');
+});
