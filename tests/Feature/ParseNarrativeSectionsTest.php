@@ -134,3 +134,50 @@ test('an empty string input returns all five fields as null', function () {
         'call_to_action' => null,
     ]);
 });
+
+test('extracts hazard, source, and impact from the real captured FFW.txt product example, which indents labels 2 spaces under a parent bullet', function () {
+    $text = file_get_contents(base_path('database/product_examples/FFW.txt'));
+    $result = (new ParseNarrativeSections)($text);
+
+    expect($result['hazard'])->toBe('Flash flooding caused by heavy rain and thunderstorms.')
+        ->and($result['hazard_source'])->toBe('Radar and automated gauges.')
+        ->and($result['impact'])->toBe('Flash flooding of small creeks and streams, urban areas, highways, streets and underpasses as well as other poor drainage and low-lying areas.')
+        ->and($result['call_to_action'])->toBe("Dangerous flooding from heavy rainfall can be expected, especially near poor drainage areas and other flood prone locations. It is harder to recognize flood dangers at night, as it will be difficult to determine the depth of the water. Most flood deaths occur in vehicles. If flooding is observed, then turn around, don't drown.");
+});
+
+test('FFW.txt uses a locations-impacted phrasing this parser does not recognize, and correctly returns null rather than guessing', function () {
+    // FFW.txt's real line is "* Some locations that will experience flash
+    // flooding include..." -- a real, different phrasing than the one
+    // recognized label ("Locations impacted include..."), which is exactly
+    // the documented coverage gap from the design spec.
+    $text = file_get_contents(base_path('database/product_examples/FFW.txt'));
+    $result = (new ParseNarrativeSections)($text);
+
+    expect($result['locations_impacted'])->toBeNull();
+});
+
+test('extracts locations_impacted from the real captured SVW.txt product example, where the label is a "* "-prefixed bullet with no blank line before its content', function () {
+    $text = file_get_contents(base_path('database/product_examples/SVW.txt'));
+    $result = (new ParseNarrativeSections)($text);
+
+    expect($result['hazard'])->toBe('60 mph wind gusts.')
+        ->and($result['hazard_source'])->toBe('Radar indicated.')
+        ->and($result['impact'])->toBe('Expect damage to roofs, siding, and trees.')
+        ->and($result['locations_impacted'])->toBe('Naylor and Oxly.')
+        ->and($result['call_to_action'])->toBe('For your protection move to an interior room on the lowest floor of a building.');
+});
+
+test('stops a section at the $$ end-of-product delimiter even when no blank line precedes it', function () {
+    $text = "IMPACT...Some impact text right up to the end.\n\$\$\nUNRELATED BOILERPLATE THAT MUST NOT LEAK IN.";
+
+    $result = (new ParseNarrativeSections)($text);
+
+    expect($result['impact'])->toBe('Some impact text right up to the end.');
+});
+
+test('handles bare CR line endings the same as LF', function () {
+    $lf = "HAZARD...Flash flooding caused by thunderstorms.\n\nSOURCE...Radar indicated.\n\nIMPACT...Flash flooding of small creeks and streams.\n";
+    $cr = str_replace("\n", "\r", $lf);
+
+    expect((new ParseNarrativeSections)($cr))->toBe((new ParseNarrativeSections)($lf));
+});
