@@ -258,6 +258,7 @@ test('a product with no VTEC line leaves every vtec_* field null', function () {
 
     expect($metadata['vtec_office'])->toBeNull()
         ->and($metadata['vtec_phenomenon'])->toBeNull()
+        ->and($metadata['vtec_significance'])->toBeNull()
         ->and($metadata['vtec_event_number'])->toBeNull()
         ->and($metadata['vtec_year'])->toBeNull()
         ->and($metadata['vtec_action'])->toBeNull()
