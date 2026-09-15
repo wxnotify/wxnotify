@@ -4,6 +4,10 @@ use App\Actions\Pipeline\ExtractCapMetadata;
 use App\Models\Product;
 use Illuminate\Support\Carbon;
 
+afterEach(function () {
+    Carbon::setTestNow();
+});
+
 /**
  * A real Flash Flood Warning CAP payload, trimmed of unrelated BLOCKCHANNEL/
  * EAS-ORG parameters but otherwise verbatim from a captured live NWWS
@@ -105,8 +109,6 @@ test('resolves product_id via the embedded VTEC parameter, same as a text produc
         ->and($metadata['vtec_event_number'])->toBe('0209')
         ->and($metadata['vtec_year'])->toBe(2026)
         ->and($metadata['vtec_action'])->toBe('NEW');
-
-    Carbon::setTestNow();
 });
 
 test('extracts the polygon into the same {lat, lon} array shape ExtractProductMetadata uses', function () {

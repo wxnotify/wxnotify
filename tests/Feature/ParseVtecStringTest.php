@@ -3,6 +3,10 @@
 use App\Actions\Pipeline\ParseVtecString;
 use Illuminate\Support\Carbon;
 
+afterEach(function () {
+    Carbon::setTestNow();
+});
+
 test('parses every component of a NEW VTEC string with a real begin time', function () {
     Carbon::setTestNow('2026-09-06T18:30:00Z');
 
@@ -18,8 +22,6 @@ test('parses every component of a NEW VTEC string with a real begin time', funct
         'begin' => Carbon::parse('2026-09-06T18:00:00Z'),
         'end' => Carbon::parse('2026-09-06T19:00:00Z'),
     ]);
-
-    Carbon::setTestNow();
 });
 
 test('an all-zero begin time (already in effect) parses to a null begin, not epoch zero', function () {
@@ -36,8 +38,6 @@ test('the year is derived from the current time, not from the VTEC string\'s own
     $result = (new ParseVtecString)('/O.NEW.KTWC.FF.W.0209.260914T2354Z-260915T0300Z/');
 
     expect($result['year'])->toBe(2027);
-
-    Carbon::setTestNow();
 });
 
 test('an all-zero end time (until further notice) parses to a null end, and the year still comes from now, not a degenerate 1999', function () {
@@ -48,8 +48,6 @@ test('an all-zero end time (until further notice) parses to a null end, and the 
     expect($result['end'])->toBeNull()
         ->and($result['year'])->toBe(2026)
         ->and($result['begin'])->not->toBeNull();
-
-    Carbon::setTestNow();
 });
 
 test('returns null when the text contains no VTEC string at all', function () {
