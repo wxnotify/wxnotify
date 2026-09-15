@@ -2,6 +2,7 @@
 
 use App\Actions\Pipeline\ExtractProductMetadata;
 use App\Models\Product;
+use Illuminate\Support\Carbon;
 
 test('a VTEC-tagged product resolves product_id from its phenomena and significance codes', function () {
     // TO.W is part of the real catalog seeded by the products table migration,
@@ -234,6 +235,8 @@ test('a product other than the Day 1 Convective Outlook never attempts risk-leve
 });
 
 test('a VTEC-tagged product also populates the shared vtec_* fields', function () {
+    Carbon::setTestNow('2026-09-06T18:30:00Z');
+
     $text = <<<'TEXT'
     WFUS51 KOKX 061800
     TORKOKX
@@ -251,6 +254,8 @@ test('a VTEC-tagged product also populates the shared vtec_* fields', function (
         ->and($metadata['vtec_action'])->toBe('NEW')
         ->and($metadata['vtec_begin'])->not->toBeNull()
         ->and($metadata['vtec_end'])->not->toBeNull();
+
+    Carbon::setTestNow();
 });
 
 test('a product with no VTEC line leaves every vtec_* field null', function () {

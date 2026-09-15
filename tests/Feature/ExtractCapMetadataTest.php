@@ -2,6 +2,7 @@
 
 use App\Actions\Pipeline\ExtractCapMetadata;
 use App\Models\Product;
+use Illuminate\Support\Carbon;
 
 /**
  * A real Flash Flood Warning CAP payload, trimmed of unrelated BLOCKCHANNEL/
@@ -91,6 +92,8 @@ test('extracts CAP envelope and info fields', function () {
 });
 
 test('resolves product_id via the embedded VTEC parameter, same as a text product would', function () {
+    Carbon::setTestNow('2026-09-14T23:54:00Z');
+
     $flashFloodWarning = Product::where('code', 'FF.W')->sole();
 
     $metadata = (new ExtractCapMetadata)(realCapAlertBody());
@@ -102,6 +105,8 @@ test('resolves product_id via the embedded VTEC parameter, same as a text produc
         ->and($metadata['vtec_event_number'])->toBe('0209')
         ->and($metadata['vtec_year'])->toBe(2026)
         ->and($metadata['vtec_action'])->toBe('NEW');
+
+    Carbon::setTestNow();
 });
 
 test('extracts the polygon into the same {lat, lon} array shape ExtractProductMetadata uses', function () {
