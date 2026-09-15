@@ -141,6 +141,46 @@ test('ingesting a VTEC product enriches product_id/ugc_codes/polygon before the 
         ->and($product->polygon)->toHaveCount(3);
 });
 
+test('ingesting a VTEC product with narrative bullets persists the five hazard/impact fields through updateOrCreate', function () {
+    // Guards against a regression at the #[Fillable] boundary specifically:
+    // ExtractProductMetadataTest and ParseNarrativeSectionsTest both prove
+    // the extraction logic is correct in isolation, but neither of them
+    // proves the resulting array keys actually survive IngestedProduct's
+    // real updateOrCreate() write — a typo or omission in Fillable would
+    // silently drop these fields and nothing else in the suite would catch
+    // it, since every other narrative test inspects the extractor's
+    // returned array directly rather than a persisted row.
+    Product::where('code', 'FF.W')->sole();
+    File::ensureDirectoryExists($this->productsRoot.'/ktwc');
+    $text = <<<'TEXT'
+    AZC021-142100-
+    /O.NEW.KTWC.FF.W.0209.260914T2354Z-260915T0300Z/
+
+    HAZARD...Flash flooding caused by thunderstorms.
+
+    SOURCE...Radar indicated.
+
+    IMPACT...Flash flooding of small creeks and streams.
+
+    LAT...LON 3251 11056 3257 11064 3261 11058 3251 11056
+    TEXT;
+    File::put($this->productsRoot.'/ktwc/ktwc_wgus55-ffwtwc.142354_1.txt', $text);
+
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'ktwc/ktwc_wgus55-ffwtwc.142354_1.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    $product = IngestedProduct::sole();
+
+    expect($product->hazard)->toBe('Flash flooding caused by thunderstorms.')
+        ->and($product->hazard_source)->toBe('Radar indicated.')
+        ->and($product->impact)->toBe('Flash flooding of small creeks and streams.')
+        ->and($product->locations_impacted)->toBeNull()
+        ->and($product->call_to_action)->toBeNull();
+});
+
 test('a newly ingested product dispatches MatchWeatherAlertRules exactly once', function () {
     // MatchWeatherAlertRules itself is synchronous (see Task 8) — asserting
     // its effect here would require real AlertRule fixtures, which belongs

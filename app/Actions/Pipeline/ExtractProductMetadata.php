@@ -9,7 +9,15 @@ use Illuminate\Support\Carbon;
  * Extracts VTEC-resolved product_id, UGC zone/county codes, a parsed
  * severe-weather polygon, and (for the SPC Day 1 Convective Outlook only)
  * categorical risk levels from a raw NWWS product's text, for storage on
- * IngestedProduct at ingest time (see IngestNwwsProductController).
+ * IngestedProduct at ingest time (see IngestNwwsProductController). Also
+ * extracts the shared vtec_* identity/timing fields (via ParseVtecString)
+ * and the hazard/hazard_source/impact/locations_impacted/call_to_action
+ * narrative fields (via ParseNarrativeSections), both run directly against
+ * the raw text -- unlike ExtractCapMetadata, which runs ParseNarrativeSections
+ * against CAP's <description> for the first four of those but sources
+ * call_to_action from CAP's own <instruction> field instead (see that
+ * class's docblock); this class has no such override, since a text product
+ * has no equivalent to <instruction>.
  *
  * Non-VTEC AWIPS-ID matching covers AFD (per-office prefix) plus a set of
  * SPC/WPC products confirmed against real live NWWS traffic and NOAA
