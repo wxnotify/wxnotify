@@ -15,10 +15,14 @@ use SimpleXMLElement;
  * Mirrors ExtractProductMetadata's output shape wherever the two overlap
  * (product_id, ugc_codes, polygon, the shared vtec_* fields) so both
  * extractors feed IngestedProduct identically. CAP does NOT split
- * hazard/source/impact out of <description> -- that narrative text arrives
- * exactly as bulleted in the raw text product, just wrapped in XML. This
- * class only extracts what CAP already gives us structured: it does not
- * attempt the narrative-bullet-splitting problem.
+ * hazard/source/impact out of <description> itself -- that narrative text
+ * arrives exactly as bulleted in the raw text product, just wrapped in XML
+ * -- so this class runs ParseNarrativeSections against <description> the
+ * same way ExtractProductMetadata runs it against the raw text, for the
+ * hazard/hazard_source/impact/locations_impacted fields. call_to_action is
+ * the one exception: CAP's own <instruction> is already reliably
+ * structured, so that field is taken directly from <instruction> rather
+ * than re-parsed out of <description>'s prose.
  *
  * A single <info>/<area> block is assumed, matching every real CAP alert
  * confirmed against live NWWS traffic so far. A multi-area CAP alert (if
