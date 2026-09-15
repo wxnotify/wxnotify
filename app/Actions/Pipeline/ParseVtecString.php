@@ -25,7 +25,7 @@ class ParseVtecString
 
         [, $action, $office, $phenomenon, $significance, $eventNumber, $beginRaw, $endRaw] = $matches;
 
-        $end = $this->parseTimestamp($endRaw);
+        $end = Carbon::createFromFormat('ymd\THi\Z', $endRaw, 'UTC');
 
         return [
             'office' => $office,
@@ -34,30 +34,8 @@ class ParseVtecString
             'event_number' => $eventNumber,
             'year' => $end->year,
             'action' => $action,
-            'begin' => str_starts_with($beginRaw, '000000T0000') ? null : $this->parseTimestamp($beginRaw),
+            'begin' => str_starts_with($beginRaw, '000000T0000') ? null : Carbon::createFromFormat('ymd\THi\Z', $beginRaw, 'UTC'),
             'end' => $end,
         ];
-    }
-
-    /**
-     * Converts a VTEC YYMMDDTHHNNZ timestamp to an ISO-8601 string and
-     * parses it via Carbon::parse() rather than createFromFormat() with an
-     * explicit 'UTC' timezone -- the latter produces a named-timezone
-     * Carbon instance (timezone_type 3, "UTC") whose internal
-     * representation differs from the offset-style ("Z", timezone_type 2)
-     * instance Carbon::parse('...Z') produces, which fails strict
-     * (toBe()/assertSame) comparisons against callers/tests that build
-     * their expected value with Carbon::parse().
-     */
-    private function parseTimestamp(string $raw): Carbon
-    {
-        return Carbon::parse(sprintf(
-            '20%s-%s-%sT%s:%s:00Z',
-            substr($raw, 0, 2),
-            substr($raw, 2, 2),
-            substr($raw, 4, 2),
-            substr($raw, 7, 2),
-            substr($raw, 9, 2),
-        ));
     }
 }
