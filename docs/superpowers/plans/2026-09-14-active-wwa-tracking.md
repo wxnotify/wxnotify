@@ -2093,6 +2093,21 @@ Every task in this plan went through the standard two-stage review (spec complia
 
 No issues survived to this final verification pass — every finding above was resolved, re-reviewed, and confirmed fixed before moving to the next task.
 
+## Post-implementation: final holistic review
+
+After all 11 tasks were implemented and individually approved, a final holistic review was dispatched across the whole feature's diff — the same practice used for prior features in this codebase, based on the same reasoning: per-task reviews only ever see one slice of a change, and issues that only emerge from the *interaction* between tasks can slip through every individual review cleanly.
+
+This review found two real bugs and two gaps, all confirmed by user decision and fixed:
+
+1. **`vtec_year` was derived from the VTEC end timestamp**, which is the all-zero "until further notice" sentinel for an entire real product class (Flood Warnings/Advisories, all tropical products) — `Carbon` normalized that to **1999**, and since `year` is part of the composite key correlating every issuance of one real-world event, a NEW issuance and its own later continuation/cancellation could compute different years and silently split one event into two unrelated `active_wwas` rows. Fixed by deriving `year` from `now()` instead (VTEC event-tracking numbers are scoped to the calendar year an event is *currently being tracked in*, and NWWS ingestion is real-time, so this is correct for the overwhelming majority of real traffic) and by nulling `end` symmetrically with `begin` when it's the all-zero sentinel. A known, documented, narrower residual limitation: an event whose real lifecycle straddles a calendar-year boundary (not just delayed ingestion) can still split — no fix is possible within this stateless function without DB state it doesn't have; flagged in the class docblock rather than engineered around.
+2. **Continuation statements clobbered `effective`/`ugc_codes`/`expires` with null** on `active_wwas` — the exact failure mode `polygon` was already explicitly guarded against, missed for these three fields. Fixed by applying the identical non-null guard to all three.
+3. **`status` never accounted for `expires` having passed** (only explicit CAN/EXP action codes) — NWS often lets a warning lapse with no EXP product ever issued. Fixed with an `expireIfPast()` check that demotes an `Active` row to `Expired` whenever the row is next touched by *any* later sync, checked against whatever `expires` value is currently on record (not just the touching issuance's own). Explicitly does not add a scheduled sweep for rows that never get touched again — out of scope for this pass, by explicit choice.
+4. **No integration test exercised the full text→CAP→continuation sequence** through the real HTTP endpoint with every action live (no mocks) — every existing test isolated one task's logic with its neighbors spied out. Added `tests/Feature/CapIngestionIntegrationTest.php`, empirically proven load-bearing by deliberately reverting both Task 7's dispatch-suppression and Task 9's polygon-consultation and confirming the test fails each way.
+
+Two rounds of the standard two-stage review caught follow-up issues in the fixes themselves before final approval: a `Carbon::setTestNow()` test-isolation risk (an unset call skippable by a failing assertion, fixed with `afterEach`, matching an existing convention already used elsewhere in this suite) and nothing further of substance. Full suite after all fixes: 455 passed (1302 assertions).
+
+Notes from the same review deliberately left undone, as accepted/documented limitations rather than gaps requiring a fix: `active_wwas.source` reflects whichever extraction wrote *last* (correct, not a bug, but worth knowing when debugging); the pre-existing Filament admin `IngestedProducts` resource predates this feature and isn't CAP-aware (not touched — admin UI was never in scope for this plan); `$product->format` on the in-memory model handed to the observer is `null` rather than `'text'` until refreshed from the DB (harmless today since both consumers only ever check `=== 'cap'`).
+
 ---
 
 ## Self-Review Notes
