@@ -1,0 +1,48 @@
+<?php
+
+namespace App\Models;
+
+use Database\Factories\ActiveWwaFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+#[Fillable([
+    'product_id', 'vtec_office', 'vtec_phenomenon', 'vtec_significance', 'vtec_event_number', 'vtec_year',
+    'status', 'ugc_codes', 'effective', 'expires', 'headline',
+    'motion_direction_degrees', 'motion_speed_kt', 'motion_reference_lat', 'motion_reference_lon', 'motion_observed_at',
+    'source', 'latest_ingested_product_id',
+])]
+class ActiveWwa extends Model
+{
+    /** @use HasFactory<ActiveWwaFactory> */
+    use HasFactory;
+
+    /**
+     * `polygon` is deliberately not fillable or cast here -- it's a native
+     * PostGIS geometry column, set/read via raw SQL (see SyncActiveWwa and
+     * MatchWeatherAlertRules), never materialized into a PHP value.
+     */
+    protected function casts(): array
+    {
+        return [
+            'ugc_codes' => 'array',
+            'effective' => 'datetime',
+            'expires' => 'datetime',
+            'motion_observed_at' => 'datetime',
+            'motion_reference_lat' => 'float',
+            'motion_reference_lon' => 'float',
+        ];
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function latestIngestedProduct(): BelongsTo
+    {
+        return $this->belongsTo(IngestedProduct::class, 'latest_ingested_product_id');
+    }
+}
