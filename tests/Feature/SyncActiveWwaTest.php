@@ -234,6 +234,29 @@ test('a stale text row outside the pairing time window is ignored, and the CAP r
         ->and(ActiveWwa::sole()->latest_ingested_product_id)->not->toBe($staleTextRow->id);
 });
 
+test('a malformed wmo_identifier is treated as no-pair-found, and the CAP row still dispatches', function () {
+    // findPairedTextProduct()'s own guard clause (count($parts) !== 3)
+    // returns null for a malformed wmo_identifier -- this now runs INSIDE
+    // syncFromCap()'s try block (moved there to also guard against the
+    // query itself throwing), so this pins down that the guard-clause path
+    // still results in a clean $pairedText === null and a real dispatch,
+    // not an accidental swallow.
+    $spy = Mockery::spy(MatchWeatherAlertRules::class);
+    app()->instance(MatchWeatherAlertRules::class, $spy);
+    $product = Product::where('code', 'FF.W')->sole();
+    $capRow = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'cap',
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'FF', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0300', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'awips_identifier' => 'FFWTWC', 'wmo_identifier' => 'malformed',
+    ]);
+
+    (new SyncActiveWwa)($capRow);
+
+    $spy->shouldHaveReceived('__invoke')->once()->with($capRow);
+    expect(ActiveWwa::sole()->latest_ingested_product_id)->toBe($capRow->id);
+});
+
 test('a failure syncing active_wwas does not prevent MatchWeatherAlertRules from still being called', function () {
     $spy = Mockery::spy(MatchWeatherAlertRules::class);
     app()->instance(MatchWeatherAlertRules::class, $spy);

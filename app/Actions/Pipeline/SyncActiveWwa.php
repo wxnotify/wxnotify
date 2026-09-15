@@ -65,9 +65,12 @@ class SyncActiveWwa
 
     private function syncFromCap(IngestedProduct $product): void
     {
-        $pairedText = $this->findPairedTextProduct($product);
+        $pairedText = null;
+        $lookupFailed = false;
 
         try {
+            $pairedText = $this->findPairedTextProduct($product);
+
             DB::transaction(function () use ($product, $pairedText): void {
                 $wwa = ActiveWwa::updateOrCreate(
                     $this->vtecKey($product),
@@ -90,13 +93,14 @@ class SyncActiveWwa
                 }
             });
         } catch (Throwable $e) {
+            $lookupFailed = true;
             logger()->error('Failed to sync active_wwas for a CAP-sourced VTEC product', [
                 'ingested_product_id' => $product->id,
                 'exception' => $e->getMessage(),
             ]);
         }
 
-        if ($pairedText === null) {
+        if ($pairedText === null || $lookupFailed) {
             app(MatchWeatherAlertRules::class)($product);
         }
     }
