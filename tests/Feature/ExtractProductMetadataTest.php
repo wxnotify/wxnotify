@@ -232,3 +232,44 @@ test('a product other than the Day 1 Convective Outlook never attempts risk-leve
 
     expect($metadata['risk_levels'])->toBeNull();
 });
+
+test('a VTEC-tagged product also populates the shared vtec_* fields', function () {
+    $text = <<<'TEXT'
+    WFUS51 KOKX 061800
+    TORKOKX
+
+    /O.NEW.KOKX.TO.W.0042.260906T1800Z-260906T1900Z/
+    TEXT;
+
+    $metadata = (new ExtractProductMetadata)($text, 'torokx');
+
+    expect($metadata['vtec_office'])->toBe('KOKX')
+        ->and($metadata['vtec_phenomenon'])->toBe('TO')
+        ->and($metadata['vtec_significance'])->toBe('W')
+        ->and($metadata['vtec_event_number'])->toBe('0042')
+        ->and($metadata['vtec_year'])->toBe(2026)
+        ->and($metadata['vtec_action'])->toBe('NEW')
+        ->and($metadata['vtec_begin'])->not->toBeNull()
+        ->and($metadata['vtec_end'])->not->toBeNull();
+});
+
+test('a product with no VTEC line leaves every vtec_* field null', function () {
+    $metadata = (new ExtractProductMetadata)("AREA FORECAST DISCUSSION\nNo VTEC line here.", 'afdokx');
+
+    expect($metadata['vtec_office'])->toBeNull()
+        ->and($metadata['vtec_phenomenon'])->toBeNull()
+        ->and($metadata['vtec_event_number'])->toBeNull()
+        ->and($metadata['vtec_year'])->toBeNull()
+        ->and($metadata['vtec_action'])->toBeNull()
+        ->and($metadata['vtec_begin'])->toBeNull()
+        ->and($metadata['vtec_end'])->toBeNull();
+});
+
+test('an all-zero VTEC begin time resolves to a null vtec_begin', function () {
+    $text = '/O.CAN.KOAX.SV.W.0413.000000T0000Z-260915T0015Z/';
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['vtec_begin'])->toBeNull()
+        ->and($metadata['vtec_action'])->toBe('CAN');
+});

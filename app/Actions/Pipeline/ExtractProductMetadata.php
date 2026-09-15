@@ -3,6 +3,7 @@
 namespace App\Actions\Pipeline;
 
 use App\Models\Product;
+use Illuminate\Support\Carbon;
 
 /**
  * Extracts VTEC-resolved product_id, UGC zone/county codes, a parsed
@@ -56,17 +57,26 @@ class ExtractProductMetadata
     private const CONVECTIVE_OUTLOOK_CODE = 'SPC.OUTLOOK';
 
     /**
-     * @return array{product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>, risk_levels: ?array<int, string>}
+     * @return array{product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>, risk_levels: ?array<int, string>, vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int, vtec_action: ?string, vtec_begin: ?Carbon, vtec_end: ?Carbon}
      */
     public function __invoke(string $text, ?string $awipsid): array
     {
         [$productId, $code] = $this->resolveProduct($text, $awipsid);
+        $vtec = (new ParseVtecString)($text);
 
         return [
             'product_id' => $productId,
             'ugc_codes' => $this->parseUgcCodes($text),
             'polygon' => $this->parsePolygon($text),
             'risk_levels' => $code === self::CONVECTIVE_OUTLOOK_CODE ? $this->extractConvectiveOutlookRiskLevels($text) : null,
+            'vtec_office' => $vtec['office'] ?? null,
+            'vtec_phenomenon' => $vtec['phenomenon'] ?? null,
+            'vtec_significance' => $vtec['significance'] ?? null,
+            'vtec_event_number' => $vtec['event_number'] ?? null,
+            'vtec_year' => $vtec['year'] ?? null,
+            'vtec_action' => $vtec['action'] ?? null,
+            'vtec_begin' => $vtec['begin'] ?? null,
+            'vtec_end' => $vtec['end'] ?? null,
         ];
     }
 
