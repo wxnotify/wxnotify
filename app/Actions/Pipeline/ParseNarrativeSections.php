@@ -55,7 +55,7 @@ class ParseNarrativeSections
             'hazard_source' => $this->extractSection($text, 'SOURCE'),
             'impact' => $this->extractSection($text, 'IMPACT'),
             'locations_impacted' => $this->extractSection($text, 'Locations impacted include'),
-            'call_to_action' => $this->extractSection($text, 'PRECAUTIONARY/PREPAREDNESS ACTIONS'),
+            'call_to_action' => $this->extractSection($text, 'PRECAUTIONARY/PREPAREDNESS ACTIONS', stopAtBlankLine: false),
         ];
     }
 
@@ -66,7 +66,7 @@ class ParseNarrativeSections
      * until the next blank line, the next section boundary, or end of
      * text -- whichever comes first.
      */
-    private function extractSection(string $text, string $label): ?string
+    private function extractSection(string $text, string $label, bool $stopAtBlankLine = true): ?string
     {
         $startPattern = '/^[ \t]*(?:\*[ \t]*)?'.preg_quote($label, '/').'\.\.\./m';
 
@@ -86,7 +86,7 @@ class ParseNarrativeSections
         }
 
         $remaining = substr($text, $bodyStart);
-        $end = $this->findSectionEnd($remaining);
+        $end = $this->findSectionEnd($remaining, $stopAtBlankLine);
         $body = $end !== null ? substr($remaining, 0, $end) : $remaining;
 
         $normalized = trim(preg_replace('/\s+/', ' ', $body));
@@ -124,16 +124,23 @@ class ParseNarrativeSections
     }
 
     /**
-     * A section body ends at whichever of two independent terminators
-     * comes first: a blank line, or the next boundary marker (another
-     * "LABEL..." header, "&&", or "$$"). Either terminator can legitimately
-     * sit at offset 0 of $remaining (e.g. a section with no body at all),
-     * so this uses explicit `=== null` checks rather than a truthiness
-     * shortcut -- `0` must be treated as "found here", not "not found".
+     * Finds where a section's body ends: either a blank line (paragraph
+     * break) or the next section boundary (another LABEL..., "&&", or
+     * "$$"), whichever comes first -- correct for HAZARD/SOURCE/IMPACT and
+     * locations_impacted, which are always single-paragraph in real
+     * bulletins. call_to_action passes $stopAtBlankLine: false, since real
+     * PRECAUTIONARY/PREPAREDNESS ACTIONS sections are routinely
+     * multi-paragraph and must run through the boundary marker or end of
+     * text instead, per the design spec -- stopping it at the first blank
+     * line would silently drop later paragraphs, including real safety
+     * instructions.
+     *
+     * A match at offset 0 must still count as valid, which is why this
+     * checks `=== null` rather than relying on truthiness.
      */
-    private function findSectionEnd(string $remaining): ?int
+    private function findSectionEnd(string $remaining, bool $stopAtBlankLine): ?int
     {
-        $blankLinePos = preg_match('/\n[ \t]*\n/', $remaining, $blankMatch, PREG_OFFSET_CAPTURE)
+        $blankLinePos = $stopAtBlankLine && preg_match('/\n[ \t]*\n/', $remaining, $blankMatch, PREG_OFFSET_CAPTURE)
             ? $blankMatch[0][1]
             : null;
 

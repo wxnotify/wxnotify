@@ -174,3 +174,10 @@ test('handles bare CR line endings the same as LF', function () {
 
     expect((new ParseNarrativeSections)($cr))->toBe((new ParseNarrativeSections)($lf));
 });
+
+test('call_to_action captures a multi-paragraph PRECAUTIONARY/PREPAREDNESS ACTIONS section in full, not just its first paragraph, using a real captured Flood Advisory bulletin', function () {
+    $text = file_get_contents(base_path('database/product_examples/FAY.txt'));
+    $result = (new ParseNarrativeSections)($text);
+
+    expect($result['call_to_action'])->toBe('Turn around, don`t drown when encountering flooded roads. Most flood deaths occur in vehicles. Please report observed flooding to local emergency services or law enforcement and request they pass this information to the National Weather Service when you can do so safely.');
+});
