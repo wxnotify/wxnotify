@@ -28,7 +28,7 @@ use SimpleXMLElement;
 class ExtractCapMetadata
 {
     /**
-     * @return array{format: string, msg_type: ?string, event: ?string, severity: ?string, urgency: ?string, certainty: ?string, headline: ?string, description: ?string, instruction: ?string, event_motion_description: ?string, awips_identifier: ?string, wmo_identifier: ?string, product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>, risk_levels: null, vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int, vtec_action: ?string, vtec_begin: ?Carbon, vtec_end: ?Carbon}
+     * @return array{format: string, msg_type: ?string, event: ?string, severity: ?string, urgency: ?string, certainty: ?string, headline: ?string, description: ?string, instruction: ?string, event_motion_description: ?string, awips_identifier: ?string, wmo_identifier: ?string, product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>, risk_levels: null, vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int, vtec_action: ?string, vtec_begin: ?Carbon, vtec_end: ?Carbon, hazard: ?string, hazard_source: ?string, impact: ?string, locations_impacted: ?string, call_to_action: ?string}
      */
     public function __invoke(string $text): array
     {
@@ -47,6 +47,9 @@ class ExtractCapMetadata
         }
 
         $area = isset($info->area) ? $info->area : null;
+        $description = (string) $info->description ?: null;
+        $instruction = (string) $info->instruction ?: null;
+        $narrative = (new ParseNarrativeSections)($description ?? '');
 
         return [
             'format' => 'cap',
@@ -56,8 +59,8 @@ class ExtractCapMetadata
             'urgency' => (string) $info->urgency ?: null,
             'certainty' => (string) $info->certainty ?: null,
             'headline' => (string) $info->headline ?: null,
-            'description' => (string) $info->description ?: null,
-            'instruction' => (string) $info->instruction ?: null,
+            'description' => $description,
+            'instruction' => $instruction,
             'event_motion_description' => $parameters['eventMotionDescription'] ?? null,
             'awips_identifier' => $parameters['AWIPSidentifier'] ?? null,
             'wmo_identifier' => $parameters['WMOidentifier'] ?? null,
@@ -73,6 +76,13 @@ class ExtractCapMetadata
             'vtec_action' => $vtec['action'] ?? null,
             'vtec_begin' => $vtec['begin'] ?? null,
             'vtec_end' => $vtec['end'] ?? null,
+            'hazard' => $narrative['hazard'],
+            'hazard_source' => $narrative['hazard_source'],
+            'impact' => $narrative['impact'],
+            'locations_impacted' => $narrative['locations_impacted'],
+            // CAP's own instruction is already reliably structured -- never
+            // re-parsed from description's prose for this one field.
+            'call_to_action' => $instruction,
         ];
     }
 

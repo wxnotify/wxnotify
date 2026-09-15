@@ -190,6 +190,54 @@ test('a Cancel-type CAP message with no polygon or area leaves those fields null
         ->and($metadata['vtec_action'])->toBe('CAN');
 });
 
+test('populates the narrative section fields from the CAP description, and call_to_action from instruction directly', function () {
+    Product::where('code', 'FF.W')->sole();
+    $metadata = (new ExtractCapMetadata)(realCapAlertBody());
+
+    expect($metadata['hazard'])->toBe('Flash flooding caused by thunderstorms.')
+        ->and($metadata['hazard_source'])->toBe('Radar indicated.')
+        ->and($metadata['impact'])->toBe('Flash flooding of small creeks and streams.')
+        ->and($metadata['call_to_action'])->toBe("Turn around, don't drown when encountering flooded roads.");
+});
+
+test('call_to_action always comes from the CAP instruction field, never re-parsed from description', function () {
+    Product::where('code', 'SV.W')->sole();
+    $body = <<<'TEXT'
+    479
+
+    XOUS53 KWBC 142354
+
+    CAPOAX
+
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+        <msgType>Alert</msgType>
+        <info>
+            <event>Severe Thunderstorm Warning</event>
+            <description>HAZARD...60 mph wind gusts.
+
+    SOURCE...Radar indicated.
+
+    IMPACT...Expect damage to roofs and trees.
+
+    PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+    This text must NOT end up as call_to_action -- it should come from
+    instruction below instead.
+
+    &amp;&amp;
+    </description>
+            <instruction>The real instruction text from CAP's own field.</instruction>
+            <parameter><valueName>VTEC</valueName><value>/O.NEW.KOAX.SV.W.0500.260906T1800Z-260906T1900Z/</value></parameter>
+        </info>
+    </alert>
+    TEXT;
+
+    $metadata = (new ExtractCapMetadata)($body);
+
+    expect($metadata['call_to_action'])->toBe("The real instruction text from CAP's own field.");
+});
+
 test('a VTEC phenomenon+significance with no matching catalog product resolves no product_id', function () {
     $body = str_replace('/O.NEW.KTWC.FF.W.0209.260914T2354Z-260915T0300Z/', '/O.NEW.KTWC.ZZ.Q.0001.260914T2354Z-260915T0300Z/', realCapAlertBody());
 
