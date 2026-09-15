@@ -8,7 +8,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['cccc', 'ttaaii', 'awipsid', 'nwws_id', 'wmo_ddhhmm', 'text', 'file_path', 'received_at', 'product_id', 'ugc_codes', 'polygon', 'risk_levels'])]
+#[Fillable([
+    'cccc', 'ttaaii', 'awipsid', 'nwws_id', 'wmo_ddhhmm', 'text', 'file_path', 'received_at',
+    'product_id', 'ugc_codes', 'polygon', 'risk_levels',
+    'vtec_office', 'vtec_phenomenon', 'vtec_significance', 'vtec_event_number', 'vtec_year',
+    'vtec_action', 'vtec_begin', 'vtec_end',
+    'format', 'msg_type', 'event', 'severity', 'urgency', 'certainty',
+    'headline', 'description', 'instruction', 'event_motion_description',
+    'awips_identifier', 'wmo_identifier',
+])]
 class IngestedProduct extends Model
 {
     /** @use HasFactory<IngestedProductFactory> */
@@ -21,6 +29,8 @@ class IngestedProduct extends Model
             'ugc_codes' => 'array',
             'polygon' => 'array',
             'risk_levels' => 'array',
+            'vtec_begin' => 'datetime',
+            'vtec_end' => 'datetime',
         ];
     }
 
