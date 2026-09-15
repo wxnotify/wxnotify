@@ -2,12 +2,14 @@
 
 use App\Actions\Weather\MatchWeatherAlertRules;
 use App\Jobs\DeliverWeatherAlert;
+use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
@@ -414,4 +416,84 @@ test('an exception evaluating one rule\'s geography does not prevent a second, v
     Log::shouldHaveReceived('error')
         ->once()
         ->withArgs(fn ($message, $context) => $context['rule_id'] === $throwingRule->id && $context['ingested_product_id'] === $ingested->id);
+});
+
+test('a Polygon-mode rule matches against active_wwas\'s persisted polygon when the triggering row has none of its own', function () {
+    // Simulates a continuation statement (e.g. SVS) that carries no LAT...LON
+    // of its own, but the event's polygon is already known from an earlier
+    // issuance -- see SyncActiveWwaTest for how that polygon gets there.
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $location = Location::factory()->create(['lat' => 40.5, 'lng' => -74.0]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+
+    $wwa = ActiveWwa::factory()->create([
+        'product_id' => $product->id, 'vtec_office' => 'KOKX', 'vtec_phenomenon' => 'TO',
+        'vtec_significance' => 'W', 'vtec_event_number' => '0042', 'vtec_year' => 2026,
+    ]);
+    DB::statement(
+        'UPDATE active_wwas SET polygon = ST_SetSRID(ST_GeomFromText(?), 4269) WHERE id = ?',
+        ['POLYGON((-74.5 40, -74.5 41, -73.5 41, -73.5 40, -74.5 40))', $wwa->id],
+    );
+
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $product->id, 'polygon' => null,
+        'vtec_office' => 'KOKX', 'vtec_phenomenon' => 'TO', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0042', 'vtec_year' => 2026,
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a Polygon-mode rule does not match a location outside active_wwas\'s persisted polygon', function () {
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $location = Location::factory()->create(['lat' => 10.0, 'lng' => -10.0]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+
+    $wwa = ActiveWwa::factory()->create([
+        'product_id' => $product->id, 'vtec_office' => 'KOKX', 'vtec_phenomenon' => 'TO',
+        'vtec_significance' => 'W', 'vtec_event_number' => '0042', 'vtec_year' => 2026,
+    ]);
+    DB::statement(
+        'UPDATE active_wwas SET polygon = ST_SetSRID(ST_GeomFromText(?), 4269) WHERE id = ?',
+        ['POLYGON((-74.5 40, -74.5 41, -73.5 41, -73.5 40, -74.5 40))', $wwa->id],
+    );
+
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $product->id, 'polygon' => null,
+        'vtec_office' => 'KOKX', 'vtec_phenomenon' => 'TO', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0042', 'vtec_year' => 2026,
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('when active_wwas has no persisted polygon for this VTEC key, matching falls back to the triggering row\'s own polygon field', function () {
+    // vtec_office is set (so the lookup runs) but no active_wwas row exists
+    // at all yet -- must not throw, must fall through cleanly.
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $location = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $product->id, 'polygon' => null, 'ugc_codes' => ['NYZ072'],
+        'vtec_office' => 'KOKX', 'vtec_phenomenon' => 'TO', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0099', 'vtec_year' => 2026,
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class); // falls back to Location-style zone matching, same as today
 });

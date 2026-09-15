@@ -5,6 +5,7 @@ namespace App\Actions\Weather;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
 use App\Jobs\DeliverWeatherAlert;
+use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
@@ -182,26 +183,79 @@ class MatchWeatherAlertRules
      */
     private function matchesPolygon(AlertRule $rule, IngestedProduct $product): ?bool
     {
-        if ($product->polygon === null || $rule->location === null || ! $rule->location->hasFix()) {
+        if ($rule->location === null || ! $rule->location->hasFix()) {
+            return null;
+        }
+
+        $lng = (float) $rule->location->lng;
+        $lat = (float) $rule->location->lat;
+
+        $activeWwaResult = $this->matchesActiveWwaPolygon($product, $lng, $lat);
+        if ($activeWwaResult !== null) {
+            return $activeWwaResult;
+        }
+
+        if ($product->polygon === null) {
             return null;
         }
 
         $wkt = $this->polygonToWkt($product->polygon);
-        $lng = (float) $rule->location->lng;
-        $lat = (float) $rule->location->lat;
 
         $result = DB::selectOne(
             'SELECT ST_Contains(ST_SetSRID(ST_GeomFromText(?), 4269), ST_SetSRID(ST_MakePoint(?, ?), 4269)) AS contains',
             [$wkt, $lng, $lat],
         );
 
-        // Not filter_var(..., FILTER_VALIDATE_BOOLEAN): it doesn't recognize
-        // Postgres's own 't'/'f' text encoding for a boolean column ('f' is
-        // non-empty, so a naive (bool) cast is equally wrong) -- the pgsql
-        // PDO driver happens to hand back a native bool today, but a driver
-        // or connection-option change silently turning a real match into a
-        // dropped alert is the worst failure mode for this system, so both
-        // representations are checked explicitly.
+        return $this->resultIsTrue($result);
+    }
+
+    /**
+     * A VTEC-class product's persisted active_wwas polygon takes priority
+     * over the triggering row's own (possibly null on a continuation
+     * statement like SVS/FFS) polygon -- see SyncActiveWwa, which is what
+     * keeps that polygon current across an event's whole lifetime. Returns
+     * null (not false) both when the product isn't VTEC-class at all and
+     * when no active_wwas row with a polygon exists yet, so the caller falls
+     * back to the row's own polygon field either way.
+     */
+    private function matchesActiveWwaPolygon(IngestedProduct $product, float $lng, float $lat): ?bool
+    {
+        if ($product->vtec_office === null) {
+            return null;
+        }
+
+        $activeWwa = ActiveWwa::query()
+            ->where('vtec_office', $product->vtec_office)
+            ->where('vtec_phenomenon', $product->vtec_phenomenon)
+            ->where('vtec_significance', $product->vtec_significance)
+            ->where('vtec_event_number', $product->vtec_event_number)
+            ->where('vtec_year', $product->vtec_year)
+            ->whereNotNull('polygon')
+            ->first();
+
+        if ($activeWwa === null) {
+            return null;
+        }
+
+        $result = DB::selectOne(
+            'SELECT ST_Contains(polygon, ST_SetSRID(ST_MakePoint(?, ?), 4269)) AS contains FROM active_wwas WHERE id = ?',
+            [$lng, $lat, $activeWwa->id],
+        );
+
+        return $this->resultIsTrue($result);
+    }
+
+    /**
+     * Not filter_var(..., FILTER_VALIDATE_BOOLEAN): it doesn't recognize
+     * Postgres's own 't'/'f' text encoding for a boolean column ('f' is
+     * non-empty, so a naive (bool) cast is equally wrong) -- the pgsql PDO
+     * driver happens to hand back a native bool today, but a driver or
+     * connection-option change silently turning a real match into a dropped
+     * alert is the worst failure mode for this system, so both
+     * representations are checked explicitly.
+     */
+    private function resultIsTrue(?object $result): bool
+    {
         return $result !== null && ($result->contains === true || $result->contains === 't');
     }
 
