@@ -93,22 +93,15 @@ test('a bulletin with no locations-impacted or call-to-action section returns nu
         ->and($result['call_to_action'])->toBeNull();
 });
 
-test('extracts locations_impacted and call_to_action, stopping at the && delimiter', function () {
+test('extracts locations_impacted and call_to_action from a bulletin with all sections present', function () {
+    // PRECAUTIONARY/PREPAREDNESS ACTIONS... conventionally has a blank line
+    // before its body starts, unlike HAZARD/SOURCE/IMPACT which put content
+    // on the same "paragraph". A naive "stop at the first blank line" parser
+    // would incorrectly capture nothing for call_to_action here.
     $result = (new ParseNarrativeSections)(realisticSevereThunderstormBulletinText());
 
     expect($result['locations_impacted'])->toBe('Springfield, Right City and Millbrook.')
         ->and($result['call_to_action'])->toBe('For your protection move to an interior room on the lowest floor of a building.');
-});
-
-test('a blank line immediately after a label does not produce an empty result', function () {
-    // PRECAUTIONARY/PREPAREDNESS ACTIONS... conventionally has a blank line
-    // before its body starts, unlike HAZARD/SOURCE/IMPACT which put content
-    // on the same "paragraph". A naive "stop at the first blank line" parser
-    // would incorrectly capture nothing here.
-    $result = (new ParseNarrativeSections)(realisticSevereThunderstormBulletinText());
-
-    expect($result['call_to_action'])->not->toBeNull()
-        ->and($result['call_to_action'])->not->toBe('');
 });
 
 test('a product with no VTEC narrative structure at all returns all five fields as null', function () {

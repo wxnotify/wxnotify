@@ -123,6 +123,14 @@ class ParseNarrativeSections
         return $bodyStart < strlen($text) ? $bodyStart : null;
     }
 
+    /**
+     * A section body ends at whichever of two independent terminators
+     * comes first: a blank line, or the next boundary marker (another
+     * "LABEL..." header, "&&", or "$$"). Either terminator can legitimately
+     * sit at offset 0 of $remaining (e.g. a section with no body at all),
+     * so this uses explicit `=== null` checks rather than a truthiness
+     * shortcut -- `0` must be treated as "found here", not "not found".
+     */
     private function findSectionEnd(string $remaining): ?int
     {
         $blankLinePos = preg_match('/\n[ \t]*\n/', $remaining, $blankMatch, PREG_OFFSET_CAPTURE)
