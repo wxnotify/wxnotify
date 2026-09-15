@@ -19,6 +19,12 @@ test('rounds 0 degrees to North and 360 degrees also to North', function () {
         ->and((new FormatMotionVector)($alsoNorth))->toBe('Moving N at 12 mph');
 });
 
+test('normalizes a negative degree value instead of producing an undefined array offset', function () {
+    $wwa = ActiveWwa::factory()->make(['motion_direction_degrees' => -30, 'motion_speed_kt' => 10]);
+
+    expect((new FormatMotionVector)($wwa))->toBe('Moving NNW at 12 mph');
+});
+
 test('returns null when the ActiveWwa is null', function () {
     expect((new FormatMotionVector)(null))->toBeNull();
 });

@@ -27,7 +27,8 @@ class FormatMotionVector
             return null;
         }
 
-        $compass = self::COMPASS_POINTS[(int) round($activeWwa->motion_direction_degrees / 22.5) % 16];
+        $normalizedDegrees = ((int) round($activeWwa->motion_direction_degrees) % 360 + 360) % 360;
+        $compass = self::COMPASS_POINTS[(int) round($normalizedDegrees / 22.5) % 16];
         $mph = (int) round($activeWwa->motion_speed_kt * 1.15078);
 
         return "Moving {$compass} at {$mph} mph";
