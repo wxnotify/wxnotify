@@ -5,6 +5,7 @@ use App\Models\IngestedProduct;
 use App\Models\Product;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     Config::set('services.pipeline.webhook_token', 'test-webhook-token');
@@ -170,4 +171,82 @@ test('a newly ingested product dispatches MatchWeatherAlertRules exactly once', 
     )->assertNoContent();
 
     $spy->shouldHaveReceived('__invoke')->once();
+});
+
+test('ingesting a CAP product runs the CAP extractor and persists its fields', function () {
+    // FF.W is part of the real catalog seeded by the products table
+    // migration (see ExtractProductMetadataTest) — no need to create it.
+    Product::where('code', 'FF.W')->sole();
+    File::ensureDirectoryExists($this->productsRoot.'/kwbc');
+    $body = <<<'TEXT'
+    480
+
+    XOUS55 KWBC 142354
+
+    CAPTWC
+
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+        <msgType>Alert</msgType>
+        <info>
+            <event>Flash Flood Warning</event>
+            <severity>Severe</severity>
+            <description>Flash flooding text.</description>
+            <parameter><valueName>AWIPSidentifier</valueName><value>FFWTWC</value></parameter>
+            <parameter><valueName>WMOidentifier</valueName><value>WGUS55 KTWC 142354</value></parameter>
+            <parameter><valueName>VTEC</valueName><value>/O.NEW.KTWC.FF.W.0209.260914T2354Z-260915T0300Z/</value></parameter>
+            <area>
+                <areaDesc>Pinal, AZ</areaDesc>
+                <polygon>32.51,-110.56 32.57,-110.64 32.61,-110.58 32.51,-110.56</polygon>
+                <geocode><valueName>UGC</valueName><value>AZC021</value></geocode>
+            </area>
+        </info>
+    </alert>
+    TEXT;
+    File::put($this->productsRoot.'/kwbc/kwbc_xous55-captwc.142354_1.txt', $body);
+
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'kwbc/kwbc_xous55-captwc.142354_1.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    $product = IngestedProduct::sole();
+
+    expect($product->format)->toBe('cap')
+        ->and($product->event)->toBe('Flash Flood Warning')
+        ->and($product->awips_identifier)->toBe('FFWTWC')
+        ->and($product->vtec_office)->toBe('KTWC')
+        ->and($product->ugc_codes)->toBe(['AZC021']);
+});
+
+test('ingesting a plain text product still runs the text extractor, not the CAP one', function () {
+    File::ensureDirectoryExists($this->productsRoot.'/okx');
+    File::put($this->productsRoot.'/okx/okx_fxus61-afdokx.061800_1.txt', "AREA FORECAST DISCUSSION\n");
+
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'okx/okx_fxus61-afdokx.061800_1.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    expect(IngestedProduct::sole()->format)->toBe('text');
+});
+
+test('ingesting a malformed CAP product logs the failure and does not create a row, rather than 500ing', function () {
+    File::ensureDirectoryExists($this->productsRoot.'/kwbc');
+    File::put($this->productsRoot.'/kwbc/kwbc_xous55-captwc.142354_2.txt', "480\n\nXOUS55 KWBC 142354\n\nCAPTWC\n\n<?xml version=\"1.0\"?><alert><unclosed>\n");
+
+    Log::spy();
+
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'kwbc/kwbc_xous55-captwc.142354_2.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    expect(IngestedProduct::count())->toBe(0);
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn ($message, $context) => $context['path'] === 'kwbc/kwbc_xous55-captwc.142354_2.txt');
 });
