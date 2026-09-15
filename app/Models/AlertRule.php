@@ -40,6 +40,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'is_active',
     'custom_subject_template',
     'message_body_style',
+    'alert_template_id',
 ])]
 class AlertRule extends Model
 {
@@ -87,6 +88,11 @@ class AlertRule extends Model
     public function notificationChannels(): BelongsToMany
     {
         return $this->belongsToMany(NotificationChannel::class);
+    }
+
+    public function alertTemplate(): BelongsTo
+    {
+        return $this->belongsTo(AlertTemplate::class);
     }
 
     public function effectiveCustomSubjectTemplate(): ?string
