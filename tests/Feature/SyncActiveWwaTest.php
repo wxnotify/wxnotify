@@ -202,6 +202,38 @@ test('a text continuation does not null out a headline previously set by CAP', f
     expect(ActiveWwa::find($wwa->id)->headline)->toBe('A previously CAP-set headline');
 });
 
+test('a stale text row outside the pairing time window is ignored, and the CAP row dispatches on its own', function () {
+    $spy = Mockery::spy(MatchWeatherAlertRules::class);
+    app()->instance(MatchWeatherAlertRules::class, $spy);
+    $product = Product::where('code', 'FF.W')->sole();
+    // A text row that superficially matches on awipsid/cccc/ttaaii/wmo_ddhhmm
+    // (which only encodes day-hour-minute, no month/year) but is actually
+    // from weeks earlier -- this must NOT be treated as this CAP row's pair.
+    $staleTextRow = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'text',
+        'cccc' => 'ktwc', 'ttaaii' => 'wgus55', 'awipsid' => 'ffwtwc', 'wmo_ddhhmm' => '142354',
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'FF', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0100', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'received_at' => now()->subWeeks(3),
+    ]);
+
+    $capRow = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'cap',
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'FF', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0209', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'awips_identifier' => 'FFWTWC', 'wmo_identifier' => 'WGUS55 KTWC 142354',
+        'received_at' => now(),
+    ]);
+
+    (new SyncActiveWwa)($capRow);
+
+    // The CAP row must dispatch on its own -- the stale row must not be
+    // treated as its pair.
+    $spy->shouldHaveReceived('__invoke')->once()->with($capRow);
+    expect(ActiveWwa::sole()->latest_ingested_product_id)->toBe($capRow->id)
+        ->and(ActiveWwa::sole()->latest_ingested_product_id)->not->toBe($staleTextRow->id);
+});
+
 test('a failure syncing active_wwas does not prevent MatchWeatherAlertRules from still being called', function () {
     $spy = Mockery::spy(MatchWeatherAlertRules::class);
     app()->instance(MatchWeatherAlertRules::class, $spy);
