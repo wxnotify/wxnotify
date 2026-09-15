@@ -85,7 +85,7 @@ class DeliverWeatherAlert implements ShouldQueue
             return;
         }
 
-        $bodySource = $product->format === 'cap' ? $product->description : $product->text;
+        $bodySource = $product->format === 'cap' ? ($product->description ?? $product->text) : $product->text;
 
         $delivered = $client->notify(
             url: $channel->apprise_url,

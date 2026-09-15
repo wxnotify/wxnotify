@@ -212,6 +212,24 @@ test('a CAP-sourced product with no paired text uses its description as the mess
     Http::assertSent(fn ($request) => $request['body'] === 'Flash flooding is ongoing across the warned area. Seek higher ground immediately.');
 });
 
+test('a CAP-sourced product with no description falls back to its raw text rather than crashing', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $product = IngestedProduct::factory()->create([
+        'format' => 'cap',
+        'text' => 'Raw CAP XML content used as the last-resort fallback.',
+        'description' => null,
+    ]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['body'] === 'Raw CAP XML content used as the last-resort fallback.');
+});
+
 test('a text-sourced product still uses its raw text as the message body, unaffected by the CAP fallback', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
