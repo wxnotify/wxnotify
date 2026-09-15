@@ -3,6 +3,7 @@
 use App\Enums\Tier;
 use App\Jobs\DeliverWeatherAlert;
 use App\Models\AlertRule;
+use App\Models\AlertTemplate;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
@@ -228,6 +229,65 @@ test('a CAP-sourced product with no description falls back to its raw text rathe
     (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
 
     Http::assertSent(fn ($request) => $request['body'] === 'Raw CAP XML content used as the last-resort fallback.');
+});
+
+test('a rule with an attached weather_alerts template sends the composed labeled-lines body instead of raw text', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create(['sections' => ['hazard', 'source']]);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'alert_template_id' => $template->id,
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $product = IngestedProduct::factory()->create([
+        'text' => 'This raw text must NOT be what gets sent.',
+        'hazard' => 'Flash flooding caused by thunderstorms.',
+        'hazard_source' => 'Radar indicated.',
+    ]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['body'] === "Hazard: Flash flooding caused by thunderstorms.\nSource: Radar indicated.");
+});
+
+test('a rule with a template that composes to null (e.g. spc_wpc) falls back to raw text exactly as today', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->spcWpc()->create();
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'alert_template_id' => $template->id,
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $product = IngestedProduct::factory()->create(['text' => 'Convective outlook raw text.']);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['body'] === 'Convective outlook raw text.');
+});
+
+test('a composed template body still respects a fixed 1500-character safety-net cap', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create(['sections' => ['hazard', 'source', 'impact', 'locations_impacted', 'call_to_action']]);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'alert_template_id' => $template->id,
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $longSentence = str_repeat('Extremely long hazard text that keeps going and going. ', 20);
+    $product = IngestedProduct::factory()->create([
+        'hazard' => $longSentence, 'hazard_source' => $longSentence, 'impact' => $longSentence,
+        'locations_impacted' => $longSentence, 'call_to_action' => $longSentence,
+    ]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => strlen($request['body']) <= 1500);
 });
 
 test('a text-sourced product still uses its raw text as the message body, unaffected by the CAP fallback', function () {

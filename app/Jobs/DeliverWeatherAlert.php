@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Weather\ComposeTemplatedAlertBody;
 use App\Actions\Weather\RenderAlertSubject;
 use App\Enums\MessageBodyStyle;
 use App\Models\AlertRule;
@@ -85,11 +86,13 @@ class DeliverWeatherAlert implements ShouldQueue
             return;
         }
 
-        $bodySource = $product->format === 'cap' ? ($product->description ?? $product->text) : $product->text;
+        $templatedBody = app(ComposeTemplatedAlertBody::class)($rule, $product);
+        $bodySource = $templatedBody ?? ($product->format === 'cap' ? ($product->description ?? $product->text) : $product->text);
+        $maxLength = $templatedBody !== null ? 1500 : ($rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500);
 
         $delivered = $client->notify(
             url: $channel->apprise_url,
-            body: Str::limit($bodySource, $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500, preserveWords: true),
+            body: Str::limit($bodySource, $maxLength, preserveWords: true),
             title: app(RenderAlertSubject::class)($rule, $product->product),
         );
 
