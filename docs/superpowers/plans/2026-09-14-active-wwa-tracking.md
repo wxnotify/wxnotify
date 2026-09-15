@@ -42,7 +42,7 @@
 
 No failing-test step for this task — it's schema and model plumbing only, verified via a real migration run and a Tinker round-trip, matching this codebase's own convention for schema-only tasks (see `docs/superpowers/plans/2026-09-08-weather-alert-engine.md` Task 1).
 
-- [ ] **Step 1: Create the migration**
+- [x] **Step 1: Create the migration**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && php artisan make:migration add_vtec_and_cap_metadata_to_ingested_products_table --no-interaction"
@@ -111,7 +111,7 @@ return new class extends Migration
 };
 ```
 
-- [ ] **Step 2: Update the `IngestedProduct` model**
+- [x] **Step 2: Update the `IngestedProduct` model**
 
 In `app/Models/IngestedProduct.php`, change the `#[Fillable]` attribute from:
 
@@ -163,7 +163,7 @@ to:
     }
 ```
 
-- [ ] **Step 3: Run the migration and verify with Tinker**
+- [x] **Step 3: Run the migration and verify with Tinker**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && php artisan migrate --no-interaction"
@@ -185,7 +185,7 @@ echo \$default->format . PHP_EOL;
 
 Expected: prints `KOAX cap Tornado Warning` then `text` (confirms the `format` default applies when not explicitly set).
 
-- [ ] **Step 4: Run Pint and commit**
+- [x] **Step 4: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -209,7 +209,7 @@ EOF
 
 No failing-test step — schema and model plumbing, verified via migration + Tinker.
 
-- [ ] **Step 1: Create the migration**
+- [x] **Step 1: Create the migration**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && php artisan make:migration create_active_wwas_table --no-interaction"
@@ -274,7 +274,7 @@ return new class extends Migration
 };
 ```
 
-- [ ] **Step 2: Create the model**
+- [x] **Step 2: Create the model**
 
 ```php
 <?php
@@ -327,7 +327,7 @@ class ActiveWwa extends Model
 }
 ```
 
-- [ ] **Step 3: Create the factory**
+- [x] **Step 3: Create the factory**
 
 ```php
 <?php
@@ -361,7 +361,7 @@ class ActiveWwaFactory extends Factory
 }
 ```
 
-- [ ] **Step 4: Run the migration and verify with Tinker**
+- [x] **Step 4: Run the migration and verify with Tinker**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && php artisan migrate --no-interaction"
@@ -381,7 +381,7 @@ echo var_export(\$contains->contains, true) . PHP_EOL;
 
 Expected: prints the office+status line, then `true` (confirms the geometry column round-trips through raw SQL correctly).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -404,7 +404,7 @@ EOF
 
 The VTEC format is `/k.aaa.cccc.pp.s.####.YYMMDDTHHNNZ-YYMMDDTHHNNZ/` (product class, action, office, phenomenon, significance, event number, begin, end). This is used identically whether the string was found via regex in raw text or read from CAP's `VTEC` parameter — one parser, two callers.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -457,7 +457,7 @@ test('finds the VTEC string embedded among other text', function () {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ParseVtecStringTest.php --compact"
@@ -465,7 +465,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: FAIL — the class doesn't exist.
 
-- [ ] **Step 3: Implement the action**
+- [x] **Step 3: Implement the action**
 
 ```php
 <?php
@@ -511,7 +511,7 @@ class ParseVtecString
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ParseVtecStringTest.php --compact"
@@ -519,7 +519,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -540,7 +540,7 @@ EOF
 - Modify: `app/Actions/Pipeline/ExtractProductMetadata.php`
 - Test: `tests/Feature/ExtractProductMetadataTest.php`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/Feature/ExtractProductMetadataTest.php` (add `use App\Actions\Pipeline\ParseVtecString;` if referenced directly — not needed here, the test only asserts `ExtractProductMetadata`'s output):
 
@@ -587,7 +587,7 @@ test('an all-zero VTEC begin time resolves to a null vtec_begin', function () {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ExtractProductMetadataTest.php --compact"
@@ -595,7 +595,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: the 3 new tests FAIL (the keys don't exist in the returned array yet); all pre-existing tests still PASS.
 
-- [ ] **Step 3: Wire `ParseVtecString` into `ExtractProductMetadata`**
+- [x] **Step 3: Wire `ParseVtecString` into `ExtractProductMetadata`**
 
 In `app/Actions/Pipeline/ExtractProductMetadata.php`, add the import:
 
@@ -652,7 +652,7 @@ Also update the class-level `@return` PHPDoc above `__invoke` to include the new
      */
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ExtractProductMetadataTest.php --compact"
@@ -660,7 +660,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS, every test in the file (22 pre-existing + 3 new = 25).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -683,7 +683,7 @@ EOF
 
 The archived product text for a CAP message includes the same WMO-style preamble every product has (a byte-count line, the WMO header, the AWIPS id) *before* the actual `<?xml ...?><alert>...` document — confirmed directly against a real captured NWWS session. This parser locates the XML portion first, then parses it.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```php
 <?php
@@ -875,7 +875,7 @@ test('a VTEC phenomenon+significance with no matching catalog product resolves n
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ExtractCapMetadataTest.php --compact"
@@ -883,7 +883,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: FAIL — the class doesn't exist.
 
-- [ ] **Step 3: Implement the action**
+- [x] **Step 3: Implement the action**
 
 ```php
 <?php
@@ -1019,7 +1019,7 @@ class ExtractCapMetadata
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/ExtractCapMetadataTest.php --compact"
@@ -1027,7 +1027,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS (7 tests).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -1050,7 +1050,7 @@ EOF
 
 `awipsid` starting with `CAP` is the detection signal — confirmed twice against real NWWS traffic (`CAPOAX`, `CAPTWC`) — checked before any body parsing.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `tests/Feature/IngestNwwsProductControllerTest.php` (add `use App\Actions\Pipeline\ExtractCapMetadata;` if needed — not required, this test only checks persisted column values):
 
@@ -1114,7 +1114,7 @@ test('ingesting a plain text product still runs the text extractor, not the CAP 
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/IngestNwwsProductControllerTest.php --compact"
@@ -1122,7 +1122,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: the first new test FAILS (CAP fields never populated, since the controller doesn't branch yet). The second passes already (the default `format` is `text`), confirming the baseline.
 
-- [ ] **Step 3: Wire the branch into the controller**
+- [x] **Step 3: Wire the branch into the controller**
 
 In `app/Http/Controllers/IngestNwwsProductController.php`, add the import:
 
@@ -1228,7 +1228,7 @@ to:
 
 Note `$parsed['awipsid']` is already lowercased by `IngestedProduct::parseFilename()` (it lowercases the whole filename), so the check is `str_starts_with($parsed['awipsid'], 'cap')`, not `'CAP'`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/IngestNwwsProductControllerTest.php --compact"
@@ -1236,7 +1236,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS, every test in the file (9 pre-existing + 2 new = 11).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -1259,7 +1259,7 @@ EOF
 
 This is the core of the design: text rows always upsert `active_wwas` and always trigger matching (preserving today's per-issuance dispatch, including continuations). CAP rows correlate to their paired text row via `awips_identifier`/`wmo_identifier`; if found, they enrich without re-dispatching; if not found, they dispatch on their own.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```php
 <?php
@@ -1370,7 +1370,7 @@ test('a CAP row with no matching paired text row dispatches on its own', functio
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/SyncActiveWwaTest.php --compact"
@@ -1378,7 +1378,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: FAIL — the class doesn't exist.
 
-- [ ] **Step 3: Implement the action**
+- [x] **Step 3: Implement the action**
 
 ```php
 <?php
@@ -1560,7 +1560,7 @@ class SyncActiveWwa
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/SyncActiveWwaTest.php --compact"
@@ -1568,7 +1568,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -1591,7 +1591,7 @@ EOF
 
 Reuses the existing spy-based observer-wiring test pattern already in this file.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `tests/Feature/IngestNwwsProductControllerTest.php`:
 
@@ -1619,7 +1619,7 @@ test('a newly ingested VTEC product dispatches SyncActiveWwa instead of MatchWea
 
 Add `use App\Actions\Pipeline\SyncActiveWwa;` to the top of the test file.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/IngestNwwsProductControllerTest.php --compact"
@@ -1627,7 +1627,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: FAILS — `SyncActiveWwa` is never called yet, since the observer still calls `MatchWeatherAlertRules` for everything. Confirm the pre-existing AFD-based observer test ("a newly ingested product dispatches MatchWeatherAlertRules exactly once") still passes — it must keep passing unmodified, since AFD isn't VTEC-class.
 
-- [ ] **Step 3: Branch the observer**
+- [x] **Step 3: Branch the observer**
 
 Read `app/Observers/IngestedProductObserver.php` first. Change it from:
 
@@ -1674,7 +1674,7 @@ class IngestedProductObserver
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/IngestNwwsProductControllerTest.php --compact"
@@ -1682,7 +1682,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS, every test in the file (11 pre-existing + 1 new = 12). Confirm specifically that "a newly ingested product dispatches MatchWeatherAlertRules exactly once" (the AFD test) still passes unmodified.
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -1705,7 +1705,7 @@ EOF
 
 When a persisted `active_wwas` polygon exists for the triggering row's VTEC key, Polygon-mode matching uses it instead of the triggering row's own (possibly-null-on-continuation) polygon. Every existing test in this file is unaffected — none of their fixtures set `vtec_office`, so the new lookup finds nothing and falls through to today's unchanged behavior.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/Feature/MatchWeatherAlertRulesTest.php` (add `use App\Models\ActiveWwa;` to the imports):
 
@@ -1791,7 +1791,7 @@ test('when active_wwas has no persisted polygon for this VTEC key, matching fall
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/MatchWeatherAlertRulesTest.php --compact"
@@ -1799,7 +1799,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: the first 2 new tests FAIL (matching doesn't consult `active_wwas` yet, so both currently fall back to zone matching — which happens to make the first test incidentally pass for the wrong reason if the rule's location also has zone data, so double check the fixture has NO `forecast_zone_ugc` set, which it doesn't above, so it correctly fails as "not pushed" since neither polygon nor zone data resolves). The third new test passes already (it's exercising the existing fallback path). All 21 pre-existing tests still pass unmodified.
 
-- [ ] **Step 3: Update `matchesPolygon()`**
+- [x] **Step 3: Update `matchesPolygon()`**
 
 Read `app/Actions/Weather/MatchWeatherAlertRules.php` first. Add the import:
 
@@ -1920,7 +1920,7 @@ to:
 
 This preserves the existing malformed-polygon regression test exactly: `matchesActiveWwaPolygon()` returns `null` immediately for any fixture that doesn't set `vtec_office` (every pre-existing test in this file), so `matchesPolygon()` falls through unchanged to the original `$product->polygon` path, including the `[]` → `ST_GeomFromText` parse-error case.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/MatchWeatherAlertRulesTest.php --compact"
@@ -1928,7 +1928,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS, every test in the file (21 pre-existing + 3 new = 24). Specifically confirm `'an exception evaluating one rule\'s geography does not prevent a second, valid rule from matching'` still passes unmodified.
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -1951,7 +1951,7 @@ EOF
 
 Only reached on the rare path where a CAP payload dispatches without a paired text row (`SyncActiveWwa`'s fallback case). `RenderAlertSubject` needs no change — it never reads `text`/`description`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `tests/Feature/DeliverWeatherAlertTest.php`:
 
@@ -1989,7 +1989,7 @@ test('a text-sourced product still uses its raw text as the message body, unaffe
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/DeliverWeatherAlertTest.php --compact"
@@ -1997,7 +1997,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: the first new test FAILS (body is still built from `$product->text`, the raw XML); the second passes already (matches current behavior).
 
-- [ ] **Step 3: Wire the body-source branch**
+- [x] **Step 3: Wire the body-source branch**
 
 Read `app/Jobs/DeliverWeatherAlert.php` first. Change:
 
@@ -2021,7 +2021,7 @@ to:
         );
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/DeliverWeatherAlertTest.php --compact"
@@ -2029,7 +2029,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: PASS, every test in the file (11 pre-existing + 2 new = 13).
 
-- [ ] **Step 5: Run Pint and commit**
+- [x] **Step 5: Run Pint and commit**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -2048,7 +2048,7 @@ EOF
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Run the complete test suite**
+- [x] **Step 1: Run the complete test suite**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest --compact"
@@ -2056,7 +2056,7 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: 100% pass, no regressions anywhere in the suite. In particular, re-confirm every AFD/SPC-WPC test in `MatchWeatherAlertRulesTest.php` and the AFD observer-wiring test in `IngestNwwsProductControllerTest.php` are unaffected — those are the non-VTEC-class paths this whole plan is explicit about leaving untouched.
 
-- [ ] **Step 2: Run Pint across the whole diff**
+- [x] **Step 2: Run Pint across the whole diff**
 
 ```bash
 docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
@@ -2064,11 +2064,11 @@ docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor
 
 Expected: `{"tool":"pint","result":"passed"}`.
 
-- [ ] **Step 3: Manual verification against the real captured NWWS traffic**
+- [x] **Step 3: Manual verification against the real captured NWWS traffic**
 
 Using the real CAP examples already captured in this session's investigation (a KOAX Severe Thunderstorm Warning cancellation and a KTWC Flash Flood Warning), manually POST both the paired text and CAP bodies through `/api/pipeline/nwws-products` (or via Tinker directly instantiating `IngestNwwsProductController`'s dependencies) against a real Postgres/PostGIS connection, and confirm: exactly one `active_wwas` row results per event, its `source` ends as `cap`, and no duplicate `DeliverWeatherAlert` dispatch occurred for a rule matching that product (check `DeliveryLog`/queued-job count, not just that the row exists).
 
-- [ ] **Step 4: Final commit (if step 3 surfaced any fixes)**
+- [x] **Step 4: Final commit (if step 3 surfaced any fixes)**
 
 ```bash
 git add -A
@@ -2076,6 +2076,22 @@ git commit -m "Fix issues found during manual verification of Active WWA trackin
 ```
 
 (Skip this step entirely if step 3 found nothing to fix.)
+
+Step 3 found nothing to fix. Manual verification used the real captured KTWC Flash Flood Warning (text + paired CAP) from this session's original NWWS debug-log investigation, POSTed through the real `/api/pipeline/nwws-products` webhook (not a test double) against the real dev Postgres/PostGIS database: two `IngestedProduct` rows resulted (`format=text` and `format=cap`, both correctly VTEC-parsed to the same `product_id`), collapsing to exactly one `active_wwas` row (`source=cap`, `status=Active`, `headline` and `ugc_codes` correctly enriched from CAP, `polygon` persisted as real PostGIS geometry matching the captured coordinates, and — critically — `latest_ingested_product_id` pointing at the **text** row's id, not the CAP row's, exactly as designed). No warnings or errors appeared in the application log during ingestion. No `AlertRule` existed to match against, so this pass deliberately didn't exercise a real Apprise dispatch (avoiding an external HTTP call from a manual verification script) — dispatch-decision correctness for this exact scenario is already covered by `SyncActiveWwaTest`'s spy-based tests. All verification data was cleaned up afterward (rows deleted, product files removed) — the dev database returned to its exact pre-verification state (2190 `IngestedProduct` rows, 0 `ActiveWwa` rows).
+
+---
+
+## Post-implementation: review history
+
+Every task in this plan went through the standard two-stage review (spec compliance, then code quality), with re-review loops until each passed cleanly. Two tasks required follow-up fixes beyond their first review pass, both worth recording:
+
+**Task 7 (`SyncActiveWwa`)** — the highest-stakes task in the plan, and the only one to receive deliberately elevated scrutiny (an `opus`-level code-quality reviewer, explicitly told to err toward flagging anything uncertain as Important). Went through four commits across three hardening rounds before final approval: the first review found a stale/unbounded CAP-to-text pairing lookup that could silently suppress a real dispatch (fixed by bounding the lookup to a time window and ordering deterministically), a conditional-spread bug that left `latest_ingested_product_id` null on a reachable path, and completely unguarded database work sitting in front of the actual notification dispatch (fixed with try/catch). A second review round found the try/catch alone didn't prevent Postgres transaction-poisoning the way this codebase's own established convention (`MatchWeatherAlertRules::matchesGeographySafely()`) already accounts for, and that the bounded-lookup fix itself had no test coverage — both fixed and verified empirically (the transaction fix was confirmed by deliberately reproducing the poisoning against the real database, both with and without the fix in place).
+
+**Task 8 → Task 7 (live-wiring surfaced a pre-existing gap)** — Task 8 itself (wiring `SyncActiveWwa` into `IngestedProductObserver`) was a clean, minimal 4-line change that passed review immediately. But making `SyncActiveWwa` reachable in production for the first time is what surfaced one more real gap in Task 7's own code: `syncFromCap()`'s pairing-lookup query ran *before* the method's try/catch block, so a transient query failure there would propagate uncaught through the whole ingest webhook — and because the triggering row was already committed by that point, a retry would hit the database's UPDATE path rather than CREATE, silently and permanently skipping matching for that product with no way to recover. Fixed by moving the lookup inside the guarded block and treating a lookup failure the same as "no pair found" (the safe default — dispatch anyway, accepting a rare possible duplicate rather than risking a silently-dropped real warning).
+
+**Task 10 (`DeliverWeatherAlert` CAP-description fallback)** — passed spec review immediately, but code-quality review caught a real, empirically-verified crash: CAP's `<description>` element is optional per the CAP 1.2 spec, and a CAP row reaching the no-paired-text delivery fallback with a null `description` would throw an uncaught `TypeError` (`Str::limit(null, ...)` silently passes `null` through; `AppriseApiClient::notify()`'s non-nullable `string $body` parameter then throws), aborting the job before any `DeliveryLog` audit row was written. Fixed with a one-line fallback to the raw text in that case.
+
+No issues survived to this final verification pass — every finding above was resolved, re-reviewed, and confirmed fixed before moving to the next task.
 
 ---
 
