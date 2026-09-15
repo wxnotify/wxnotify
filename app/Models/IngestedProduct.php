@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'format', 'msg_type', 'event', 'severity', 'urgency', 'certainty',
     'headline', 'description', 'instruction', 'event_motion_description',
     'awips_identifier', 'wmo_identifier',
+    'hazard', 'hazard_source', 'impact', 'locations_impacted', 'call_to_action',
 ])]
 class IngestedProduct extends Model
 {
