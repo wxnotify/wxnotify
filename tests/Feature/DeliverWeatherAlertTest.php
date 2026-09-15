@@ -193,3 +193,35 @@ test('the default title (no custom template) still reaches Apprise as displayNam
 
     Http::assertSent(fn ($request) => $request['title'] === $rule->displayName());
 });
+
+test('a CAP-sourced product with no paired text uses its description as the message body', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $product = IngestedProduct::factory()->create([
+        'format' => 'cap',
+        'text' => '<?xml version="1.0"?><alert>raw CAP XML, never meant to reach a subscriber</alert>',
+        'description' => 'Flash flooding is ongoing across the warned area. Seek higher ground immediately.',
+    ]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['body'] === 'Flash flooding is ongoing across the warned area. Seek higher ground immediately.');
+});
+
+test('a text-sourced product still uses its raw text as the message body, unaffected by the CAP fallback', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $product = IngestedProduct::factory()->create(['format' => 'text', 'text' => 'Tornado Warning issued for the area.']);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['body'] === 'Tornado Warning issued for the area.');
+});
