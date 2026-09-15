@@ -3,6 +3,7 @@
 use App\Actions\Weather\RenderAlertSubject;
 use App\Enums\Tier;
 use App\Models\AlertRule;
+use App\Models\AlertTemplate;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\User;
@@ -26,6 +27,47 @@ test('a template using all three placeholders resolves correctly', function () {
     $result = (new RenderAlertSubject)($rule, $product);
 
     expect($result)->toBe('Weather Alerts: Tornado Warning for your area');
+});
+
+test('an attached AlertTemplate\'s subject takes priority over an old custom_subject_template on the same rule', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create(['subject_template' => 'From template: {product}']);
+    $product = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'custom_subject_template' => 'From old field: {product}',
+        'alert_template_id' => $template->id,
+    ]);
+
+    $result = (new RenderAlertSubject)($rule, $product);
+
+    expect($result)->toBe('From template: Tornado Warning');
+});
+
+test('falls through to the old custom_subject_template when no AlertTemplate is attached', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $product = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'custom_subject_template' => 'From old field: {product}',
+        'alert_template_id' => null,
+    ]);
+
+    $result = (new RenderAlertSubject)($rule, $product);
+
+    expect($result)->toBe('From old field: Tornado Warning');
+});
+
+test('falls through to the old custom_subject_template when the attached AlertTemplate has a blank subject', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create(['subject_template' => null]);
+    $product = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'custom_subject_template' => 'From old field: {product}',
+        'alert_template_id' => $template->id,
+    ]);
+
+    $result = (new RenderAlertSubject)($rule, $product);
+
+    expect($result)->toBe('From old field: Tornado Warning');
 });
 
 test('{product} falls back to the category label when no product is given', function () {
