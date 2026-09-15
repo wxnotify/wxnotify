@@ -57,12 +57,13 @@ class ExtractProductMetadata
     private const CONVECTIVE_OUTLOOK_CODE = 'SPC.OUTLOOK';
 
     /**
-     * @return array{product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>, risk_levels: ?array<int, string>, vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int, vtec_action: ?string, vtec_begin: ?Carbon, vtec_end: ?Carbon}
+     * @return array{product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>, risk_levels: ?array<int, string>, vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int, vtec_action: ?string, vtec_begin: ?Carbon, vtec_end: ?Carbon, hazard: ?string, hazard_source: ?string, impact: ?string, locations_impacted: ?string, call_to_action: ?string}
      */
     public function __invoke(string $text, ?string $awipsid): array
     {
         [$productId, $code] = $this->resolveProduct($text, $awipsid);
         $vtec = (new ParseVtecString)($text);
+        $narrative = (new ParseNarrativeSections)($text);
 
         return [
             'product_id' => $productId,
@@ -77,6 +78,11 @@ class ExtractProductMetadata
             'vtec_action' => $vtec['action'] ?? null,
             'vtec_begin' => $vtec['begin'] ?? null,
             'vtec_end' => $vtec['end'] ?? null,
+            'hazard' => $narrative['hazard'],
+            'hazard_source' => $narrative['hazard_source'],
+            'impact' => $narrative['impact'],
+            'locations_impacted' => $narrative['locations_impacted'],
+            'call_to_action' => $narrative['call_to_action'],
         ];
     }
 

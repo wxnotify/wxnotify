@@ -281,3 +281,44 @@ test('an all-zero VTEC begin time resolves to a null vtec_begin', function () {
     expect($metadata['vtec_begin'])->toBeNull()
         ->and($metadata['vtec_action'])->toBe('CAN');
 });
+
+test('populates the narrative section fields from a real VTEC warning bulletin', function () {
+    $text = <<<'TEXT'
+    WGUS55 KTWC 142354
+    FFWTWC
+
+    BULLETIN - EAS ACTIVATION REQUESTED
+    Flash Flood Warning
+    National Weather Service Tucson AZ
+    454 PM MST Mon Sep 14 2026
+
+    AZC021-142100-
+    /O.NEW.KTWC.FF.W.0209.260914T2354Z-260915T0300Z/
+
+    HAZARD...Flash flooding caused by thunderstorms.
+
+    SOURCE...Radar indicated.
+
+    IMPACT...Flash flooding of small creeks and streams.
+
+    LAT...LON 3251 11056 3257 11064 3261 11058 3251 11056
+    TEXT;
+
+    $metadata = (new ExtractProductMetadata)($text, 'ffwtwc');
+
+    expect($metadata['hazard'])->toBe('Flash flooding caused by thunderstorms.')
+        ->and($metadata['hazard_source'])->toBe('Radar indicated.')
+        ->and($metadata['impact'])->toBe('Flash flooding of small creeks and streams.')
+        ->and($metadata['locations_impacted'])->toBeNull()
+        ->and($metadata['call_to_action'])->toBeNull();
+});
+
+test('a product with no narrative sections leaves all five fields null', function () {
+    $metadata = (new ExtractProductMetadata)("AREA FORECAST DISCUSSION\nNo labeled sections here.", 'afdokx');
+
+    expect($metadata['hazard'])->toBeNull()
+        ->and($metadata['hazard_source'])->toBeNull()
+        ->and($metadata['impact'])->toBeNull()
+        ->and($metadata['locations_impacted'])->toBeNull()
+        ->and($metadata['call_to_action'])->toBeNull();
+});
