@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
 use App\Models\IngestedProduct;
 use App\Models\Product;
@@ -249,4 +250,24 @@ test('ingesting a malformed CAP product logs the failure and does not create a r
     Log::shouldHaveReceived('warning')
         ->once()
         ->withArgs(fn ($message, $context) => $context['path'] === 'kwbc/kwbc_xous55-captwc.142354_2.txt');
+});
+
+test('a newly ingested VTEC product dispatches SyncActiveWwa instead of MatchWeatherAlertRules directly', function () {
+    $syncSpy = Mockery::spy(SyncActiveWwa::class);
+    app()->instance(SyncActiveWwa::class, $syncSpy);
+    $matchSpy = Mockery::spy(MatchWeatherAlertRules::class);
+    app()->instance(MatchWeatherAlertRules::class, $matchSpy);
+
+    File::ensureDirectoryExists($this->productsRoot.'/kokx');
+    $text = "NYZ069-081200-\n/O.NEW.KOKX.TO.W.0042.260906T1800Z-260906T1900Z/\n";
+    File::put($this->productsRoot.'/kokx/kokx_wfus51-torokx.061800_1.txt', $text);
+
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'kokx/kokx_wfus51-torokx.061800_1.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    $syncSpy->shouldHaveReceived('__invoke')->once();
+    $matchSpy->shouldNotHaveReceived('__invoke');
 });
