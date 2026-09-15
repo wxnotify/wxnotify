@@ -35,6 +35,15 @@ use Illuminate\Support\Str;
  * after $channel is resolved) — the "rule gone"/"channel gone" branches
  * fall back to a log line instead of forcing a schema change or a
  * meaningless sentinel channel_type value.
+ *
+ * Body composition: a rule with an attached weather_alerts-category
+ * AlertTemplate that App\Actions\Weather\ComposeTemplatedAlertBody manages
+ * to compose into something non-null takes priority, always capped at 1500
+ * characters. Otherwise the raw product text is used (a CAP product's
+ * description, falling back to its text), capped at 280 or 1500 characters
+ * per the rule's existing message_body_style — the templated body bypasses
+ * that Brief cap entirely, since section selection is what controls length
+ * in that case.
  */
 class DeliverWeatherAlert implements ShouldQueue
 {
@@ -88,7 +97,7 @@ class DeliverWeatherAlert implements ShouldQueue
 
         $templatedBody = app(ComposeTemplatedAlertBody::class)($rule, $product);
         $bodySource = $templatedBody ?? ($product->format === 'cap' ? ($product->description ?? $product->text) : $product->text);
-        $maxLength = $templatedBody !== null ? 1500 : ($rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500);
+        $maxLength = $templatedBody === null && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500;
 
         $delivered = $client->notify(
             url: $channel->apprise_url,
