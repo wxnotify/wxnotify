@@ -32,22 +32,29 @@ class SyncActiveWwa
 
     private function syncFromText(IngestedProduct $product): void
     {
-        $wwa = ActiveWwa::updateOrCreate(
-            $this->vtecKey($product),
-            [
-                'product_id' => $product->product_id,
-                'status' => $this->resolveStatus($product->vtec_action),
-                'ugc_codes' => $product->ugc_codes,
-                'effective' => $product->vtec_begin,
-                'expires' => $product->vtec_end,
-                'latest_ingested_product_id' => $product->id,
-                'source' => 'text',
-            ],
-        );
+        try {
+            $wwa = ActiveWwa::updateOrCreate(
+                $this->vtecKey($product),
+                [
+                    'product_id' => $product->product_id,
+                    'status' => $this->resolveStatus($product->vtec_action),
+                    'ugc_codes' => $product->ugc_codes,
+                    'effective' => $product->vtec_begin,
+                    'expires' => $product->vtec_end,
+                    'latest_ingested_product_id' => $product->id,
+                    'source' => 'text',
+                ],
+            );
 
-        if ($product->polygon !== null) {
-            $wkt = $this->polygonToWkt($product->polygon);
-            DB::statement('UPDATE active_wwas SET polygon = ST_SetSRID(ST_GeomFromText(?), 4269) WHERE id = ?', [$wkt, $wwa->id]);
+            if ($product->polygon !== null) {
+                $wkt = $this->polygonToWkt($product->polygon);
+                DB::statement('UPDATE active_wwas SET polygon = ST_SetSRID(ST_GeomFromText(?), 4269) WHERE id = ?', [$wkt, $wwa->id]);
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to sync active_wwas for a text-sourced VTEC product', [
+                'ingested_product_id' => $product->id,
+                'exception' => $e->getMessage(),
+            ]);
         }
 
         app(MatchWeatherAlertRules::class)($product);
@@ -57,24 +64,31 @@ class SyncActiveWwa
     {
         $pairedText = $this->findPairedTextProduct($product);
 
-        $wwa = ActiveWwa::updateOrCreate(
-            $this->vtecKey($product),
-            [
-                'product_id' => $product->product_id,
-                'status' => $this->resolveStatus($product->vtec_action),
-                'ugc_codes' => $product->ugc_codes,
-                'effective' => $product->vtec_begin,
-                'expires' => $product->vtec_end,
-                'headline' => $product->headline,
-                'source' => 'cap',
-                ...($pairedText === null ? ['latest_ingested_product_id' => $product->id] : []),
-                ...$this->parseMotion($product->event_motion_description),
-            ],
-        );
+        try {
+            $wwa = ActiveWwa::updateOrCreate(
+                $this->vtecKey($product),
+                [
+                    'product_id' => $product->product_id,
+                    'status' => $this->resolveStatus($product->vtec_action),
+                    'ugc_codes' => $product->ugc_codes,
+                    'effective' => $product->vtec_begin,
+                    'expires' => $product->vtec_end,
+                    'headline' => $product->headline,
+                    'source' => 'cap',
+                    'latest_ingested_product_id' => $pairedText?->id ?? $product->id,
+                    ...$this->parseMotion($product->event_motion_description),
+                ],
+            );
 
-        if ($product->polygon !== null) {
-            $wkt = $this->polygonToWkt($product->polygon);
-            DB::statement('UPDATE active_wwas SET polygon = ST_SetSRID(ST_GeomFromText(?), 4269) WHERE id = ?', [$wkt, $wwa->id]);
+            if ($product->polygon !== null) {
+                $wkt = $this->polygonToWkt($product->polygon);
+                DB::statement('UPDATE active_wwas SET polygon = ST_SetSRID(ST_GeomFromText(?), 4269) WHERE id = ?', [$wkt, $wwa->id]);
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to sync active_wwas for a CAP-sourced VTEC product', [
+                'ingested_product_id' => $product->id,
+                'exception' => $e->getMessage(),
+            ]);
         }
 
         if ($pairedText === null) {
@@ -130,6 +144,9 @@ class SyncActiveWwa
             ->where('cccc', strtolower($cccc))
             ->where('ttaaii', strtolower($ttaaii))
             ->where('wmo_ddhhmm', $ddhhmm)
+            ->where('received_at', '>=', $capProduct->received_at->copy()->subMinutes(10))
+            ->where('received_at', '<=', $capProduct->received_at)
+            ->latest('received_at')
             ->first();
     }
 

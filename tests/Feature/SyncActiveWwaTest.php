@@ -80,6 +80,7 @@ test('a CAP row with a matching paired text row enriches active_wwas without re-
         'cccc' => 'ktwc', 'ttaaii' => 'wgus55', 'awipsid' => 'ffwtwc', 'wmo_ddhhmm' => '142354',
         'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'FF', 'vtec_significance' => 'W',
         'vtec_event_number' => '0209', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'received_at' => now(),
     ]);
     (new SyncActiveWwa)($textRow);
     $spy->shouldHaveReceived('__invoke')->once();
@@ -90,6 +91,7 @@ test('a CAP row with a matching paired text row enriches active_wwas without re-
         'vtec_event_number' => '0209', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
         'awips_identifier' => 'FFWTWC', 'wmo_identifier' => 'WGUS55 KTWC 142354',
         'ugc_codes' => ['AZC021'], 'polygon' => [['lat' => 32.5, 'lon' => -110.5]],
+        'received_at' => now()->addSeconds(5),
     ]);
 
     (new SyncActiveWwa)($capRow);
@@ -151,4 +153,71 @@ test('a CAP row with a motion description enriches active_wwas motion fields', f
         ->and((float) $wwa->motion_reference_lat)->toBe(41.31)
         ->and((float) $wwa->motion_reference_lon)->toBe(-96.18)
         ->and($wwa->motion_observed_at)->not->toBeNull();
+});
+
+test('a CAP row that finds its paired text row still sets latest_ingested_product_id to that paired row, even when active_wwas is being created for the first time', function () {
+    $spy = Mockery::spy(MatchWeatherAlertRules::class);
+    app()->instance(MatchWeatherAlertRules::class, $spy);
+    $product = Product::where('code', 'FF.W')->sole();
+    $textRow = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'text',
+        'cccc' => 'ktwc', 'ttaaii' => 'wgus55', 'awipsid' => 'ffwtwc', 'wmo_ddhhmm' => '142354',
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'FF', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0209', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'received_at' => now(),
+    ]);
+    // Note: no prior sync call for $textRow here -- this specifically covers
+    // the case where active_wwas doesn't exist yet and CAP creates it,
+    // despite a matching paired text row already existing in ingested_products.
+    $capRow = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'cap',
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'FF', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0209', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'awips_identifier' => 'FFWTWC', 'wmo_identifier' => 'WGUS55 KTWC 142354',
+        'received_at' => now()->addSeconds(5),
+    ]);
+
+    (new SyncActiveWwa)($capRow);
+
+    expect(ActiveWwa::sole()->latest_ingested_product_id)->toBe($textRow->id);
+});
+
+test('a text continuation does not null out a headline previously set by CAP', function () {
+    app()->instance(MatchWeatherAlertRules::class, Mockery::spy(MatchWeatherAlertRules::class));
+    $product = Product::where('code', 'SV.W')->sole();
+    $wwa = ActiveWwa::factory()->create([
+        'product_id' => $product->id, 'vtec_office' => 'KOAX', 'vtec_phenomenon' => 'SV',
+        'vtec_significance' => 'W', 'vtec_event_number' => '0413', 'vtec_year' => 2026,
+        'headline' => 'A previously CAP-set headline',
+    ]);
+
+    $continuation = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'text',
+        'vtec_office' => 'KOAX', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0413', 'vtec_year' => 2026, 'vtec_action' => 'CON',
+    ]);
+
+    (new SyncActiveWwa)($continuation);
+
+    expect(ActiveWwa::find($wwa->id)->headline)->toBe('A previously CAP-set headline');
+});
+
+test('a failure syncing active_wwas does not prevent MatchWeatherAlertRules from still being called', function () {
+    $spy = Mockery::spy(MatchWeatherAlertRules::class);
+    app()->instance(MatchWeatherAlertRules::class, $spy);
+    $product = Product::where('code', 'TO.W')->sole();
+    // A polygon with a NaN-producing/invalid shape isn't easy to construct via
+    // valid PHP floats, so instead force the failure via an out-of-range
+    // motion value on a CAP row with no paired text (still must dispatch).
+    $capRow = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'cap',
+        'vtec_office' => 'KOKX', 'vtec_phenomenon' => 'TO', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0099', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'awips_identifier' => 'NOTHING', 'wmo_identifier' => 'ZZZZ99 KOKX 999999',
+        'event_motion_description' => '2026-09-14T23:53:00-00:00...storm...999999DEG...34KT...41.31,-96.18',
+    ]);
+
+    (new SyncActiveWwa)($capRow);
+
+    $spy->shouldHaveReceived('__invoke')->once()->with($capRow);
 });
