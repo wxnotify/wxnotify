@@ -40,13 +40,15 @@ class SyncActiveWwa
                     [
                         'product_id' => $product->product_id,
                         'status' => $this->resolveStatus($product->vtec_action),
-                        'ugc_codes' => $product->ugc_codes,
-                        'effective' => $product->vtec_begin,
-                        'expires' => $product->vtec_end,
                         'latest_ingested_product_id' => $product->id,
                         'source' => 'text',
+                        ...($product->ugc_codes !== null ? ['ugc_codes' => $product->ugc_codes] : []),
+                        ...($product->vtec_begin !== null ? ['effective' => $product->vtec_begin] : []),
+                        ...($product->vtec_end !== null ? ['expires' => $product->vtec_end] : []),
                     ],
                 );
+
+                $this->expireIfPast($wwa);
 
                 if ($product->polygon !== null) {
                     $wkt = $this->polygonToWkt($product->polygon);
@@ -77,15 +79,17 @@ class SyncActiveWwa
                     [
                         'product_id' => $product->product_id,
                         'status' => $this->resolveStatus($product->vtec_action),
-                        'ugc_codes' => $product->ugc_codes,
-                        'effective' => $product->vtec_begin,
-                        'expires' => $product->vtec_end,
                         'headline' => $product->headline,
                         'source' => 'cap',
                         'latest_ingested_product_id' => $pairedText?->id ?? $product->id,
+                        ...($product->ugc_codes !== null ? ['ugc_codes' => $product->ugc_codes] : []),
+                        ...($product->vtec_begin !== null ? ['effective' => $product->vtec_begin] : []),
+                        ...($product->vtec_end !== null ? ['expires' => $product->vtec_end] : []),
                         ...$this->parseMotion($product->event_motion_description),
                     ],
                 );
+
+                $this->expireIfPast($wwa);
 
                 if ($product->polygon !== null) {
                     $wkt = $this->polygonToWkt($product->polygon);
@@ -126,6 +130,23 @@ class SyncActiveWwa
             'EXP' => 'Expired',
             default => 'Active',
         };
+    }
+
+    /**
+     * Demotes an already-Active row to Expired once its currently-recorded
+     * expires timestamp has passed -- covers the common case where NWS lets
+     * a warning lapse with no explicit EXP product ever issued. Only ever
+     * fires against whatever expires value is currently on record (which
+     * might have been set by an EARLIER issuance, not necessarily this
+     * one), since a later touch to the row (e.g. a CAP enrichment, or a
+     * continuation that doesn't itself carry a fresh end time) is exactly
+     * the moment this check should re-run.
+     */
+    private function expireIfPast(ActiveWwa $wwa): void
+    {
+        if ($wwa->status === 'Active' && $wwa->expires !== null && $wwa->expires->isPast()) {
+            $wwa->update(['status' => 'Expired']);
+        }
     }
 
     /**

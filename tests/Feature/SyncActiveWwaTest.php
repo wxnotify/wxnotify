@@ -257,6 +257,85 @@ test('a malformed wmo_identifier is treated as no-pair-found, and the CAP row st
     expect(ActiveWwa::sole()->latest_ingested_product_id)->toBe($capRow->id);
 });
 
+test('a continuation with an all-zero begin/end does not clobber a previously known effective/expires/ugc_codes', function () {
+    app()->instance(MatchWeatherAlertRules::class, Mockery::spy(MatchWeatherAlertRules::class));
+    $product = Product::where('code', 'FL.W')->sole();
+    // Establish real values first, from a NEW issuance with a real begin
+    // and a real (non-degenerate) end.
+    $new = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'text',
+        'vtec_office' => 'KOAX', 'vtec_phenomenon' => 'FL', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0500', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'vtec_begin' => now()->subHour(), 'vtec_end' => now()->addDays(3),
+        'ugc_codes' => ['NEC055'],
+    ]);
+    (new SyncActiveWwa)($new);
+
+    // A continuation with all-zero begin AND end (both nulled by
+    // ParseVtecString) and no ugc_codes of its own must not wipe out any
+    // of the three fields established above.
+    $continuation = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'text',
+        'vtec_office' => 'KOAX', 'vtec_phenomenon' => 'FL', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0500', 'vtec_year' => 2026, 'vtec_action' => 'CON',
+        'vtec_begin' => null, 'vtec_end' => null, 'ugc_codes' => null,
+    ]);
+    (new SyncActiveWwa)($continuation);
+
+    $wwa = ActiveWwa::sole();
+    expect($wwa->effective)->not->toBeNull()
+        ->and($wwa->expires)->not->toBeNull()
+        ->and($wwa->ugc_codes)->toBe(['NEC055']);
+});
+
+test('a row whose recorded expires has already passed is demoted to Expired when the row is next touched', function () {
+    app()->instance(MatchWeatherAlertRules::class, Mockery::spy(MatchWeatherAlertRules::class));
+    $product = Product::where('code', 'SV.W')->sole();
+    // Establish a normal, currently-active warning: expires is still in
+    // the future at the moment this NEW issuance is synced, so expireIfPast()
+    // has nothing to correct yet.
+    $original = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'text',
+        'vtec_office' => 'KOAX', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0600', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'vtec_begin' => now()->subHour(), 'vtec_end' => now()->addMinutes(30),
+    ]);
+    (new SyncActiveWwa)($original);
+    expect(ActiveWwa::sole()->status)->toBe('Active'); // not yet re-checked
+
+    // Time passes beyond the recorded expires with no explicit EXP product
+    // ever issued -- NWS let the warning lapse. Any later touch to the
+    // row -- here, a CAP enrichment with no fresh expires of its own --
+    // should notice the now-past expires and demote status.
+    $this->travel(1)->hour();
+
+    $capEnrichment = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'cap',
+        'vtec_office' => 'KOAX', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0600', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'vtec_begin' => null, 'vtec_end' => null,
+        'awips_identifier' => 'NOMATCH', 'wmo_identifier' => 'NOMATCH NOMATCH 999999',
+    ]);
+    (new SyncActiveWwa)($capEnrichment);
+
+    expect(ActiveWwa::sole()->status)->toBe('Expired');
+});
+
+test('a Cancelled row is not overridden back by the expiry check', function () {
+    app()->instance(MatchWeatherAlertRules::class, Mockery::spy(MatchWeatherAlertRules::class));
+    $product = Product::where('code', 'SV.W')->sole();
+    $ingested = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'text',
+        'vtec_office' => 'KOAX', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0700', 'vtec_year' => 2026, 'vtec_action' => 'CAN',
+        'vtec_begin' => null, 'vtec_end' => now()->subHour(),
+    ]);
+
+    (new SyncActiveWwa)($ingested);
+
+    expect(ActiveWwa::sole()->status)->toBe('Cancelled');
+});
+
 test('a failure syncing active_wwas does not prevent MatchWeatherAlertRules from still being called', function () {
     $spy = Mockery::spy(MatchWeatherAlertRules::class);
     app()->instance(MatchWeatherAlertRules::class, $spy);
