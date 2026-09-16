@@ -2,8 +2,11 @@
 
 namespace App\Filament\Dashboard\Resources\AlertTemplates\Tables;
 
+use App\Enums\AlertCategory;
 use App\Models\AlertTemplate;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -19,7 +22,7 @@ class AlertTemplatesTable
                     ->weight('medium'),
                 TextColumn::make('category')
                     ->badge()
-                    ->formatStateUsing(fn (mixed $state): string => $state->label()),
+                    ->formatStateUsing(fn (AlertCategory $state): string => $state->label()),
                 TextColumn::make('sections')
                     ->label('Sections')
                     ->formatStateUsing(fn (AlertTemplate $record): string => $record->sections === null || $record->sections === []
@@ -34,6 +37,11 @@ class AlertTemplatesTable
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make(),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                ]),
             ]);
     }
 }
