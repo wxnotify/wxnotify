@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Tier;
+use App\Filament\Dashboard\Resources\Locations\LocationResource;
 use App\Filament\Dashboard\Resources\Locations\Pages\CreateLocation;
 use App\Filament\Dashboard\Resources\Locations\Pages\ListLocations;
 use App\Models\Location;
@@ -44,6 +45,20 @@ test('creating a location attaches it to the authenticated user', function () {
     $location = Location::where('label', 'Home')->sole();
 
     expect($location->user_id)->toBe($this->user->id);
+});
+
+test('creating a location redirects back to the list page, not the edit page', function () {
+    livewire(CreateLocation::class)
+        ->fillForm([
+            'label' => 'Home',
+            'lat' => 39.8283,
+            'lng' => -98.5795,
+            'address' => 'Somewhere, KS',
+            'timezone' => 'America/Chicago',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors()
+        ->assertRedirect(LocationResource::getUrl('index'));
 });
 
 test('a Free subscriber cannot create a second location', function () {

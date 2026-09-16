@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Tier;
+use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\EditAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
@@ -62,6 +63,23 @@ test('creating a threshold alert persists the rule and its channel', function ()
         ->and($rule->displayName())->toBe('Temperature Falls below 32.0°F');
 
     expect($rule->notificationChannels->pluck('id')->all())->toBe([$this->channel->id]);
+});
+
+test('creating an alert rule redirects back to the list page, not the edit page', function () {
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'threshold',
+            'variable' => 'temperature',
+            'direction' => 'below',
+            'threshold_value' => 32,
+            'timeframe' => 'overnight',
+            'location_id' => $this->location->id,
+            'delivery_time' => '06:00',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors()
+        ->assertRedirect(AlertRuleResource::getUrl('index'));
 });
 
 test('creating a weather alerts rule persists the chosen products and matching mode', function () {
@@ -359,7 +377,9 @@ test('connecting a channel inline from the channels field dispatches a code and 
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->notificationChannels->pluck('id')->all())->toBe([$this->channel->id, $newChannel->id]);
+    // The pivot query carries no explicit orderBy(), so the DB is free to
+    // return the two attached channels in either order -- compare as a set.
+    expect($rule->notificationChannels->pluck('id')->all())->toEqualCanonicalizing([$this->channel->id, $newChannel->id]);
 });
 
 test('the inline channel action for a no-cost type is hidden once a Free subscriber has used their slot', function () {

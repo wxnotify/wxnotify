@@ -29,6 +29,11 @@ class CreateAlertRule extends CreateRecord
         return $data;
     }
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
     protected function afterCreate(): void
     {
         // ->filter(is_numeric(...)) is defense-in-depth: product_ids is keyed
