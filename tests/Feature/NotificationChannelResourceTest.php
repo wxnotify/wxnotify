@@ -63,3 +63,27 @@ test('the verify action is visible for an unverified channel', function () {
     livewire(ListNotificationChannels::class)
         ->assertActionVisible(TestAction::make('verify')->table($channel));
 });
+
+test('editing a channel changes its label', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'Old label']);
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('edit')->table($channel), data: [
+            'label' => 'New label',
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($channel->fresh()->label)->toBe('New label');
+});
+
+test('the label is required and cannot be cleared out', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'Old label']);
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('edit')->table($channel), data: [
+            'label' => '',
+        ])
+        ->assertHasActionErrors(['label' => 'required']);
+
+    expect($channel->fresh()->label)->toBe('Old label');
+});
