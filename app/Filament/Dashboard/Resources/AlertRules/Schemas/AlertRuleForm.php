@@ -11,6 +11,7 @@ use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
 use App\Enums\Tier;
+use App\Filament\Dashboard\Resources\AlertTemplates\Schemas\AlertTemplateForm;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
 use App\Models\NotificationChannel;
 use App\Models\Product;
@@ -226,7 +227,32 @@ class AlertRuleForm
                     ->maxLength(255)
                     ->helperText('Leave blank to use the default. Placeholders: {product}, {location}, {category}.')
                     ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free),
+                self::alertTemplateSelect()
+                    ->visible(fn (Get $get): bool => auth()->user()->tier() !== Tier::Free
+                        && in_array($get('category'), [AlertCategory::WeatherAlerts->value, AlertCategory::SpcWpc->value], true)),
             ]);
+    }
+
+    /**
+     * Deliberately native, not ->searchable()/->relationship() -- same
+     * dynamic-Wizard-step entangle bug documented on locationSelect() and
+     * wfoField() above applies here too, since this field's ->visible()
+     * closure depends on `category`, which is set in an earlier step.
+     * Additive alongside message_body_style/custom_subject_template above,
+     * not a replacement -- see this field's helperText.
+     */
+    protected static function alertTemplateSelect(): Select
+    {
+        return Select::make('alert_template_id')
+            ->label('Message template (optional)')
+            ->options(fn (Get $get): array => auth()->user()->alertTemplates()
+                ->where('category', $get('category'))
+                ->pluck('name', 'id')
+                ->all())
+            ->createOptionForm(AlertTemplateForm::fields())
+            ->createOptionAction(fn (Action $action): Action => $action->modalHeading('Add a template'))
+            ->createOptionUsing(fn (array $data): int => auth()->user()->alertTemplates()->create($data)->getKey())
+            ->helperText('Takes priority over the subject line and message length above when set. Leave blank to keep using those.');
     }
 
     /**

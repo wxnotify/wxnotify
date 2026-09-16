@@ -153,6 +153,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->hasMany(AlertRule::class);
     }
 
+    public function alertTemplates(): HasMany
+    {
+        return $this->hasMany(AlertTemplate::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *

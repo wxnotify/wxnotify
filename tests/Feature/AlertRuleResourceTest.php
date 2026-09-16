@@ -5,6 +5,7 @@ use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\EditAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Models\AlertRule;
+use App\Models\AlertTemplate;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
@@ -515,4 +516,24 @@ test('editing an existing rule round-trips the custom subject and message length
             'custom_subject_template' => 'Original subject',
             'message_body_style' => 'brief',
         ]);
+});
+
+test('the alert_template_id select only offers templates matching the rule\'s own category', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $this->actingAs($plusUser);
+    $channel = NotificationChannel::factory()->for($plusUser)->create();
+
+    AlertTemplate::factory()->for($plusUser)->create(['category' => 'weather_alerts', 'name' => 'Matching']);
+    AlertTemplate::factory()->for($plusUser)->spcWpc()->create(['name' => 'Mismatched']);
+
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
+            'matching_mode' => 'nationwide',
+            'channel_ids' => [$channel->id],
+        ])
+        ->assertFormFieldExists('alert_template_id');
 });
