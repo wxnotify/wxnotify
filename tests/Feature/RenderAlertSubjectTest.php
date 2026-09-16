@@ -34,6 +34,9 @@ test('an attached AlertTemplate\'s subject takes priority over an old custom_sub
     $template = AlertTemplate::factory()->for($plusUser)->create(['subject_template' => 'From template: {product}']);
     $product = Product::factory()->create(['name' => 'Tornado Warning']);
     $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts',
+        'matching_mode' => 'nationwide',
+        'location_id' => null,
         'custom_subject_template' => 'From old field: {product}',
         'alert_template_id' => $template->id,
     ]);
@@ -151,4 +154,17 @@ test('a custom template is ignored for a Free-tier rule owner, falling back to d
     ]);
 
     expect((new RenderAlertSubject)($rule))->toBe($rule->displayName());
+});
+
+test('a downgraded Free-tier subscriber no longer gets their attached AlertTemplate\'s subject', function () {
+    $freeUser = User::factory()->create(['tier_override' => Tier::Free]);
+    $template = AlertTemplate::factory()->for($freeUser)->create(['subject_template' => 'From template: {product}']);
+    $product = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = AlertRule::factory()->for($freeUser)->create([
+        'alert_template_id' => $template->id,
+    ]);
+
+    $result = (new RenderAlertSubject)($rule, $product);
+
+    expect($result)->toBe($rule->displayName());
 });

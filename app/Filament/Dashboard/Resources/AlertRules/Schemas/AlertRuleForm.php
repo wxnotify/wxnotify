@@ -73,6 +73,7 @@ class AlertRuleForm
                     ->afterStateUpdated(function (Set $set, Get $get): void {
                         self::seedProductIdsDefaults($set, $get);
                         self::seedForecastDiscussionWfoDefault($set, $get);
+                        self::clearAlertTemplateIfCategoryUnsupported($set, $get);
                     }),
             ]);
     }
@@ -117,6 +118,22 @@ class AlertRuleForm
     {
         if ($get('category') === AlertCategory::ForecastDiscussion->value && blank($get('wfo'))) {
             $set('wfo', self::suggestedWfo());
+        }
+    }
+
+    /**
+     * alert_template_id's own field is hidden (not just disabled) once the
+     * category changes away from weather_alerts/spc_wpc, and a hidden
+     * field is neither dehydrated nor validated by default -- so without
+     * this, a stale id from a prior category selection would silently
+     * survive the save and leak into DeliverScheduledAlert's
+     * RenderAlertSubject call for a category that's supposed to never
+     * have one attached.
+     */
+    protected static function clearAlertTemplateIfCategoryUnsupported(Set $set, Get $get): void
+    {
+        if (! in_array($get('category'), [AlertCategory::WeatherAlerts->value, AlertCategory::SpcWpc->value], true)) {
+            $set('alert_template_id', null);
         }
     }
 

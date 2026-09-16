@@ -95,6 +95,15 @@ class AlertRule extends Model
         return $this->belongsTo(AlertTemplate::class);
     }
 
+    public function effectiveAlertTemplate(): ?AlertTemplate
+    {
+        if ($this->user->tier() === Tier::Free) {
+            return null;
+        }
+
+        return $this->alertTemplate?->category === $this->category ? $this->alertTemplate : null;
+    }
+
     public function effectiveCustomSubjectTemplate(): ?string
     {
         return $this->user->tier() !== Tier::Free ? $this->custom_subject_template : null;

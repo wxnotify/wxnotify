@@ -2,10 +2,12 @@
 
 use App\Actions\Weather\ComposeTemplatedAlertBody;
 use App\Enums\AlertTemplateSection;
+use App\Enums\Tier;
 use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\AlertTemplate;
 use App\Models\IngestedProduct;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 
 afterEach(function () {
@@ -24,10 +26,11 @@ function vtecKeyFor(): array
 }
 
 test('composes a labeled-lines body from the checked sections in fixed canonical order', function () {
-    $template = AlertTemplate::factory()->create([
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create([
         'sections' => [AlertTemplateSection::Impact->value, AlertTemplateSection::Hazard->value, AlertTemplateSection::Source->value],
     ]);
-    $rule = AlertRule::factory()->create(['alert_template_id' => $template->id]);
+    $rule = AlertRule::factory()->for($plusUser)->create(['category' => 'weather_alerts', 'alert_template_id' => $template->id]);
     $product = IngestedProduct::factory()->create([
         ...vtecKeyFor(),
         'hazard' => 'Flash flooding caused by thunderstorms.',
@@ -41,10 +44,11 @@ test('composes a labeled-lines body from the checked sections in fixed canonical
 });
 
 test('skips a checked section that is null on this specific event, rather than showing a placeholder', function () {
-    $template = AlertTemplate::factory()->create([
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create([
         'sections' => [AlertTemplateSection::Hazard->value, AlertTemplateSection::LocationsImpacted->value],
     ]);
-    $rule = AlertRule::factory()->create(['alert_template_id' => $template->id]);
+    $rule = AlertRule::factory()->for($plusUser)->create(['category' => 'weather_alerts', 'alert_template_id' => $template->id]);
     $product = IngestedProduct::factory()->create([...vtecKeyFor(), 'hazard' => 'Flash flooding.', 'locations_impacted' => null]);
 
     $result = (new ComposeTemplatedAlertBody)($rule, $product);
@@ -59,8 +63,9 @@ test('pulls expiration and motion from the matching ActiveWwa row via the VTEC k
     // "1 hour from now"), making an exact-string assertion flaky.
     Carbon::setTestNow('2026-09-15 12:00:00');
 
-    $template = AlertTemplate::factory()->create(['sections' => [AlertTemplateSection::Expiration->value, AlertTemplateSection::Motion->value]]);
-    $rule = AlertRule::factory()->create(['alert_template_id' => $template->id]);
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create(['sections' => [AlertTemplateSection::Expiration->value, AlertTemplateSection::Motion->value]]);
+    $rule = AlertRule::factory()->for($plusUser)->create(['category' => 'weather_alerts', 'alert_template_id' => $template->id]);
     // ActiveWwa is created before the IngestedProduct: IngestedProductObserver
     // (see app/Observers/IngestedProductObserver.php) fires SyncActiveWwa on
     // create, which does its own ActiveWwa::updateOrCreate() for this VTEC
@@ -106,4 +111,21 @@ test('returns null when every checked section is null for this event', function 
     $product = IngestedProduct::factory()->create(['locations_impacted' => null, 'call_to_action' => null]);
 
     expect((new ComposeTemplatedAlertBody)($rule, $product))->toBeNull();
+});
+
+test('returns null for a Free-tier subscriber\'s rule, even with a real weather_alerts template attached', function () {
+    $freeUser = User::factory()->create(['tier_override' => 'free']);
+    $template = AlertTemplate::factory()->for($freeUser)->create(['sections' => ['hazard']]);
+    $rule = AlertRule::factory()->for($freeUser)->create(['category' => 'weather_alerts', 'alert_template_id' => $template->id]);
+    $product = IngestedProduct::factory()->create([...vtecKeyFor(), 'hazard' => 'Flash flooding.']);
+
+    expect((new ComposeTemplatedAlertBody)($rule, $product))->toBeNull();
+});
+
+test('effectiveAlertTemplate returns null when the attached template\'s category no longer matches the rule\'s own category', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create(['category' => 'spc_wpc']);
+    $rule = AlertRule::factory()->for($plusUser)->create(['category' => 'weather_alerts', 'alert_template_id' => $template->id]);
+
+    expect($rule->effectiveAlertTemplate())->toBeNull();
 });

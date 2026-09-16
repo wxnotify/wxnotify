@@ -24,7 +24,7 @@ class ComposeTemplatedAlertBody
 {
     public function __invoke(AlertRule $rule, IngestedProduct $product): ?string
     {
-        $template = $rule->alertTemplate;
+        $template = $rule->effectiveAlertTemplate();
 
         if ($template === null || $template->category !== AlertCategory::WeatherAlerts) {
             return null;

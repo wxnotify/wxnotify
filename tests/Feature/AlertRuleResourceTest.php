@@ -550,3 +550,30 @@ test('the alert_template_id select only offers templates matching the rule\'s ow
             return in_array($matching->id, $optionIds) && ! in_array($mismatched->id, $optionIds);
         });
 });
+
+test('changing an alert rule\'s category away from weather_alerts clears a stale alert_template_id', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $this->actingAs($plusUser);
+    $location = Location::factory()->for($plusUser)->create();
+    $channel = NotificationChannel::factory()->for($plusUser)->create();
+
+    $template = AlertTemplate::factory()->for($plusUser)->create(['category' => 'weather_alerts']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'alert_template_id' => $template->id,
+    ]);
+    $rule->notificationChannels()->attach($channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->set('data.category', 'daily_summary')
+        // daily_summary's own required location_id -- unlike category and
+        // alert_template_id, this one isn't seeded automatically by any
+        // afterStateUpdated() hook, so the switch needs it set explicitly
+        // for save() to pass validation; it's incidental to what this test
+        // is actually verifying (that alert_template_id gets cleared).
+        ->set('data.location_id', $location->id)
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->alert_template_id)->toBeNull();
+});

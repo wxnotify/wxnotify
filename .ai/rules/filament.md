@@ -40,3 +40,10 @@ Found while building the ShapefileLayerResource list page (`Status` column showi
 Fix: call `->hiddenIndicator()` on the field, or set explicit `->idleIndicator('heroicon-...')`/`->selectedIndicator(...)` values with icons that actually exist — don't rely on this package's unconfigured default.
 
 Found while swapping `ConnectChannel.php`'s channel-type `ToggleButtons` for `RadioCards` (Better Options plugin).
+
+## A hidden field's Set() clear in afterStateUpdated doesn't survive an EditRecord save
+Setting a field to null via `Set $set` inside another field's `->afterStateUpdated()` (e.g. clearing `alert_template_id` when `category` changes away from a value that supports it) only updates in-memory form STATE. If the cleared field's own `->visible()` now evaluates false, Filament's default `isDehydratedWhenHidden(false)` means `dehydrateState()` (`vendor/filament/schemas/src/Components/Concerns/HasState.php`) removes that key from `$data` entirely at save time -- it does not dehydrate the already-cleared value. `EditRecord`'s default `handleRecordUpdate()` does `$record->update($data)` (mass assignment), so a key that's simply absent leaves that DB column untouched -- a record that already had a real value before the field was hidden keeps that stale value forever, even though the live UI and a fresh Create both show it cleared.
+
+Fix: don't rely on the `Set`-in-`afterStateUpdated` clear alone for an Edit page. Also override `mutateFormDataBeforeSave(array $data): array` on that Edit page to force the field to its cleared value there, independent of dehydration. Verify with a real `livewire(EditPage::class, ['record' => ...])->set('data.category', ...)->call('save')` test asserting the DB value, not just `assertFormSet()` -- the in-memory state can look correct while the persisted value is stale.
+
+See `AlertRuleForm::clearAlertTemplateIfCategoryUnsupported()` + `EditAlertRule::mutateFormDataBeforeSave()` for the working pattern.
