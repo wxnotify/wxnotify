@@ -155,6 +155,57 @@ test('a CAP row with a motion description enriches active_wwas motion fields', f
         ->and($wwa->motion_observed_at)->not->toBeNull();
 });
 
+test('a text row with a real TIME...MOT...LOC line enriches active_wwas motion fields too, not just CAP rows', function () {
+    // Real captured text from database/product_examples/SVW.txt -- confirms
+    // syncFromText() now writes motion fields, closing the gap where only
+    // syncFromCap() ever did, which left the section-picker template
+    // builder's Motion section effectively unreachable in the common
+    // dispatch path (DeliverWeatherAlert usually fires off the text row,
+    // before CAP has a chance to supply motion data).
+    app()->instance(MatchWeatherAlertRules::class, Mockery::spy(MatchWeatherAlertRules::class));
+    $product = Product::where('code', 'SV.W')->sole();
+    $text = file_get_contents(base_path('database/product_examples/SVW.txt'));
+    $textRow = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'text', 'text' => $text,
+        'vtec_office' => 'KPAH', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0236', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'received_at' => '2026-09-14 00:52:00',
+    ]);
+
+    (new SyncActiveWwa)($textRow);
+
+    $wwa = ActiveWwa::sole();
+    expect($wwa->motion_direction_degrees)->toBe(278)
+        ->and($wwa->motion_speed_kt)->toBe(15)
+        ->and((float) $wwa->motion_reference_lat)->toBe(36.56)
+        ->and((float) $wwa->motion_reference_lon)->toBe(-90.73)
+        ->and($wwa->motion_observed_at)->not->toBeNull();
+});
+
+test('a text continuation with no TIME...MOT...LOC line does not clobber previously known motion fields', function () {
+    app()->instance(MatchWeatherAlertRules::class, Mockery::spy(MatchWeatherAlertRules::class));
+    $product = Product::where('code', 'SV.W')->sole();
+    ActiveWwa::factory()->create([
+        'product_id' => $product->id, 'vtec_office' => 'KPAH', 'vtec_phenomenon' => 'SV',
+        'vtec_significance' => 'W', 'vtec_event_number' => '0236', 'vtec_year' => 2026,
+        'motion_direction_degrees' => 278, 'motion_speed_kt' => 15,
+        'motion_reference_lat' => 36.56, 'motion_reference_lon' => -90.73,
+    ]);
+
+    $continuation = createIngestedProductWithoutMatchingForSync([
+        'product_id' => $product->id, 'format' => 'text',
+        'text' => "SEVERE WEATHER STATEMENT\nNo motion line in this continuation.\n",
+        'vtec_office' => 'KPAH', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0236', 'vtec_year' => 2026, 'vtec_action' => 'CON',
+    ]);
+
+    (new SyncActiveWwa)($continuation);
+
+    $wwa = ActiveWwa::sole();
+    expect($wwa->motion_direction_degrees)->toBe(278)
+        ->and($wwa->motion_speed_kt)->toBe(15);
+});
+
 test('a CAP row that finds its paired text row still sets latest_ingested_product_id to that paired row, even when active_wwas is being created for the first time', function () {
     $spy = Mockery::spy(MatchWeatherAlertRules::class);
     app()->instance(MatchWeatherAlertRules::class, $spy);

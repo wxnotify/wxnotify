@@ -17,6 +17,13 @@ use Throwable;
  * resolve to the same product_id as their parent warning). CAP rows only
  * dispatch when their paired text row can't be found, since the normal case
  * is CAP arriving a few seconds after text already dispatched.
+ *
+ * Both syncFromText() and syncFromCap() write motion_* fields when their
+ * respective source carries one (a text row's own TIME...MOT...LOC line, or
+ * CAP's eventMotionDescription parameter) -- text is what actually populates
+ * it in the common case, since dispatch (and therefore anything consuming
+ * these columns, e.g. the Custom Alert Templates Motion section) usually
+ * fires off the text row before CAP has a chance to arrive at all.
  */
 class SyncActiveWwa
 {
@@ -45,6 +52,7 @@ class SyncActiveWwa
                         ...($product->ugc_codes !== null ? ['ugc_codes' => $product->ugc_codes] : []),
                         ...($product->vtec_begin !== null ? ['effective' => $product->vtec_begin] : []),
                         ...($product->vtec_end !== null ? ['expires' => $product->vtec_end] : []),
+                        ...app(ParseTextMotionDescription::class)($product->text, $product->received_at),
                     ],
                 );
 

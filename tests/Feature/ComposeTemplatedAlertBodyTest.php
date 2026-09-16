@@ -129,3 +129,26 @@ test('effectiveAlertTemplate returns null when the attached template\'s category
 
     expect($rule->effectiveAlertTemplate())->toBeNull();
 });
+
+test('renders a real Motion line for a text-sourced product ingested through the real pipeline, not just a hand-built ActiveWwa row', function () {
+    // Closes the loop on the fix for the Motion section being effectively
+    // unreachable in the common dispatch path: this test lets the REAL
+    // IngestedProductObserver -> SyncActiveWwa -> ParseTextMotionDescription
+    // pipeline run against a real captured bulletin (database/product_examples/SVW.txt),
+    // rather than hand-constructing the ActiveWwa row directly the way the
+    // other Motion-related test above does.
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create(['sections' => [AlertTemplateSection::Motion->value]]);
+    $rule = AlertRule::factory()->for($plusUser)->create(['category' => 'weather_alerts', 'alert_template_id' => $template->id]);
+
+    $product = IngestedProduct::factory()->create([
+        'format' => 'text',
+        'text' => file_get_contents(base_path('database/product_examples/SVW.txt')),
+        'vtec_office' => 'KPAH', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '0236', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+    ]);
+
+    $result = (new ComposeTemplatedAlertBody)($rule, $product);
+
+    expect($result)->toBe('Motion: Moving W at 17 mph');
+});
