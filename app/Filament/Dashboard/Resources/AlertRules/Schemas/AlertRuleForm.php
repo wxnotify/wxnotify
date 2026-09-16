@@ -252,7 +252,9 @@ class AlertRuleForm
             ->createOptionForm(AlertTemplateForm::fields())
             ->createOptionAction(fn (Action $action): Action => $action->modalHeading('Add a template'))
             ->createOptionUsing(fn (array $data): int => auth()->user()->alertTemplates()->create($data)->getKey())
-            ->helperText('Takes priority over the subject line and message length above when set. Leave blank to keep using those.');
+            ->helperText(fn (Get $get): string => $get('category') === AlertCategory::WeatherAlerts->value
+                ? 'Takes priority over the subject line and message length above when set. Leave blank to keep using those.'
+                : 'Takes priority over the subject line above when set. Leave blank to keep using that.');
     }
 
     /**
