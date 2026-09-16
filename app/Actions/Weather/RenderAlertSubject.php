@@ -19,7 +19,8 @@ class RenderAlertSubject
 {
     public function __invoke(AlertRule $rule, ?Product $product = null): string
     {
-        $subjectTemplate = $rule->alertTemplate?->subject_template ?? $rule->effectiveCustomSubjectTemplate();
+        $templateSubject = $rule->alertTemplate?->subject_template;
+        $subjectTemplate = filled($templateSubject) ? $templateSubject : $rule->effectiveCustomSubjectTemplate();
 
         if (blank($subjectTemplate)) {
             return $rule->displayName();

@@ -70,6 +70,22 @@ test('falls through to the old custom_subject_template when the attached AlertTe
     expect($result)->toBe('From old field: Tornado Warning');
 });
 
+test('falls through to the old custom_subject_template when the attached AlertTemplate has an empty-string subject, not just a null one', function () {
+    // A Filament TextInput submits '' for an untouched optional field, not
+    // null -- this must fall through exactly like the null case does.
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create(['subject_template' => '']);
+    $product = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'custom_subject_template' => 'From old field: {product}',
+        'alert_template_id' => $template->id,
+    ]);
+
+    $result = (new RenderAlertSubject)($rule, $product);
+
+    expect($result)->toBe('From old field: Tornado Warning');
+});
+
 test('{product} falls back to the category label when no product is given', function () {
     $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
     $rule = AlertRule::factory()->for($plusUser)->create([
