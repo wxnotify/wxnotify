@@ -11,6 +11,7 @@ use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\ProductCatalogSeeder;
+use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
@@ -523,8 +524,8 @@ test('the alert_template_id select only offers templates matching the rule\'s ow
     $this->actingAs($plusUser);
     $channel = NotificationChannel::factory()->for($plusUser)->create();
 
-    AlertTemplate::factory()->for($plusUser)->create(['category' => 'weather_alerts', 'name' => 'Matching']);
-    AlertTemplate::factory()->for($plusUser)->spcWpc()->create(['name' => 'Mismatched']);
+    $matching = AlertTemplate::factory()->for($plusUser)->create(['category' => 'weather_alerts', 'name' => 'Matching']);
+    $mismatched = AlertTemplate::factory()->for($plusUser)->spcWpc()->create(['name' => 'Mismatched']);
 
     $tornadoWarning = Product::where('code', 'TO.W')->sole();
 
@@ -535,5 +536,17 @@ test('the alert_template_id select only offers templates matching the rule\'s ow
             'matching_mode' => 'nationwide',
             'channel_ids' => [$channel->id],
         ])
-        ->assertFormFieldExists('alert_template_id');
+        // No assertFormFieldOptionsExist()/assertFormFieldOptionsDoNotExist()
+        // exists in this installed Filament version (confirmed: grep for
+        // "assertFormFieldOptions" across tests/ and
+        // vendor/filament/forms/src/Testing/TestsForms.php turns up nothing).
+        // assertFormFieldExists()'s $checkFieldUsing callback receives the
+        // live, hydrated Select instance, so calling ->getOptions() on it
+        // exercises the exact same options() closure -- and the exact same
+        // Get $get resolution -- the real Livewire component would use.
+        ->assertFormFieldExists('alert_template_id', function (Select $field) use ($matching, $mismatched): bool {
+            $optionIds = array_keys($field->getOptions());
+
+            return in_array($matching->id, $optionIds) && ! in_array($mismatched->id, $optionIds);
+        });
 });
