@@ -19,12 +19,19 @@ use Illuminate\Support\Carbon;
  * time-of-day, which carries no date of its own -- the product's own
  * received_at, on the same narrow, documented same-day assumption this
  * codebase already makes elsewhere for other day/time-only fields (see
- * ParseVtecString's year-derivation docblock).
+ * ParseVtecString's year-derivation docblock). Known, accepted limitation:
+ * a bulletin timestamped just before UTC midnight while received_at has
+ * already rolled to the next UTC day (or vice versa) puts
+ * motion_observed_at a full day off. Not chased further because nothing
+ * in this codebase currently reads or renders motion_observed_at anywhere
+ * (FormatMotionVector only consumes motion_direction_degrees/motion_speed_kt)
+ * -- revisit if a future consumer actually needs it to be exact.
  *
- * Takes only the FIRST lat/lon pair when a real bulletin lists several
- * storm cells sharing one motion vector (confirmed in
- * database/product_examples/SPS.txt) -- matches CAP's own single-point
- * eventMotionDescription shape.
+ * Takes only the FIRST lat/lon pair when a real bulletin lists more than
+ * one on the same TIME...MOT...LOC line (confirmed in
+ * database/product_examples/SPS.txt -- two endpoints of one storm line's
+ * leading edge, not distinct storm cells) -- matches CAP's own
+ * single-point eventMotionDescription shape.
  *
  * @return array{motion_observed_at?: Carbon, motion_direction_degrees?: int, motion_speed_kt?: int, motion_reference_lat?: float, motion_reference_lon?: float}
  */
