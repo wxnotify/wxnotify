@@ -66,9 +66,9 @@ class ComposeTemplatedAlertBody
     }
 
     /**
-     * Same VTEC-composite-key lookup MatchWeatherAlertRules::matchesActiveWwaPolygon()
-     * already uses to correlate an IngestedProduct to its current-state
-     * ActiveWwa row.
+     * Correlates an IngestedProduct to its current-state ActiveWwa row via
+     * ActiveWwa::scopeForProduct() -- the same VTEC composite-key lookup
+     * MatchWeatherAlertRules::matchesActiveWwaPolygon() uses.
      */
     private function findActiveWwa(IngestedProduct $product): ?ActiveWwa
     {
@@ -76,12 +76,6 @@ class ComposeTemplatedAlertBody
             return null;
         }
 
-        return ActiveWwa::query()
-            ->where('vtec_office', $product->vtec_office)
-            ->where('vtec_phenomenon', $product->vtec_phenomenon)
-            ->where('vtec_significance', $product->vtec_significance)
-            ->where('vtec_event_number', $product->vtec_event_number)
-            ->where('vtec_year', $product->vtec_year)
-            ->first();
+        return ActiveWwa::query()->forProduct($product)->first();
     }
 }

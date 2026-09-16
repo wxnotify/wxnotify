@@ -36,7 +36,7 @@ class SyncActiveWwa
         try {
             DB::transaction(function () use ($product): void {
                 $wwa = ActiveWwa::updateOrCreate(
-                    $this->vtecKey($product),
+                    ActiveWwa::vtecKeyFor($product),
                     [
                         'product_id' => $product->product_id,
                         'status' => $this->resolveStatus($product->vtec_action),
@@ -75,7 +75,7 @@ class SyncActiveWwa
 
             DB::transaction(function () use ($product, $pairedText): void {
                 $wwa = ActiveWwa::updateOrCreate(
-                    $this->vtecKey($product),
+                    ActiveWwa::vtecKeyFor($product),
                     [
                         'product_id' => $product->product_id,
                         'status' => $this->resolveStatus($product->vtec_action),
@@ -107,20 +107,6 @@ class SyncActiveWwa
         if ($pairedText === null || $lookupFailed) {
             app(MatchWeatherAlertRules::class)($product);
         }
-    }
-
-    /**
-     * @return array{vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int}
-     */
-    private function vtecKey(IngestedProduct $product): array
-    {
-        return [
-            'vtec_office' => $product->vtec_office,
-            'vtec_phenomenon' => $product->vtec_phenomenon,
-            'vtec_significance' => $product->vtec_significance,
-            'vtec_event_number' => $product->vtec_event_number,
-            'vtec_year' => $product->vtec_year,
-        ];
     }
 
     private function resolveStatus(?string $vtecAction): string

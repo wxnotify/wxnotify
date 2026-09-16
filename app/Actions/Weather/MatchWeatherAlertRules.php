@@ -225,11 +225,7 @@ class MatchWeatherAlertRules
         }
 
         $activeWwa = ActiveWwa::query()
-            ->where('vtec_office', $product->vtec_office)
-            ->where('vtec_phenomenon', $product->vtec_phenomenon)
-            ->where('vtec_significance', $product->vtec_significance)
-            ->where('vtec_event_number', $product->vtec_event_number)
-            ->where('vtec_year', $product->vtec_year)
+            ->forProduct($product)
             ->whereNotNull('polygon')
             ->first();
 

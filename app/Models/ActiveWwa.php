@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\ActiveWwaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,5 +45,30 @@ class ActiveWwa extends Model
     public function latestIngestedProduct(): BelongsTo
     {
         return $this->belongsTo(IngestedProduct::class, 'latest_ingested_product_id');
+    }
+
+    /**
+     * Scopes to the row(s) sharing an IngestedProduct's VTEC composite key
+     * (office, phenomenon, significance, event number, year) -- the same
+     * correlation SyncActiveWwa uses to upsert the current-state row for an
+     * event, and that callers use to look it back up.
+     */
+    public function scopeForProduct(Builder $query, IngestedProduct $product): Builder
+    {
+        return $query->where(static::vtecKeyFor($product));
+    }
+
+    /**
+     * @return array{vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int}
+     */
+    public static function vtecKeyFor(IngestedProduct $product): array
+    {
+        return [
+            'vtec_office' => $product->vtec_office,
+            'vtec_phenomenon' => $product->vtec_phenomenon,
+            'vtec_significance' => $product->vtec_significance,
+            'vtec_event_number' => $product->vtec_event_number,
+            'vtec_year' => $product->vtec_year,
+        ];
     }
 }
