@@ -191,8 +191,14 @@ test('a concatenated 8-digit LAT...LON token (SPC MD/WPC MPD format) decodes cor
     ]);
 });
 
-test('a warning-family separate-token LAT...LON line still decodes exactly as before (no regression)', function () {
-    $text = "LAT...LON 3650 9082 3666 9079 3663 9055 3650 9058\nTIME...MOT...LOC 0052Z 278DEG 15KT 3656 9073\n";
+test('many individually-4-digit separate tokens are never misclassified as combined-format, regardless of total count', function () {
+    // Distinct from the "decodes 4-digit coordinate pairs" test above: that
+    // test only has 4 tokens (2 points). This one has 16 tokens (8 points)
+    // -- none individually >= 8 chars -- to prove $isCombinedFormat's
+    // per-token length check isn't fooled by a large total token/digit
+    // count and doesn't accidentally route a legitimate separate-token line
+    // through the combined-token decode path.
+    $text = "LAT...LON 3650 9082 3666 9079 3663 9055 3650 9058 3644 9061 3658 9070 3672 9065 3655 9048\n";
 
     $metadata = (new ExtractProductMetadata)($text, null);
 
@@ -201,6 +207,10 @@ test('a warning-family separate-token LAT...LON line still decodes exactly as be
         ['lat' => 36.66, 'lon' => -90.79],
         ['lat' => 36.63, 'lon' => -90.55],
         ['lat' => 36.5, 'lon' => -90.58],
+        ['lat' => 36.44, 'lon' => -90.61],
+        ['lat' => 36.58, 'lon' => -90.7],
+        ['lat' => 36.72, 'lon' => -90.65],
+        ['lat' => 36.55, 'lon' => -90.48],
     ]);
 });
 

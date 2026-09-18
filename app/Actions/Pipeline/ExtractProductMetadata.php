@@ -250,10 +250,10 @@ class ExtractProductMetadata
         // MCD fixture, database/product_examples/SWO.txt. A product uses
         // one convention consistently, so the presence of any combined
         // token switches parsing for the whole line.
-        $isCombinedFormat = collect($tokens)->contains(fn (string $t): bool => strlen($t) >= 8);
+        $isCombinedFormat = collect($tokens)->contains(fn (string $token): bool => strlen($token) >= 8);
 
         if ($isCombinedFormat) {
-            $points = collect($tokens)->map(fn (string $t): array => self::decodeCombinedToken($t))->all();
+            $points = collect($tokens)->map(fn (string $token): array => self::decodeCombinedToken($token))->all();
 
             return count($points) >= 3 ? $points : null;
         }
