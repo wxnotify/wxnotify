@@ -166,6 +166,44 @@ test('a non-digit-leading continuation line inside the polygon block is skipped,
     ]);
 });
 
+test('a concatenated 8-digit LAT...LON token (SPC MD/WPC MPD format) decodes correctly', function () {
+    $text = file_get_contents(base_path('database/product_examples/SWO.txt'));
+
+    $metadata = (new ExtractProductMetadata)($text, 'swomcd');
+
+    expect($metadata['polygon'])->toBe([
+        ['lat' => 33.31, 'lon' => -114.29],
+        ['lat' => 34.15, 'lon' => -114.73],
+        ['lat' => 34.54, 'lon' => -114.89],
+        ['lat' => 35.2, 'lon' => -115.15],
+        ['lat' => 35.55, 'lon' => -114.99],
+        ['lat' => 35.32, 'lon' => -113.91],
+        ['lat' => 35.08, 'lon' => -113.1],
+        ['lat' => 34.62, 'lon' => -112.2],
+        ['lat' => 34.34, 'lon' => -111.41],
+        ['lat' => 33.81, 'lon' => -110.53],
+        ['lat' => 32.73, 'lon' => -109.67],
+        ['lat' => 32.47, 'lon' => -109.95],
+        ['lat' => 32.39, 'lon' => -110.71],
+        ['lat' => 32.5, 'lon' => -111.98],
+        ['lat' => 33.05, 'lon' => -113.99],
+        ['lat' => 33.31, 'lon' => -114.29],
+    ]);
+});
+
+test('a warning-family separate-token LAT...LON line still decodes exactly as before (no regression)', function () {
+    $text = "LAT...LON 3650 9082 3666 9079 3663 9055 3650 9058\nTIME...MOT...LOC 0052Z 278DEG 15KT 3656 9073\n";
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['polygon'])->toBe([
+        ['lat' => 36.5, 'lon' => -90.82],
+        ['lat' => 36.66, 'lon' => -90.79],
+        ['lat' => 36.63, 'lon' => -90.55],
+        ['lat' => 36.5, 'lon' => -90.58],
+    ]);
+});
+
 test('a product with no LAT...LON line resolves no polygon', function () {
     $metadata = (new ExtractProductMetadata)("AREA FORECAST DISCUSSION\nNo polygon here.", null);
 

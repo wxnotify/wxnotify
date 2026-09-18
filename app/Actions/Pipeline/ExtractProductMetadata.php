@@ -198,12 +198,12 @@ class ExtractProductMetadata
 
     /**
      * Finds a "LAT...LON" line, collects wrapped continuation lines until a
-     * blank line or a "TIME..." line, and decodes each 4-or-5-digit
-     * coordinate pair. Doesn't pre-filter by product type (the legacy
-     * reference implementation gates this on a fixed list of AWIPS product
-     * types) — scanning every product's text for the line and returning
-     * null when absent is simpler and has the same practical effect, since
-     * most VTEC products never carry one.
+     * blank line or a "TIME..." line, and decodes each coordinate token.
+     * Doesn't pre-filter by product type (the legacy reference implementation
+     * gates this on a fixed list of AWIPS product types) — scanning every
+     * product's text for the line and returning null when absent is simpler
+     * and has the same practical effect, since most VTEC products never
+     * carry one.
      *
      * @return ?array<int, array{lat: float, lon: float}>
      */
@@ -211,7 +211,7 @@ class ExtractProductMetadata
     {
         $lines = preg_split('/\r\n|\r|\n/', $text);
         $collecting = false;
-        $numbers = [];
+        $tokens = [];
 
         foreach ($lines as $line) {
             $trimmed = trim($line);
@@ -234,21 +234,67 @@ class ExtractProductMetadata
                 continue;
             }
 
-            if (preg_match_all('/\d{4,5}/', $trimmed, $matches)) {
-                array_push($numbers, ...$matches[0]);
+            if (preg_match_all('/\d{4,9}/', $trimmed, $matches)) {
+                array_push($tokens, ...$matches[0]);
             }
         }
 
-        if (count($numbers) < 6 || count($numbers) % 2 !== 0) {
+        if ($tokens === []) {
             return null;
         }
 
-        return collect(array_chunk($numbers, 2))
+        // SPC MD/WPC MPD products encode each lat/lon pair as one
+        // concatenated 8-9 digit token (e.g. "33311429") rather than
+        // warning-family's two separate space-delimited 4-5 digit tokens
+        // (e.g. "3650 9082") -- confirmed against this repo's own real SPC
+        // MCD fixture, database/product_examples/SWO.txt. A product uses
+        // one convention consistently, so the presence of any combined
+        // token switches parsing for the whole line.
+        $isCombinedFormat = collect($tokens)->contains(fn (string $t): bool => strlen($t) >= 8);
+
+        if ($isCombinedFormat) {
+            $points = collect($tokens)->map(fn (string $t): array => self::decodeCombinedToken($t))->all();
+
+            return count($points) >= 3 ? $points : null;
+        }
+
+        if (count($tokens) < 6 || count($tokens) % 2 !== 0) {
+            return null;
+        }
+
+        return collect(array_chunk($tokens, 2))
             ->map(fn (array $pair): array => [
                 'lat' => self::decodeCoordinatePart($pair[0]),
                 'lon' => -self::decodeCoordinatePart($pair[1]),
             ])
             ->all();
+    }
+
+    /**
+     * Decodes one combined lat/lon token: the first 4 digits are latitude
+     * (decimal after 2, as usual), the rest is longitude. A 4-digit
+     * remainder always represents a longitude >= 100 degrees with its
+     * leading "1" digit dropped -- confirmed against this repo's own real
+     * SPC MCD fixture (database/product_examples/SWO.txt: token "33311429"
+     * only decodes to a real Arizona/Nevada/California-border coordinate,
+     * matching that MD's own "AREAS AFFECTED...CENTRAL/SOUTHERN AZ...FAR
+     * ERN CA...FAR SRN NV" text, if the longitude half is read as "114.29"
+     * rather than "14.29"). Built from a single real confirmed example --
+     * if a real MD/MPD example is ever found using a different convention,
+     * this needs revisiting, not guessed at further.
+     *
+     * @return array{lat: float, lon: float}
+     */
+    private static function decodeCombinedToken(string $token): array
+    {
+        $lat = substr($token, 0, 4);
+        $lonDigits = substr($token, 4);
+        $lon = strlen($lonDigits) === 4 ? '1'.$lonDigits : $lonDigits;
+
+        return [
+            'lat' => self::decodeCoordinatePart($lat),
+            'lon' => -self::decodeCoordinatePart($lon),
+        ];
     }
 
     /**
