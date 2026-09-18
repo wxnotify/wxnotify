@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('test_product_scenarios', function (Blueprint $table): void {
             $table->id();
             $table->string('name')->nullable();
-            $table->foreignId('product_id')->constrained();
+            $table->foreignId('product_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('continues_scenario_id')->nullable()->constrained('test_product_scenarios')->nullOnDelete();
             $table->json('input');
             $table->timestamps();

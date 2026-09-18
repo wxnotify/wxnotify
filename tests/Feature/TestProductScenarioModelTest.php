@@ -9,9 +9,9 @@ test('a scenario belongs to a product, can continue another scenario, and casts 
     $original = TestProductScenario::factory()->for($product)->create(['input' => ['wfo' => 'TWC']]);
     $followUp = TestProductScenario::factory()->for($product)->create(['continues_scenario_id' => $original->id]);
 
-    expect($followUp->fresh()->continuesScenario->is($original))->toBeTrue()
-        ->and($original->fresh()->product->is($product))->toBeTrue()
-        ->and($original->fresh()->input)->toBe(['wfo' => 'TWC']);
+    expect($followUp->fresh()->continuesScenario->is($original))->toBeTrue();
+    expect($original->fresh()->product->is($product))->toBeTrue();
+    expect($original->fresh()->input)->toBe(['wfo' => 'TWC']);
 });
 
 test('a scenario tracks every ingested product it has spawned', function () {

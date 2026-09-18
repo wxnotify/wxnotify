@@ -14,7 +14,7 @@ class TestProductScenarioFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->optional()->sentence(3),
+            'name' => fake()->sentence(3),
             'product_id' => Product::factory(),
             'input' => [
                 'mode' => 'new',
