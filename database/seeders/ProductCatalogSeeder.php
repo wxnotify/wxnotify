@@ -227,6 +227,16 @@ class ProductCatalogSeeder extends Seeder
         }
 
         foreach (self::NEW as $abbr => $data) {
+            // Warning/Watch/Advisory families always carry VTEC and UGC. Statement-family
+            // products default to false/false since their VTEC-continuation status isn't
+            // uniformly true (see SVS vs SPS in the base catalog's migration backfill) --
+            // except FFS, the well-established VTEC-continuation statement for FF.W.
+            $hasVtecAndUgc = $abbr === 'FFS' || in_array($data['family'], [
+                ProductFamily::Warning,
+                ProductFamily::Watch,
+                ProductFamily::Advisory,
+            ], true);
+
             Product::updateOrCreate(
                 ['code' => $abbr],
                 [
@@ -234,6 +244,8 @@ class ProductCatalogSeeder extends Seeder
                     'family' => $data['family'],
                     'category' => $data['category'],
                     'wea_warning' => $data['wea_warning'],
+                    'has_vtec' => $hasVtecAndUgc,
+                    'has_ugc' => $hasVtecAndUgc,
                     'description' => trim($descriptions[$abbr]),
                     'example' => $this->example($abbr),
                     'status' => ProductStatus::Active,

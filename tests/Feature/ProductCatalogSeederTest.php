@@ -53,3 +53,21 @@ test('a manual edit to a matched product survives a re-run except for the merged
 
     expect(Product::where('code', 'TO.W')->sole()->name)->toBe('Staff-Renamed Warning');
 });
+
+test('sets has_vtec/has_ugc for every new Warning/Watch/Advisory product, with FFS correctly flagged as a VTEC continuation', function () {
+    $this->seed(ProductCatalogSeeder::class);
+
+    // FAW (Areal Flood Warning) is a plain Warning-family new product.
+    expect(Product::where('code', 'FAW')->sole()->has_vtec)->toBeTrue()
+        ->and(Product::where('code', 'FAW')->sole()->has_ugc)->toBeTrue()
+        // FFS (Flash Flood Statement) is Statement-family but is the well-established
+        // VTEC-continuation statement for FF.W, so it's explicitly overridden to true.
+        ->and(Product::where('code', 'FFS')->sole()->has_vtec)->toBeTrue()
+        ->and(Product::where('code', 'FFS')->sole()->has_ugc)->toBeTrue()
+        // HLS and MAS are also Statement-family, but their VTEC-continuation status
+        // isn't confidently established, so they stay at the safe false/false default.
+        ->and(Product::where('code', 'HLS')->sole()->has_vtec)->toBeFalse()
+        ->and(Product::where('code', 'HLS')->sole()->has_ugc)->toBeFalse()
+        ->and(Product::where('code', 'MAS')->sole()->has_vtec)->toBeFalse()
+        ->and(Product::where('code', 'MAS')->sole()->has_ugc)->toBeFalse();
+});
