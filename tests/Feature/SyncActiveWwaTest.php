@@ -388,6 +388,7 @@ test('a Cancelled row is not overridden back by the expiry check', function () {
 });
 
 test('propagates is_test from the triggering product onto the active_wwas row', function () {
+    app()->instance(MatchWeatherAlertRules::class, Mockery::spy(MatchWeatherAlertRules::class));
     $product = createIngestedProductWithoutMatchingForSync([
         'format' => 'text',
         'is_test' => true,
@@ -402,6 +403,7 @@ test('propagates is_test from the triggering product onto the active_wwas row', 
 });
 
 test('a real (non-test) product leaves is_test false on its active_wwas row', function () {
+    app()->instance(MatchWeatherAlertRules::class, Mockery::spy(MatchWeatherAlertRules::class));
     $product = createIngestedProductWithoutMatchingForSync([
         'format' => 'text',
         'is_test' => false,
@@ -413,6 +415,30 @@ test('a real (non-test) product leaves is_test false on its active_wwas row', fu
     (new SyncActiveWwa)($product);
 
     expect(ActiveWwa::where('vtec_event_number', '9002')->sole()->is_test)->toBeFalse();
+});
+
+test('a product with is_test left unset (as real ingestion always leaves it) still writes false, not null, onto active_wwas', function () {
+    // Regression guard for the NOT-NULL trap: a freshly-created (not
+    // ->fresh()'d) IngestedProduct has is_test === null in memory even
+    // though the database column defaults to false -- see isTest()'s
+    // doc comment on SyncActiveWwa. Unlike the two tests above, this one
+    // deliberately does NOT pass is_test at all, mirroring real ingestion
+    // (ParseVtecString et al never set it), so it actually exercises the
+    // `?? false` coalesce -- reverting that back to a bare $product->is_test
+    // would fail this test with a NOT NULL constraint violation swallowed
+    // by the try/catch, leaving no active_wwas row at all.
+    app()->instance(MatchWeatherAlertRules::class, Mockery::spy(MatchWeatherAlertRules::class));
+    $product = createIngestedProductWithoutMatchingForSync([
+        'format' => 'text',
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '9003', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'text' => "/O.NEW.KTWC.SV.W.9003.260918T0000Z-260918T0100Z/\n",
+    ]);
+    expect($product->is_test)->toBeNull();
+
+    (new SyncActiveWwa)($product);
+
+    expect(ActiveWwa::where('vtec_event_number', '9003')->sole()->is_test)->toBeFalse();
 });
 
 test('a failure syncing active_wwas does not prevent MatchWeatherAlertRules from still being called', function () {

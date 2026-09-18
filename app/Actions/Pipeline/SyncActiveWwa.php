@@ -47,7 +47,7 @@ class SyncActiveWwa
                     [
                         'product_id' => $product->product_id,
                         'status' => $this->resolveStatus($product->vtec_action),
-                        'is_test' => $product->is_test ?? false,
+                        'is_test' => $this->isTest($product),
                         'latest_ingested_product_id' => $product->id,
                         'source' => 'text',
                         ...($product->ugc_codes !== null ? ['ugc_codes' => $product->ugc_codes] : []),
@@ -88,7 +88,7 @@ class SyncActiveWwa
                     [
                         'product_id' => $product->product_id,
                         'status' => $this->resolveStatus($product->vtec_action),
-                        'is_test' => $product->is_test ?? false,
+                        'is_test' => $this->isTest($product),
                         'headline' => $product->headline,
                         'source' => 'cap',
                         'latest_ingested_product_id' => $pairedText?->id ?? $product->id,
@@ -117,6 +117,22 @@ class SyncActiveWwa
         if ($pairedText === null || $lookupFailed) {
             app(MatchWeatherAlertRules::class)($product);
         }
+    }
+
+    /**
+     * A freshly-created (not `->fresh()`'d) IngestedProduct instance has
+     * `is_test === null` in memory -- Eloquent doesn't reload the row after
+     * insert, so the `is_test` column's `false` database default never
+     * makes it into the in-memory attribute, even though every real row
+     * does end up `false` in the database. Coalescing here prevents an
+     * explicit NULL write against active_wwas.is_test, which is NOT NULL --
+     * that insert would throw, and since it happens inside this action's
+     * try/catch, the exception would be silently logged and swallowed,
+     * dropping the whole active_wwas row for every real (non-test) product.
+     */
+    private function isTest(IngestedProduct $product): bool
+    {
+        return $product->is_test ?? false;
     }
 
     private function resolveStatus(?string $vtecAction): string
