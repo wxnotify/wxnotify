@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['code', 'name', 'family', 'category', 'has_polygon', 'risk_level_options', 'status', 'sort_order', 'description', 'example', 'wea_warning'])]
+#[Fillable(['code', 'name', 'family', 'category', 'has_polygon', 'has_vtec', 'has_ugc', 'risk_level_options', 'damage_tag_options', 'status', 'sort_order', 'description', 'example', 'wea_warning'])]
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
@@ -25,7 +25,10 @@ class Product extends Model
             'family' => ProductFamily::class,
             'category' => ProductCategory::class,
             'has_polygon' => 'boolean',
+            'has_vtec' => 'boolean',
+            'has_ugc' => 'boolean',
             'risk_level_options' => 'array',
+            'damage_tag_options' => 'array',
             'status' => ProductStatus::class,
             'wea_warning' => 'boolean',
         ];

@@ -33,10 +33,19 @@ class ProductForm
                     ->options(collect(ProductCategory::cases())->mapWithKeys(fn (ProductCategory $c) => [$c->value => $c->label()]))
                     ->helperText('Hazard-type grouping, distinct from family (which drives alert-wizard filtering).'),
                 Toggle::make('has_polygon'),
+                Toggle::make('has_vtec')
+                    ->label('Carries a VTEC line')
+                    ->helperText('Drives the Test Product Generator\'s "warning" shape and whether this product supports the continue-existing-event flow.'),
+                Toggle::make('has_ugc')
+                    ->label('Carries a UGC/zone line')
+                    ->helperText('Independent of VTEC — e.g. Special Weather Statements carry UGC with no VTEC line.'),
                 Toggle::make('wea_warning')
                     ->helperText('Activates the Wireless Emergency Alerts (cell-phone) system when issued.'),
                 TagsInput::make('risk_level_options')
                     ->helperText('Leave blank for products with no risk-level filter.'),
+                TagsInput::make('damage_tag_options')
+                    ->label('Damage tags')
+                    ->helperText('Exact NWS-format lines selectable in the Test Product Generator (e.g. "TORNADO...RADAR INDICATED"). Leave blank for products with no damage tags.'),
                 Select::make('status')
                     ->options(collect(ProductStatus::cases())->mapWithKeys(fn (ProductStatus $s) => [$s->value => ucfirst($s->value)]))
                     ->default(ProductStatus::Draft)
