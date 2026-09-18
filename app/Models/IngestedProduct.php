@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'headline', 'description', 'instruction', 'event_motion_description',
     'awips_identifier', 'wmo_identifier',
     'hazard', 'hazard_source', 'impact', 'locations_impacted', 'call_to_action',
+    'is_test', 'test_product_scenario_id',
 ])]
 class IngestedProduct extends Model
 {
@@ -32,12 +33,18 @@ class IngestedProduct extends Model
             'risk_levels' => 'array',
             'vtec_begin' => 'datetime',
             'vtec_end' => 'datetime',
+            'is_test' => 'boolean',
         ];
     }
 
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function scenario(): BelongsTo
+    {
+        return $this->belongsTo(TestProductScenario::class, 'test_product_scenario_id');
     }
 
     /**
