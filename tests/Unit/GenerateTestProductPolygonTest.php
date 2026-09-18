@@ -9,11 +9,15 @@ test('generates a 4-point diamond around a center point at the given radius', fu
     // North point: same lon, higher lat by roughly radius/69 degrees.
     expect($points[0]['lat'])->toBeGreaterThan(36.0)
         ->and($points[0]['lon'])->toEqual(-94.0, 0.0001);
-    // South point: same lon, lower lat.
-    expect($points[2]['lat'])->toBeLessThan(36.0);
-    // East/West points: same lat, differing lon.
+    // East point: same lat, higher lon.
     expect($points[1]['lat'])->toEqual(36.0, 0.0001)
-        ->and($points[3]['lat'])->toEqual(36.0, 0.0001);
+        ->and($points[1]['lon'])->toBeGreaterThan(-93.9);
+    // South point: same lon, lower lat.
+    expect($points[2]['lat'])->toBeLessThan(36.0)
+        ->and($points[2]['lon'])->toEqual(-94.0, 0.0001);
+    // West point: same lat, lower lon.
+    expect($points[3]['lat'])->toEqual(36.0, 0.0001)
+        ->and($points[3]['lon'])->toBeLessThan(-94.1);
 });
 
 test('parses a raw lat,lon-per-line textarea into points, skipping malformed lines', function () {
