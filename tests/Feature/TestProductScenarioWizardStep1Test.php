@@ -104,21 +104,75 @@ test('choosing a continued event inherits its product, WFO, event number, and pr
 
     // The critical assertion: the live form state above (`assertFormSet`)
     // only proves Livewire's in-memory state looked right. product_id and
-    // input.wfo are both ->visible() only while mode !== 'continue', so
-    // without CreateTestProductScenario::mutateFormDataBeforeCreate()
-    // re-deriving them independent of dehydration, Filament's default
+    // input.wfo/input.vtec_event_number are all ->visible() only while
+    // mode !== 'continue', so without
+    // CreateTestProductScenario::mutateFormDataBeforeCreate() re-deriving
+    // them independent of dehydration, Filament's default
     // isDehydratedWhenHidden(false) strips them from $data before
     // ::create() ever runs -- the DB row is the only place that bug is
     // actually visible.
+    //
+    // input.hazard/input.ugc_codes are deliberately NOT asserted here even
+    // though assertFormSet() above proved them present in live state: with
+    // no real Step 2/3 field declared for those paths yet, they don't
+    // dehydrate into $data at all (there's no Field to dehydrate), and
+    // mutateFormDataBeforeCreate() must NOT force them back in the way it
+    // does for wfo/vtec_event_number -- see
+    // TestProductScenarioForm::dehydrationSafeInheritedFieldsFor()'s
+    // docblock for why (an admin's real edit to a submitted content field
+    // would otherwise be silently overwritten by the inherited value).
     $created = TestProductScenario::where('id', '!=', $scenario->id)->sole();
 
     expect($created->product_id)->toBe($product->id)
         ->and($created->continues_scenario_id)->toBe($scenario->id)
         ->and($created->input['wfo'] ?? null)->toBe('TWC')
         ->and($created->input['vtec_event_number'] ?? null)->toBe('9020')
-        ->and($created->input['hazard'] ?? null)->toBe('Large hail.')
-        ->and($created->input['ugc_codes'] ?? null)->toBe(['AZC019'])
         ->and($created->input['vtec_action'] ?? null)->toBe('CON');
+});
+
+test('mutateFormDataBeforeCreate rescues only wfo/event-number/product_id, never overwriting submitted content', function () {
+    $product = Product::where('code', 'TO.W')->sole();
+    $scenario = TestProductScenario::factory()->for($product)->create([
+        'input' => ['hazard' => 'Inherited hazard text.'],
+    ]);
+    $ingestedProduct = IngestedProduct::factory()->create([
+        'is_test' => true, 'test_product_scenario_id' => $scenario->id,
+    ]);
+    ActiveWwa::factory()->create([
+        'product_id' => $product->id, 'is_test' => true, 'status' => 'Active',
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'TO', 'vtec_significance' => 'W', 'vtec_event_number' => '9020', 'vtec_year' => now()->year,
+        'latest_ingested_product_id' => $ingestedProduct->id,
+    ]);
+
+    // Called directly rather than through the full Livewire form: Steps 2/3
+    // don't have a real `input.hazard` field yet, so there's no way to get
+    // Livewire to actually submit a differing value for it today. Simulates
+    // what a submitted $data array will look like once such a field
+    // exists -- a `hazard` key already present and different from the
+    // continued scenario's own inherited value.
+    $page = new CreateTestProductScenario;
+    $method = new ReflectionMethod($page, 'mutateFormDataBeforeCreate');
+    $method->setAccessible(true);
+
+    $data = $method->invoke($page, [
+        'mode' => 'continue',
+        'continues_scenario_id' => $scenario->id,
+        'input' => [
+            'hazard' => 'Admin-edited hazard text.',
+            'issued_at' => now(),
+            'expires_minutes' => 60,
+            'vtec_action' => 'CON',
+        ],
+    ]);
+
+    expect($data['product_id'])->toBe($product->id)
+        ->and($data['input']['wfo'])->toBe('TWC')
+        ->and($data['input']['vtec_event_number'])->toBe('9020')
+        // The actual point of this test: hazard is NOT one of the
+        // structurally-hidden fields dehydrationSafeInheritedFieldsFor()
+        // rescues, so the admin's submitted value must win over the
+        // originally-inherited one, not get silently overwritten by it.
+        ->and($data['input']['hazard'])->toBe('Admin-edited hazard text.');
 });
 
 test('switching mode back to "new" clears inherited fields from live form state', function () {

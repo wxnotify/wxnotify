@@ -25,23 +25,33 @@ class CreateTestProductScenario extends CreateRecord
     /**
      * TestProductScenarioForm::inheritFromContinuedScenario() copies the
      * continued event's product/wfo/event-number/content into LIVE form
-     * state via `Set $set`, but `product_id` and `input.wfo` are only ever
-     * set while `mode === 'continue'` -- which is exactly when both fields
-     * are `->visible(false)`. Filament's default `isDehydratedWhenHidden(false)`
-     * means dehydrateState() drops a hidden field's key from $data entirely
+     * state via `Set $set`, but `product_id` and `input.wfo`/
+     * `input.vtec_event_number` are only ever set while `mode === 'continue'`
+     * -- which is exactly when all three fields are `->visible(false)`.
+     * Filament's default `isDehydratedWhenHidden(false)` means
+     * dehydrateState() drops a hidden field's key from $data entirely
      * rather than dehydrating its already-set value (the same trap
      * documented in .ai/rules/filament.md for EditAlertRule's
      * alert_template_id, just hit here on a Create page instead of an
      * Edit's save). Left alone, `static::getModel()::create($data)` would
-     * persist `product_id = null` and an `input` with no wfo/event
-     * number/content at all, even though the wizard showed them filled in.
+     * persist `product_id = null` and no wfo/event number in `input`, even
+     * though the wizard showed them filled in.
      *
-     * Force them back in here, independent of dehydration, as the actual
-     * point that writes to the database -- re-derived from
+     * Force ONLY those three back in here, independent of dehydration, as
+     * the actual point that writes to the database -- re-derived from
      * `continues_scenario_id` (which DOES survive dehydration, since it's
-     * visible exactly when `product_id`/`input.wfo` are hidden) via the
-     * same TestProductScenarioForm::inheritedDataFor() helper the live form
-     * uses, so the two can't drift apart.
+     * visible exactly when the other three are hidden) via
+     * TestProductScenarioForm::dehydrationSafeInheritedFieldsFor().
+     *
+     * Deliberately does NOT reuse inheritedDataFor() (the FULL inheritance,
+     * including geography/content input.* keys) here -- once Steps 2/3
+     * (Geography, Content) wire up real fields for those keys, they stay
+     * visible and editable regardless of mode, so they dehydrate normally
+     * and `$data['input']` will already hold whatever the admin actually
+     * submitted for them. Overwriting that with the originally-inherited
+     * value here would silently discard a deliberate edit made during a
+     * "continue" flow. See dehydrationSafeInheritedFieldsFor()'s own
+     * docblock for the full reasoning.
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
@@ -50,13 +60,13 @@ class CreateTestProductScenario extends CreateRecord
             return $data;
         }
 
-        $inherited = TestProductScenarioForm::inheritedDataFor((int) $continuedScenarioId);
-        if ($inherited === null) {
+        $rescued = TestProductScenarioForm::dehydrationSafeInheritedFieldsFor((int) $continuedScenarioId);
+        if ($rescued === null) {
             return $data;
         }
 
-        $data['product_id'] = $inherited['product_id'];
-        $data['input'] = array_merge($data['input'] ?? [], $inherited['input']);
+        $data['product_id'] = $rescued['product_id'];
+        $data['input'] = array_merge($data['input'] ?? [], $rescued['input']);
 
         return $data;
     }

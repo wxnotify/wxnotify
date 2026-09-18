@@ -191,18 +191,15 @@ class TestProductScenarioForm
      * its most recent geography/content fields into this new scenario's
      * LIVE form state, so the admin only has to change what's actually
      * different for the follow-up (e.g. an updated impact statement)
-     * rather than re-entering everything.
+     * rather than re-entering everything. This is the correct place for
+     * the FULL inheritance -- pre-filling a sensible default the admin can
+     * then freely edit before submitting.
      *
-     * This alone is NOT sufficient to persist the inheritance on save --
-     * `product_id` and `input.wfo` are only ever set here while
-     * `mode === 'continue'`, which is exactly when both fields are
-     * `->visible(false)`. Filament's default `isDehydratedWhenHidden(false)`
-     * strips a hidden field's key from dehydrated state entirely (the same
-     * trap documented in this file's rule doc for EditAlertRule's
-     * alert_template_id), so a bare `$record->create($data)` would silently
-     * drop them. CreateTestProductScenario::mutateFormDataBeforeCreate()
-     * re-derives the same data via inheritedDataFor() below, independent of
-     * dehydration, as the actual point that writes to the database.
+     * Note this alone is NOT sufficient to persist product_id/input.wfo/
+     * input.vtec_event_number on save -- see
+     * dehydrationSafeInheritedFieldsFor()'s docblock below for why, and why
+     * the rest of the inherited input.* keys deliberately do NOT get the
+     * same save-time treatment.
      */
     protected static function inheritFromContinuedScenario(Set $set, Get $get): void
     {
@@ -224,12 +221,14 @@ class TestProductScenarioForm
     }
 
     /**
-     * Re-derives the same product/WFO/event-number/content inheritance as
-     * inheritFromContinuedScenario() above, but as a plain array rather
-     * than a `Set $set` side effect -- usable from a `mutateFormDataBe...`
-     * page hook (which works with a `$data` array, not live Livewire
-     * state) as well as from the live form. Returns null when the
-     * continued scenario or its open ActiveWwa row can no longer be found
+     * The full product/WFO/event-number/geography/content inheritance, as
+     * a plain array rather than a `Set $set` side effect -- used by
+     * inheritFromContinuedScenario() above to pre-fill LIVE form state only.
+     * Deliberately NOT used by CreateTestProductScenario::
+     * mutateFormDataBeforeCreate() -- see
+     * dehydrationSafeInheritedFieldsFor() below for the narrower subset
+     * that save-time hook actually needs. Returns null when the continued
+     * scenario or its open ActiveWwa row can no longer be found
      * (defense-in-depth; shouldn't happen for a scenario id that came from
      * openSyntheticEventOptions()).
      *
@@ -237,16 +236,11 @@ class TestProductScenarioForm
      */
     public static function inheritedDataFor(int $continuedScenarioId): ?array
     {
-        $continuedScenario = TestProductScenario::find($continuedScenarioId);
-        $wwa = ActiveWwa::query()
-            ->where('is_test', true)
-            ->where('status', 'Active')
-            ->whereHas('latestIngestedProduct', fn (Builder $q) => $q->where('test_product_scenario_id', $continuedScenarioId))
-            ->first();
-
-        if ($continuedScenario === null || $wwa === null) {
+        $found = self::findContinuedScenarioAndWwa($continuedScenarioId);
+        if ($found === null) {
             return null;
         }
+        [$continuedScenario, $wwa] = $found;
 
         $input = [
             'wfo' => $wwa->vtec_office !== null ? substr($wwa->vtec_office, 1) : null,
@@ -263,6 +257,74 @@ class TestProductScenarioForm
             'product_id' => $continuedScenario->product_id,
             'input' => $input,
         ];
+    }
+
+    /**
+     * ONLY the fields that are structurally guaranteed to be
+     * ->visible(false) -- and therefore dropped by Filament's default
+     * `isDehydratedWhenHidden(false)` -- while `mode === 'continue'`:
+     * `product_id` and `input.wfo`/`input.vtec_event_number` all live on
+     * THIS step's schema and are hidden by exactly that condition (see
+     * productAndTimingStep() above). A hidden field's key is stripped from
+     * dehydrated state entirely (the same trap documented in this app's
+     * rule doc for EditAlertRule's alert_template_id), so
+     * CreateTestProductScenario::mutateFormDataBeforeCreate() force-fills
+     * these three back in, independent of dehydration, as the actual point
+     * that writes to the database.
+     *
+     * Deliberately does NOT include the rest of INHERITED_INPUT_KEYS
+     * (ugc_codes, hazard, impact, ...). Those geography/content fields
+     * belong to Steps 2/3 (Geography, Content) which -- once built -- stay
+     * visible and editable regardless of mode, so they dehydrate normally
+     * and their submitted value is whatever the admin actually typed. If
+     * this method force-filled them too, an admin who deliberately edited
+     * an inherited value during a "continue" flow would have that edit
+     * silently overwritten by the original scenario's value at save time.
+     * inheritFromContinuedScenario() above is the correct (and only) place
+     * those fields get inherited -- as a LIVE pre-fill the admin can then
+     * change, not a save-time override.
+     *
+     * @return array{product_id: ?int, input: array{wfo: ?string, vtec_event_number: ?string}}|null
+     */
+    public static function dehydrationSafeInheritedFieldsFor(int $continuedScenarioId): ?array
+    {
+        $found = self::findContinuedScenarioAndWwa($continuedScenarioId);
+        if ($found === null) {
+            return null;
+        }
+        [$continuedScenario, $wwa] = $found;
+
+        return [
+            'product_id' => $continuedScenario->product_id,
+            'input' => [
+                'wfo' => $wwa->vtec_office !== null ? substr($wwa->vtec_office, 1) : null,
+                'vtec_event_number' => $wwa->vtec_event_number,
+            ],
+        ];
+    }
+
+    /**
+     * Shared lookup behind inheritedDataFor() and
+     * dehydrationSafeInheritedFieldsFor() -- the continued scenario and its
+     * currently-open ActiveWwa row (via the same VTEC-owning-scenario
+     * correlation openSyntheticEventOptions() uses).
+     *
+     * @return array{0: TestProductScenario, 1: ActiveWwa}|null
+     */
+    protected static function findContinuedScenarioAndWwa(int $continuedScenarioId): ?array
+    {
+        $continuedScenario = TestProductScenario::find($continuedScenarioId);
+        $wwa = ActiveWwa::query()
+            ->where('is_test', true)
+            ->where('status', 'Active')
+            ->whereHas('latestIngestedProduct', fn (Builder $q) => $q->where('test_product_scenario_id', $continuedScenarioId))
+            ->first();
+
+        if ($continuedScenario === null || $wwa === null) {
+            return null;
+        }
+
+        return [$continuedScenario, $wwa];
     }
 
     /**
