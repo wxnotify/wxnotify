@@ -1,7 +1,11 @@
 <?php
 
+use App\Filament\Admin\Resources\TestProductScenarios\Pages\ListTestProductScenarios;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\User;
+use Filament\Facades\Filament;
+
+use function Pest\Livewire\livewire;
 
 test('the resource is hidden and inaccessible when APP_ENV is production', function () {
     // app()->environment() reads the container's 'env' binding (set once at
@@ -22,4 +26,14 @@ test('a staff user can access the resource outside production', function () {
 
     expect(TestProductScenarioResource::shouldRegisterNavigation())->toBeTrue()
         ->and(TestProductScenarioResource::canAccess())->toBeTrue();
+});
+
+test('a staff user can see the New scenario action on the list page', function () {
+    app()->instance('env', 'testing');
+    $staff = User::factory()->create(['is_staff' => true]);
+    $this->actingAs($staff);
+    Filament::setCurrentPanel('admin');
+
+    livewire(ListTestProductScenarios::class)
+        ->assertActionExists('create');
 });
