@@ -1,1 +1,46 @@
-Product example coming soon!
+URGENT - WEATHER MESSAGE
+National Weather Service Twin Cities/Chanhassen MN
+451 PM CST Mon Jan 20 2025
+
+MNZ054-056>060-062-064>070-073>077-082>085-091>093-210700-
+/O.UPG.KMPX.CW.Y.0002.000000T0000Z-250121T1800Z/
+/O.EXA.KMPX.EC.W.0001.000000T0000Z-250121T1800Z/
+Lac Qui Parle-Chippewa-Kandiyohi-Meeker-Wright-Hennepin-Ramsey-
+Yellow Medicine-Renville-McLeod-Sibley-Carver-Scott-Dakota-
+Redwood-Brown-Nicollet-Le Sueur-Rice-Watonwan-Blue Earth-Waseca-
+Steele-Martin-Faribault-Freeborn-
+Including the cities of Chanhassen, Waseca, Mankato, Fairmont,
+Victoria, Albert Lea, Olivia, St James, Hastings, Owatonna,
+Gaylord, Minneapolis, Granite Falls, Willmar, Monticello,
+Madison, Litchfield, Hutchinson, Montevideo, Faribault, Chaska,
+St Peter, Le Sueur, New Ulm, Redwood Falls, St Paul, Shakopee,
+and Blue Earth
+451 PM CST Mon Jan 20 2025
+
+...EXTREME COLD WARNING IN EFFECT UNTIL NOON CST TUESDAY...
+
+* WHAT...Dangerously cold wind chills as low as 37 below.
+* WHERE...Portions of central, east central, south central,
+  southwest, and west central Minnesota.
+
+* WHEN...Until noon CST Tuesday.
+* IMPACTS...The dangerously cold wind chills could cause frostbite
+  on exposed skin in as little as 10 minutes.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Persons are urged to stay indoors until conditions improve. If you
+must go outside, dress in layers. Several layers of clothes will
+keep you warmer than a single heavy coat. Cover exposed skin to
+reduce your risk of frostbite or hypothermia. Gloves, a scarf, and a
+hat will keep you from losing your body heat.
+
+Keep pets indoors as much as possible.
+
+Make frequent checks on older family, friends, and neighbors. Ensure
+portable heaters are used correctly. Do not use generators or grills
+inside.
+
+&&
+
+$$

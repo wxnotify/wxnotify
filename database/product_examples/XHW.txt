@@ -1,1 +1,55 @@
-Product example coming soon!
+233 
+WWUS74 KEWX 131753
+NPWEWX
+
+URGENT - WEATHER MESSAGE
+National Weather Service Austin/San Antonio TX
+1253 PM CDT Tue May 13 2025
+
+TXZ171>173-183>193-202>208-217>223-228-141000-
+/O.NEW.KEWX.XH.W.0001.250514T1800Z-250515T0200Z/
+/O.EXT.KEWX.HT.Y.0001.250513T1800Z-250514T1800Z/
+Llano-Burnet-Williamson-Val Verde-Edwards-Real-Kerr-Bandera-
+Gillespie-Kendall-Blanco-Hays-Travis-Bastrop-Kinney-Uvalde-Medina-
+Bexar-Comal-Guadalupe-Caldwell-Maverick-Zavala-Frio-Atascosa-
+Wilson-Karnes-Gonzales-Dimmit-
+Including the cities of Boerne, Bastrop, Georgetown, Uvalde,
+Leakey, Fredericksburg, Hondo, Pearsall, Lockhart, Del Rio,
+Floresville, Eagle Pass, Gonzales, Burnet, Brackettville, San
+Antonio, Rocksprings, Kerrville, Blanco, Crystal City, Austin,
+Seguin, Bandera, New Braunfels, Carrizo Springs, Llano, San
+Marcos, Karnes City, and Pleasanton
+1253 PM CDT Tue May 13 2025
+
+...HEAT ADVISORY NOW IN EFFECT UNTIL 1 PM CDT WEDNESDAY...
+...EXTREME HEAT WARNING IN EFFECT FROM 1 PM TO 9 PM CDT WEDNESDAY...
+
+* WHAT...For the Heat Advisory, air temperatures near 104 degrees, 
+  except near 110 along the Rio Grande. For the Extreme Heat 
+  Warning, dangerously hot conditions with air temperatures of 105 
+  to 108 degrees, with near 115 degrees along the Rio Grande.
+
+* WHERE...A portion of south central Texas.
+
+* WHEN...For the Heat Advisory, until 1 PM CDT Wednesday. For the 
+  Extreme Heat Warning, from 1 PM to 9 PM CDT Wednesday.
+
+* IMPACTS...Heat related illnesses increase significantly during 
+  extreme heat and high humidity events. Hot temperatures and high 
+  humidity may cause heat illnesses.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Drink plenty of fluids, stay in an air-conditioned room, stay out of 
+the sun, and check up on relatives and neighbors.
+
+To reduce risk during outdoor work, the Occupational Safety and 
+Health Administration recommends scheduling frequent rest breaks in 
+shaded or air conditioned environments. Anyone overcome by heat 
+should be moved to a cool and shaded location. Heat stroke is an 
+emergency! Call 9 1 1.
+
+&&
+
+$$
+

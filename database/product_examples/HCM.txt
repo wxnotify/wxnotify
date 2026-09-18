@@ -1,1 +1,59 @@
-Product example coming soon!
+775
+NGUS86 KRSA 161336
+HCMRSA
+
+Hydrometeorological Coordination Message
+National Weather Service / California-Nevada RFC / Sacramento CA
+635 AM PDT Wed Sep 16 2026
+
+...SCATTERED PRECIP NEAR THE CA/OR BORDER TODAY INTO THURSDAY...
+...COOLER TEMPERATURES WARMING INTO NEXT WEEK...
+
+.METEOROLOGICAL CONDITIONS (WED AM - TUE AM)...
+
+The s/wv trof in the vicinity of Vancouver Island yesterday at this
+time has drifted southward and is beginning to settle over northern
+CA. Radar imagery indicates an area of scattered showers currently
+rotating on the downstream side of this feature moving northward
+from eastern Siskiyou and Modoc counties into southern OR. Over the
+past 6-hours ending at 16/13Z...gauge data indicates scattered light
+amounts in this area mainly near or less than 0.10-inch.
+
+This area of low pressure is expected to spin over northern CA for
+the next 24 to 36 hours bringing scattered showers and t-storms
+primarily to the upper Klamath River basin and the higher terrain of
+far northern CA. Overall...totals should remain near or less than
+0.33-inch with the best totals falling across the upper Klamath
+River basin. Along with the scattered precip...cooler-than-normal
+temperatures are anticipated to impact much of the region over the
+next couple days...except for northeast NV. Anomalies will run 5- to
+15-degF below seasonal normals.
+
+To end the week...this area of low pressure will slowly make its way
+to the east-northeast before exiting the area on Saturday. A few
+showers may remain over far northern and eastern NV on Friday as the
+system passes overhead. Temperatures will also start to rebound and
+shift above normal for much of the area by the end of the weekend as
+a transitory upr ridge shifts inland. Then for Monday into Tuesday a
+weak area of low pressure will traverse the region with a slight
+chance of showers over the southern Sierra and parts of NV on
+Monday.
+
+
+Please Note: This product may NOT be routinely updated.
+Please refer to the following product issued by the CNRFC
+www.cnrfc.noaa.gov/Daily-Briefing for a graphical summary of
+weather and hydrologic conditions.
+
+QPF graphics are available at www.cnrfc.noaa.gov/qpf.php
+
+*********************** Contact Information ************************
+
+CNRFC Office Hours Phone:     1 (916) 979-3056 Extension 338
+After-Hours Calling Service:  1 (800) 218-0858
+                              Leave Name...Office...and Phone Number
+
+
+DRK
+
+$$

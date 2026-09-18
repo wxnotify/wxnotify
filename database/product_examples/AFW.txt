@@ -1,1 +1,1529 @@
-Product example coming soon!
+421
+FOUS54 KJAN 110630
+AFWJAN
+
+ZONE FIRE WEATHER MATRIX
+NATIONAL WEATHER SERVICE JACKSON MS
+130 AM CDT FRI SEP 11 2026
+
+MSZ060-112100-
+ADAMS-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML PC ML ML ML ML PC ML CL CL ML ML ML CL CL ML ML
+WEATHER COV   SC SC SC CH CH CH CH CH CL CL CL CL CL PT CL CL CL SC CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS CL CL CL CL CL FG CL CL CL TS TS
+TEMP          74 73 75 83 88 91 91 85 79 76 75 75 74 73 75 83 89 92 92
+RH            97 99 97 80 68 61 60 71 89 96 98 99100 99100 82 67 59 59
+20FT DIR       S SW SW  W  W SW SW  S  S  S  S  S  S  S  S SW SW SW SW
+20FT SPD       1  0  1  2  2  2  4  4  4  4  2  2  2  2  2  4  4  4  4
+20FT GUST      5  5  5  6  6  6  7  8  9  9  8  8  8  7  7  8  7  7  8
+MIX HGT (HFT)  4  4  5 17 32 37 35 16  4  4  4  4  4  4  8 20 39 47 47
+MIX HGT (HM)   1  1  1  5  9 11 10  4  1  1  1  1  1  1  2  6 12 14 14
+TRAN DIR       S SW SW  W  W SW SW  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  6  6  4  6  6  9  6  6  9  9  6  6  6  6  6  6  6
+TRAN SP (M/S)  2  2  3  3  2  3  3  4  3  3  4  4  3  3  3  3  3  3  3
+LVORI          9  9  9  4  3  2  2  3  6  7  8  9  9  9  8  3  3  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+ARZ074-112100-
+ASHLEY-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML CL CL PC PC ML ML ML ML ML ML ML ML ML CL CL ML
+WEATHER COV   CL CL CL CL SC CH LK CH SC CL CL CL CL PT PT CL CL SC SC
+WEATHER TYPE  CL CL CL CL TS TS TS TS TS CL CL CL CL FG FG CL CL TS TS
+TEMP          77 75 78 87 92 93 91 87 80 77 75 73 72 72 74 84 91 93 93
+RH            84 88 85 64 52 49 54 62 83 92 95 99100100100 75 59 52 52
+20FT DIR      SW SW  W  W  W SW SW  S NE NE NE SE SW SW SW SW SW SW SW
+20FT SPD       1  1  0  1  1  2  2  1  0  0  0  1  1  1  1  2  2  1  1
+20FT GUST      7  6  5  5  6  8  8  6  5  6  6  6  6  5  6  7  6  6  6
+MIX HGT (HFT)  4  4  6 21 45 55 44 19  4  4  4  4  4  4  6 19 46 55 51
+MIX HGT (HM)   1  1  2  6 14 16 13  5  1  1  1  1  1  1  2  5 14 17 15
+TRAN DIR      SW SW SW  W SW SW SW  S  S SE  S  S SW SW SW SW  W  W  W
+TRAN SP (MPH)  9  6  6  9  6  6  6  6  6  6  6  6  6  6  6  9  6  6  6
+TRAN SP (M/S)  4  3  3  4  3  3  3  3  3  3  3  3  3  3  3  4  3  3  3
+LVORI          7  7  6  3  1  1  1  2  5  6  7  9  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ037-112100-
+ATTALA-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML PC PC PC ML ML ML PC ML CL ML ML ML
+WEATHER COV   CL CL CH CH CH LK CH LK CH CL SC SC SC PT SC CL SC CH CH
+WEATHER TYPE  CL CL TS TS TS TS TS TS TS CL RW RW RW FG RW CL RW TS TS
+TEMP          74 73 76 82 87 90 88 83 77 74 73 73 72 71 73 81 87 90 88
+RH            91 93 92 79 67 60 63 73 92100100100100100100 84 68 61 64
+20FT DIR       S  N NW SW  S SE SE  S  S  S SE SE  S SW SW SW SW SW SW
+20FT SPD       0  0  0  1  1  2  2  2  1  1  1  1  1  1  2  2  2  2  2
+20FT GUST      5  4  4  5  6  7  8  7  7  8  7  7  7  6  7  8  7  8  8
+MIX HGT (HFT)  4  5  8 19 33 37 36 15  4  4  4  4  4  4  7 19 41 48 30
+MIX HGT (HM)   1  1  2  5 10 11 11  4  1  1  1  1  1  1  2  6 12 14  9
+TRAN DIR      SW SW SW SW  S SE SE  S  S  S  S  S  S SW SW SW  W SW SW
+TRAN SP (MPH)  6  6  4  4  4  4  6  6  6  6  6  6  6  6  9  9  6  6  6
+TRAN SP (M/S)  3  3  2  2  2  2  3  3  3  3  3  3  3  3  4  4  3  3  3
+LVORI          9  9  9  4  3  2  2  3  6  9 10  9  9  9  8  4  3  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ018-112100-
+BOLIVAR-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           CL ML ML ML ML ML PC MC PC ML ML ML ML CL CL ML CL ML ML
+WEATHER COV   CL CL CL SC SC CH LK LK CH CH CL CL CL CL CL CL CL CH SC
+WEATHER TYPE  CL CL CL RW RW TS TS TS TS TS CL CL CL CL CL CL CL TS TS
+TEMP          77 76 79 86 92 94 91 87 81 77 75 74 73 73 76 84 91 93 92
+RH            85 88 83 69 55 51 55 64 82 95 99100100100 99 79 62 55 54
+20FT DIR       S SW  S  S SW SW SW  W  E SE SE  S  S  S SW SW SW  W  W
+20FT SPD       4  2  2  4  4  4  4  4  4  4  4  2  2  2  2  4  4  4  4
+20FT GUST      9  6  6  6  7  8  9  8  8  8  8  8  7  6  7  7  7  8  8
+MIX HGT (HFT)  5  4  9 18 38 46 30 10  4  4  4  4  4  4  6 20 46 63 44
+MIX HGT (HM)   1  1  3  5 11 14  9  3  1  1  1  1  1  1  1  6 14 19 13
+TRAN DIR      SW SW SW SW SW SW SW SW SE SE  S  S  S  S SW SW  W  W  W
+TRAN SP (MPH)  9  6  6  6  6  9  9  9  6  9  9  9  9  9  9  9  9  6  9
+TRAN SP (M/S)  4  3  3  3  3  4  4  4  3  4  4  4  4  4  4  4  4  3  4
+LVORI          6  6  5  3  1  1  1  3  5  7  9  9  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ027-112100-
+CARROLL-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML PC PC PC PC ML ML ML ML ML CL ML ML ML
+WEATHER COV   CL CL CL SC CH LK CH LK CH SC SC SC SC PT PT CL SC CH CH
+WEATHER TYPE  CL CL CL TS TS TS TS TS TS TS TS RW RW FG FG CL RW TS TS
+TEMP          76 75 77 84 90 92 89 85 78 75 73 73 71 71 74 82 88 91 91
+RH            87 90 88 73 59 54 59 67 89 99100100100100100 80 66 59 58
+20FT DIR       S NW SW SW  S  S SE SE  E SE SE SE  S  S SW SW SW SW SW
+20FT SPD       1  0  0  1  2  2  4  2  1  1  1  1  1  1  2  4  2  2  2
+20FT GUST      6  5  5  5  6  7  8  8  8  8  7  7  7  7  7  8  7  8  9
+MIX HGT (HFT)  4  4  9 19 40 45 31 15  4  4  4  4  4  4  7 20 48 55 31
+MIX HGT (HM)   1  1  2  5 12 13  9  4  1  1  1  1  1  1  2  6 14 17  9
+TRAN DIR      SW SW SW SW SW  S  S  S  S  S  S  S  S  S SW SW  W  W SW
+TRAN SP (MPH)  9  6  6  6  4  6  9  6  6  6  6  6  6  6  9  9  9  6  9
+TRAN SP (M/S)  4  3  3  3  2  3  4  3  3  3  3  3  3  3  4  4  4  3  4
+LVORI          8  9  6  3  2  1  1  3  6  9  9  9  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+LAZ024-112100-
+CATAHOULA-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML ML CL ML ML ML PC ML CL CL CL ML CL CL CL CL CL
+WEATHER COV   CL PT SC SC SC CH SC CH CL CL CL CL CL CL CL CL CL SC CH
+WEATHER TYPE  CL FG TS TS TS TS TS TS CL CL CL CL CL CL CL CL CL TS TS
+TEMP          75 74 76 84 90 92 92 88 80 77 76 75 74 73 75 84 91 93 91
+RH            95 97 94 74 61 55 57 65 86 94 96 97 99100100 78 62 55 59
+20FT DIR      SW SW SW  W  W SW SW  S  S  S  S  S SW SW  S SW SW SW  S
+20FT SPD       1  1  1  2  4  4  4  4  4  4  2  2  4  2  4  4  4  4  5
+20FT GUST      6  5  5  6  5  6  8  8  9  9  9  9  9  7  7  8  6  6  8
+MIX HGT (HFT)  4  4  5 20 39 42 39 18  4  4  4  4  4  3  9 23 43 54 44
+MIX HGT (HM)   1  1  1  6 11 12 11  5  1  1  1  1  1  1  2  7 13 16 13
+TRAN DIR      SW SW SW  W SW SW  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  6  6  6  4  6  6  9  9  9  9  9  9  6  6  9  6  6  6
+TRAN SP (M/S)  3  3  3  3  2  3  3  4  4  4  4  4  4  3  3  4  3  3  3
+LVORI          8  8  8  3  2  1  1  2  5  7  7  8  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+ARZ075-112100-
+CHICOT-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML ML CL ML ML PC PC ML ML ML ML CL CL CL CL CL ML
+WEATHER COV   CL CL SC SC SC LK LK CH CH SC SC CL CL CL CL CL CL CH CH
+WEATHER TYPE  CL CL TS TS TS TS TS TS TS TS TS CL CL CL CL CL CL TS TS
+TEMP          77 75 78 86 92 94 92 88 81 78 76 74 73 73 76 85 91 93 93
+RH            84 88 85 66 53 50 53 61 80 90 94 98100100 98 73 59 53 53
+20FT DIR       S SW SW SW SW SW  S SW SE  E SE  S  S  S  S SW SW SW SW
+20FT SPD       4  2  1  2  4  4  4  4  2  2  2  2  2  2  2  4  4  4  4
+20FT GUST      8  6  5  6  7  8  9  7  7  7  7  7  7  7  7  8  7  7  7
+MIX HGT (HFT)  5  4  6 19 38 46 40 12  4  4  4  4  4  4  6 19 42 61 45
+MIX HGT (HM)   1  1  2  6 11 14 12  3  1  1  1  1  1  1  2  5 12 18 13
+TRAN DIR      SW SW SW  W SW SW SW SW  S SE  S  S  S SW SW SW  W SW SW
+TRAN SP (MPH)  9  6  6  9  6  9  9  6  6  9  9  9  9  9  9  9  9  6  9
+TRAN SP (M/S)  4  3  3  4  3  4  4  3  3  4  4  4  4  4  4  4  4  3  4
+LVORI          6  6  5  3  1  1  1  3  4  6  7  8  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ032-112100-
+CHOCTAW-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML ML ML ML ML PC PC PC ML ML ML ML ML ML ML ML ML
+WEATHER COV   CL CL SC CH CH LK CH CH CH SC SC SC CH PT SC CL CH CH LK
+WEATHER TYPE  CL CL RW TS TS TS TS TS TS TS TS RW RW FG RW CL TS TS TS
+TEMP          74 73 75 83 87 89 87 82 77 74 73 73 72 71 73 82 88 89 88
+RH            91 93 94 80 68 65 67 78 96100100100100100100 86 69 65 65
+20FT DIR       N  N  N  N SE SE SE  S NE  S  N  N NW NW SW SW SW SW SW
+20FT SPD       0  0  0  0  1  1  2  1  0  1  0  0  0  0  1  2  1  2  1
+20FT GUST      5  4  4  5  6  8  8  8  6  7  6  6  6  6  6  7  7  8  8
+MIX HGT (HFT)  4  5  8 17 32 33 39 17  4  4  4  4  4  4  7 19 40 51 36
+MIX HGT (HM)   1  1  2  5  9 10 12  5  1  1  1  1  1  1  2  5 12 15 11
+TRAN DIR      SW SW SW  S  S SE SE  S  S  S SE  S SW SW SW  W  W SW SW
+TRAN SP (MPH)  6  6  4  4  4  6  6  6  6  6  4  4  6  6  9  9  9  6  6
+TRAN SP (M/S)  3  3  2  2  2  3  3  3  3  3  2  2  3  3  4  4  4  3  3
+LVORI          8  9  9  4  3  2  3  4  7  9 10 10  9  9  8  4  3  2  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ053-112100-
+CLAIBORNE-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML ML PC ML CL CL CL ML ML CL CL CL CL
+WEATHER COV   SC SC CH CH CH CH CH CH SC CL CL CL CL PT CL CL CL SC SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG CL CL CL TS TS
+TEMP          75 75 76 81 86 89 88 83 79 77 75 75 74 74 75 82 87 90 89
+RH            96 97 95 91 79 71 71 83 99100100100100100100 91 78 70 70
+20FT DIR       N  N  N  W  W  S  S  S  S  S  S  S SW  S SW SW SW SW  S
+20FT SPD       0  0  0  2  1  1  2  2  2  2  1  1  2  2  2  4  4  2  4
+20FT GUST      5  4  5  6  6  6  7  8  8  8  8  8  9  8  8  9  7  7  8
+MIX HGT (HFT)  4  4  6 15 28 38 29 16  4  4  4  4  4  4  8 21 39 50 45
+MIX HGT (HM)   1  1  1  4  8 11  8  5  1  1  1  1  1  1  2  6 12 15 13
+TRAN DIR      SW SW SW  W  W SW SW  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  4  6  6  4  4  6  6  6  6  6  9  6  6  6  6  6  6  6
+TRAN SP (M/S)  3  2  3  3  2  2  3  3  3  3  3  4  3  3  3  3  3  3  3
+LVORI          9 10  9  5  3  3  3  4  9  9  9  9  9  9  8  4  3  3  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ058-112100-
+CLARKE-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC MC MC MC MC MC PC PC PC PC ML PC PC ML ML ML PC ML ML
+WEATHER COV   SC SC CH CH LK LK CH CH SC SC CL SC SC SC CL SC CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS TS CL TS TS TS CL TS CL TS TS
+TEMP          73 73 75 79 83 85 86 83 77 75 74 73 73 72 74 82 87 88 88
+RH            97 97 95 91 82 75 71 77 97100100100100100100 84 69 65 65
+20FT DIR       N  E SE SE  S SE  S  S  S  S  S  S SW SW SW SW SW SW SW
+20FT SPD       0  1  1  2  4  4  4  4  2  2  2  2  2  2  2  4  4  4  4
+20FT GUST      4  5  5  6  6  7  8  8  8  8  8  8  8  7  7  8  7  8  8
+MIX HGT (HFT)  4  5  6 13 22 26 28 15  4  4  4  4  4  4  8 19 35 44 25
+MIX HGT (HM)   1  1  2  4  6  8  8  4  1  1  1  1  1  1  2  6 10 13  7
+TRAN DIR       S  S  S  S  S  S  S  S  S  S  S SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  6  6  6  4  4  6  6  6  6  6  9  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  3  3  3  2  2  3  3  3  3  3  4  3  3  3
+LVORI         10 10  9  6  4  3  3  4  8 10  9  9  9  9  8  4  3  2  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ030-112100-
+CLAY-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML ML PC PC ML PC PC PC PC PC PC ML ML ML ML PC ML
+WEATHER COV   CL CL SC SC CH CH CH LK CH SC SC SC CH SC PT CL SC LK CH
+WEATHER TYPE  CL CL RW TS TS TS TS TS TS TS TS RW TS TS FG CL TS TS TS
+TEMP          74 73 76 84 89 90 87 82 77 75 74 73 72 72 74 82 89 90 89
+RH            94 95 91 79 66 63 69 79 96100100100100100100 85 68 64 65
+20FT DIR       S NE  S  S SE  S  S SE SE  S SE  S  S  S SW SW SW SW SW
+20FT SPD       1  0  1  1  2  4  4  4  2  2  1  1  1  1  1  1  2  4  2
+20FT GUST      5  4  4  5  7  9 10  9  8  8  7  6  6  5  5  6  7  9  8
+MIX HGT (HFT)  4  4  8 17 34 39 34 15  4  4  4  4  4  4  7 20 41 58 39
+MIX HGT (HM)   1  1  2  5 10 11 10  4  1  1  1  1  1  1  2  6 12 17 12
+TRAN DIR       S  S SW  S SE  S  S  S SE  S SE  S  S SW SW SW  W  W SW
+TRAN SP (MPH)  6  4  4  4  6  9  9  9  6  6  6  4  6  6  6  9  9  6  9
+TRAN SP (M/S)  3  2  2  2  3  4  4  4  3  3  3  2  3  3  3  4  4  3  4
+LVORI          7  9  8  4  3  1  3  4  7  9  9 10  9  9  8  4  2  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+LAZ026-112100-
+CONCORDIA-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML ML ML ML ML ML PC ML CL CL CL ML ML CL CL ML ML
+WEATHER COV   SC SC SC SC CH CH CH CH CL CL CL CL CL PT CL CL CL SC CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS CL CL CL CL CL FG CL CL CL TS TS
+TEMP          74 74 75 84 90 92 91 87 80 77 76 75 74 73 75 84 90 93 91
+RH            97 97 97 78 65 58 60 69 88 95 98 98 99100100 80 64 57 60
+20FT DIR       S  S SW  W  W SW SW  S  S  S  S  S SW  S  S SW SW SW SW
+20FT SPD       1  1  1  2  4  4  4  4  4  4  2  2  2  2  2  4  4  4  5
+20FT GUST      6  5  5  5  6  6  8  9  9  9  9  9  8  7  7  8  7  7  8
+MIX HGT (HFT)  4  3  5 18 36 39 36 16  4  4  4  4  4  4  9 22 40 48 46
+MIX HGT (HM)   1  1  1  5 11 11 11  5  1  1  1  1  1  1  2  6 12 14 14
+TRAN DIR      SW SW SW  W  W SW  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  4  6  6  4  6  6  9  9  9  9  9  6  6  6  9  6  6  6
+TRAN SP (M/S)  3  2  3  3  2  3  3  4  4  4  4  4  3  3  3  4  3  3  3
+LVORI          8  9  9  3  2  2  1  3  6  7  8  8  9  9  8  3  2  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ054-112100-
+COPIAH-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC PC PC ML ML PC PC PC ML ML CL CL ML ML CL ML ML ML
+WEATHER COV   CH CH CH CH CH LK CH CH SC CL CL CL CL PT CL CL CL CH SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG CL CL CL TS TS
+TEMP          74 74 75 81 86 89 87 82 78 76 75 74 74 73 75 82 88 90 88
+RH            96 97 96 90 78 70 71 83 97 98 99 99100100100 88 73 67 71
+20FT DIR      NW  N  W  W NW SW  S  S  S  S  S  S  S SW SW SW SW SW  S
+20FT SPD       0  0  0  2  2  2  2  2  2  2  2  2  2  2  2  4  4  4  4
+20FT GUST      4  4  5  6  7  7  8  8  7  8  8  8  8  7  7  9  8  8  9
+MIX HGT (HFT)  7  5  6 16 27 34 33 13  4  4  4  4  4  4  8 20 36 47 37
+MIX HGT (HM)   2  1  2  5  8 10 10  4  1  1  1  1  1  1  2  6 11 14 11
+TRAN DIR      SW SW  W  W NW  W  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  6  6  4  4  6  6  6  6  9  6  6  6  6  9  6  6
+TRAN SP (M/S)  2  2  2  3  3  2  2  3  3  3  3  4  3  3  3  3  4  3  3
+LVORI         10 10  9  5  3  3  3  4  8  8  9  9  9  9  8  4  3  2  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ065-112100-
+COVINGTON-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML MC MC PC PC PC PC ML PC PC PC PC ML ML CL ML PC ML ML
+WEATHER COV   CH CH CH CH CH LK LK LK SC CL CL CL CL PT PT SC SC CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG FG TS TS TS TS
+TEMP          74 74 75 80 85 87 86 82 77 75 74 73 73 72 74 82 88 90 87
+RH            97 97 97 88 76 70 69 78 94 99100100100100100 82 67 62 65
+20FT DIR       N  N  N  W  W  E SE  S  S  S  S  S SW SW SW SW SW SW SW
+20FT SPD       0  0  0  2  2  2  2  2  1  1  1  1  1  1  1  4  4  4  4
+20FT GUST      2  4  4  6  7  8  9  8  7  7  6  7  7  6  6  8  8  9  9
+MIX HGT (HFT)  5  4  6 15 28 30 28 12  4  3  4  4  4  4  6 20 34 48 38
+MIX HGT (HM)   1  1  1  4  8  9  8  3  1  1  1  1  1  1  2  6 10 14 11
+TRAN DIR      SW SW  W  W  W NW  S  S  S SW SW SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  4  4  4  4  4  6  6  6  4  6  9  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  2  2  2  2  2  3  3  3  2  3  4  3  3  3
+LVORI         10 10  9  5  3  3  3  4  7  9  9  9  9 10  9  3  3  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+LAZ009-112100-
+EAST CARROLL-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML CL ML ML ML PC ML ML ML ML CL CL CL CL CL CL
+WEATHER COV   SC SC SC SC SC CH CH CH SC SC SC CL CL PT CL CL CL CH SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS TS TS CL CL FG CL CL CL TS TS
+TEMP          75 75 77 84 91 92 92 89 81 78 76 75 74 73 76 84 90 92 92
+RH            90 91 89 71 59 55 57 62 81 90 94 97 98100 98 75 61 56 56
+20FT DIR       S SW SW SW  W  S  S  S  S SE SE  S  S  S SW SW SW SW SW
+20FT SPD       1  1  1  1  1  1  2  2  1  1  1  1  2  2  2  2  2  2  1
+20FT GUST      7  6  5  6  6  7  8  7  7  7  7  7  8  8  8  8  7  7  7
+MIX HGT (HFT)  4  4  5 17 35 38 39 14  5  4  4  4  4  4  8 19 41 53 49
+MIX HGT (HM)   1  1  1  5 10 11 11  4  1  1  1  1  1  1  2  6 12 16 15
+TRAN DIR       S SW SW  W  W SW  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  9  6  6  9  6  6  9  9  9  9  9  9  9  9  9  9  6  4  6
+TRAN SP (M/S)  4  3  3  4  3  3  4  4  4  4  4  4  4  4  4  4  3  2  3
+LVORI          7  7  6  3  2  1  1  2  5  6  6  8  9  9  7  3  1  2  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ074-112100-
+FORREST-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC MC PC PC PC PC ML PC PC ML ML ML CL CL CL ML PC PC PC
+WEATHER COV   CH CH CH CH CH DE LK LK CL CL CL CL CL PT PT SC SC CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS CL CL CL CL CL FG FG TS TS TS TS
+TEMP          75 75 76 79 83 87 88 83 78 76 75 74 73 73 75 82 87 90 90
+RH            95 96 94 92 82 70 67 79 91 95 98100100100100 84 70 62 61
+20FT DIR       N  N NE  W NW SW SW  S  S  S  S  S SW SW SW SW SW SW SW
+20FT SPD       0  0  1  2  4  4  4  4  2  1  1  1  2  1  1  4  4  4  4
+20FT GUST      2  2  5  7  8  9  9  8  6  5  5  6  6  5  5  8  8  9 10
+MIX HGT (HFT)  4  5  5 15 28 34 32 14  4  4  4  4  4  4  7 20 35 39 36
+MIX HGT (HM)   1  1  1  4  8 10  9  4  1  1  1  1  1  1  2  6 10 12 11
+TRAN DIR       N NW  W  W  W  W  W SW  S  S  S SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  6  6  6  6  6  6  6  6  4  6  6  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  3  3  3  3  3  3  3  3  2  3  3  3  3  3
+LVORI         10 10  9  5  3  3  3  4  6  7  8  9  9 10  9  4  3  2  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+LAZ023-112100-
+FRANKLIN LA-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML ML ML ML ML ML PC ML CL CL ML CL CL CL CL CL CL
+WEATHER COV   CL CL SC SC SC CH CH CH CL CL CL CL CL CL CL CL CL CH SC
+WEATHER TYPE  CL CL TS TS TS TS TS TS CL CL CL CL CL CL CL CL CL TS TS
+TEMP          75 75 77 84 89 92 91 88 81 78 76 75 74 73 75 83 89 92 91
+RH            92 94 92 75 62 56 58 64 84 93 96 97 99100100 78 64 57 59
+20FT DIR       S SW SW  W  W SW  S  S  S  S  S  S  S  S  S SW SW SW SW
+20FT SPD       2  2  2  4  2  4  4  4  4  4  4  4  4  4  4  4  4  2  4
+20FT GUST      6  5  6  6  6  6  8  8  8  8  8  9  9  8  8  8  6  6  7
+MIX HGT (HFT)  4  4  5 19 39 41 40 17  4  4  4  4  4  4  9 24 47 51 43
+MIX HGT (HM)   1  1  1  5 12 12 12  5  1  1  1  1  1  1  3  7 14 15 13
+TRAN DIR      SW SW SW  W  W SW  S  S  S  S  S  S SW SW SW SW SW SW  S
+TRAN SP (MPH)  6  6  6  6  4  6  9  9  9  9 11  9  9  6  9  9  6  4  6
+TRAN SP (M/S)  3  3  3  3  2  3  4  4  4  4  5  4  4  3  4  4  3  2  3
+LVORI          8  8  6  3  2  1  1  2  5  6  7  8  9  9  8  3  2  2  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ061-112100-
+FRANKLIN MS-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML PC ML ML ML CL CL ML ML ML ML ML ML ML
+WEATHER COV   SC SC CH CH CH CH CH CH SC CL CL CL CL PT CL CL CL SC CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG CL CL CL TS TS
+TEMP          74 73 75 81 86 89 90 83 77 75 74 74 73 73 74 82 88 90 90
+RH            98100 97 86 74 66 63 75 94 99 99100100100100 84 69 63 62
+20FT DIR       N  N SW  W  W SW  S  S  S  S  S  S  S  S  S SW SW SW  S
+20FT SPD       0  0  0  2  2  2  2  2  2  2  1  1  2  2  2  4  4  4  4
+20FT GUST      4  4  4  7  7  7  7  8  7  7  7  7  8  7  7  8  7  8  8
+MIX HGT (HFT)  6  4  5 16 29 36 34 12  4  4  4  4  4  4  7 19 39 42 39
+MIX HGT (HM)   1  1  1  5  9 11 10  3  1  1  1  1  1  1  2  6 11 13 11
+TRAN DIR      SW SW SW  W NW  W  S SW  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  6  6  4  6  6  6  6  6  6  6  6  6  6  6  6  6
+TRAN SP (M/S)  2  2  2  3  3  2  3  3  3  3  3  3  3  3  3  3  3  3  3
+LVORI         10 10  9  4  3  3  2  4  7  9  9  9  9  9  9  3  3  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ026-112100-
+GRENADA-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML PC PC PC ML PC ML CL ML ML ML ML PC ML
+WEATHER COV   CL CL CL CL CH LK CH LK CH CH SC SC SC PT PT CL SC CH CH
+WEATHER TYPE  CL CL CL CL TS TS TS TS TS TS TS RW RW FG FG CL RW TS TS
+TEMP          75 74 77 84 91 93 90 85 78 75 74 73 72 72 74 82 89 91 90
+RH            87 90 86 72 57 53 59 69 91 99100100100100100 82 65 59 58
+20FT DIR       S SW SW SW  S  S  S SE  N SE SE SE  S  S SW SW SW SW SW
+20FT SPD       1  0  0  1  2  2  2  2  1  1  1  1  1  1  1  2  2  2  2
+20FT GUST      7  5  4  5  6  8  8  8  8  7  6  6  6  5  6  7  7  8  8
+MIX HGT (HFT)  4  4  8 19 43 46 35 15  4  4  4  4  4  4  7 20 49 60 32
+MIX HGT (HM)   1  1  2  5 13 14 10  4  1  1  1  1  1  1  2  6 15 18  9
+TRAN DIR      SW SW SW SW SW  S  S SW  W  S  S  S  S SW SW  W  W  W SW
+TRAN SP (MPH)  9  6  6  6  6  6  9  9  6  6  4  4  6  6  9  9  9  6  9
+TRAN SP (M/S)  4  3  3  3  3  3  4  4  3  3  2  2  3  3  4  4  4  3  4
+LVORI          7  7  6  3  1  1  1  3  6  9 10  9  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ048-112100-
+HINDS-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML MC PC ML ML PC PC ML PC ML ML CL ML ML CL CL CL CL ML
+WEATHER COV   CH CH CH CH CH LK CH CH SC CL CL CL CL PT CL CL CL CH SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG CL CL CL TS TS
+TEMP          75 75 76 81 87 90 87 83 79 76 75 74 74 73 74 82 88 90 88
+RH            96 97 95 91 78 69 73 82 97 99100 99100100100 91 76 68 72
+20FT DIR       N  N  N  W  W  S  S  S  S  S  S  S  S SW SW SW SW SW SW
+20FT SPD       0  0  0  1  2  2  4  4  2  2  1  1  2  2  2  4  4  4  4
+20FT GUST      5  4  4  6  6  7  8  8  8  8  8  8  8  8  8  9  8  8  8
+MIX HGT (HFT)  9  6  7 16 28 37 35 14  4  4  4  4  4  4  8 20 38 44 40
+MIX HGT (HM)   2  2  2  5  8 11 10  4  1  1  1  1  1  1  2  6 11 13 12
+TRAN DIR      SW SW SW  W  W SW  S SW  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  4  6  6  6  4  6  6  6  6  6  6  6  6  9  9  6  6  6
+TRAN SP (M/S)  3  2  3  3  3  2  3  3  3  3  3  3  3  3  4  4  3  3  3
+LVORI          9 10  9  5  3  3  3  4  8  9  9  9  9  9  8  4  3  3  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ036-112100-
+HOLMES-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML PC PC ML ML CL ML ML CL CL CL ML ML
+WEATHER COV   SC SC SC SC CH CH CH LK CH CL SC SC SC PT CL CL SC CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL TS RW RW FG CL CL RW TS TS
+TEMP          76 75 77 84 90 92 91 86 79 76 74 73 72 72 74 83 89 91 92
+RH            89 91 88 74 60 54 57 65 86 97100100100100100 80 65 58 57
+20FT DIR       S  S  S SW  S  S  S SE SE  E SE  S  S  S SW SW SW SW SW
+20FT SPD       1  0  1  2  2  2  4  2  2  2  1  1  1  1  2  4  4  4  4
+20FT GUST      6  5  5  5  6  7  8  8  8  8  7  7  7  7  7  8  7  8  8
+MIX HGT (HFT)  5  4  9 18 37 45 35 15  4  4  4  4  4  4  7 19 43 50 30
+MIX HGT (HM)   1  1  2  5 11 13 10  4  1  1  1  1  1  1  2  6 13 15  9
+TRAN DIR      SW SW SW SW SW  S  S  S  S SE  S  S  S SW SW SW  W SW SW
+TRAN SP (MPH)  6  6  6  6  4  6  6  6  6  6  6  6  6  6  9  9  6  6  6
+TRAN SP (M/S)  3  3  3  3  2  3  3  3  3  3  3  3  3  3  4  4  3  3  3
+LVORI          8  9  7  3  2  1  1  3  5  8  9  9  9  9  8  3  2  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ035-112100-
+HUMPHREYS-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC PC ML ML ML ML ML PC ML ML CL ML ML CL CL CL ML ML
+WEATHER COV   SC SC CH CH CH CH CH LK SC SC SC SC CL CL CL CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS TS TS RW CL CL CL CL CL TS TS
+TEMP          77 76 77 85 91 93 92 87 81 77 75 74 74 72 76 84 90 93 92
+RH            88 90 88 73 59 52 55 64 83 93100100100100100 79 64 56 56
+20FT DIR       S  S SW SW SW  S  S SW SE  E SE  S  S  S  S SW SW SW SW
+20FT SPD       1  1  1  2  4  4  4  4  2  2  2  2  2  2  2  4  4  4  4
+20FT GUST      7  5  6  6  7  8  9  9  9  9  7  8  8  7  8  9  8  8  8
+MIX HGT (HFT)  4  4  8 16 32 42 42 20  4  4  4  4  4  4  8 21 46 61 39
+MIX HGT (HM)   1  1  2  5  9 13 12  6  1  1  1  1  1  1  2  6 14 18 12
+TRAN DIR       S SW SW SW SW SW  S SW  S SE  S  S  S  S SW SW SW SW SW
+TRAN SP (MPH)  9  6  6  6  6  6  9  9  6  9  9  9  9  9  9  9  9  6  6
+TRAN SP (M/S)  4  3  3  3  3  3  4  4  3  4  4  4  4  4  4  4  4  3  3
+LVORI          7  8  6  3  2  1  1  2  5  6  9  9  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ040-112100-
+ISSAQUENA-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML ML ML ML ML ML ML CL CL CL CL CL CL
+WEATHER COV   SC SC CH CH CH CH CH CH SC SC SC CL CL PT CL CL CL CH SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS TS TS CL CL FG CL CL CL TS TS
+TEMP          76 75 77 84 90 92 92 88 82 79 76 75 74 74 76 84 90 92 92
+RH            90 92 89 74 61 57 57 63 80 89 93 96 98 99 97 78 64 59 58
+20FT DIR       S SW SW SW SW  S SW  S  S SE SE  S SW  S SW SW SW SW SW
+20FT SPD       1  0  1  1  1  2  2  2  1  1  1  1  1  1  2  2  2  2  2
+20FT GUST      6  5  5  6  6  7  8  8  8  8  7  7  9  8  8  9  7  8  8
+MIX HGT (HFT)  4  4  6 16 31 38 37 16  4  4  4  4  4  4  9 20 41 55 48
+MIX HGT (HM)   1  1  2  4  9 11 11  5  1  1  1  1  1  1  2  6 12 16 14
+TRAN DIR      SW SW SW  W  W SW  S SW  S SE  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  6  6  6  6  6  6  9  6  9  9  9  9  9  9  9  6  6  6
+TRAN SP (M/S)  3  3  3  3  3  3  3  4  3  4  4  4  4  4  4  4  3  3  3
+LVORI          6  7  6  3  2  2  1  2  4  6  6  8  9  9  6  3  2  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ057-112100-
+JASPER-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC MC MC MC PC PC PC PC ML ML PC PC ML ML ML ML PC ML ML
+WEATHER COV   CH CH CH CH LK LK LK LK SC CL SC CL CL SC SC CL SC CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL TS CL CL TS RW CL TS TS TS
+TEMP          73 73 74 78 83 85 85 82 76 74 74 73 72 72 73 81 87 88 86
+RH            97 97 96 93 83 76 75 82 99100100100100100100 86 72 67 70
+20FT DIR       N  N  E  S  S SE  S  S  S  S  S  S  S SW SW SW SW SW SW
+20FT SPD       0  0  0  2  2  4  4  4  2  2  2  2  2  2  2  4  4  4  4
+20FT GUST      4  4  4  6  6  7  8  8  7  7  7  7  8  7  7  8  7  8  8
+MIX HGT (HFT)  5  6  6 15 24 29 30 16  4  4  4  4  4  4  7 19 34 47 29
+MIX HGT (HM)   1  2  1  4  7  8  9  5  1  1  1  1  1  1  2  6 10 14  9
+TRAN DIR       S SW  S  S SW SW  S  S  S  S  S SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  4  6  6  4  4  6  6  6  6  6  9  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  2  3  3  2  2  3  3  3  3  3  4  3  3  3
+LVORI         10 10  9  6  4  4  3  4  9 10  9  9  9  9  8  4  3  2  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ059-112100-
+JEFFERSON-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML ML ML ML ML ML PC ML CL CL ML ML ML CL CL ML CL
+WEATHER COV   SC SC CH CH CH CH CH CH SC CL CL CL CL CL CL CL CL SC SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL CL CL CL CL TS TS
+TEMP          74 74 75 81 85 89 89 83 78 76 75 75 74 73 75 82 87 90 90
+RH            96 97 95 87 76 67 67 80 96100100100100100100 88 74 66 64
+20FT DIR       S  W SW  W  W SW  S  S  S  S  S  S  S  S  S SW SW SW SW
+20FT SPD       0  0  1  2  2  2  2  2  2  2  2  2  2  2  2  4  4  2  4
+20FT GUST      5  4  5  7  6  6  7  7  8  8  8  8  9  8  8  8  7  7  8
+MIX HGT (HFT)  4  4  6 15 29 34 31 15  4  4  4  4  4  4  8 20 40 49 45
+MIX HGT (HM)   1  1  1  4  8 10  9  4  1  1  1  1  1  1  2  6 12 14 13
+TRAN DIR      SW SW SW  W  W SW  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  4  6  6  4  4  6  6  6  6  9  9  6  6  6  6  6  6  6
+TRAN SP (M/S)  3  2  3  3  2  2  3  3  3  3  4  4  3  3  3  3  3  3  3
+LVORI          9 10  9  4  3  3  3  4  8  9  9  9  9  9  8  4  3  2  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ064-112100-
+JEFFERSON DAVIS-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC MC PC MC PC PC PC ML PC PC ML ML ML ML CL ML ML ML ML
+WEATHER COV   CH CH CH CH CH LK CH CH CH CL CL CL CL PT PT SC CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG FG TS CL TS TS
+TEMP          74 74 75 81 85 88 87 82 76 75 74 73 73 72 75 83 89 90 88
+RH            97 98 96 86 74 69 66 79 95100100100100100100 81 65 62 64
+20FT DIR       N  N NW  W NW  W SE  S  S  S  S  S SW SW SW SW SW SW SW
+20FT SPD       0  0  0  2  2  2  2  2  1  1  1  1  1  1  1  4  2  2  2
+20FT GUST      4  4  4  6  7  7  8  8  7  6  6  7  7  6  6  8  8  9  9
+MIX HGT (HFT)  5  4  5 14 28 30 30 12  4  4  4  4  4  4  6 20 35 47 35
+MIX HGT (HM)   1  1  1  4  8  9  9  3  1  1  1  1  1  1  2  6 10 14 10
+TRAN DIR      SW SW  W  W NW  W SW  S  S SW SW SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  4  4  4  6  6  6  6  6  6  6  6  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  2  2  2  3  3  3  3  3  3  3  3  3  3  3
+LVORI         10 10  9  4  3  3  3  4  7  9  9  9  9  9  9  3  2  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ066-112100-
+JONES-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC MC PC MC MC PC ML PC ML ML PC PC ML ML CL ML PC ML ML
+WEATHER COV   CH CH CH CH LK LK LK LK SC CL CL CL CL PT PT CL SC CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG FG CL TS TS TS
+TEMP          74 74 75 79 83 86 86 83 78 76 74 73 73 73 74 81 87 89 89
+RH            97 97 97 93 83 74 71 78 93 98100100100100100 86 72 65 65
+20FT DIR       N NE NE  S  S SE  S  S  S  S  S  S SW SW SW SW SW SW SW
+20FT SPD       0  0  1  2  4  4  4  4  2  2  2  2  2  1  2  4  4  4  4
+20FT GUST      4  4  5  6  7  8  9  8  7  7  7  7  7  6  6  8  8  9  9
+MIX HGT (HFT)  4  5  6 14 25 30 32 15  4  4  4  4  4  4  7 19 34 44 38
+MIX HGT (HM)   1  1  1  4  7  9  9  4  1  1  1  1  1  1  2  5 10 13 11
+TRAN DIR      SE  S  S SW SW SW SW  S  S  S  S SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  4  6  6  4  4  6  6  6  4  6  9  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  2  3  3  2  2  3  3  3  2  3  4  3  3  3
+LVORI         10 10  9  6  4  3  3  4  7  9  9  9  9 10  9  4  3  2  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ046-112100-
+KEMPER-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC PC PC PC PC PC PC ML ML PC ML ML ML ML CL ML ML PC
+WEATHER COV   SC SC SC CH CH CH LK CH SC SC CL SC CH SC CL SC SC LK CH
+WEATHER TYPE  TS TS RW TS TS TS TS TS TS TS CL TS RW RW CL TS TS TS TS
+TEMP          73 73 74 80 83 85 85 82 76 75 74 73 72 72 74 81 86 88 87
+RH            95 95 96 86 79 73 71 78 99100100100100100100 85 70 65 64
+20FT DIR       S  S  S  S SE SE  S  S SE  S SE  S  S SW SW SW SW SW SW
+20FT SPD       0  1  1  2  4  4  4  4  2  2  2  2  2  2  4  4  4  4  4
+20FT GUST      4  4  5  5  7  8  8  9  8  7  7  7  7  7  8  8  7  8  8
+MIX HGT (HFT)  4  5  7 17 28 33 29 14  4  4  4  4  4  4  8 19 37 47 26
+MIX HGT (HM)   1  1  2  5  8 10  8  4  1  1  1  1  1  1  2  6 11 14  8
+TRAN DIR       S  S  S  S  S  S  S  S  S  S  S SW SW SW SW  W SW  W SW
+TRAN SP (MPH)  4  4  4  4  4  6  6  6  6  4  4  6  6  6  6  9  9  6  9
+TRAN SP (M/S)  2  2  2  2  2  3  3  3  3  2  2  3  3  3  3  4  4  3  4
+LVORI         10 10  9  4  3  3  3  4  9 10 10  9  9  9  8  4  3  2  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ073-112100-
+LAMAR-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC MC PC PC PC ML PC PC PC PC PC ML CL CL CL ML PC PC PC
+WEATHER COV   SC SC CH CH CH LK LK LK SC CL CL CL CL PT PT SC SC LK CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG FG TS TS TS TS
+TEMP          75 74 75 80 83 87 87 81 77 75 74 73 73 72 75 82 87 90 88
+RH            95 97 94 90 80 69 68 83 93 98 99100100100100 83 70 62 64
+20FT DIR       N  N NW NW NW SW NW  S  S  S  S  S SW SW SW SW SW SW SW
+20FT SPD       0  0  1  2  2  2  4  4  1  1  1  1  2  1  1  4  4  4  4
+20FT GUST      2  2  4  6  7  8  9  8  6  6  6  6  6  5  5  8  8  9  9
+MIX HGT (HFT)  4  4  5 15 29 32 29 11  4  4  4  4  4  4  7 20 35 40 32
+MIX HGT (HM)   1  1  1  4  8  9  8  3  1  1  1  1  1  1  2  6 10 12  9
+TRAN DIR      NW  W NW  W  W  W  W  S  S  S SW SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  6  6  4  6  6  6  6  6  4  6  6  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  3  3  2  3  3  3  3  3  2  3  3  3  3  3
+LVORI         10 10  9  5  3  3  3  4  6  8  9  9  9 10  9  3  3  2  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ052-112100-
+LAUDERDALE-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC PC MC MC MC MC PC PC PC ML ML PC PC ML ML ML PC PC ML
+WEATHER COV   SC SC CH CH CH LK CH CH SC CL CL SC CH SC CL SC CL CH CH
+WEATHER TYPE  TS TS RW TS TS TS TS TS TS CL CL TS TS TS CL TS CL TS TS
+TEMP          73 73 75 79 83 85 86 82 76 75 74 73 72 72 74 81 87 88 88
+RH            96 97 95 88 80 74 70 78 99100100100100100100 83 70 65 64
+20FT DIR       N  S  S  S  S  S SE  S  S  S  S  S  S SW SW SW SW SW SW
+20FT SPD       0  1  1  2  4  4  4  4  2  2  2  2  2  2  4  4  4  4  5
+20FT GUST      4  4  5  6  6  8  9  8  8  8  8  8  8  7  8  8  7  8  8
+MIX HGT (HFT)  4  5  7 17 26 29 29 16  4  4  4  4  4  4  8 19 36 48 23
+MIX HGT (HM)   1  1  2  5  7  8  8  5  1  1  1  1  1  1  2  6 11 14  7
+TRAN DIR       S  S  S  S  S  S  S  S  S  S  S SW SW SW SW  W SW  W SW
+TRAN SP (MPH)  4  4  4  4  4  6  6  6  6  4  6  6  6  6  6  9  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  3  3  3  3  2  3  3  3  3  3  4  3  3  3
+LVORI         10 10  9  5  4  3  3  4  9 10  9  9  9  9  8  3  3  2  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ063-112100-
+LAWRENCE-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC MC PC PC ML PC PC PC PC ML ML ML CL CL ML ML ML ML ML
+WEATHER COV   CH CH CH CH CH LK CH CH CH CL CL CL CL PT PT CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG FG CL CL TS TS
+TEMP          74 74 75 81 86 89 87 82 77 75 75 74 73 73 75 83 89 91 87
+RH            97 98 97 87 75 68 68 81 93 98 98 99100100100 82 68 64 68
+20FT DIR       N  N  W  W  W  W  S  S  S  S  S  S  S SW SW SW SW SW SW
+20FT SPD       0  0  0  2  2  2  2  2  1  1  1  1  1  1  2  4  4  4  2
+20FT GUST      2  2  4  6  7  7  8  8  7  6  6  7  7  6  6  8  8  9  9
+MIX HGT (HFT)  8  4  5 15 26 30 30 12  4  4  4  4  4  4  6 21 35 50 34
+MIX HGT (HM)   2  1  1  4  8  9  9  3  1  1  1  1  1  1  2  6 10 15 10
+TRAN DIR      SW SW  W  W NW  W SW  S  S SW  S SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  4  4  6  6  6  6  6  6  6  6  6  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  2  2  3  3  3  3  3  3  3  3  3  3  3  3
+LVORI         10 10  9  5  3  3  3  4  6  8  8  9  9  9  9  3  3  1  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ044-112100-
+LEAKE-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC PC PC PC PC PC ML ML PC ML ML ML PC ML CL ML ML ML
+WEATHER COV   SC SC CH CH LK LK CH LK CH CL SC CL CL CL CL CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL RW CL CL CL CL CL CL TS TS
+TEMP          74 73 75 82 86 89 87 83 76 74 73 73 72 72 73 82 88 90 88
+RH            94 94 94 80 71 62 66 74 93100100100100100100 81 67 60 64
+20FT DIR       S  S  S SW  S SE SE  S SE  S SE  S  S SW SW SW SW SW SW
+20FT SPD       1  1  1  1  2  4  4  2  2  2  2  2  2  2  2  4  4  4  4
+20FT GUST      5  4  4  5  6  7  8  7  7  8  7  7  7  7  7  8  7  8  8
+MIX HGT (HFT)  5  5  8 17 29 35 32 15  4  4  4  4  4  4  7 18 40 50 33
+MIX HGT (HM)   1  1  2  5  8 10  9  4  1  1  1  1  1  1  2  5 12 15 10
+TRAN DIR       S SW SW SW SW SE SE  S  S  S  S  S SW SW SW  W SW  W SW
+TRAN SP (MPH)  6  4  4  4  4  4  6  6  4  4  4  6  6  6  6  9  9  6  9
+TRAN SP (M/S)  3  2  2  2  2  2  3  3  2  2  2  3  3  3  3  4  4  3  4
+LVORI          9 10  9  4  3  2  3  3  7 10 10  9  9  9  8  3  2  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ025-112100-
+LEFLORE-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML PC PC PC ML ML ML ML CL CL ML ML ML
+WEATHER COV   CL CL SC SC CH CH CH DE CH SC SC SC CL PT CL CL SC CH CH
+WEATHER TYPE  CL CL TS TS TS TS TS TS TS TS TS RW CL FG CL CL RW TS TS
+TEMP          76 76 78 85 91 93 91 87 79 75 74 73 72 72 75 83 90 92 92
+RH            86 89 85 73 58 52 55 65 90 99100100100100100 81 65 57 57
+20FT DIR       S  S  S SW  S  S  S SE NE SE SE SE  S  S  S SW SW SW SW
+20FT SPD       2  1  1  2  4  4  4  4  4  2  2  2  2  2  2  4  4  4  4
+20FT GUST      8  6  5  6  6  8  8  9  9  8  7  7  8  7  7  8  7  8  8
+MIX HGT (HFT)  4  4  9 16 36 45 34 14  4  4  4  4  4  4  7 20 43 53 36
+MIX HGT (HM)   1  1  2  5 11 13 10  4  1  1  1  1  1  1  2  6 13 16 11
+TRAN DIR       S SW SW SW SW  S  S  S  S SE  S  S  S  S SW SW SW  W SW
+TRAN SP (MPH)  9  6  6  6  6  6  9  9  9  9  6  6  9  9  9  9  9  6  9
+TRAN SP (M/S)  4  3  3  3  3  3  4  4  4  4  3  3  4  4  4  4  4  3  4
+LVORI          8  8  6  3  2  1  1  3  6  9  9  9  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ062-112100-
+LINCOLN-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC PC PC PC ML PC PC PC ML ML ML CL CL ML ML ML ML ML ML
+WEATHER COV   SC SC CH CH CH LK CH CH CH CL CL CL CL CL CL CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL CL CL CL CL TS TS
+TEMP          74 73 75 81 85 88 88 82 77 75 74 73 73 73 74 82 88 90 88
+RH            98 98 96 89 77 69 68 80 95 98 99100100100100 85 70 66 68
+20FT DIR       N  N SW  W NW  W  S  S  S  S  S  S SW SW SW SW SW SW SW
+20FT SPD       0  0  1  2  2  2  2  2  1  2  2  2  2  2  2  4  4  4  4
+20FT GUST      4  4  5  7  7  7  8  8  7  7  7  8  8  7  7  9  8  9  9
+MIX HGT (HFT)  8  5  6 17 28 32 29 11  4  4  4  4  4  4  7 21 35 47 34
+MIX HGT (HM)   2  1  1  5  8  9  8  3  1  1  1  1  1  1  2  6 10 14 10
+TRAN DIR      SW SW  W  W NW  W SW  S  S  S  S SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  6  6  4  4  6  6  6  6  6  6  6  6  6  6  6  6
+TRAN SP (M/S)  2  2  2  3  3  2  2  3  3  3  3  3  3  3  3  3  3  3  3
+LVORI         10 10  9  5  3  3  3  4  7  8  9  9  9  9  8  4  3  2  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ031-112100-
+LOWNDES-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML PC PC ML ML PC ML PC PC PC PC ML ML PC ML
+WEATHER COV   CL CL SC CH CH CH CH CH CH CH SC CH CH CH SC CL CH LK CH
+WEATHER TYPE  CL CL RW TS TS TS TS TS TS TS TS TS TS TS RW CL TS TS TS
+TEMP          73 73 76 82 87 88 86 82 76 75 74 73 72 72 74 81 88 90 88
+RH            95 95 92 83 71 66 71 81 98100100100100100100 87 70 63 66
+20FT DIR       S  S  S  S SE SE SE  S SE  S SE  S  S  S SW SW SW SW SW
+20FT SPD       2  1  2  4  4  5  5  5  4  4  4  2  2  2  2  4  4  4  4
+20FT GUST      6  5  6  6  8 10 10 10  9  9  8  7  7  6  6  7  7  9  9
+MIX HGT (HFT)  4  5  9 18 33 37 36 18  6  5  4  4  4  4  9 19 38 51 32
+MIX HGT (HM)   1  1  2  5 10 11 11  5  1  1  1  1  1  1  2  5 11 15  9
+TRAN DIR       S  S  S  S SE  S  S  S  S  S SE  S  S SW SW SW  W  W SW
+TRAN SP (MPH)  6  6  6  4  6  9  9  9  9  6  6  6  6  6  6  6  9  6  9
+TRAN SP (M/S)  3  3  3  2  3  4  4  4  4  3  3  3  3  3  3  3  4  3  4
+LVORI          8  9  8  4  3  2  3  3  8  9  9  9  9  9  8  4  3  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+LAZ016-112100-
+MADISON LA-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC ML ML ML ML ML ML ML PC ML ML ML ML ML CL CL CL CL CL
+WEATHER COV   SC SC CH CH SC CH CH CH CL CL SC CL CL PT CL CL CL CH SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS CL CL TS CL CL FG CL CL CL TS TS
+TEMP          75 75 77 83 89 90 90 86 80 77 76 75 74 74 75 83 89 91 90
+RH            93 94 91 80 68 63 65 72 92 97 98 99100100100 83 69 63 65
+20FT DIR       S SW SW  W  W  S  S  S SE  S  S  S SW  S  S SW SW SW SW
+20FT SPD       1  1  1  1  1  1  2  1  1  1  1  1  2  2  2  4  1  1  1
+20FT GUST      6  5  5  6  5  6  7  7  8  8  8  8  9  8  8  8  6  6  7
+MIX HGT (HFT)  4  4  6 18 34 34 36 12  4  4  4  4  4  4  9 22 42 51 49
+MIX HGT (HM)   1  1  2  5 10 10 11  3  1  1  1  1  1  1  2  6 13 15 15
+TRAN DIR       S SW SW  W  W SW  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  6  6  6  4  6  6  6  6  9  9  9  9  9  9  6  6  4  6
+TRAN SP (M/S)  3  3  3  3  2  3  3  3  3  4  4  4  4  4  4  3  3  2  3
+LVORI          9  9  8  3  3  2  2  3  6  8  8  9  9  9  8  3  3  2  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ043-112100-
+MADISON MS-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML ML PC ML ML ML ML ML CL CL ML ML ML
+WEATHER COV   SC SC LK CH LK CH CH LK CH CL CL CL CL CL CL CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL CL CL CL CL TS TS
+TEMP          75 75 77 82 87 90 89 84 78 76 75 74 73 73 74 83 88 91 89
+RH            94 95 92 82 71 63 65 74 89 99 99100100100100 83 70 62 65
+20FT DIR       S  S  S SW SW SE  S  S  S SE SE  S  S SW SW SW SW SW SW
+20FT SPD       1  1  1  1  2  2  4  4  2  4  2  2  2  2  4  4  4  4  4
+20FT GUST      5  4  4  5  6  7  8  8  8  8  8  8  8  7  8  9  7  8  8
+MIX HGT (HFT)  6  6  8 17 30 37 37 14  4  4  4  4  4  4  8 19 40 52 35
+MIX HGT (HM)   2  1  2  5  9 11 11  4  1  1  1  1  1  1  2  5 12 15 10
+TRAN DIR      SW SW SW  W  W  S  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  4  4  4  4  4  6  6  6  6  6  6  6  6  9  9  6  6  6
+TRAN SP (M/S)  3  2  2  2  2  2  3  3  3  3  3  3  3  3  4  4  3  3  3
+LVORI          9  9  9  4  3  2  2  3  6  9  9  9  9  9  8  3  3  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ072-112100-
+MARION-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC MC PC PC PC ML PC PC PC ML ML ML CL CL ML ML PC PC PC
+WEATHER COV   SC SC CH CH CH LK LK CH SC CL CL CL CL PT PT SC SC CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG FG TS TS TS TS
+TEMP          75 74 75 81 86 89 87 81 77 75 74 74 73 73 75 83 89 91 88
+RH            95 98 96 86 75 66 68 82 93 98 99 99 99 99100 81 67 60 65
+20FT DIR       N  N NW NW  W SW NW  S  S SW  S  S SW  W SW SW SW SW SW
+20FT SPD       0  0  0  1  2  2  2  2  1  1  1  1  1  0  1  2  2  4  4
+20FT GUST      2  2  4  6  7  8  8  7  6  5  5  6  6  5  5  7  8  9  9
+MIX HGT (HFT)  4  4  4 14 28 30 32 12  4  4  4  4  4  4  7 20 35 47 32
+MIX HGT (HM)   1  1  1  4  8  9  9  3  1  1  1  1  1  1  2  6 10 14  9
+TRAN DIR      NW  W NW  W NW  W  W  S  S SW  S SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  6  6  4  6  6  6  6  4  4  6  6  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  3  3  2  3  3  3  3  2  2  3  3  3  3  3
+LVORI         10 10  9  5  3  3  3  4  6  9  9  9 10  9  9  3  3  1  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ028-112100-
+MONTGOMERY-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML PC PC PC PC PC ML ML ML ML CL ML ML ML
+WEATHER COV   CL CL SC SC CH LK CH LK CH SC SC SC SC PT PT CL SC CH CH
+WEATHER TYPE  CL CL RW TS TS TS TS TS TS TS TS RW RW FG FG CL RW TS TS
+TEMP          75 74 76 83 89 91 88 83 77 74 73 72 71 71 73 82 88 90 89
+RH            89 91 89 75 61 57 62 75 93 99100100100100100 83 67 62 63
+20FT DIR      NW  N  N NW  S SE  S  S NE SE  N  N  N  N SW SW SW SW SW
+20FT SPD       0  0  0  0  1  2  2  1  0  0  0  0  0  0  1  1  1  1  2
+20FT GUST      6  4  4  5  6  7  8  7  7  7  6  6  6  5  6  7  7  8  8
+MIX HGT (HFT)  4  4  9 20 40 43 37 16  4  4  4  4  4  4  7 21 45 51 31
+MIX HGT (HM)   1  1  2  6 12 13 11  4  1  1  1  1  1  1  2  6 13 15  9
+TRAN DIR      SW SW SW SW  S SE  S  S SE  S  S  S  S SW SW SW  W  W SW
+TRAN SP (MPH)  6  6  6  4  4  6  6  6  4  6  4  6  6  6  9  9  9  6  9
+TRAN SP (M/S)  3  3  3  2  2  3  3  3  2  3  2  3  3  3  4  4  4  3  4
+LVORI          8  9  8  3  2  1  2  3  7  9 10  9  9  9  8  3  2  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+LAZ007-112100-
+MOREHOUSE-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML CL CL CL ML ML ML ML ML ML CL CL ML CL ML CL CL ML
+WEATHER COV   CL CL SC CL SC CH CH CH SC CL CL CL CL PT PT CL CL CH SC
+WEATHER TYPE  CL CL TS CL TS TS TS TS TS CL CL CL CL FG FG CL CL TS TS
+TEMP          76 75 77 85 91 93 92 87 79 77 75 74 73 73 74 83 90 92 92
+RH            87 91 89 68 55 51 53 63 86 92 95 98100100 99 77 61 54 54
+20FT DIR      SW NW NW NW  N SW SW  N  N  N  N  N SW SW SW SW SW  N  N
+20FT SPD       1  0  0  0  0  1  1  0  0  0  0  0  1  1  1  1  1  0  0
+20FT GUST      7  5  5  5  6  7  8  6  5  6  6  6  7  6  6  7  6  6  6
+MIX HGT (HFT)  4  4  5 20 43 51 44 19  4  4  4  4  4  4  7 20 44 60 50
+MIX HGT (HM)   1  1  1  6 13 15 13  5  1  1  1  1  1  1  2  6 13 18 15
+TRAN DIR      SW SW SW  W SW SW SW  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  9  6  6  9  6  6  9  6  6  6  9  9  9  6  6  9  6  4  6
+TRAN SP (M/S)  4  3  3  4  3  3  4  3  3  3  4  4  4  3  3  4  3  2  3
+LVORI          7  7  6  3  1  1  1  2  5  6  7  8  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ045-112100-
+NESHOBA-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC PC PC PC PC PC PC ML ML PC ML ML PC ML ML ML PC PC
+WEATHER COV   SC SC SC CH CH LK CH CH CH CL SC SC SC SC CL SC SC CH CH
+WEATHER TYPE  TS TS RW TS TS TS TS TS TS CL RW RW RW RW CL TS TS TS TS
+TEMP          73 72 74 81 85 87 86 83 76 74 73 72 72 72 74 82 87 90 87
+RH            93 95 96 81 73 65 66 74 96100100100100100100 80 66 60 63
+20FT DIR       S  S  S  S SE  E SE  S  S SE SE  S  S SW SW SW SW SW SW
+20FT SPD       1  1  1  2  4  4  4  4  4  2  2  2  2  2  4  4  4  4  4
+20FT GUST      4  4  4  5  7  8  8  8  7  7  7  7  7  7  8  8  7  8  8
+MIX HGT (HFT)  5  5  8 17 28 35 34 15  4  4  4  4  4  4  7 19 38 50 31
+MIX HGT (HM)   1  1  2  5  8 10 10  4  1  1  1  1  1  1  2  5 11 15  9
+TRAN DIR      SW  S SW  S  S SE  S  S  S  S  S SW SW SW SW  W  W  W SW
+TRAN SP (MPH)  6  4  4  4  4  4  6  6  4  4  6  6  6  6  9  9  9  6  9
+TRAN SP (M/S)  3  2  2  2  2  2  3  3  2  2  3  3  3  3  4  4  4  3  4
+LVORI          9 10  9  4  3  3  3  3  7 10  9  9  9  9  8  3  2  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ051-112100-
+NEWTON-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC PC MC PC PC PC PC PC PC ML ML ML ML ML ML ML PC PC ML
+WEATHER COV   SC SC CH CH CH LK CH CH SC CL SC CL CL CL CL SC CL CH CH
+WEATHER TYPE  TS TS RW TS TS TS TS TS TS CL TS CL CL CL CL TS CL TS TS
+TEMP          73 73 75 80 84 86 86 83 76 74 73 73 72 72 73 82 88 90 87
+RH            95 96 94 84 76 70 69 75 96100100100100100100 80 67 62 65
+20FT DIR       N  S  S  S  S  S SE  S  S  S  S  S SW SW SW SW SW SW SW
+20FT SPD       0  0  1  2  4  4  4  4  2  2  2  2  2  2  2  4  4  4  4
+20FT GUST      4  4  4  5  6  7  8  8  7  8  8  8  8  7  8  9  7  8  8
+MIX HGT (HFT)  7  6  7 16 28 33 30 16  4  4  4  4  4  4  7 19 37 46 28
+MIX HGT (HM)   2  1  2  4  8 10  9  5  1  1  1  1  1  1  2  5 11 14  8
+TRAN DIR       S SW  S SW SW  S SE  S  S  S  S SW SW SW SW  W SW  W SW
+TRAN SP (MPH)  4  4  4  4  4  4  6  6  6  6  6  6  6  6  6  9  9  6  6
+TRAN SP (M/S)  2  2  2  2  2  2  3  3  3  3  3  3  3  3  3  4  4  3  3
+LVORI         10  9  9  4  3  3  3  4  8  9  9  9  9  9  8  3  3  1  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ039-112100-
+NOXUBEE-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML PC PC PC ML ML ML ML ML ML PC ML ML ML PC ML
+WEATHER COV   CL CL SC CH CH CH LK CH SC SC CL SC CH SC CL CL SC LK CH
+WEATHER TYPE  CL CL RW TS TS TS TS TS TS TS CL TS RW RW CL CL TS TS TS
+TEMP          74 73 75 81 85 87 85 81 76 75 74 74 73 73 74 81 87 89 87
+RH            94 95 94 86 76 70 73 80 98100100100100100100 87 70 63 66
+20FT DIR       S  S  S  S SE  S  S  S SE  S SE  S  S  S SW SW SW SW SW
+20FT SPD       1  1  1  2  4  4  4  4  2  2  2  2  2  2  2  4  4  4  4
+20FT GUST      5  5  5  6  8  9 10 10  8  8  7  7  7  6  7  7  7  9  9
+MIX HGT (HFT)  4  6  9 18 30 34 31 16  4  4  4  4  4  4  8 18 38 48 30
+MIX HGT (HM)   1  1  3  5  9 10  9  5  1  1  1  1  1  1  2  5 11 14  9
+TRAN DIR       S  S  S  S SE  S  S  S SE  S  S  S  S SW SW  W  W  W SW
+TRAN SP (MPH)  4  4  4  4  6  6  9  9  6  6  4  6  6  6  6  9  9  6  9
+TRAN SP (M/S)  2  2  2  2  3  3  4  4  3  3  2  3  3  3  3  4  4  3  4
+LVORI          9 10  9  4  3  3  3  4  8  9 10  9  9  9  8  4  3  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ033-112100-
+OKTIBBEHA-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML PC PC PC PC PC PC PC ML PC ML CL ML PC ML
+WEATHER COV   CL CL SC CH CH LK CH CH CH SC SC SC CH SC PT CL SC LK CH
+WEATHER TYPE  CL CL RW TS TS TS TS TS TS TS TS RW TS TS FG CL TS TS TS
+TEMP          74 73 75 83 88 89 87 82 77 75 75 74 73 72 74 82 88 90 88
+RH            94 96 94 82 69 67 70 79 95100100100100100100 86 69 65 66
+20FT DIR       S  N  N  S SE  S SE  S  S  S SE  S  S  W SW SW SW SW SW
+20FT SPD       0  0  0  1  2  4  4  2  2  1  1  1  1  1  1  2  2  2  2
+20FT GUST      5  4  4  5  7  9  9  9  7  7  6  5  5  5  6  6  7  8  8
+MIX HGT (HFT)  4  4  9 17 32 35 39 17  4  4  4  4  4  4  7 19 41 54 37
+MIX HGT (HM)   1  1  2  5  9 10 12  5  1  1  1  1  1  1  2  6 12 16 11
+TRAN DIR      SW  S SW  S SE  S SE  S  S  S SE  S  S SW SW  W  W SW SW
+TRAN SP (MPH)  6  4  4  4  6  6  6  9  6  6  4  4  6  6  6  9  9  6  9
+TRAN SP (M/S)  3  2  2  2  3  3  3  4  3  3  2  2  3  3  3  4  4  3  4
+LVORI          8  9  9  4  3  3  3  3  7  9 10 10  9  9  8  4  2  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ049-112100-
+RANKIN-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC MC PC PC PC PC PC PC PC ML ML ML ML ML ML CL ML ML ML
+WEATHER COV   CH CH CH CH LK LK CH LK SC CL CL CL CL CL SC CL CL CH SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL CL RW CL CL TS TS
+TEMP          75 75 76 82 86 89 87 83 78 76 75 74 74 73 74 83 88 91 88
+RH            94 95 94 81 71 64 68 76 88 96 96 98 99100100 79 68 61 65
+20FT DIR       N  N  W  W NW SE  S  S  S  S  S  S  S SW SW SW SW SW SW
+20FT SPD       0  0  0  1  2  2  4  4  2  4  2  2  2  2  4  4  4  4  4
+20FT GUST      4  4  4  5  6  7  8  8  8  8  8  8  8  8  8  9  8  8  8
+MIX HGT (HFT)  8  7  7 16 28 34 35 13  4  4  4  4  4  4  7 18 38 44 34
+MIX HGT (HM)   2  2  2  4  8 10 10  4  1  1  1  1  1  1  2  5 11 13 10
+TRAN DIR      SW SW SW  W NW SW  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  4  4  4  4  4  4  6  4  6  6  6  6  6  9  9  6  6  6
+TRAN SP (M/S)  3  2  2  2  2  2  2  3  2  3  3  3  3  3  4  4  3  3  3
+LVORI          9  9  9  4  3  2  3  4  6  7  7  8  9  9  8  3  3  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+LAZ015-112100-
+RICHLAND-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML CL CL ML ML PC PC ML CL CL ML CL CL CL CL CL CL
+WEATHER COV   CL CL SC CL SC CH CH CH CL CL CL CL CL CL CL CL CL CH SC
+WEATHER TYPE  CL CL TS CL TS TS TS TS CL CL CL CL CL CL CL CL CL TS TS
+TEMP          76 75 77 84 90 92 91 88 81 78 76 75 74 73 75 83 90 92 92
+RH            90 93 88 73 61 55 56 63 83 91 94 96 97 99 99 79 64 56 56
+20FT DIR       S  S SW  W  W SW  S  S  S  S  S  S  S  S  S SW SW SW SW
+20FT SPD       2  1  1  2  1  2  4  2  2  2  1  2  2  2  2  4  2  1  1
+20FT GUST      7  5  5  6  5  6  8  7  6  7  7  7  8  7  7  7  6  6  6
+MIX HGT (HFT)  4  4  5 20 41 42 42 17  4  4  4  4  4  4  9 22 45 56 49
+MIX HGT (HM)   1  1  1  6 12 12 12  5  1  1  1  1  1  1  2  6 14 17 15
+TRAN DIR      SW SW SW  W  W SW  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  9  6  6  9  6  6  9  9  9  9  9  9  9  6  6  6  6  4  6
+TRAN SP (M/S)  4  3  3  4  3  3  4  4  4  4  4  4  4  3  3  3  3  2  3
+LVORI          6  6  6  3  2  1  1  2  5  6  6  7  8  9  8  3  2  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ050-112100-
+SCOTT-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC PC PC PC ML PC PC ML PC ML ML ML ML PC ML CL ML PC ML
+WEATHER COV   SC SC CH CH LK LK CH CH SC CL CL CL CL PT SC CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG RW CL CL TS TS
+TEMP          74 73 75 81 85 88 85 82 76 74 73 72 72 72 73 83 88 90 86
+RH            96 96 94 82 75 67 72 79 94100100100100100100 80 68 61 69
+20FT DIR       E SE  S SW SW SE SE  S  S SE  S  S  S SW SW SW SW SW SW
+20FT SPD       0  0  0  1  2  2  2  2  2  2  2  2  2  2  2  4  4  4  4
+20FT GUST      4  4  4  5  6  7  8  7  7  8  8  8  8  7  8  8  7  7  7
+MIX HGT (HFT)  9  6  7 16 27 33 30 14  4  4  4  4  4  4  7 18 39 47 33
+MIX HGT (HM)   2  2  2  4  8 10  9  4  1  1  1  1  1  1  2  5 11 14 10
+TRAN DIR       S SW SW SW  W  S SE  S  S  S  S  S SW SW SW  W SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  4  6  6  4  4  6  6  6  6  6  9  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  2  3  3  2  2  3  3  3  3  3  4  3  3  3
+LVORI         10 10  9  4  3  3  3  4  8  9  9  9  9  9  8  3  3  1  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ041-112100-
+SHARKEY-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML PC ML ML ML ML ML ML ML CL ML ML CL CL CL CL ML ML
+WEATHER COV   SC SC CH CH CH CH CH LK SC SC SC SC CL PT CL CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS TS TS RW CL FG CL CL CL TS TS
+TEMP          76 75 77 85 91 93 93 89 82 79 76 75 74 73 76 84 90 92 93
+RH            89 92 90 72 59 54 54 61 78 87 93 97 99 99 98 76 63 56 55
+20FT DIR       S  S SW SW SW  S SW SW  S SE SE  S  S SW SW SW SW SW SW
+20FT SPD       1  1  1  2  2  4  4  4  2  2  1  1  2  2  2  4  4  4  4
+20FT GUST      6  5  6  6  7  8  9  8  8  8  7  7  8  8  8  9  8  9  8
+MIX HGT (HFT)  4  4  7 16 31 42 38 19  4  4  4  4  4  4  9 21 46 61 46
+MIX HGT (HM)   1  1  2  5  9 13 11  5  1  1  1  1  1  1  2  6 14 18 14
+TRAN DIR      SW SW SW  W  W SW SW SW  S SE  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  9  6  6  6  6  6  6  9  6  9  9  9  9  9  9  9  9  6  6
+TRAN SP (M/S)  4  3  3  3  3  3  3  4  3  4  4  4  4  4  4  4  4  3  3
+LVORI          6  7  6  3  2  1  1  2  4  6  6  8  9  9  7  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ055-112100-
+SIMPSON-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC PC PC PC PC PC PC PC PC PC ML ML ML ML ML CL ML ML ML
+WEATHER COV   CH CH CH CH CH LK CH LK SC CL CL CL CL PT CL CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL CL CL CL FG CL CL CL TS TS
+TEMP          75 74 75 81 85 88 85 81 77 75 74 73 73 72 74 83 88 90 86
+RH            96 96 95 85 76 68 72 83 94 99 98 99100100100 82 69 63 69
+20FT DIR       N  N SW  W  W NE  S  S  S  S  S  S SW SW SW SW SW SW SW
+20FT SPD       0  0  0  1  2  2  2  2  2  2  2  2  2  2  2  4  2  2  2
+20FT GUST      4  4  4  6  7  7  8  8  7  8  7  8  8  7  7  9  8  8  8
+MIX HGT (HFT)  8  6  6 15 27 34 30 12  4  4  4  4  4  4  7 19 36 45 33
+MIX HGT (HM)   2  1  2  4  8 10  9  3  1  1  1  1  1  1  2  6 11 13 10
+TRAN DIR      SW SW SW  W NW NW  S  S  S  S SW SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  4  4  4  4  6  6  6  6  6  6  9  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  2  2  2  2  3  3  3  3  3  3  4  3  3  3
+LVORI         10 10  9  4  3  3  3  4  7  9  8  9  9  9  8  3  3  1  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ056-112100-
+SMITH-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           PC PC MC MC PC PC PC PC PC PC PC PC ML PC ML CL PC ML ML
+WEATHER COV   CH CH CH CH LK LK LK LK SC CL SC CL CL SC SC CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL TS CL CL TS RW CL CL TS TS
+TEMP          74 74 75 80 84 86 84 81 76 74 73 73 72 72 73 82 87 89 86
+RH            95 97 96 88 79 71 74 81 96100100100100100100 83 70 64 70
+20FT DIR       N  N  N SW SW SE  S  S  S  S  S  S  S SW SW SW SW SW SW
+20FT SPD       0  0  0  1  2  2  2  2  1  1  1  1  1  1  2  2  2  2  2
+20FT GUST      4  4  4  5  6  7  8  7  7  7  7  7  8  6  7  8  7  8  8
+MIX HGT (HFT)  7  8  6 14 25 31 29 13  4  4  4  4  4  4  7 19 35 47 31
+MIX HGT (HM)   2  2  2  4  7  9  9  4  1  1  1  1  1  1  2  6 10 14  9
+TRAN DIR      SW SW SW  W  W SW  S  S  S  S SW SW SW SW SW SW SW SW SW
+TRAN SP (MPH)  4  4  4  4  4  4  4  4  4  4  6  6  6  6  6  9  6  6  6
+TRAN SP (M/S)  2  2  2  2  2  2  2  2  2  2  3  3  3  3  3  4  3  3  3
+LVORI         10 10  9  5  4  3  3  4  8 10  9  9  9  9  8  3  3  2  3
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ019-112100-
+SUNFLOWER-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML PC PC MC PC PC ML ML ML ML CL CL ML ML ML
+WEATHER COV   CL CL SC SC CH CH LK LK CH SC SC CL CL CL CL CL SC CH CH
+WEATHER TYPE  CL CL TS TS TS TS TS TS TS TS TS CL CL CL CL CL RW TS TS
+TEMP          77 76 79 86 92 93 91 88 80 76 75 74 73 72 76 84 91 93 92
+RH            85 89 84 71 56 51 55 64 85 98100100100100100 80 63 56 57
+20FT DIR       S  S  S SW SW  S SW SW  E SE SE  S  S  S  S SW SW SW SW
+20FT SPD       4  2  2  4  4  4  4  4  4  4  2  2  2  2  2  4  4  4  4
+20FT GUST      9  6  5  6  7  8  9  8  9  9  8  8  8  7  7  7  7  8  8
+MIX HGT (HFT)  4  4  9 17 37 48 38 17  4  4  4  4  4  4  6 20 45 61 42
+MIX HGT (HM)   1  1  3  5 11 14 11  5  1  1  1  1  1  1  2  6 14 18 12
+TRAN DIR      SW SW SW SW SW SW SW SW SE SE  S  S  S  S SW SW  W  W SW
+TRAN SP (MPH) 11  9  6  6  6  9  9  9  9  9  9  9  9  9  9  9  9  6  9
+TRAN SP (M/S)  5  4  3  3  3  4  4  4  4  4  4  4  4  4  4  4  4  3  4
+LVORI          6  8  6  3  1  1  1  2  5  8  9  9  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+LAZ025-112100-
+TENSAS-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML ML PC ML CL ML CL ML ML CL CL CL CL
+WEATHER COV   SC SC CH CH CH CH CH CH CL CL CL CL CL CL CL CL CL SC SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS CL CL CL CL CL CL CL CL CL TS TS
+TEMP          75 75 76 83 88 91 90 87 80 78 76 75 75 74 75 83 89 91 91
+RH            94 96 94 79 68 61 62 68 88 96 98 99100100100 81 68 60 61
+20FT DIR       S SW SW  W  W  S  S  S  S  S  S  S SW SW  S SW SW SW SW
+20FT SPD       1  1  1  2  2  2  4  4  4  4  2  2  4  4  4  4  4  4  4
+20FT GUST      6  5  5  6  6  6  7  8  8  9  9  9  9  8  8  8  6  6  7
+MIX HGT (HFT)  4  4  6 19 33 36 34 13  4  4  4  4  4  4  9 23 43 50 50
+MIX HGT (HM)   1  1  1  5 10 11 10  4  1  1  1  1  1  1  2  7 13 15 15
+TRAN DIR      SW SW SW  W  W SW  S  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  6  6  6  4  6  9  6  9  9  9  9  9  6  9  6  6  6  6
+TRAN SP (M/S)  3  3  3  3  2  3  4  3  4  4  4  4  4  3  4  3  3  3  3
+LVORI          9  9  7  3  3  2  2  3  6  7  8  9  9  9  8  3  3  2  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ047-112100-
+WARREN-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML ML ML ML CL ML ML ML CL CL CL CL CL
+WEATHER COV   CH CH CH CH CH CH CH CH CL CL CL CL CL PT CL CL CL CH SC
+WEATHER TYPE  TS TS TS TS TS TS TS TS CL CL CL CL CL FG CL CL CL TS TS
+TEMP          76 75 77 82 88 90 90 86 80 77 76 75 74 74 75 83 89 91 90
+RH            94 95 92 85 72 66 66 74 93 98 99 99100100100 87 72 67 67
+20FT DIR       N  N  N  W  W  S  S  S  S  S  S  S  S  S SW SW SW SW SW
+20FT SPD       0  0  0  1  1  1  2  2  1  1  1  1  1  1  2  4  2  2  4
+20FT GUST      5  5  5  6  6  7  7  8  8  8  8  8  9  8  8  9  7  7  8
+MIX HGT (HFT)  5  4  6 14 30 37 33 14  4  4  4  4  4  4  9 21 40 50 44
+MIX HGT (HM)   1  1  2  4  9 11 10  4  1  1  1  1  1  1  2  6 12 15 13
+TRAN DIR      SW SW SW  W  W SW SW  S SE  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  6  4  6  6  4  4  6  6  6  6  9  9  6  6  9  9  6  6  6
+TRAN SP (M/S)  3  2  3  3  2  2  3  3  3  3  4  4  3  3  4  4  3  3  3
+LVORI          9  9  9  4  3  3  3  4  7  8  9  9  9  9  8  4  3  3  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ034-112100-
+WASHINGTON-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML PC PC ML ML ML ML CL CL CL ML ML ML
+WEATHER COV   SC SC SC CH CH CH LK LK CH SC SC CL CL CL CL CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS TS TS CL CL CL CL CL CL TS TS
+TEMP          77 76 78 86 92 94 92 88 82 78 76 74 74 73 76 84 91 93 93
+RH            85 88 85 69 55 51 53 62 78 90 97 99100100 99 76 62 55 54
+20FT DIR       S SW SW SW SW  S SW SW  S  E SE  S  S  S SW SW SW SW SW
+20FT SPD       2  2  2  2  4  4  4  4  4  4  2  2  2  2  4  4  4  4  4
+20FT GUST      8  6  5  6  6  8  8  8  8  8  7  7  8  7  7  8  7  8  8
+MIX HGT (HFT)  4  4  7 17 34 43 36 16  4  4  4  4  4  4  7 21 45 60 44
+MIX HGT (HM)   1  1  2  5 10 13 11  5  1  1  1  1  1  1  2  6 13 18 13
+TRAN DIR       S SW  W SW SW SW SW  W  S SE  S  S  S  S SW SW SW SW SW
+TRAN SP (MPH)  9  6  9  6  6  9  9  9  6  9  9  9  9  9  9  9  9  6  9
+TRAN SP (M/S)  4  3  4  3  3  4  4  4  3  4  4  4  4  4  4  4  4  3  4
+LVORI          6  7  5  3  2  1  1  2  4  6  8  9  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ029-112100-
+WEBSTER-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML ML ML PC ML PC PC ML ML PC ML ML CL ML ML ML ML
+WEATHER COV   CL CL CL SC CH CH CH LK CH CH SC SC CH PT PT CL SC LK LK
+WEATHER TYPE  CL CL CL TS TS TS TS TS TS TS TS RW TS FG FG CL TS TS TS
+TEMP          74 73 76 84 89 90 87 82 77 75 73 73 72 72 73 82 88 90 89
+RH            90 92 91 77 64 62 67 79 96 99100100100100100 85 69 66 66
+20FT DIR      SW  N  N  N SE  S SE  S NE  S NE  N NW  N SW SW SW SW SW
+20FT SPD       0  0  0  0  1  1  2  2  0  0  0  0  0  0  1  1  1  1  1
+20FT GUST      6  4  4  5  6  8  8  8  7  7  6  6  6  5  6  7  7  8  8
+MIX HGT (HFT)  4  4  8 18 38 38 38 15  4  4  4  4  4  4  7 20 44 56 36
+MIX HGT (HM)   1  1  2  5 11 11 11  4  1  1  1  1  1  1  2  6 13 17 11
+TRAN DIR      SW SW SW SW  S  S  S  S SE  S SE  S SW SW SW  W  W  W SW
+TRAN SP (MPH)  6  6  4  4  4  6  6  6  6  6  4  4  6  6  9  9  9  6  9
+TRAN SP (M/S)  3  3  2  2  2  3  3  3  3  3  2  2  3  3  4  4  4  3  4
+LVORI          7  8  8  4  2  2  3  4  8  9 10 10  9  9  8  4  2  2  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+LAZ008-112100-
+WEST CARROLL-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML ML ML ML CL ML CL ML PC ML ML ML ML CL CL ML CL CL CL
+WEATHER COV   CL CL SC SC SC CH CH CH SC SC SC CL CL PT PT CL CL CH SC
+WEATHER TYPE  CL CL TS TS TS TS TS TS TS TS TS CL CL FG FG CL CL TS TS
+TEMP          75 75 77 85 91 92 91 88 80 78 75 74 73 73 75 83 90 92 92
+RH            90 91 88 70 57 54 54 62 83 90 94 97100100100 76 63 56 54
+20FT DIR       S SW SW  W  W SW  S  S SE SE SE  S  S  S  S SW SW SW  W
+20FT SPD       1  1  1  1  1  1  2  1  1  1  1  1  1  1  2  2  1  1  0
+20FT GUST      7  6  5  6  6  7  8  7  6  7  6  7  8  7  7  8  7  6  7
+MIX HGT (HFT)  4  4  5 18 37 46 42 18  5  4  4  4  4  4  6 18 41 57 47
+MIX HGT (HM)   1  1  1  5 11 14 12  5  1  1  1  1  1  1  2  5 12 17 14
+TRAN DIR       S SW SW  W SW SW SW  S  S  S  S  S SW SW SW SW SW SW SW
+TRAN SP (MPH)  9  6  6  9  6  6  9  6  9  9  9  9  9  9  9  9  6  4  6
+TRAN SP (M/S)  4  3  3  4  3  3  4  3  4  4  4  4  4  4  4  4  3  2  3
+LVORI          6  8  6  3  2  1  1  2  5  6  6  8  9  9  8  3  1  1  1
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ038-112100-
+WINSTON-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML PC PC PC PC ML PC ML PC ML ML PC ML ML ML PC ML
+WEATHER COV   CL CL SC CH CH LK CH CH CH CL CL SC CH SC CL CL SC CH CH
+WEATHER TYPE  CL CL RW TS TS TS TS TS TS CL CL RW RW RW CL CL TS TS TS
+TEMP          73 73 75 82 86 87 86 83 76 74 73 73 72 72 74 82 88 89 87
+RH            93 95 95 81 71 66 68 74 96100100100100100100 83 67 62 65
+20FT DIR      SW  N SW  S SE SE SE  S  S SE  S  S  S SW SW SW SW SW SW
+20FT SPD       0  0  0  2  4  4  4  4  2  2  1  1  2  2  2  4  4  4  4
+20FT GUST      5  4  4  5  7  8  9  8  7  7  6  6  6  6  7  8  8  8  8
+MIX HGT (HFT)  4  5  8 17 26 32 38 15  4  4  4  4  4  4  7 19 39 48 31
+MIX HGT (HM)   1  1  2  5  8  9 11  4  1  1  1  1  1  1  2  5 12 14  9
+TRAN DIR      SW SW SW  S  S SE SE  S  S  S  S SW SW SW SW  W  W SW SW
+TRAN SP (MPH)  6  4  4  4  4  4  6  6  6  6  4  6  6  6  9  9  9  6  9
+TRAN SP (M/S)  3  2  2  2  2  2  3  3  3  3  2  3  3  3  4  4  4  3  4
+LVORI          9 10  9  4  3  3  3  3  7  9 10  9  9  9  8  3  2  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+MSZ042-112100-
+YAZOO-
+130 AM CDT FRI SEP 11 2026
+
+DATE             FRI 09/11/26                        SAT 09/12/26
+CDT 2HRLY     04 06 08 10 12 14 16 18 20 22 00 02 04 06 08 10 12 14 16
+
+SKY           ML PC ML ML ML ML ML ML ML ML ML ML ML ML CL CL CL CL ML
+WEATHER COV   SC SC CH CH CH CH CH LK SC CL SC SC SC PT CL CL CL CH CH
+WEATHER TYPE  TS TS TS TS TS TS TS TS TS CL TS RW RW FG CL CL CL TS TS
+TEMP          76 75 77 83 89 91 91 86 79 77 75 74 73 73 75 83 88 91 91
+RH            92 94 91 80 66 61 61 70 86 94 98 99 99100100 83 69 62 61
+20FT DIR       S  S  S SW SW  S  S  S  S SE SE  S  S SW SW SW SW SW SW
+20FT SPD       1  0  1  2  2  2  4  4  2  2  1  1  2  2  2  4  4  4  4
+20FT GUST      5  5  5  6  6  7  8  8  8  8  7  7  8  7  8  9  8  8  8
+MIX HGT (HFT)  5  4  7 17 32 40 37 17  4  4  4  4  4  4  7 20 43 58 36
+MIX HGT (HM)   1  1  2  5 10 12 11  5  1  1  1  1  1  1  2  6 13 17 11
+TRAN DIR      SW SW SW  W SW SW  S SW  S SE  S  S  S SW SW SW SW SW SW
+TRAN SP (MPH)  6  6  6  6  4  6  6  6  6  6  6  6  6  6  9  9  6  6  6
+TRAN SP (M/S)  3  3  3  3  2  3  3  3  3  3  3  3  3  3  4  4  3  3  3
+LVORI          8  8  8  4  3  2  2  3  5  7  8  9  9  9  8  3  3  1  2
+FWDI           0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+$$
+
+FOLLOWING IS A WEATHER ELEMENT KEY FOR THE ABOVE PRODUCT...
+
+SKY (SKY COVERAGE):
+CD...CLOUDY
+ML...MOSTLY CLOUDY
+PC...PARTLY CLOUDY
+MC...MOSTLY CLEAR
+CL...CLEAR
+
+WEATHER COV (WEATHER COVERAGE):
+CL...NO WEATHER COVERAGE
+SC...SLIGHT CHANCE
+IS...ISOLATED
+CH...CHANCE
+ST...SCATTERED
+LK...LIKELY
+NU...NUMEROUS
+DE...DEFINITE
+WI...WIDESPREAD
+OC...OCCASIONAL
+FR...FREQUENT
+PD...PERIODS
+IT...INTERMITTENT
+AR...AREAS
+PT...PATCHY
+
+WEATHER TYPE:
+CL...NO WEATHER
+TS...THUNDERSTORMS
+RW...RAIN SHOWERS
+RA...RAIN
+SW...SNOW SHOWERS
+SN...SNOW
+RS...RAIN AND SNOW
+SR...SNOW AND RAIN
+DZ...DRIZZLE
+FR...FREEZING RAIN
+FD...FREEZING DRIZZLE
+IP...SLEET
+FG...FOG
+FF...FREEZING FOG
+IF...ICE FOG
+IC...ICE CRYSTALS
+BN...BLOWING SNOW
+FS...FROST
+
+TEMP: AIR TEMPERATURE IN DEGREES FARENHEIT
+
+RH: RELATIVE HUMIDITY IN PERCENT
+
+20FT DIR: WIND DIRECTION AT 20 FEET ABOVE GROUND LEVEL
+
+20FT SPD: WIND SPEED AT 20 FEET ABOVE GROUND LEVEL IN MPH
+
+20FT GUST: WIND GUST AT 20 FEET ABOVE GROUND LEVEL IN MPH
+
+MIX HGT (HFT): MIXING HEIGHT IN HUNDREDS OF FEET
+
+MIX HGT (HM): MIXING HEIGHT IN HUNDREDS OF METERS
+
+TRAN DIR: TRANSPORT WIND DIRECTION
+
+TRAN SP (MPH): TRANSPORT WIND SPEED IN MPH
+
+TRAN SP (M/S): TRANSPORT WIND SPEED IN M/S
+
+LVORI: LOW VISIBILITY OCCURRENCE RISK INDEX
+
+FWDI: FIRE WEATHER DANGER INDEX
+(0...NONE; 1...LITTLE; 2...LOW; 3...MODERATE; 4...HIGH; 5...EXTREME)
+

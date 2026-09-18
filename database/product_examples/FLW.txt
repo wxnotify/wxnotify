@@ -1,1 +1,55 @@
-Product example coming soon!
+493
+WGUS41 KRLX 100722
+FLWRLX
+
+BULLETIN - IMMEDIATE BROADCAST REQUESTED
+Flood Warning
+National Weather Service Charleston WV
+322 AM EDT Thu Sep 10 2026
+
+OHC167-101315-
+/O.NEW.KRLX.FA.W.0109.260910T0722Z-260910T1315Z/
+/00000.0.ER.000000T0000Z.000000T0000Z.000000T0000Z.OO/
+Washington OH-
+322 AM EDT Thu Sep 10 2026
+
+...FLOOD WARNING IN EFFECT UNTIL 915 AM EDT THIS MORNING...
+...REPLACES FLASH FLOOD WARNING...
+
+* WHAT...Flooding caused by excessive rainfall is expected.
+
+* WHERE...North Central Washington County in southeastern Ohio...
+
+* WHEN...Until 915 AM EDT.
+
+* IMPACTS...Flooding of rivers, creeks, streams, and other low-lying
+  and flood-prone locations is imminent or occurring.
+
+* ADDITIONAL DETAILS...
+  - At 322 AM EDT, Doppler radar indicated heavy rain due to
+    thunderstorms. Flooding is ongoing or expected to begin shortly
+    in the warned area. Between 1.5 and 2.5 inches of rain have
+    fallen.
+  - Some locations that will experience flooding include...
+    Macksburg.
+  - This includes Interstate 77 in Ohio between mile markers 13 and
+    17.
+  - http://www.weather.gov/safety/flood
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Turn around, don't drown when encountering flooded roads. Most flood
+deaths occur in vehicles.
+
+Report flooding to the National Weather Service by calling toll free,
+800 401 9535, when you can do so safely.
+
+&&
+
+LAT...LON 3958 8141 3958 8147 3965 8147 3965 8145
+      3963 8145 3963 8141 3962 8141
+
+
+$$
+
+5

@@ -1,1 +1,27 @@
-Product example coming soon!
+743
+FZUS61 KBUF 101403
+GLFSL
+
+Forecast for the Saint Lawrence River
+including the Thousand Islands Region
+National Weather Service Buffalo NY
+1003 AM EDT Thu Sep 10 2026
+
+SLZ022-024-102100-
+Saint Lawrence River from Cape Vincent to Saint Regis
+1003 AM EDT Thu Sep 10 2026
+
+.THIS AFTERNOON...West winds 10 to 15 knots. Mostly sunny.
+.TONIGHT...Northwest winds 5 to 10 knots becoming light and
+variable. Mostly cloudy early, then clearing.
+.FRIDAY...Light and variable winds. Sunny.
+.FRIDAY NIGHT...Southwest winds less than 10 knots becoming
+south. Mainly clear.
+.SATURDAY...South winds 5 to 15 knots. A chance of showers
+Saturday night.
+.SUNDAY...Southwest winds 10 knots or less becoming northwest. A
+chance of showers.
+.MONDAY...North winds 10 knots or less becoming southeast. A
+chance of showers Monday night.
+
+$$

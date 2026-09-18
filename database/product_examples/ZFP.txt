@@ -1,1 +1,623 @@
-Product example coming soon!
+186
+FPUS51 KBUF 141400
+ZFPBUF
+
+Zone Forecasts for Western New York
+National Weather Service Buffalo NY
+1000 AM EDT Mon Sep 14 2026
+
+NYZ001-142200-
+Niagara-
+Including the city of Niagara Falls
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Mostly sunny. Highs in the upper 60s. North winds
+around 10 mph, becoming northwest.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy.
+Lows ranging from the upper 40s inland to the lower 50s along the
+Lake Ontario shore. Light south winds.
+.TUESDAY...Partly to mostly sunny. Highs in the upper 70s. South
+winds 5 to 10 mph, increasing to 10 to 15 mph.
+.TUESDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Much warmer with lows in the mid 60s. Southwest winds 5 to 10 mph,
+becoming light.
+.WEDNESDAY...Mostly cloudy in the morning, then becoming partly
+sunny. A 50 percent chance of showers. Highs in the mid 70s. Light
+winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a 40 percent chance of
+showers. Lows in the lower 60s.
+.THURSDAY...Showers likely. Highs in the mid 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Mostly cloudy with a 30 percent chance of showers.
+Lows around 60.
+.FRIDAY...Mostly sunny. Highs in the mid 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the upper 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Partly sunny with a 40 percent chance of showers. Highs
+around 70.
+
+$$
+
+NYZ010-142200-
+Northern Erie-
+Including the city of Buffalo
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Partly sunny. Highs in the upper 60s. North winds
+around 10 mph, becoming northwest.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy.
+Lows around 50. Light southeast winds.
+.TUESDAY...Partly to mostly sunny. Highs in the upper 70s. Light
+winds, becoming south 5 to 10 mph.
+.TUESDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Much warmer with lows in the mid 60s. South winds 5 to 10 mph,
+becoming light.
+.WEDNESDAY...Mostly cloudy with a 50 percent chance of showers.
+Highs in the mid 70s. Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a chance of showers. Lows in
+the lower 60s. Chance of rain 50 percent.
+.THURSDAY...Showers likely. Highs in the upper 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Mostly cloudy with a 40 percent chance of showers.
+Lows around 60.
+.FRIDAY...Mostly sunny. Highs in the mid 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the upper 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Partly sunny with a 50 percent chance of showers. Highs
+around 70.
+
+$$
+
+NYZ002-142200-
+Orleans-
+Including the city of Medina
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Mostly sunny. Highs in the upper 60s. Northwest
+winds around 10 mph.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy.
+Lows around 50. Light south winds.
+.TUESDAY...Mostly sunny. Highs in the upper 70s. South winds around
+10 mph.
+.TUESDAY NIGHT...Mostly cloudy with a 40 percent chance of showers.
+Much warmer with lows in the mid 60s. Light winds.
+.WEDNESDAY...Mostly cloudy in the morning, then becoming partly
+sunny. A 40 percent chance of showers. Humid with highs in the mid
+70s. Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a 50 percent chance of
+showers. Lows in the lower 60s.
+.THURSDAY...Showers likely. Highs in the upper 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Mostly cloudy with a 30 percent chance of showers.
+Lows around 60.
+.FRIDAY...Mostly sunny. Highs in the mid 70s.
+.FRIDAY NIGHT...Mostly cloudy. Lows in the upper 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Partly sunny with a 40 percent chance of showers. Highs
+around 70.
+
+$$
+
+NYZ011-142200-
+Genesee-
+Including the city of Batavia
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Mostly sunny. Highs in the upper 60s. Northwest
+winds around 10 mph.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy.
+Lows in the upper 40s. Light south winds.
+.TUESDAY...Mostly sunny. Highs in the upper 70s. South winds around
+10 mph.
+.TUESDAY NIGHT...Mostly cloudy. A chance of showers overnight. Much
+warmer with lows in the mid 60s. South winds 10 mph or less,
+becoming southwest. Chance of rain 40 percent.
+.WEDNESDAY...Mostly cloudy with a 40 percent chance of showers.
+Humid with highs in the mid 70s. Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a chance of showers. Lows in
+the lower 60s. Chance of rain 50 percent.
+.THURSDAY...Showers likely. Highs in the upper 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Mostly cloudy with a 40 percent chance of showers.
+Lows around 60.
+.FRIDAY...Mostly sunny. Highs in the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the mid 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Partly sunny with a 50 percent chance of showers. Highs in
+the upper 60s.
+
+$$
+
+NYZ085-142200-
+Southern Erie-
+Including the cities of Orchard Park and Springville
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Partly to mostly sunny. Highs ranging from the
+lower 60s on the hilltops to the upper 60s across the lower
+elevations. North winds around 10 mph, becoming northwest.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy.
+Lows ranging from the mid 40s inland to the lower 50s along the Lake
+Erie shore. Light southeast winds.
+.TUESDAY...Mostly sunny. Highs ranging from the lower 70s on the
+hilltops to the upper 70s across the lower elevations. Light winds,
+becoming south around 10 mph.
+.TUESDAY NIGHT...Partly cloudy in the evening, then mostly cloudy
+with a chance of showers overnight. Much warmer with lows ranging
+from the lower 60s inland to the mid 60s along the Lake Erie shore.
+Light winds. Chance of rain 50 percent.
+.WEDNESDAY...Mostly cloudy with a 50 percent chance of showers.
+Highs in the mid 70s. Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a chance of showers. Lows in
+the lower 60s. Chance of rain 40 percent.
+.THURSDAY...Showers likely. Highs in the upper 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows around 60.
+.FRIDAY...Partly sunny. Highs in the mid 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the mid 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a chance of showers. Lows in
+the mid 50s. Chance of rain 50 percent.
+.SUNDAY...Mostly cloudy with a chance of showers. Highs in the upper
+60s. Chance of rain 50 percent.
+
+$$
+
+NYZ012-142200-
+Wyoming-
+Including the city of Warsaw
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Partly sunny. Highs ranging from the lower 60s on
+the hilltops to the mid 60s across the lower elevations. North winds
+5 to 10 mph, becoming northwest.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy
+with some patchy fog developing overnight. Lows in the mid 40s.
+Light winds.
+.TUESDAY...Some patchy fog in the morning, otherwise mostly sunny.
+Highs ranging from the lower 70s on the hilltops to the mid 70s
+across the lower elevations. South winds 10 mph or less.
+.TUESDAY NIGHT...Partly cloudy in the evening, then mostly cloudy
+with a chance of showers overnight. Much warmer with lows in the
+lower 60s. South winds 5 to 10 mph, becoming southwest. Chance of
+rain 40 percent.
+.WEDNESDAY...Mostly cloudy with a 40 percent chance of showers.
+Highs in the mid 70s. Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a chance of showers. Lows in
+the lower 60s. Chance of rain 50 percent.
+.THURSDAY...Showers likely. Highs in the mid 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Showers likely. Lows in the upper 50s. Chance of
+rain 60 percent.
+.FRIDAY...Partly sunny. Highs in the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the mid 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+around 70.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Mostly cloudy with a 50 percent chance of showers. Highs
+in the upper 60s.
+
+$$
+
+NYZ019-142200-
+Chautauqua-
+Including the city of Jamestown
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Becoming mostly sunny. Highs in the mid 60s. North
+winds 10 mph or less, becoming northwest.
+.TONIGHT...Mainly clear in the evening, then becoming mostly cloudy
+with some patchy fog developing overnight. Lows ranging from the mid
+40s in interior valleys to the lower 50s along the Lake Erie shore.
+Light southeast winds.
+.TUESDAY...Some patchy fog in the morning, otherwise mostly sunny.
+Highs ranging from the lower 70s on the hilltops to the upper 70s
+across the lower elevations. South winds 5 to 10 mph, increasing to
+10 to 15 mph.
+.TUESDAY NIGHT...Partly cloudy in the evening, then mostly cloudy
+with a chance of showers overnight. Warmer with lows ranging from
+around 60 in interior valleys to the mid 60s along the Lake Erie
+shore. South winds 10 to 15 mph, diminishing to 5 to 10 mph. Chance
+of rain 50 percent.
+.WEDNESDAY...Mostly cloudy with a chance of showers. Humid with
+highs in the mid 70s. Light winds. Chance of rain 50 percent.
+.WEDNESDAY NIGHT...Mostly cloudy with a chance of showers. Lows in
+the lower 60s. Chance of rain 40 percent.
+.THURSDAY...Showers likely. Highs in the upper 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Showers likely. Lows in the lower 60s. Chance of
+rain 70 percent.
+.FRIDAY...Mostly sunny. Highs in the mid 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the mid 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Showers likely. Lows in the mid 50s. Chance of
+rain 60 percent.
+.SUNDAY...Mostly cloudy with a chance of showers. Highs around 70.
+Chance of rain 50 percent.
+
+$$
+
+NYZ020-142200-
+Cattaraugus-
+Including the city of Olean
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Partly to mostly sunny. Highs in the mid 60s. North
+winds around 10 mph, becoming northwest.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy
+with some patchy fog developing overnight. Lows in the mid 40s.
+Light southeast winds.
+.TUESDAY...Some patchy fog in the morning, otherwise mostly sunny.
+Highs ranging from the lower 70s on the hilltops to the mid 70s
+across the lower elevations. Light winds, becoming south 5 to
+10 mph.
+.TUESDAY NIGHT...Partly cloudy in the evening, then mostly cloudy
+with a chance of showers overnight. Milder with lows in the upper
+50s. South winds 5 to 10 mph, becoming light. Chance of rain
+50 percent.
+.WEDNESDAY...Partly sunny in the morning, then becoming mostly
+cloudy. A chance of showers. Highs in the mid 70s. Light winds.
+Chance of rain 50 percent.
+.WEDNESDAY NIGHT...Mostly cloudy with a chance of showers. Lows in
+the lower 60s. Chance of rain 40 percent.
+.THURSDAY...Showers. Highs in the upper 70s. Chance of rain
+80 percent.
+.THURSDAY NIGHT...Showers. Lows in the upper 50s. Chance of rain
+80 percent.
+.FRIDAY...Partly sunny with a 30 percent chance of showers. Highs in
+the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the mid 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Mostly cloudy with a chance of showers. Highs in the upper
+60s. Chance of rain 50 percent.
+
+$$
+
+NYZ021-142200-
+Allegany-
+Including the city of Wellsville
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Partly sunny. Highs ranging from the lower 60s on
+the hilltops to the mid 60s across the lower elevations. North winds
+10 to 15 mph, diminishing to 5 to 10 mph.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy
+with some patchy fog developing overnight. Lows in the mid 40s.
+Light winds.
+.TUESDAY...Some patchy fog in the morning, otherwise mostly sunny.
+Highs ranging from the upper 60s on the hilltops to the mid 70s
+across the lower elevations. Light winds, becoming south 5 to
+10 mph.
+.TUESDAY NIGHT...Mainly clear in the evening, then partly cloudy
+with a chance of showers overnight. Milder with lows in the upper
+50s. South winds 5 to 10 mph, becoming light. Chance of rain
+30 percent.
+.WEDNESDAY...Partly sunny in the morning, then becoming mostly
+cloudy. A 30 percent chance of showers. Highs ranging from the lower
+70s on the hilltops to the upper 70s across the lower elevations.
+Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a 40 percent chance of showers
+and thunderstorms. Lows in the lower 60s.
+.THURSDAY...Showers with a chance of thunderstorms. Highs in the mid
+70s. Chance of rain 80 percent.
+.THURSDAY NIGHT...Showers. Lows in the upper 50s. Chance of rain
+80 percent.
+.FRIDAY...Partly sunny with a 30 percent chance of showers. Highs in
+the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the lower 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the lower 50s.
+.SUNDAY...Mostly cloudy with a chance of showers. Highs in the mid
+60s. Chance of rain 50 percent.
+
+$$
+
+NYZ013-142200-
+Livingston-
+Including the city of Geneseo
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Mostly sunny. Highs ranging from the lower 60s on
+the hilltops to the upper 60s across the lower elevations. North
+winds 10 to 15 mph, becoming northwest 5 to 10 mph.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy
+with some patchy fog developing overnight. Lows in the upper 40s.
+Light south winds.
+.TUESDAY...Some patchy fog in the morning, otherwise mostly sunny.
+Highs in the mid 70s. South winds 10 mph or less, increasing to
+10 to 15 mph.
+.TUESDAY NIGHT...Partly cloudy in the evening, then mostly cloudy
+with a chance of showers overnight. Much warmer with lows in the
+lower 60s. South winds 10 to 15 mph, diminishing to 5 to 10 mph.
+Chance of rain 40 percent.
+.WEDNESDAY...Partly sunny in the morning, then becoming mostly
+cloudy. A 40 percent chance of showers. Highs in the mid 70s. Light
+winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a 50 percent chance of showers
+and thunderstorms. Lows in the lower 60s.
+.THURSDAY...Showers likely with a chance of thunderstorms. Highs in
+the upper 70s. Chance of rain 70 percent.
+.THURSDAY NIGHT...Showers likely. Lows around 60. Chance of rain
+70 percent.
+.FRIDAY...Partly sunny with a 30 percent chance of showers. Highs in
+the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the mid 50s.
+.SATURDAY...Partly sunny with a 30 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Mostly cloudy with a 50 percent chance of showers. Highs
+in the upper 60s.
+
+$$
+
+NYZ014-142200-
+Ontario-
+Including the city of Canandaigua
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Mostly sunny. Highs ranging from the lower 60s on
+the hilltops to the upper 60s across the lower elevations. North
+winds 10 to 15 mph, becoming northwest.
+.TONIGHT...Mainly clear. Lows in the upper 40s. Light south winds.
+.TUESDAY...Mostly sunny. Highs ranging from around 70 on the
+hilltops to the mid 70s across the lower elevations. Light winds,
+becoming south 10 to 15 mph.
+.TUESDAY NIGHT...Partly cloudy in the evening, then mostly cloudy
+with a chance of showers overnight. Much warmer with lows in the
+lower 60s. South winds 5 to 10 mph. Chance of rain 40 percent.
+.WEDNESDAY...Partly sunny in the morning, then becoming mostly
+cloudy. A 40 percent chance of showers. Highs ranging from the lower
+70s on the hilltops to the mid 70s across the lower elevations.
+Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a 50 percent chance of
+showers. Lows in the lower 60s.
+.THURSDAY...Showers likely with a chance of thunderstorms. Highs in
+the upper 70s. Chance of rain 70 percent.
+.THURSDAY NIGHT...Showers likely. Lows around 60. Chance of rain
+70 percent.
+.FRIDAY...Mostly sunny. Highs in the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the mid 50s.
+.SATURDAY...Partly sunny with a 30 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Mostly cloudy with a 50 percent chance of showers. Highs
+in the upper 60s.
+
+$$
+
+NYZ003-142200-
+Monroe-
+Including the city of Rochester
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Mostly sunny. Highs in the upper 60s. North winds
+5 to 10 mph, becoming northwest.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy.
+Lows ranging from the upper 40s inland to the lower 50s along the
+Lake Ontario shore. Light south winds.
+.TUESDAY...Mostly sunny. Highs in the upper 70s. South winds 10 mph
+or less.
+.TUESDAY NIGHT...Mostly cloudy with a 40 percent chance of showers.
+Much warmer with lows in the mid 60s. South winds around 10 mph,
+becoming light.
+.WEDNESDAY...Mostly cloudy in the morning, then becoming partly
+sunny. A 40 percent chance of showers. Humid with highs in the mid
+70s. Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a 50 percent chance of
+showers. Lows in the lower 60s.
+.THURSDAY...Showers likely. Highs in the upper 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Mostly cloudy with a 40 percent chance of showers.
+Lows in the lower 60s.
+.FRIDAY...Mostly sunny. Highs in the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the upper 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Partly sunny with a 40 percent chance of showers. Highs
+around 70.
+
+$$
+
+NYZ004-142200-
+Wayne-
+Including the city of Newark
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Sunny. Highs in the upper 60s. North winds 10 to
+15 mph, becoming northwest 5 to 10 mph.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy.
+Lows ranging from the upper 40s inland to the lower 50s along the
+Lake Ontario shore. Light winds.
+.TUESDAY...Mostly sunny. Highs in the mid 70s. Light winds, becoming
+south 5 to 10 mph.
+.TUESDAY NIGHT...Mostly cloudy. A chance of showers overnight.
+Warmer with lows in the lower 60s. South winds 5 to 10 mph, becoming
+light. Chance of rain 30 percent.
+.WEDNESDAY...Mostly cloudy in the morning, then becoming partly
+sunny. A 30 percent chance of showers. Highs in the mid 70s. Light
+winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a 50 percent chance of
+showers. Lows in the lower 60s.
+.THURSDAY...Showers likely with a chance of thunderstorms. Highs in
+the upper 70s. Chance of rain 70 percent.
+.THURSDAY NIGHT...Showers likely. Lows in the lower 60s. Chance of
+rain 70 percent.
+.FRIDAY...Mostly sunny. Highs in the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the mid 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Partly sunny with a 40 percent chance of showers. Highs in
+the upper 60s.
+
+$$
+
+NYZ005-142200-
+Northern Cayuga-
+Including the city of Fair Haven
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Sunny. Highs in the upper 60s. North winds 10 to
+15 mph, becoming northwest.
+.TONIGHT...Mainly clear in the evening, then becoming partly cloudy.
+Lows ranging from the upper 40s inland to the lower 50s along the
+Lake Ontario shore. Light south winds.
+.TUESDAY...Mostly sunny. Highs in the lower 70s. Light winds,
+becoming south 5 to 10 mph.
+.TUESDAY NIGHT...Mostly cloudy. A chance of showers overnight.
+Warmer with lows in the lower 60s. South winds 5 to 10 mph, becoming
+light. Chance of rain 30 percent.
+.WEDNESDAY...Mostly cloudy with a chance of showers in the morning,
+then partly sunny in the afternoon. Highs in the mid 70s. Light
+winds. Chance of rain 30 percent.
+.WEDNESDAY NIGHT...Mostly cloudy with a 40 percent chance of
+showers. Lows in the lower 60s.
+.THURSDAY...Showers likely with a chance of thunderstorms. Highs in
+the upper 70s. Chance of rain 70 percent.
+.THURSDAY NIGHT...Showers likely. Lows around 60. Chance of rain
+70 percent.
+.FRIDAY...Mostly sunny. Highs in the mid 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the mid 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the mid 50s.
+.SUNDAY...Partly sunny with a 40 percent chance of showers. Highs
+around 70.
+
+$$
+
+NYZ006-142200-
+Oswego-
+Including the city of Oswego
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Sunny. Highs ranging from the lower 60s on the Tug
+Hill to the mid 60s across the lower elevations. Northwest winds
+10 to 15 mph.
+.TONIGHT...Mainly clear. Lows ranging from the mid 40s across the
+Tug Hill to the lower 50s along the Lake Ontario shore. Light
+southeast winds.
+.TUESDAY...Mostly sunny. Highs ranging from the upper 60s on the Tug
+Hill to the lower 70s across the lower elevations. Light winds,
+becoming south 5 to 10 mph.
+.TUESDAY NIGHT...Mostly cloudy with a 30 percent chance of showers.
+Milder with lows ranging from the mid 50s on the Tug Hill to the
+upper 50s across the lower elevations. South winds 5 to 10 mph,
+becoming light.
+.WEDNESDAY...Partly sunny. A chance of showers in the morning. Highs
+ranging from the lower 70s on the Tug Hill to the mid 70s across the
+lower elevations. Light winds. Chance of rain 30 percent.
+.WEDNESDAY NIGHT...Mostly cloudy with a 40 percent chance of
+showers. Lows in the upper 50s.
+.THURSDAY...Showers likely. Highs in the mid 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Showers likely. Lows in the upper 50s. Chance of
+rain 70 percent.
+.FRIDAY...Mostly sunny. Highs in the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the lower 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the lower 70s.
+.SATURDAY NIGHT...Mostly cloudy with a 50 percent chance of showers.
+Lows in the lower 50s.
+.SUNDAY...Partly sunny with a 40 percent chance of showers. Highs in
+the upper 60s.
+
+$$
+
+NYZ007-142200-
+Jefferson-
+Including the city of Watertown
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Sunny. Highs ranging from the lower 60s on the Tug
+Hill to the upper 60s across the lower elevations. North winds 10 to
+15 mph, becoming northwest 5 to 10 mph.
+.TONIGHT...Mainly clear with some patchy fog developing overnight.
+Lows ranging from the mid 40s across the Tug Hill to the lower 50s
+along the Lake Ontario shore. Light winds.
+.TUESDAY...Some patchy fog in the morning, otherwise partly to
+mostly sunny. Highs ranging from the upper 60s on the Tug Hill to
+the lower 70s across the lower elevations. Light winds, becoming
+south 10 to 15 mph.
+.TUESDAY NIGHT...Mostly cloudy with a 30 percent chance of showers.
+Breezy, warmer with lows ranging from the mid 50s on the Tug Hill to
+the lower 60s across the lower elevations. South winds 10 to 15 mph.
+.WEDNESDAY...Partly sunny. Highs ranging from the lower 70s on the
+Tug Hill to the mid 70s across the lower elevations. Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a 30 percent chance of
+showers. Lows in the upper 50s.
+.THURSDAY...Showers likely. Highs in the lower 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Showers likely. Lows in the mid 50s. Chance of
+rain 70 percent.
+.FRIDAY...Mostly sunny. Highs in the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the lower 50s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the upper 60s.
+.SATURDAY NIGHT...Mostly cloudy with a 40 percent chance of showers.
+Lows in the lower 50s.
+.SUNDAY...Partly sunny with a 30 percent chance of showers. Highs in
+the upper 60s.
+
+$$
+
+NYZ008-142200-
+Lewis-
+Including the city of Lowville
+1000 AM EDT Mon Sep 14 2026
+
+.REST OF TODAY...Mostly sunny. Highs ranging from around 60 on the
+hilltops to the mid 60s across the lower elevations. Northwest winds
+10 to 15 mph.
+.TONIGHT...Mainly clear with some patchy fog developing overnight.
+Lows in the lower 40s. Northwest winds 10 mph or less.
+.TUESDAY...Some patchy fog in the morning, otherwise partly to
+mostly sunny. Highs ranging from the mid 60s on the hilltops to
+around 70 across the lower elevations. South winds 10 mph or less.
+.TUESDAY NIGHT...Mostly cloudy and warmer with lows in the mid 50s.
+South winds 5 to 10 mph.
+.WEDNESDAY...Partly sunny. Highs ranging from the lower 70s on the
+hilltops to the mid 70s across the lower elevations. Light winds.
+.WEDNESDAY NIGHT...Mostly cloudy with a 40 percent chance of
+showers. Lows in the mid 50s.
+.THURSDAY...Showers likely. Highs in the lower 70s. Chance of rain
+70 percent.
+.THURSDAY NIGHT...Showers likely. Lows in the mid 50s. Chance of
+rain 70 percent.
+.FRIDAY...Mostly sunny. Highs in the lower 70s.
+.FRIDAY NIGHT...Partly cloudy. Lows in the upper 40s.
+.SATURDAY...Partly sunny with a 40 percent chance of showers. Highs
+in the upper 60s.
+.SATURDAY NIGHT...Mostly cloudy with a 40 percent chance of showers.
+Lows in the upper 40s.
+.SUNDAY...Partly sunny with a 40 percent chance of showers. Highs in
+the mid 60s.
+
+$$

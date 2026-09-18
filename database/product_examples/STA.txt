@@ -1,1 +1,33 @@
-Product example coming soon!
+015
+NWUS22 KWNS 102206
+STAHRY
+
+                        SPC TORNADO AND SEVERE THUNDERSTORM REPORTS
+               UNOFFICIAL - FOR OFFICIAL REPORTS, SEE PUBLICATION 'STORM DATA'
+                    FOR 06CST THU SEP 10  2026 THRU 16CST THU SEP 10  2026
+
+      EVENT    LOCATION                       REMARKS                 (CST)TIME
+
+  .....TORNADO REPORTS..........TORNADO REPORTS..........TORNADO REPORTS.....
+
+
+     NONE REPORTED
+
+
+
+ .......LRG HAIL/STRONG WIND RPTS.............LRG HAIL/STRONG WIND RPTS......
+
+   1  G 53  3 SSE Mineral Wells TX      (0 E MWL)                       10/1443
+            Report corrected for syntax. KMWL.             FWD/LSR   3278 9806
+   2  G 56  1 SE Colby KS      (35 E GLD)                               10/1538
+            mesonet station reported thunderstorm wind gustGLD/LSR   393810104
+                    of 64 mph station ID:
+   3  G 76  1 SE Colby KS      (35 E GLD)                               10/1545
+            mesonet station reported 87 mph thunderstorm   GLD/LSR   393810104
+                    wind gust. Station ID:
+
+
+ .........OTHER SEVERE REPORTS..................OTHER SEVERE REPORTS.........
+
+
+     NONE REPORTED

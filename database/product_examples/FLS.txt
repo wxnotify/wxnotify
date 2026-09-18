@@ -1,1 +1,39 @@
-Product example coming soon!
+784
+WGUS83 KDMX 152322
+FLSDMX
+
+Flood Statement
+National Weather Service Des Moines IA
+622 PM CDT Tue Sep 15 2026
+
+...The Flood Warning is cancelled for the following rivers in Iowa...
+
+  Walnut Creek at Clive I-80/35 affecting Dallas and Polk Counties.
+
+IAC049-153-160030-
+/O.CAN.KDMX.FL.W.0021.000000T0000Z-260915T2322Z/
+/CLVI4.1.ER.000000T0000Z.000000T0000Z.000000T0000Z.NO/
+622 PM CDT Tue Sep 15 2026
+
+...FLOOD WARNING IS CANCELLED...
+
+The Flood Warning is cancelled for
+  the Walnut Creek at Clive I-80/35, or from Little Walnut Creek to
+  the North Walnut Creek.
+
+* ADDITIONAL DETAILS...
+  - At 6:13 PM CDT Tuesday the stage was 8.8 feet, and falling.
+  - Forecast...The river is expected to fall to 8.0 feet this
+    evening.
+  - Flood stage is 9.0 feet.
+
+
+&&
+
+LAT...LON 4161 9383 4165 9382 4161 9370 4158 9373
+      4160 9379
+
+
+$$
+
+Hagenhoff

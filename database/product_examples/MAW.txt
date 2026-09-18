@@ -1,1 +1,53 @@
-Product example coming soon!
+376
+WHUS52 KCHS 151407
+SMWCHS
+AMZ362-382-151445-
+/O.NEW.KCHS.MA.W.0129.260915T1407Z-260915T1445Z/
+
+BULLETIN - IMMEDIATE BROADCAST REQUESTED
+Special Marine Warning
+National Weather Service Charleston SC
+1007 AM EDT Tue Sep 15 2026
+
+The National Weather Service in Charleston has issued a
+
+* Special Marine Warning for...
+  Waters from Edisto Beach SC to Savannah GA out 60 NM...
+
+* Until 1045 AM EDT.
+
+* At 1007 AM EDT, showers producing waterspouts were located along a
+  line from near Beaufort 45 Feet Reef to 8 NM south of Betsy Ross
+  Reef, moving southwest at 10 knots.
+
+  HAZARD...Waterspouts.
+
+  SOURCE...Emergency management reported. At 1003 AM, Hilton Head
+           Emergency Management relayed a video of a large waterspout
+           just offshore of Hilton Head. While this waterspout has
+           dissipated, additional waterspouts are possible.
+
+  IMPACT...Waterspouts can create locally hazardous seas.
+
+* Locations impacted include...
+  Hilton Head Reef, Beaufort 45 Feet Reef, General Gordon, Betsy Ross
+  Reef, Gaskins Bank Wreck, Gaskin Banks, Fish America, Whitewater
+  Reef and Calibogue Sound.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Move to safe harbor until hazardous weather passes.
+
+&&
+
+LAT...LON 3211 8086 3220 8052 3208 8043 3192 8028
+      3183 8042 3188 8052 3199 8077
+TIME...MOT...LOC 1405Z 61DEG 12KT 3210 8057 3202 8051 3193 8042
+
+WATERSPOUT...OBSERVED
+MAX HAIL SIZE...0.00 IN
+MAX WIND GUST...<34 KTS
+
+$$
+
+ST

@@ -1,1 +1,37 @@
-Product example coming soon!
+619
+FNUS75 KSLC 100256
+FWSSLC
+
+Spot Forecast for Narrows SAR...Zion National Park
+National Weather Service Salt Lake City UT
+856 PM MDT Wed Sep 9 2026
+
+Forecast is based on forecast start time of 2100 MDT on September 09.
+If conditions become unrepresentative...contact the National Weather
+Service.
+
+.DISCUSSION...Dry conditions will prevail over the park through at least
+the next 24 hours, with largely clear skies expected throughout
+the overnight hours. Temperatures will cool into the upper-50s
+within the Narrows by early morning on Thursday, with lows
+bottoming out in the mid-60s closer to Springdale. Light drainage,
+down-canyon winds are expected through the night.
+
+.REST OF TONIGHT...
+
+Sky/weather.........Clear (0-10 percent cloud cover).
+Chance of pcpn......0 percent.
+Chance of lightning.0 percent.
+Min temperature.....57-59.
+Max humidity........31-33 percent.
+Flash Flooding......Not Expected.
+Surface winds (mph).North winds (down-canyon) 5-8 mph.
+
+$$
+Forecaster...Webber
+Requested by...Riccio
+Type of request...SAR
+.TAG 2621557.0/SLC
+.DELDT 09/09/26
+.FormatterVersion 2.0.0
+.EMAIL zion_dispatch@nps.gov

@@ -1,1 +1,31 @@
-Product example coming soon!
+URGENT - WEATHER MESSAGE
+National Weather Service Pendleton OR
+1057 AM PST Fri Feb 21 2025
+
+WAZ029-212100-
+/O.EXT.KPDT.ZF.Y.0008.000000T0000Z-250221T2100Z/
+Foothills of the Blue Mountains of Washington-
+Including the cities of Walla Walla, Waitsburg, and Dayton
+1057 AM PST Fri Feb 21 2025
+
+...FREEZING FOG ADVISORY NOW IN EFFECT UNTIL 1 PM PST THIS
+AFTERNOON...
+
+* WHAT...Visibility of one-quarter mile or less in freezing fog.
+
+* WHERE...Foothills of the Blue Mountains of Washington.
+
+* WHEN...Until 1 PM PST this afternoon.
+
+* IMPACTS...Low visibility could make driving conditions hazardous.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+If driving, slow down, use your headlights, and leave plenty of
+distance ahead of you.
+
+&&
+
+$$
+
+MC

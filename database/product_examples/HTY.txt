@@ -1,1 +1,39 @@
-Product example coming soon!
+636
+WWUS74 KOHX 081652
+NPWOHX
+
+URGENT - WEATHER MESSAGE
+National Weather Service Nashville TN
+1152 AM CDT Tue Sep 8 2026
+
+TNZ005>007-023>027-090600-
+/O.NEW.KOHX.HT.Y.0008.260909T1600Z-260910T0100Z/
+Stewart-Montgomery-Robertson-Houston-Humphreys-Dickson-Cheatham-
+Davidson-
+Including the cities of Nashville, Ashland City, Clarksville, McEwen,
+Erin, Dickson, Springfield, New Johnsonville, Kingston Springs,
+Waverly, Tennessee Ridge, and Dover
+1152 AM CDT Tue Sep 8 2026
+
+...HEAT ADVISORY IN EFFECT FROM 11 AM TO 8 PM CDT WEDNESDAY...
+
+* WHAT...Heat index values up to 105 expected.
+
+* WHERE...Cheatham, Davidson, Dickson, Houston, Humphreys,
+  Montgomery, Robertson, and Stewart Counties.
+
+* WHEN...From 11 AM to 8 PM CDT Wednesday.
+
+* IMPACTS...Hot temperatures and high humidity may cause heat
+  illnesses.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Drink plenty of fluids, stay in an air-conditioned room, stay out of
+the sun, and check up on relatives and neighbors.
+
+&&
+
+$$
+
+Baggett

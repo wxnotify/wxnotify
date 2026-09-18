@@ -1,1 +1,398 @@
-Product example coming soon!
+900
+FNUS75 KSLC 130643
+SMFSLC
+
+Smoke Management Forecast
+National Weather Service Salt Lake City Utah
+1243 AM MDT Sun Sep 13 2026
+
+A Graphical version of the clearing index is available at:
+https://www.weather.gov/slc/ClearingIndex
+
+* All heights are above sea level (ASL) unless noted otherwise *
+
+-----------------------------------------------------------------
+ ...AIR SHED 1...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 8300
+Transport Winds............. NW 23
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 4700
+Transport Winds............. N 12
+Clearing Index.............. 550
+
+TUESDAY...
+Afternoon Mixing Height..... 4400
+Transport Winds............. S 10
+Clearing Index.............. 410
+
+WEDNESDAY...
+Afternoon Mixing Height..... 8300
+Transport Winds............. SW 11
+Clearing Index.............. 910
+
+-----------------------------------------------------------------
+ ...AIR SHED 2...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 9200
+Transport Winds............. SW 27
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 5600
+Transport Winds............. NW 15
+Clearing Index.............. 680
+
+TUESDAY...
+Afternoon Mixing Height..... 9800
+Transport Winds............. SW 18
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 10200
+Transport Winds............. SW 17
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 3...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 7200
+Transport Winds............. SW 20
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 9000
+Transport Winds............. SW 18
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 8800
+Transport Winds............. SW 15
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 9000
+Transport Winds............. SW 14
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 4...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 7900
+Transport Winds............. SW 22
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 5600
+Transport Winds............. NW 11
+Clearing Index.............. 620
+
+TUESDAY...
+Afternoon Mixing Height..... 6800
+Transport Winds............. SW 12
+Clearing Index.............. 790
+
+WEDNESDAY...
+Afternoon Mixing Height..... 8900
+Transport Winds............. SW 13
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 5...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 7800
+Transport Winds............. SW 24
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 5100
+Transport Winds............. W 14
+Clearing Index.............. 670
+
+TUESDAY...
+Afternoon Mixing Height..... 7500
+Transport Winds............. SW 15
+Clearing Index.............. 960
+
+WEDNESDAY...
+Afternoon Mixing Height..... 8600
+Transport Winds............. SW 14
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 6...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 8300
+Transport Winds............. SW 27
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 6900
+Transport Winds............. W 17
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 9700
+Transport Winds............. SW 18
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 8600
+Transport Winds............. SW 16
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 7...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 7600
+Transport Winds............. SW 31
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 7900
+Transport Winds............. W 19
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 9000
+Transport Winds............. SW 18
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 7700
+Transport Winds............. SW 18
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 8...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 9800
+Transport Winds............. SW 25
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 5600
+Transport Winds............. W 12
+Clearing Index.............. 680
+
+TUESDAY...
+Afternoon Mixing Height..... 9600
+Transport Winds............. SW 16
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 10100
+Transport Winds............. SW 14
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 9...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 9000
+Transport Winds............. SW 23
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 10000
+Transport Winds............. W 19
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 9500
+Transport Winds............. SW 16
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 6800
+Transport Winds............. SW 14
+Clearing Index.............. 870
+
+-----------------------------------------------------------------
+ ...AIR SHED 10...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 8700
+Transport Winds............. SW 22
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 8100
+Transport Winds............. W 15
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 10000
+Transport Winds............. SW 15
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 9700
+Transport Winds............. SW 14
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 11...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 8800
+Transport Winds............. SW 25
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 10000
+Transport Winds............. W 17
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 9600
+Transport Winds............. SW 17
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 7600
+Transport Winds............. SW 15
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 12...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 8300
+Transport Winds............. SW 21
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 9500
+Transport Winds............. SW 16
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 8800
+Transport Winds............. SW 15
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 8200
+Transport Winds............. SW 14
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 13...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 7000
+Transport Winds............. SW 23
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 8500
+Transport Winds............. SW 17
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 9000
+Transport Winds............. SW 16
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 8900
+Transport Winds............. SW 15
+Clearing Index.............. 1000+
+
+-----------------------------------------------------------------
+ ...AIR SHED 14...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 6700
+Transport Winds............. SW 16
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 9200
+Transport Winds............. SW 18
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 8300
+Transport Winds............. SW 13
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 8800
+Transport Winds............. SW 12
+Clearing Index.............. 990
+
+-----------------------------------------------------------------
+ ...AIR SHED 15...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 8400
+Transport Winds............. SW 16
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 7000
+Transport Winds............. SW 13
+Clearing Index.............. 900
+
+TUESDAY...
+Afternoon Mixing Height..... 7100
+Transport Winds............. S 11
+Clearing Index.............. 800
+
+WEDNESDAY...
+Afternoon Mixing Height..... 7000
+Transport Winds............. S 12
+Clearing Index.............. 820
+
+-----------------------------------------------------------------
+ ...AIR SHED 16...
+-----------------------------------------------------------------
+
+TODAY...
+Afternoon Mixing Height..... 7600
+Transport Winds............. SW 24
+Clearing Index.............. 1000+
+
+TOMORROW...
+Afternoon Mixing Height..... 8100
+Transport Winds............. W 17
+Clearing Index.............. 1000+
+
+TUESDAY...
+Afternoon Mixing Height..... 8800
+Transport Winds............. SW 17
+Clearing Index.............. 1000+
+
+WEDNESDAY...
+Afternoon Mixing Height..... 8200
+Transport Winds............. SW 16
+Clearing Index.............. 1000+
+
+$$

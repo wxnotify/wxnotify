@@ -1,1 +1,271 @@
-Product example coming soon!
+883
+FOUS52 KCHS 160936
+PFMCHS
+
+Point Forecast Matrices
+National Weather Service Charleston SC
+536 AM EDT Wed Sep 16 2026
+
+SCZ150-162000-
+Charleston International Airport-Charleston SC
+32.91N  80.03W Elev. 45 ft
+536 AM EDT Wed Sep 16 2026
+
+Date             Wed 09/16/26            Thu 09/17/26            Fri 09/18/26
+EDT 3hrly     05 08 11 14 17 20 23 02 05 08 11 14 17 20 23 02 05 08 11 14 17 20
+UTC 3hrly     09 12 15 18 21 00 03 06 09 12 15 18 21 00 03 06 09 12 15 18 21 00
+
+Max/Min                      88          68          88          69          90
+Temp             70 81 86 83 75 73 70 69 69 81 86 84 76 73 71 69 71 83 89 87 78
+Dewpt            65 66 65 65 65 66 66 65 66 66 63 64 66 68 68 68 68 67 67 68 68
+RH               84 60 50 55 71 79 87 87 90 60 46 51 71 84 90 97 90 59 48 53 71
+Wind dir          N NE NE  E  E  E NE NE  N NE  E  E SE  N  N  N NW NW SE  S  S
+Wind spd          9 11 11 13  9  5  5  6  8  9  8  9  5  0  0  0  3  3  3  9  6
+Clouds           SC SC SC FW FW FW CL CL FW CL CL FW SC FW FW FW FW FW FW FW FW
+PoP 12hr                      0           0           0           0           5
+QPF 12hr                      0           0           0           0           0
+Snow 12hr                 00-00       00-00       00-00
+Heat index                                                             92 91
+Max heat                                                               92    93
+
+
+Date          Sat 09/19/26  Sun 09/20/26  Mon 09/21/26  Tue 09/22/26
+EDT 6hrly     02 08 14 20   02 08 14 20   02 08 14 20   02 08 14 20
+UTC 6hrly     06 12 18 00   06 12 18 00   06 12 18 00   06 12 18 00
+
+Min/Max          72    89      72    88      73    88      73    87
+Temp          74 73 87 80   75 74 86 80   76 75 85 80   75 74 84 79
+Dewpt         70 71 71 71   72 72 72 73   73 73 73 73   74 74 74 73
+PWind dir         S     E       E     E       E     E       E     E
+Wind char        LT    LT      LT    LT      LT    LT      LT    LT
+Avg clouds    FW FW SC SC   SC SC SC SC   SC SC SC B1   SC SC B1 B1
+PoP 12hr          5    30      10    20      10    50      40    60
+Rain shwrs              C          S  S          C  C    C  C  C  L
+Tstms                   C          S  S          S  C    S  S  S  C
+
+$$
+GAZ218-162000-
+Savannah International Airport-Inland Chatham GA
+32.12N  81.20W Elev. 50 ft
+536 AM EDT Wed Sep 16 2026
+
+Date             Wed 09/16/26            Thu 09/17/26            Fri 09/18/26
+EDT 3hrly     05 08 11 14 17 20 23 02 05 08 11 14 17 20 23 02 05 08 11 14 17 20
+UTC 3hrly     09 12 15 18 21 00 03 06 09 12 15 18 21 00 03 06 09 12 15 18 21 00
+
+Max/Min                      88          69          88          69          90
+Temp             72 81 86 85 77 74 71 70 70 81 87 86 76 73 71 69 70 82 89 88 78
+Dewpt            66 67 67 67 68 67 66 66 66 68 66 66 67 68 68 67 67 69 68 69 69
+RH               81 63 53 55 74 79 84 87 87 65 50 51 74 84 90 93 90 65 50 54 74
+Wind dir         NE NE NE  E  E  E NE  N  N NE  E  E  E  E  N  N  N  N  E SE SE
+Wind spd          9 10 11 11  8  4  3  5  6  9  9  9  4  1  0  1  3  3  3  6  4
+Clouds           SC FW FW FW FW FW CL FW FW FW CL CL FW FW FW FW FW FW FW FW FW
+PoP 12hr                      0           0           0           0           5
+QPF 12hr                      0           0           0           0           0
+Snow 12hr                 00-00       00-00       00-00
+Heat index                                                             93 92
+Max heat                     90                                        93    95
+
+
+Date          Sat 09/19/26  Sun 09/20/26  Mon 09/21/26  Tue 09/22/26
+EDT 6hrly     02 08 14 20   02 08 14 20   02 08 14 20   02 08 14 20
+UTC 6hrly     06 12 18 00   06 12 18 00   06 12 18 00   06 12 18 00
+
+Min/Max          72    90      73    88      73    87      73    87
+Temp          74 73 88 80   74 74 86 79   75 74 85 79   75 74 84 78
+Dewpt         70 70 73 73   72 72 75 74   73 73 75 74   74 73 76 74
+PWind dir        SE     E       E     E       E     E       E     E
+Wind char        LT    LT      LT    LT      LT    LT      LT    LT
+Avg clouds    FW FW SC SC   SC FW SC B1   B1 SC B1 B1   B1 SC B1 B1
+PoP 12hr         10    20      10    40      20    50      30    60
+Rain shwrs              S          C  C       S  C  C    C  C  C  L
+Tstms                   S          S  C          S  C    S        C
+
+$$
+SCZ150-162000-
+Charleston Waterfront-Charleston SC
+32.78N  79.94W Elev. 10 ft
+536 AM EDT Wed Sep 16 2026
+
+Date             Wed 09/16/26            Thu 09/17/26            Fri 09/18/26
+EDT 3hrly     05 08 11 14 17 20 23 02 05 08 11 14 17 20 23 02 05 08 11 14 17 20
+UTC 3hrly     09 12 15 18 21 00 03 06 09 12 15 18 21 00 03 06 09 12 15 18 21 00
+
+Max/Min                      86          71          86          72          88
+Temp             72 81 86 82 77 75 73 72 72 81 85 83 77 76 74 72 73 83 88 85 79
+Dewpt            67 70 71 70 69 68 68 68 68 70 69 69 69 70 70 70 70 70 72 71 72
+RH               84 69 61 67 76 79 84 87 87 69 59 63 76 82 87 93 90 65 59 63 79
+Wind dir         NE NE NE  E  E  E NE NE  N NE  E  E  E  E  E  N  N  N SE  S  S
+Wind spd          9 11 14 14  9  6  4  5  6  9 10  9  4  2  1  1  2  2  5  8  4
+Clouds           FW SC SC FW FW FW CL CL FW FW FW SC SC FW FW FW FW FW FW FW FW
+PoP 12hr                      5           0           0           0           5
+QPF 12hr                      0           0           0           0           0
+Snow 12hr                 00-00       00-00       00-00
+Heat index             91                                              94 90
+Max heat               91    90                                        94    94
+
+
+Date          Sat 09/19/26  Sun 09/20/26  Mon 09/21/26  Tue 09/22/26
+EDT 6hrly     02 08 14 20   02 08 14 20   02 08 14 20   02 08 14 20
+UTC 6hrly     06 12 18 00   06 12 18 00   06 12 18 00   06 12 18 00
+
+Min/Max          74    87      74    87      75    86      75    85
+Temp          76 75 86 81   77 76 86 81   78 76 85 81   78 76 84 80
+Dewpt         72 73 75 74   74 74 77 75   75 75 77 76   75 75 78 76
+PWind dir         S     E       E     E       E     E       E     E
+Wind char        LT    LT      LT    LT      LT    LT      LT    LT
+Avg clouds    FW FW SC SC   SC SC SC SC   SC SC SC B1   SC SC B1 B1
+PoP 12hr          5    20      20    30      20    50      40    60
+Rain shwrs              S    S  S  C  S       S  C  C    C  C  C  L
+Tstms                   S    S  S  S  S       S  S  C    C  S  S  C
+
+$$
+SCZ148-162000-
+Beaufort Marine Corps Air Station-Beaufort SC
+32.48N  80.72W Elev. 37 ft
+536 AM EDT Wed Sep 16 2026
+
+Date             Wed 09/16/26            Thu 09/17/26            Fri 09/18/26
+EDT 3hrly     05 08 11 14 17 20 23 02 05 08 11 14 17 20 23 02 05 08 11 14 17 20
+UTC 3hrly     09 12 15 18 21 00 03 06 09 12 15 18 21 00 03 06 09 12 15 18 21 00
+
+Max/Min                      87          69          87          70          90
+Temp             72 81 85 85 77 74 72 70 71 81 86 85 77 74 72 70 72 83 88 87 78
+Dewpt            66 68 69 69 68 67 67 66 67 68 67 67 68 69 69 69 69 70 70 71 71
+RH               81 65 59 59 74 79 84 87 87 65 53 55 74 84 90 97 90 65 55 59 79
+Wind dir         NE NE NE  E  E  E NE NE  N NE  E  E SE  E  N  N  N  N  E SE  S
+Wind spd          9 10 10 11  8  4  3  4  6  9  6  6  3  1  0  1  3  2  2  6  4
+Wind gust                    19
+Clouds           FW FW FW FW FW FW CL FW CL FW FW CL FW FW FW FW FW FW FW FW FW
+PoP 12hr                      0           0           0           0           5
+QPF 12hr                      0           0           0           0           0
+Snow 12hr                 00-00       00-00       00-00
+Heat index                                                             93 93
+Max heat                                                               93    94
+
+
+Date          Sat 09/19/26  Sun 09/20/26  Mon 09/21/26  Tue 09/22/26
+EDT 6hrly     02 08 14 20   02 08 14 20   02 08 14 20   02 08 14 20
+UTC 6hrly     06 12 18 00   06 12 18 00   06 12 18 00   06 12 18 00
+
+Min/Max          73    88      73    87      74    87      74    86
+Temp          75 74 86 80   75 75 85 80   76 75 84 80   75 75 83 79
+Dewpt         72 72 75 74   73 73 76 75   74 74 77 75   74 74 77 75
+PWind dir         S     E       E     E       E     E       E     E
+Wind char        LT    LT      LT    LT      LT    LT      LT    LT
+Avg clouds    FW FW FW SC   SC FW SC SC   B1 SC B1 B1   SC SC SC B1
+PoP 12hr         10    30      20    40      20    50      40    60
+Rain shwrs              C       S  C  C       S  C  C    C  C  C  L
+Tstms                   C          S  C       S  S  C    C        C
+
+$$
+SCZ043-162000-
+Walterboro-Inland Colleton SC
+32.91N  80.67W Elev. 98 ft
+536 AM EDT Wed Sep 16 2026
+
+Date             Wed 09/16/26            Thu 09/17/26            Fri 09/18/26
+EDT 3hrly     05 08 11 14 17 20 23 02 05 08 11 14 17 20 23 02 05 08 11 14 17 20
+UTC 3hrly     09 12 15 18 21 00 03 06 09 12 15 18 21 00 03 06 09 12 15 18 21 00
+
+Max/Min                      87          64          88          66          91
+Temp             68 81 86 85 75 70 67 65 66 81 86 86 75 71 68 66 68 83 89 89 78
+Dewpt            64 63 62 60 63 64 63 63 64 64 61 60 63 65 65 65 66 66 66 66 67
+RH               87 54 45 43 66 81 87 93 93 56 43 42 66 81 90 97 93 57 47 47 69
+Wind dir          N NE NE NE  E  N  N  N  N NE  E  E SE  N  N  N  N  N SE SE  S
+Wind spd          6  9 10  8  5  0  0  3  5  6  6  4  4  0  0  0  0  0  2  3  5
+Clouds           FW FW CL FW FW FW CL CL FW CL CL CL FW FW FW FW FW FW FW FW FW
+PoP 12hr                      0           0           0           0          10
+QPF 12hr                      0           0           0           0           0
+Snow 12hr                 00-00       00-00       00-00
+Heat index                                                             92 92
+Max heat                                                               92    94
+
+
+Date          Sat 09/19/26  Sun 09/20/26  Mon 09/21/26  Tue 09/22/26
+EDT 6hrly     02 08 14 20   02 08 14 20   02 08 14 20   02 08 14 20
+UTC 6hrly     06 12 18 00   06 12 18 00   06 12 18 00   06 12 18 00
+
+Min/Max          69    90      70    89      70    88      70    86
+Temp          71 71 88 79   72 72 86 79   72 72 86 78   72 72 84 77
+Dewpt         68 69 70 70   70 71 72 71   71 72 72 72   71 72 73 72
+PWind dir         S     E       E     E      SE     E       E     E
+Wind char        LT    LT      LT    LT      LT    LT      LT    LT
+Avg clouds    FW FW SC SC   SC FW SC SC   B1 FW B1 B1   SC SC B1 SC
+PoP 12hr         10    40       5    30      10    50      30    60
+Rain shwrs              C          S  C          C  C    C  C  C  L
+Tstms                   C             C             C    S        C
+
+$$
+GAZ099-162000-
+Metter-Candler GA
+32.40N  82.06W Elev. 197 ft
+536 AM EDT Wed Sep 16 2026
+
+Date             Wed 09/16/26            Thu 09/17/26            Fri 09/18/26
+EDT 3hrly     05 08 11 14 17 20 23 02 05 08 11 14 17 20 23 02 05 08 11 14 17 20
+UTC 3hrly     09 12 15 18 21 00 03 06 09 12 15 18 21 00 03 06 09 12 15 18 21 00
+
+Max/Min                      89          65          90          66          92
+Temp             69 81 87 87 75 71 68 66 66 81 88 88 76 71 68 66 68 82 90 90 79
+Dewpt            66 66 63 63 64 66 66 65 64 65 63 62 64 66 66 66 65 68 68 68 69
+RH               90 60 45 45 69 84 93 97 93 58 43 42 66 84 93100 90 63 49 49 72
+Wind dir         NE NE NE NE  E  E NE NE  N NE NE  E  E SE  N NW NW  N NE  E SE
+Wind spd          5  9 11  9  4  3  1  3  4  6  8  5  2  2  0  1  2  3  3  4  3
+Clouds           FW SC FW FW FW FW CL CL CL CL CL CL CL CL FW FW FW FW FW FW FW
+PoP 12hr                      0           0           0           0           5
+QPF 12hr                      0           0           0           0           0
+Snow 12hr                 00-00       00-00       00-00
+Heat index                                                             94 94
+Max heat                                                               94    96
+
+
+Date          Sat 09/19/26  Sun 09/20/26  Mon 09/21/26  Tue 09/22/26
+EDT 6hrly     02 08 14 20   02 08 14 20   02 08 14 20   02 08 14 20
+UTC 6hrly     06 12 18 00   06 12 18 00   06 12 18 00   06 12 18 00
+
+Min/Max          70    91      70    90      71    90      71    88
+Temp          72 72 89 81   73 72 88 79   73 73 87 79   73 73 86 78
+Dewpt         70 69 72 73   72 71 73 74   73 72 74 74   73 72 74 75
+PWind dir        SE     E       E     E       E     E       E     E
+Wind char        LT    LT      LT    LT      LT    LT      LT    LT
+Avg clouds    FW FW FW SC   SC FW SC SC   SC SC SC B1   B1 SC SC SC
+PoP 12hr         10    20       5    30       5    50      20    60
+Rain shwrs              S             C             C    S  S  S  L
+Tstms                   S             C             C    S        C
+
+$$
+
+PRODUCT KEY...
+
+--- Cloud Cover ---
+CODE   PERCENTAGE            SKY COVER DAY/NIGHT
+ CL    0 TO <=5 percent      Sunny/Clear
+ FW    >5 TO <=25 percent    Sunny/Mostly Clear
+ SC    >25 TO <=50 percent   Partly Cloudy
+ B1    >50 TO <=69 percent   Mostly Cloudy
+ B2    >69 TO <=87 percent   Mostly Cloudy
+ OV    >87 TO 100 percent    Cloudy
+
+--- Obstructions to Visibility ---    --- Weather Coverage ---
+CODE   TYPE                           CODE   QUALIFYING TERM
+ F     Fog                             S     Slight
+ PF    Patchy Fog                      C     Chance
+ F+    Dense Fog                       L     Likely
+ PF+   Patchy Dense Fog                O     Occasional
+ H     Haze                            D     Definite
+ BS    Blowing Snow
+ K     Smoke
+ BD    Blowing Dust
+ AF    Volcanic Ashfall
+
+--- Extended Wind Forecast Character ---
+                           12-HR MAX SUSTAINED
+CODE   WIND CHARACTER          WIND SPEED
+ LT    Light                   < 8 mph
+ GN    Gentle                  8-14 mph
+ BZ    Breezy                  15-22 mph
+ WY    Windy                   23-30 mph
+ VW    Very Windy              31-39 mph
+ SD    Strong/Damaging         >=40 mph
+

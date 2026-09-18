@@ -1,1 +1,41 @@
-Product example coming soon!
+593
+FNUS21 KWNS 161621
+FWDDY1
+
+Day 1 Fire Weather Outlook
+NWS Storm Prediction Center Norman OK
+1121 AM CDT Wed Sep 16 2026
+
+Valid 161700Z - 171200Z
+
+Elevated fire weather conditions are still expected across portions
+of central Nevada with no changes needed for this update.
+Temperatures are trending warmer and relative humidity lower from
+yesterday, with dry, south-southwest flow expected to increase
+through the day as a mid-level low remains over northern CA.
+South-southwest winds of 15-20 mph and relative humidity falling to
+around 15% will support an elevated fire concern threat for several
+hours this afternoon.
+
+..Williams.. 09/16/2026
+
+.PREV DISCUSSION... /ISSUED 1154 PM CDT Tue Sep 15 2026/
+
+...Synopsis...
+A mid-level low sliding southward from the Pacific Northwest will
+stall over northern California this afternoon, increasing deep-layer
+southwesterly flow across the Great Basin. Hot and dry conditions
+will continue across Texas and Oklahoma as high pressure expands
+into the central U.S., though much lighter winds will limit broader
+fire weather concerns.
+
+...Central Nevada...
+Elevated fire weather conditions are expected this afternoon where
+dry and breezy south-southwesterly winds of 15-20 mph amid minimum
+RH values of 10-15% overlap drying fuels. RH may decline to less
+than 10% in some valleys, but marginal fuel receptiveness will mute
+a more significant fire weather concern across the area.
+
+...Please see www.spc.noaa.gov/fire for graphic product...
+
+$$

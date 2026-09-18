@@ -1,1 +1,47 @@
-Product example coming soon!
+238
+SXUS83 KLOT 111405
+OMRLOT
+ILZ104-121515-
+
+Southern Lake Michigan Water Temperatures
+National Weather Service Chicago/Romeoville IL
+905 AM CDT Fri Sep 11 2026
+
+Lake Michigan Water Temperatures...
+
+Chicago Shore...........69.
+
+Chicago Crib............60.
+
+Chicago Buoy............70.
+
+Chicago Ohio St Beach...69.
+
+Wilmette Buoy...........69.
+
+Waukegan Buoy...........68.
+
+Winthrop Harbor Buoy....68.
+
+Michigan City...........52.
+
+Michigan City Buoy......68.
+
+South Mid Lake Buoy.....74.
+
+Central Mid Lake Buoy...72.
+
+North Mid Lake Buoy.....69.
+
+&&
+
+M is for missing data that is normally available. Chicago Shore,
+Chicago Crib, and Michigan City are read every day of the year.
+
+Measured at a depth of 60 ft for Chicago Crib and 30 ft for
+Michigan City. May not represent surface temperature.
+
+For Lake Michigan water levels, please see:
+water.usace.army.mil/office/lre/forecast/weekly
+
+$$

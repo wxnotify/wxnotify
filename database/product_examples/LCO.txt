@@ -1,1 +1,63 @@
-Product example coming soon!
+333
+SXUS51 KRLX 081131
+LCORLX
+COCORAHS Precipitation Summary
+National Weather Service CHARLESTON WV
+730 AM EDT Tue Sep 08 2026
+
+COCORAHS Precipitation Reports
+These reports are considered supplemental and unofficial
+Values are for the previous 24 hours ending around 7 AM local time
+
+.B RLX 0908 E DH07/PP/SF/SD/SW
+:
+:COCORAHS PRECIPITATION REPORTS IN WEST VIRGINIA
+:
+:                                               Snow   Snow  Water
+:                                        Pcpn   fall  depth  equiv
+:
+WVKN33    : Charleston 2.6 W         * : 0.00 / 0.0 /    0 / 0.00
+WVPT10    : Hurricane 1.6 SSW        * : 0.00 / 0.0 /    0 /   MM
+WVRT04    : Harrisville 3.9 NNE      * : 0.00 / 0.0 /    0 / 0.00
+WVMG16    : Morgantown 5.9 SW        * : 0.00 / 0.0 /    0 / 0.00
+WVPR11    : Thomas 7.4 N             * : 0.00 / 0.0 /    0 / 0.00
+WVBY16    : Bunker Hill 1.5 SW       * : 0.00 / 0.0 /    0 /   MM
+WVCB02    : Huntington 2.9 E         * : 0.00 / 0.0 /   MM /   MM
+WVDD02    : West Union 8.2 NE        * : 0.00 / 0.0 /   MM /   MM
+WVKN43    : South Charleston 1.6 ENE * : 0.00 / 0.0 /   MM /   MM
+WVKN55    : Charleston 4.0 SSE       * : 0.00 / 0.0 /   MM /   MM
+WVNC04    : Craigsville 0.6 NE       * : 0.00 / 0.0 /   MM /   MM
+WVPC04    : Cass 3.7 SW              * : 0.00 / 0.0 /   MM /   MM
+WVPC07    : Green Bank 1.2 ESE       * : 0.00 / 0.0 /   MM /   MM
+WVHN09    : New Cumberland 2.7 NNE   * : 0.00 / 0.0 /   MM /   MM
+WVMA10    : Rivesville 1.7 N         * : 0.00 / 0.0 /   MM /   MM
+WVOH06    : Valley Grove 3.5 NNE     * : 0.00 / 0.0 /   MM /   MM
+WVBY13    : Martinsburg 2.9 SE       * : 0.00 / 0.0 /   MM /   MM
+:
+:COCORAHS PRECIPITATION REPORTS IN SOUTHEAST OHIO
+:
+:                                               Snow   Snow  Water
+:                                        Pcpn   fall  depth  equiv
+:
+OHAT09    : Glouster 3.6 SW          * : 0.00 / 0.0 /   MM /   MM
+OHLW08    : Chesapeake 1.6 WSW       * : 0.00 / 0.0 /   MM /   MM
+OHMS07    : Albany 3.0 SSE           * : 0.00 / 0.0 /   MM /   MM
+OHWS16    : Coolville 5.3 N          * : 0.00 / 0.0 /   MM /   MM
+:
+:COCORAHS PRECIPITATION REPORTS IN NORTHEAST KENTUCKY
+:
+:                                               Snow   Snow  Water
+:                                        Pcpn   fall  depth  equiv
+:
+:No Reports Found...
+:
+:COCORAHS PRECIPITATION REPORTS IN SOUTHWEST VIRGINIA
+:
+:                                               Snow   Snow  Water
+:                                        Pcpn   fall  depth  equiv
+:
+:No Reports Found...
+:
+.END
+
+$$
