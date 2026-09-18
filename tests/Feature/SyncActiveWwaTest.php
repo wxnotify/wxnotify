@@ -387,6 +387,34 @@ test('a Cancelled row is not overridden back by the expiry check', function () {
     expect(ActiveWwa::sole()->status)->toBe('Cancelled');
 });
 
+test('propagates is_test from the triggering product onto the active_wwas row', function () {
+    $product = createIngestedProductWithoutMatchingForSync([
+        'format' => 'text',
+        'is_test' => true,
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '9001', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'text' => "/O.NEW.KTWC.SV.W.9001.260918T0000Z-260918T0100Z/\n",
+    ]);
+
+    (new SyncActiveWwa)($product);
+
+    expect(ActiveWwa::where('vtec_event_number', '9001')->sole()->is_test)->toBeTrue();
+});
+
+test('a real (non-test) product leaves is_test false on its active_wwas row', function () {
+    $product = createIngestedProductWithoutMatchingForSync([
+        'format' => 'text',
+        'is_test' => false,
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'SV', 'vtec_significance' => 'W',
+        'vtec_event_number' => '9002', 'vtec_year' => 2026, 'vtec_action' => 'NEW',
+        'text' => "/O.NEW.KTWC.SV.W.9002.260918T0000Z-260918T0100Z/\n",
+    ]);
+
+    (new SyncActiveWwa)($product);
+
+    expect(ActiveWwa::where('vtec_event_number', '9002')->sole()->is_test)->toBeFalse();
+});
+
 test('a failure syncing active_wwas does not prevent MatchWeatherAlertRules from still being called', function () {
     $spy = Mockery::spy(MatchWeatherAlertRules::class);
     app()->instance(MatchWeatherAlertRules::class, $spy);

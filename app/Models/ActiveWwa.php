@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'product_id', 'vtec_office', 'vtec_phenomenon', 'vtec_significance', 'vtec_event_number', 'vtec_year',
-    'status', 'ugc_codes', 'effective', 'expires', 'headline',
+    'status', 'is_test', 'ugc_codes', 'effective', 'expires', 'headline',
     'motion_direction_degrees', 'motion_speed_kt', 'motion_reference_lat', 'motion_reference_lon', 'motion_observed_at',
     'source', 'latest_ingested_product_id',
 ])]
@@ -28,6 +28,7 @@ class ActiveWwa extends Model
     protected function casts(): array
     {
         return [
+            'is_test' => 'boolean',
             'ugc_codes' => 'array',
             'effective' => 'datetime',
             'expires' => 'datetime',

@@ -47,6 +47,7 @@ class SyncActiveWwa
                     [
                         'product_id' => $product->product_id,
                         'status' => $this->resolveStatus($product->vtec_action),
+                        'is_test' => $product->is_test ?? false,
                         'latest_ingested_product_id' => $product->id,
                         'source' => 'text',
                         ...($product->ugc_codes !== null ? ['ugc_codes' => $product->ugc_codes] : []),
@@ -87,6 +88,7 @@ class SyncActiveWwa
                     [
                         'product_id' => $product->product_id,
                         'status' => $this->resolveStatus($product->vtec_action),
+                        'is_test' => $product->is_test ?? false,
                         'headline' => $product->headline,
                         'source' => 'cap',
                         'latest_ingested_product_id' => $pairedText?->id ?? $product->id,
