@@ -19,6 +19,23 @@ use Illuminate\Support\Facades\DB;
 
 class TestProductScenarioForm
 {
+    /**
+     * input.* keys copied verbatim from the continued scenario's own
+     * `input` array (geography/content fields that don't need any
+     * transformation, unlike wfo/vtec_event_number which are re-derived
+     * from the open ActiveWwa row instead). Shared between
+     * inheritFromContinuedScenario() (live form state) and
+     * inheritedDataFor() (the dehydration-independent copy used by
+     * CreateTestProductScenario::mutateFormDataBeforeCreate()) so the two
+     * never drift apart.
+     *
+     * @var array<int, string>
+     */
+    protected const INHERITED_INPUT_KEYS = [
+        'ugc_codes', 'hazard', 'hazard_source', 'impact', 'locations_impacted', 'call_to_action',
+        'polygon_center_lat', 'polygon_center_lon', 'polygon_radius_miles', 'polygon_advanced', 'polygon_raw', 'damage_tags',
+    ];
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -63,6 +80,7 @@ class TestProductScenarioForm
                     ->options(['new' => 'New event', 'continue' => 'Continue existing event'])
                     ->default('new')
                     ->live()
+                    ->afterStateUpdated(fn (Set $set, Get $get) => self::clearInheritedFieldsIfModeIsNew($set, $get))
                     ->visible(fn (): bool => self::openSyntheticEventOptions() !== []),
                 Select::make('continues_scenario_id')
                     ->label('Continue which event?')
@@ -171,9 +189,20 @@ class TestProductScenarioForm
     /**
      * Copies the continued event's product/WFO/event-number identity plus
      * its most recent geography/content fields into this new scenario's
-     * form state, so the admin only has to change what's actually different
-     * for the follow-up (e.g. an updated impact statement) rather than
-     * re-entering everything.
+     * LIVE form state, so the admin only has to change what's actually
+     * different for the follow-up (e.g. an updated impact statement)
+     * rather than re-entering everything.
+     *
+     * This alone is NOT sufficient to persist the inheritance on save --
+     * `product_id` and `input.wfo` are only ever set here while
+     * `mode === 'continue'`, which is exactly when both fields are
+     * `->visible(false)`. Filament's default `isDehydratedWhenHidden(false)`
+     * strips a hidden field's key from dehydrated state entirely (the same
+     * trap documented in this file's rule doc for EditAlertRule's
+     * alert_template_id), so a bare `$record->create($data)` would silently
+     * drop them. CreateTestProductScenario::mutateFormDataBeforeCreate()
+     * re-derives the same data via inheritedDataFor() below, independent of
+     * dehydration, as the actual point that writes to the database.
      */
     protected static function inheritFromContinuedScenario(Set $set, Get $get): void
     {
@@ -182,6 +211,32 @@ class TestProductScenarioForm
             return;
         }
 
+        $inherited = self::inheritedDataFor((int) $continuedScenarioId);
+        if ($inherited === null) {
+            return;
+        }
+
+        $set('product_id', $inherited['product_id']);
+
+        foreach ($inherited['input'] as $key => $value) {
+            $set("input.{$key}", $value);
+        }
+    }
+
+    /**
+     * Re-derives the same product/WFO/event-number/content inheritance as
+     * inheritFromContinuedScenario() above, but as a plain array rather
+     * than a `Set $set` side effect -- usable from a `mutateFormDataBe...`
+     * page hook (which works with a `$data` array, not live Livewire
+     * state) as well as from the live form. Returns null when the
+     * continued scenario or its open ActiveWwa row can no longer be found
+     * (defense-in-depth; shouldn't happen for a scenario id that came from
+     * openSyntheticEventOptions()).
+     *
+     * @return array{product_id: ?int, input: array<string, mixed>}|null
+     */
+    public static function inheritedDataFor(int $continuedScenarioId): ?array
+    {
         $continuedScenario = TestProductScenario::find($continuedScenarioId);
         $wwa = ActiveWwa::query()
             ->where('is_test', true)
@@ -190,17 +245,51 @@ class TestProductScenarioForm
             ->first();
 
         if ($continuedScenario === null || $wwa === null) {
+            return null;
+        }
+
+        $input = [
+            'wfo' => $wwa->vtec_office !== null ? substr($wwa->vtec_office, 1) : null,
+            'vtec_event_number' => $wwa->vtec_event_number,
+        ];
+
+        foreach (self::INHERITED_INPUT_KEYS as $key) {
+            if (array_key_exists($key, $continuedScenario->input)) {
+                $input[$key] = $continuedScenario->input[$key];
+            }
+        }
+
+        return [
+            'product_id' => $continuedScenario->product_id,
+            'input' => $input,
+        ];
+    }
+
+    /**
+     * Mirrors AlertRuleForm::clearAlertTemplateIfCategoryUnsupported()'s
+     * pattern: switching `mode` back to 'new' (whether or not an event was
+     * ever picked to continue) drops whatever `continues_scenario_id` and
+     * inherited product/wfo/event-number/content values are currently
+     * sitting in live form state, so they can't linger and get silently
+     * reused if the admin flips back to 'continue' and picks a different
+     * event, or accidentally leaves stale data behind for the "New event"
+     * path to build on. Only clears -- it never runs on the 'continue'
+     * branch, where inheritFromContinuedScenario() is the one setting
+     * these same keys.
+     */
+    protected static function clearInheritedFieldsIfModeIsNew(Set $set, Get $get): void
+    {
+        if ($get('mode') === 'continue') {
             return;
         }
 
-        $set('product_id', $continuedScenario->product_id);
-        $set('input.wfo', $wwa->vtec_office !== null ? substr($wwa->vtec_office, 1) : null);
-        $set('input.vtec_event_number', $wwa->vtec_event_number);
+        $set('continues_scenario_id', null);
+        $set('product_id', null);
+        $set('input.wfo', null);
+        $set('input.vtec_event_number', null);
 
-        foreach (['ugc_codes', 'hazard', 'hazard_source', 'impact', 'locations_impacted', 'call_to_action', 'polygon_center_lat', 'polygon_center_lon', 'polygon_radius_miles', 'polygon_advanced', 'polygon_raw', 'damage_tags'] as $key) {
-            if (array_key_exists($key, $continuedScenario->input)) {
-                $set("input.{$key}", $continuedScenario->input[$key]);
-            }
+        foreach (self::INHERITED_INPUT_KEYS as $key) {
+            $set("input.{$key}", null);
         }
     }
 
