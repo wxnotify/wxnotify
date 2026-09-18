@@ -66,7 +66,7 @@ class RenderTestProductText
             'locationsImpacted' => $input['locations_impacted'] ?? null,
             'callToAction' => $input['call_to_action'] ?? '',
             'polygonLine' => $this->buildPolygonLine($polygonPoints),
-            'motionLine' => $this->buildMotionLine($input),
+            'motionLine' => $this->buildMotionLine($input, $issuedAt),
             'damageTagLines' => $input['damage_tags'] ?? [],
         ])->render();
     }
@@ -209,7 +209,7 @@ class RenderTestProductText
         return str_pad((string) $integerPart, $integerDigits, '0', STR_PAD_LEFT).str_pad((string) $fraction, 2, '0', STR_PAD_LEFT);
     }
 
-    private function buildMotionLine(array $input): ?string
+    private function buildMotionLine(array $input, Carbon $issuedAt): ?string
     {
         if (! isset($input['motion_direction_degrees'], $input['motion_speed_kt'])) {
             return null;
@@ -220,7 +220,7 @@ class RenderTestProductText
 
         return sprintf(
             'TIME...MOT...LOC %s %dDEG %dKT %s %s',
-            Carbon::now()->format('Hi\Z'),
+            $issuedAt->format('Hi\Z'),
             $input['motion_direction_degrees'],
             $input['motion_speed_kt'],
             $this->encodeCoordinatePart(abs($lat)),

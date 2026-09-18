@@ -4,10 +4,21 @@ use App\Actions\Pipeline\ExtractProductMetadata;
 use App\Actions\Testing\RenderTestProductText;
 use App\Models\Product;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 afterEach(function () {
     Carbon::setTestNow();
 });
+
+function insertPahBoundary(): void
+{
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'PAH', 'cwa' => 'PAH', 'city' => 'Paducah', 'st' => 'KY', 'citystate' => 'Paducah KY',
+        'lon' => -88.77, 'lat' => 37.06,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-90 36, -87 36, -87 38, -90 38, -90 36))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+}
 
 test('renders a warning-shape product with a real-looking VTEC line, UGC line, and hazard bullets', function () {
     Carbon::setTestNow('2026-09-18 00:52:00');
@@ -40,6 +51,65 @@ test('renders a warning-shape product with a real-looking VTEC line, UGC line, a
         ->and($text)->toContain('LAT...LON')
         ->and($text)->toContain('HAIL THREAT...RADAR INDICATED')
         ->and($text)->toContain('$$');
+});
+
+test('the motion line reflects the scenario\'s pinned issued_at, not wall-clock time at render', function () {
+    // "now" (wall clock) is deliberately different from the scenario's own
+    // issued_at, so a motion line built from Carbon::now() instead of the
+    // pinned $issuedAt would show 0500Z here, not 0052Z.
+    Carbon::setTestNow('2026-09-18 05:00:00');
+    $product = Product::where('code', 'SV.W')->sole();
+
+    $text = (new RenderTestProductText)($product, [
+        'issued_at' => '2026-09-18 00:52:00',
+        'wfo' => 'PAH',
+        'vtec_action' => 'NEW',
+        'vtec_event_number' => '9003',
+        'expires_minutes' => 23,
+        'ugc_codes' => ['MOC023'],
+        'hazard' => '60 mph wind gusts.',
+        'hazard_source' => 'Radar indicated.',
+        'impact' => 'Expect damage to roofs, siding, and trees.',
+        'locations_impacted' => null,
+        'call_to_action' => 'Take cover now.',
+        'polygon_mode' => 'point_radius',
+        'polygon_center_lat' => 36.83,
+        'polygon_center_lon' => -89.12,
+        'polygon_radius_miles' => 8,
+        'damage_tags' => [],
+        'motion_direction_degrees' => 270,
+        'motion_speed_kt' => 25,
+    ]);
+
+    expect($text)->toContain('TIME...MOT...LOC 0052Z 270DEG 25KT')
+        ->and($text)->not->toContain('0500Z');
+});
+
+test('renders the office\'s real city/state name when a cwa_boundaries row exists for the WFO', function () {
+    Carbon::setTestNow('2026-09-18 00:52:00');
+    insertPahBoundary();
+    $product = Product::where('code', 'SV.W')->sole();
+
+    $text = (new RenderTestProductText)($product, [
+        'wfo' => 'PAH',
+        'vtec_action' => 'NEW',
+        'vtec_event_number' => '9004',
+        'expires_minutes' => 23,
+        'ugc_codes' => ['MOC023'],
+        'hazard' => '60 mph wind gusts.',
+        'hazard_source' => 'Radar indicated.',
+        'impact' => 'Expect damage to roofs, siding, and trees.',
+        'locations_impacted' => null,
+        'call_to_action' => 'Take cover now.',
+        'polygon_mode' => 'point_radius',
+        'polygon_center_lat' => 36.83,
+        'polygon_center_lon' => -89.12,
+        'polygon_radius_miles' => 8,
+        'damage_tags' => [],
+    ]);
+
+    expect($text)->toContain('National Weather Service Paducah KY')
+        ->and($text)->not->toContain('National Weather Service PAH');
 });
 
 test('a warning-shape render round-trips through the real extraction pipeline correctly', function () {
@@ -98,7 +168,8 @@ test('renders a discussion-shape product whose polygon round-trips through the f
     $metadata = (new ExtractProductMetadata)($text, 'swomcd');
 
     expect($metadata['product_id'])->toBe($product->id)
-        ->and($metadata['polygon'])->toHaveCount(4);
+        ->and($metadata['polygon'])->toHaveCount(4)
+        ->and($text)->toContain('11:55 PM');
 });
 
 test('renders a plain-text-shape product with no VTEC line and a UGC line when the product has one', function () {
