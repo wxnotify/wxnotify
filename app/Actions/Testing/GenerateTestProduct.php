@@ -3,11 +3,13 @@
 namespace App\Actions\Testing;
 
 use App\Actions\Pipeline\IngestProductText;
+use App\Enums\ProductFamily;
 use App\Models\ActiveWwa;
 use App\Models\IngestedProduct;
 use App\Models\Product;
 use App\Models\TestProductScenario;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Orchestrates one "Generate" click: renders the scenario's stored input
@@ -17,6 +19,13 @@ use Illuminate\Support\Str;
  */
 class GenerateTestProduct
 {
+    /**
+     * Bounds the reserved-event-number collision retry loop (see
+     * nextReservedEventNumber()) so an exhausted pool fails fast with a
+     * clear error instead of spinning forever.
+     */
+    private const MAX_EVENT_NUMBER_ATTEMPTS = 50;
+
     public function __construct(
         private readonly RenderTestProductText $renderTestProductText,
         private readonly IngestProductText $ingestProductText,
@@ -26,22 +35,22 @@ class GenerateTestProduct
     {
         $product = $scenario->product;
         $input = $scenario->input;
+        $wfo = $input['wfo'];
 
         if (($input['mode'] ?? 'new') === 'new' && $product->has_vtec && blank($input['vtec_event_number'] ?? null)) {
-            $input['vtec_event_number'] = (string) $this->nextReservedEventNumber();
+            $input['vtec_event_number'] = (string) $this->nextReservedEventNumber($product, $wfo);
             $input['vtec_action'] = 'NEW';
         }
 
         $text = ($this->renderTestProductText)($product, $input);
 
-        $wfo = $input['wfo'];
         $isCap = false;
         $filePath = "test-generated/{$scenario->id}/".Str::uuid()->toString().'.txt';
 
         $identity = [
             'cccc' => 'k'.strtolower($wfo),
             'ttaaii' => match (true) {
-                $product->family->value === 'spc_wpc' => 'acus11',
+                $product->family === ProductFamily::SpcWpc => 'acus11',
                 $product->has_vtec => 'wuus53',
                 default => 'fxus61',
             },
@@ -60,14 +69,51 @@ class GenerateTestProduct
      * Draws a 4-digit VTEC event number from a reserved high range never
      * used by real NWS sequential numbering (see the design doc), so a
      * synthetic event's VTEC key can never collide with a real active one.
+     *
+     * Collisions are checked against the full VTEC composite key (office,
+     * phenomenon, significance, event number, year -- see
+     * ActiveWwa::vtecKeyFor() and its unique index), not the event number
+     * alone, so unrelated offices/phenomena can freely reuse the same
+     * reserved number instead of needlessly competing for the shared
+     * 1000-number pool.
+     *
+     * The retry loop is bounded: once the pool for this specific VTEC key
+     * is exhausted (nothing in this app ever expires an is_test
+     * active_wwas row on a timer -- see the continue-existing-event flow,
+     * a later task), looping forever would hang the request, so this fails
+     * fast with a clear error instead.
      */
-    private function nextReservedEventNumber(): int
+    private function nextReservedEventNumber(Product $product, string $wfo): int
     {
-        do {
-            $candidate = random_int(9000, 9999);
-        } while (ActiveWwa::where('vtec_event_number', (string) $candidate)->where('status', 'Active')->exists());
+        $codeParts = explode('.', $product->code);
+        $vtecKey = [
+            'vtec_office' => 'K'.$wfo,
+            'vtec_phenomenon' => $codeParts[0],
+            'vtec_significance' => $codeParts[1] ?? 'W',
+            'vtec_year' => (int) now()->year,
+        ];
 
-        return $candidate;
+        for ($attempt = 0; $attempt < self::MAX_EVENT_NUMBER_ATTEMPTS; $attempt++) {
+            $candidate = random_int(9000, 9999);
+
+            if (! $this->reservedEventNumberIsTaken($vtecKey, $candidate)) {
+                return $candidate;
+            }
+        }
+
+        throw new RuntimeException('Unable to find an unused reserved VTEC event number in the 9000-9999 range — too many open synthetic events. Close some out via the continue-existing-event flow.');
+    }
+
+    /**
+     * @param  array{vtec_office: string, vtec_phenomenon: string, vtec_significance: string, vtec_year: int}  $vtecKey
+     */
+    protected function reservedEventNumberIsTaken(array $vtecKey, int $candidate): bool
+    {
+        return ActiveWwa::where([
+            ...$vtecKey,
+            'vtec_event_number' => (string) $candidate,
+            'status' => 'Active',
+        ])->exists();
     }
 
     /**
