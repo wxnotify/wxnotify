@@ -20,7 +20,7 @@ use Marcelodelgado\Announcements\Traits\HasAnnouncements;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'is_test_account'])]
 #[Hidden(['password', 'remember_token', 'app_authentication_secret'])]
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, MustVerifyEmail
 {
@@ -169,6 +169,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_staff' => 'boolean',
+            'is_test_account' => 'boolean',
             'tier_override' => Tier::class,
         ];
     }
