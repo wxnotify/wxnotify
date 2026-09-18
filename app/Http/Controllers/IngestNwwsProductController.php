@@ -2,19 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\Pipeline\ExtractCapMetadata;
-use App\Actions\Pipeline\ExtractProductMetadata;
+use App\Actions\Pipeline\IngestProductText;
 use App\Models\IngestedProduct;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
-use Throwable;
 
 class IngestNwwsProductController extends Controller
 {
     public function __construct(
-        private readonly ExtractProductMetadata $extractProductMetadata,
-        private readonly ExtractCapMetadata $extractCapMetadata,
+        private readonly IngestProductText $ingestProductText,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -43,30 +40,7 @@ class IngestNwwsProductController extends Controller
         $text = file_get_contents($absolutePath);
         $isCap = $parsed['awipsid'] !== null && str_starts_with($parsed['awipsid'], 'cap');
 
-        if ($isCap) {
-            try {
-                $metadata = ($this->extractCapMetadata)($text);
-            } catch (Throwable $e) {
-                Log::warning('Failed to parse a CAP product; skipping ingestion', [
-                    'path' => $validated['path'],
-                    'exception' => $e->getMessage(),
-                ]);
-
-                return response()->noContent();
-            }
-        } else {
-            $metadata = ($this->extractProductMetadata)($text, $parsed['awipsid']);
-        }
-
-        IngestedProduct::updateOrCreate(
-            ['file_path' => $validated['path']],
-            [
-                ...$parsed,
-                ...$metadata,
-                'text' => $text,
-                'received_at' => now(),
-            ],
-        );
+        ($this->ingestProductText)($text, $validated['path'], $parsed, $isCap);
 
         return response()->noContent();
     }
