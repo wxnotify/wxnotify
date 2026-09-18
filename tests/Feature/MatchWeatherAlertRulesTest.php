@@ -9,6 +9,7 @@ use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -496,4 +497,38 @@ test('when active_wwas has no persisted polygon for this VTEC key, matching fall
     (new MatchWeatherAlertRules)($ingested);
 
     Queue::assertPushed(DeliverWeatherAlert::class); // falls back to Location-style zone matching, same as today
+});
+
+test('an is_test product only matches AlertRules belonging to a user flagged is_test_account, not real subscribers', function () {
+    Queue::fake();
+    $realUser = User::factory()->create(['is_test_account' => false]);
+    $testUser = User::factory()->create(['is_test_account' => true]);
+    $realChannel = NotificationChannel::factory()->for($realUser)->create();
+    $testChannel = NotificationChannel::factory()->for($testUser)->create();
+
+    $realRule = AlertRule::factory()->for($realUser)->create(['category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'TWC', 'location_id' => null]);
+    $realRule->notificationChannels()->attach($realChannel);
+    $testRule = AlertRule::factory()->for($testUser)->create(['category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'TWC', 'location_id' => null]);
+    $testRule->notificationChannels()->attach($testChannel);
+
+    $ingestedProduct = createIngestedProductWithoutMatching(['cccc' => 'ktwc', 'is_test' => true]);
+
+    (new MatchWeatherAlertRules)($ingestedProduct);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job) => $job->ruleId === $realRule->id);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job) => $job->ruleId === $testRule->id);
+});
+
+test('a real (non-test) product matches every active subscriber as before, regardless of is_test_account', function () {
+    Queue::fake();
+    $realUser = User::factory()->create(['is_test_account' => false]);
+    $channel = NotificationChannel::factory()->for($realUser)->create();
+    $rule = AlertRule::factory()->for($realUser)->create(['category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'TWC', 'location_id' => null]);
+    $rule->notificationChannels()->attach($channel);
+
+    $ingestedProduct = createIngestedProductWithoutMatching(['cccc' => 'ktwc', 'is_test' => false]);
+
+    (new MatchWeatherAlertRules)($ingestedProduct);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job) => $job->ruleId === $rule->id);
 });

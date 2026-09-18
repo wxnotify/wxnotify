@@ -45,6 +45,7 @@ class MatchWeatherAlertRules
                         ->orWhere(fn (Builder $q) => $q->whereIn('category', self::PRODUCT_MATCHED_CATEGORIES)
                             ->whereHas('products', fn (Builder $q) => $q->whereKey($product->product_id)));
                 })
+                ->when($product->is_test, fn (Builder $query) => $query->whereHas('user', fn (Builder $q) => $q->where('is_test_account', true)))
                 ->get();
         } catch (Throwable $e) {
             logger()->error('Failed to query matching AlertRules', [
