@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources\TestProductScenarios\Pages;
 
 use App\Actions\Testing\GenerateTestProduct;
 use App\Actions\Testing\NotifyGenerationOutcome;
+use App\Filament\Admin\Resources\TestProductScenarios\Pages\Concerns\OffersSaveWithoutGenerating;
 use App\Filament\Admin\Resources\TestProductScenarios\Schemas\TestProductScenarioForm;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\TestProductScenario;
@@ -15,7 +16,10 @@ use Filament\Schemas\Components\Wizard\Step;
 
 class EditTestProductScenario extends EditRecord
 {
-    use HasWizard;
+    use HasWizard, OffersSaveWithoutGenerating {
+        OffersSaveWithoutGenerating::getWizardComponent insteadof HasWizard;
+        HasWizard::getWizardComponent as baseWizardComponent;
+    }
 
     protected static string $resource = TestProductScenarioResource::class;
 
@@ -99,8 +103,18 @@ class EditTestProductScenario extends EditRecord
         return $data;
     }
 
+    public function saveWithoutGenerating(): void
+    {
+        $this->generateAfterSaving = false;
+        $this->save();
+    }
+
     protected function afterSave(): void
     {
+        if (! $this->generateAfterSaving) {
+            return;
+        }
+
         /** @var TestProductScenario $scenario */
         $scenario = $this->record;
 

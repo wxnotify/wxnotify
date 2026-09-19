@@ -113,8 +113,8 @@ test('the wizard submit action is labelled Generate on both Create and Edit', fu
     $create = livewire(CreateTestProductScenario::class)->instance();
     $edit = livewire(EditTestProductScenario::class, ['record' => $scenario->id])->instance();
 
-    expect($create->getWizardComponent()->getSubmitAction()->getLabel())->toBe('Generate')
-        ->and($edit->getWizardComponent()->getSubmitAction()->getLabel())->toBe('Generate');
+    expect((string) $create->getWizardComponent()->getSubmitAction())->toContain('Generate')
+        ->and((string) $edit->getWizardComponent()->getSubmitAction())->toContain('Generate');
 });
 
 test('the scenario name persists through Create and Edit', function () {

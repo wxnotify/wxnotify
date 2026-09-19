@@ -3,6 +3,7 @@
 use App\Actions\Testing\GenerateTestProduct;
 use App\Filament\Admin\Resources\TestProductScenarios\Pages\CreateTestProductScenario;
 use App\Filament\Admin\Resources\TestProductScenarios\Pages\EditTestProductScenario;
+use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\IngestedProduct;
 use App\Models\Product;
 use App\Models\TestProductScenario;
@@ -103,4 +104,41 @@ test('a failed generation on Edit shows a danger notification instead of the suc
         ->assertNotified('Failed to generate the test product');
 
     expect(IngestedProduct::count())->toBe(0);
+});
+
+test('Save on the Review step stores the scenario, generates nothing, and returns to the list', function () {
+    $product = Product::where('code', 'AFD')->sole();
+
+    livewire(CreateTestProductScenario::class)
+        ->fillForm([
+            'product_id' => $product->id,
+            'input.wfo' => 'PIH',
+            'input.issued_at' => now(),
+            'input.body_text' => 'Clear skies.',
+        ])
+        ->call('saveWithoutGenerating')
+        ->assertHasNoFormErrors()
+        ->assertRedirect(TestProductScenarioResource::getUrl('index'));
+
+    expect(TestProductScenario::count())->toBe(1)
+        ->and(IngestedProduct::where('is_test', true)->count())->toBe(0);
+});
+
+test('Save on an existing scenario updates it without generating', function () {
+    $scenario = TestProductScenario::factory()->for(Product::where('code', 'AFD')->sole())
+        ->create(['input' => ['wfo' => 'PIH', 'issued_at' => now()->toIso8601String(), 'body_text' => 'Clear skies.']]);
+
+    livewire(EditTestProductScenario::class, ['record' => $scenario->id])
+        ->fillForm(['name' => 'Renamed only'])
+        ->call('saveWithoutGenerating')
+        ->assertHasNoFormErrors();
+
+    expect($scenario->fresh()->name)->toBe('Renamed only')
+        ->and(IngestedProduct::where('is_test', true)->count())->toBe(0);
+});
+
+test('the Review step renders both a Save and a Generate button', function () {
+    livewire(CreateTestProductScenario::class)
+        ->assertSeeHtml('saveWithoutGenerating')
+        ->assertSee('Generate');
 });
