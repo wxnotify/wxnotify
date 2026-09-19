@@ -246,11 +246,6 @@ class TestProductScenarioForm
                     ->required()
                     ->rows(4)
                     ->visible(fn (Get $get): bool => self::selectedProductIsDiscussion($get)),
-                Select::make('input.risk_level')
-                    ->label('Risk level')
-                    ->options(fn (Get $get): array => collect(Product::find($get('product_id'))?->risk_level_options ?? [])->mapWithKeys(fn (string $l) => [$l => $l])->all())
-                    ->visible(fn (Get $get): bool => self::selectedProductIsDiscussion($get)
-                        && Product::find($get('product_id'))?->risk_level_options !== null),
 
                 // Plain-text-shaped (AFD, SPS)
                 Textarea::make('input.body_text')
@@ -262,24 +257,54 @@ class TestProductScenarioForm
     }
 
     /**
+     * Memoizes the Content step's repeated Product::find($get('product_id'))
+     * lookups within a single request -- a render of this step previously
+     * issued one query per helper call per field re-evaluation (measured at
+     * 20 for a single field change). Safe across the request/response
+     * lifecycle used here (plain PHP-FPM, no Octane): these static
+     * properties are reset for every fresh request, and within a request
+     * the cache is keyed by product id, so switching product_id (e.g. via a
+     * live Select, or a test driving multiple products through the same
+     * Livewire instance) always re-fetches rather than returning stale data
+     * for a different id.
+     */
+    protected static ?Product $cachedProduct = null;
+
+    protected static ?int $cachedProductId = null;
+
+    protected static function selectedProduct(Get $get): ?Product
+    {
+        $id = $get('product_id');
+        if ($id === null) {
+            return null;
+        }
+
+        if (self::$cachedProductId !== (int) $id) {
+            self::$cachedProduct = Product::find($id);
+            self::$cachedProductId = (int) $id;
+        }
+
+        return self::$cachedProduct;
+    }
+
+    /**
      * @return array<string, string>
      */
     protected static function selectedProductDamageTagOptions(Get $get): array
     {
-        $product = Product::find($get('product_id'));
-        $options = $product?->damage_tag_options ?? [];
+        $options = self::selectedProduct($get)?->damage_tag_options ?? [];
 
         return collect($options)->mapWithKeys(fn (string $tag): array => [$tag => $tag])->all();
     }
 
     protected static function selectedProductIsDiscussion(Get $get): bool
     {
-        return Product::find($get('product_id'))?->family === ProductFamily::SpcWpc;
+        return self::selectedProduct($get)?->family === ProductFamily::SpcWpc;
     }
 
     protected static function selectedProductIsPlainText(Get $get): bool
     {
-        $product = Product::find($get('product_id'));
+        $product = self::selectedProduct($get);
 
         return $product !== null && ! $product->has_vtec && $product->family !== ProductFamily::SpcWpc;
     }

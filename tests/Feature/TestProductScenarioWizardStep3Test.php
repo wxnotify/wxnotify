@@ -38,11 +38,13 @@ test('warning-shaped narrative fields only appear for a has_vtec product', funct
         ->assertFormFieldVisible('input.hazard')
         ->assertFormFieldVisible('input.hazard_source')
         ->assertFormFieldVisible('input.impact')
+        ->assertFormFieldVisible('input.locations_impacted')
         ->assertFormFieldVisible('input.call_to_action')
         ->set('data.product_id', $forecastDiscussion->id)
         ->assertFormFieldHidden('input.hazard')
         ->assertFormFieldHidden('input.hazard_source')
         ->assertFormFieldHidden('input.impact')
+        ->assertFormFieldHidden('input.locations_impacted')
         ->assertFormFieldHidden('input.call_to_action');
 });
 
@@ -79,20 +81,4 @@ test('motion vector fields only appear for a has_vtec product', function () {
         ->set('data.product_id', $forecastDiscussion->id)
         ->assertFormFieldHidden('input.motion_direction_degrees')
         ->assertFormFieldHidden('input.motion_speed_kt');
-});
-
-test('the risk level select only appears for an spc_wpc product that has risk_level_options configured', function () {
-    // SPC.OUTLOOK has risk_level_options but is has_polygon=false, so it's
-    // excluded from eligibleProductsQuery() and never reachable via the
-    // product_id Select's own option list -- set() bypasses that and drives
-    // the field's visibility logic directly, which only cares about
-    // family+risk_level_options, not eligibility.
-    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
-    $mesoscaleDiscussion = Product::where('code', 'SPC.MD')->sole();
-
-    livewire(CreateTestProductScenario::class)
-        ->set('data.product_id', $outlook->id)
-        ->assertFormFieldVisible('input.risk_level')
-        ->set('data.product_id', $mesoscaleDiscussion->id)
-        ->assertFormFieldHidden('input.risk_level');
 });
