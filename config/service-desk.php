@@ -50,7 +50,7 @@ return [
     */
 
     'sla' => [
-        'enabled' => true,
+        'enabled' => false,
         'auto_apply' => true,
         'near_breach_minutes' => 30,
         'pause_on_statuses' => ['on_hold'],
@@ -64,7 +64,7 @@ return [
     */
 
     'knowledge_base' => [
-        'enabled' => true,
+        'enabled' => false,
         'default_visibility' => 'public',
         'versioning_enabled' => true,
         'feedback_enabled' => true,
@@ -79,7 +79,7 @@ return [
     */
 
     'service_catalog' => [
-        'enabled' => true,
+        'enabled' => false,
         'default_visibility' => 'public',
         'auto_create_ticket' => true,
         'approval_enabled' => true,
