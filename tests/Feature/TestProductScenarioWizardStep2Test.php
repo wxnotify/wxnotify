@@ -18,6 +18,13 @@ beforeEach(function () {
 
 function insertGeographyTwcBoundary(): void
 {
+    DB::table('public_zones')->insert([
+        'state' => 'AZ', 'cwa' => 'TWC', 'zone' => '019', 'name' => 'Pima', 'state_zone' => 'AZ019',
+        'lon' => -110.9, 'lat' => 32.2,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-112 31, -109 31, -109 34, -112 34, -112 31))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
     DB::table('cwa_boundaries')->insert([
         'wfo' => 'TWC', 'cwa' => 'TWC', 'city' => 'Tucson', 'st' => 'AZ', 'citystate' => 'Tucson AZ',
         'lon' => -110.9, 'lat' => 32.2,
@@ -119,6 +126,7 @@ test('the WFO sanity-check warning is advisory only and does not block the wizar
         ->set('data.input.polygon_center_lon', -40.0)
         ->set('data.input.polygon_radius_miles', 10)
         ->assertFormFieldVisible('wfo_sanity_warning')
+        ->set('data.input.ugc_codes', ['AZZ019'])
         // TO.W is has_vtec, so Step 3's warning-shaped fields are required
         // to actually reach create() successfully.
         ->set('data.input.hazard', 'Large hail.')
@@ -135,4 +143,44 @@ test('the WFO sanity-check warning is advisory only and does not block the wizar
     $created = TestProductScenario::sole();
     expect((float) ($created->input['polygon_center_lat'] ?? null))->toBe(35.0)
         ->and((float) ($created->input['polygon_center_lon'] ?? null))->toBe(-40.0);
+});
+
+test('a UGC-bearing product requires at least one county/zone', function () {
+    insertGeographyTwcBoundary();
+    $product = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateTestProductScenario::class)
+        ->set('data.product_id', $product->id)
+        ->set('data.input.wfo', 'TWC')
+        ->set('data.input.polygon_center_lat', 32.5)
+        ->set('data.input.polygon_center_lon', -110.5)
+        ->set('data.input.polygon_radius_miles', 10)
+        ->set('data.input.hazard', 'Large hail.')
+        ->set('data.input.hazard_source', 'Radar indicated.')
+        ->set('data.input.impact', 'Damaging winds possible.')
+        ->set('data.input.call_to_action', 'Take shelter now.')
+        ->call('create')
+        ->assertHasFormErrors(['input.ugc_codes']);
+});
+
+test('raw coordinates with fewer than 3 valid pairs are rejected and surface a warning', function () {
+    $product = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateTestProductScenario::class)
+        ->set('data.product_id', $product->id)
+        ->set('data.input.wfo', 'TWC')
+        ->set('data.input.polygon_advanced', true)
+        ->set('data.input.polygon_raw', "32.5,-110.5\nnot a pair")
+        ->assertFormFieldVisible('wfo_sanity_warning')
+        ->call('create')
+        ->assertHasFormErrors(['input.polygon_raw']);
+});
+
+test('a WFO-wide product shows the nothing-to-fill-in note on the geography step', function () {
+    $product = Product::where('code', 'AFD')->sole();
+    $product->update(['has_ugc' => false, 'has_polygon' => false]);
+
+    livewire(CreateTestProductScenario::class)
+        ->set('data.product_id', $product->id)
+        ->assertFormFieldVisible('wfo_wide_note');
 });

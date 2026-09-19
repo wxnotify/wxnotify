@@ -22,6 +22,12 @@ beforeEach(function () {
         'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-114 41, -111 41, -111 44, -114 44, -114 41))')), 4269)"),
         'created_at' => now(), 'updated_at' => now(),
     ]);
+    DB::table('public_zones')->insert([
+        'state' => 'ID', 'cwa' => 'PIH', 'zone' => '001', 'name' => 'Bannock', 'state_zone' => 'ID001',
+        'lon' => -112.44, 'lat' => 42.87,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-114 41, -111 41, -111 44, -114 44, -114 41))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
 });
 
 /**
@@ -34,6 +40,7 @@ function contEditCreateNewThenCancel(): array
 {
     $product = Product::where('code', 'SV.W')->sole();
     $content = [
+        'input.ugc_codes' => ['IDZ001'],
         'input.hazard' => '60 mph wind gusts.',
         'input.hazard_source' => 'Radar indicated.',
         'input.impact' => 'Tree damage possible.',
@@ -148,6 +155,7 @@ test('re-pointing a continuation at a different open event on Edit adopts that e
                 'input.polygon_center_lat' => 42.87,
                 'input.polygon_center_lon' => -112.44,
                 'input.polygon_radius_miles' => 8,
+                'input.ugc_codes' => ['IDZ001'],
                 'input.hazard' => '60 mph wind gusts.',
                 'input.hazard_source' => 'Radar indicated.',
                 'input.impact' => 'Tree damage possible.',

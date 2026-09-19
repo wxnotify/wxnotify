@@ -1,6 +1,6 @@
 {{-- $ttaaii, $wfo (SPC/WPC's own 3-letter office, e.g. WNS), $issuedAt (Carbon), $discussionNumber,
      $productLabel (e.g. "MESOSCALE DISCUSSION"), $officeName, $areasAffected, $ugcLine,
-     $discussionText, $riskLevel, $polygonLine, $attnWfos (array<string>) --}}
+     $discussionText, $concerning, $polygonLine, $attnWfos (array<string>) --}}
 {{ strtoupper($ttaaii) }} K{{ $wfo }} {{ $issuedAt->format('dHi') }}
 SWOMCD
 SPC MCD {{ $issuedAt->format('dHi') }}
@@ -10,9 +10,14 @@ SPC MCD {{ $issuedAt->format('dHi') }}
 {{ $officeName }}
 {{ $issuedAt->format('g:i A T D M j Y') }}
 
+@if ($areasAffected !== '')
 AREAS AFFECTED...{{ $areasAffected }}
 
-CONCERNING...{{ $riskLevel }}
+@endif
+@if ($concerning !== '')
+CONCERNING...{{ $concerning }}
+
+@endif
 
 VALID {{ $issuedAt->format('dHi') }}Z - {{ $issuedAt->copy()->addHours(2)->format('dHi') }}Z
 

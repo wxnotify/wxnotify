@@ -85,7 +85,7 @@ class RenderTestProductText
             'areasAffected' => $input['areas_affected'] ?? '',
             'ugcLine' => $this->buildUgcLine($input['ugc_codes'] ?? [], $issuedAt->copy()->addHours(2)),
             'discussionText' => $input['discussion_text'] ?? '',
-            'riskLevel' => $input['risk_level'] ?? '',
+            'concerning' => $input['concerning'] ?? '',
             'polygonLine' => $this->buildCombinedPolygonLine($polygonPoints),
             'attnWfos' => $input['attn_wfos'] ?? [$input['wfo']],
         ])->render();

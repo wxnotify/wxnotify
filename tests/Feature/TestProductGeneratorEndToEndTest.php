@@ -95,7 +95,7 @@ test('a generated SPC mesoscale discussion parses its concatenated polygon and d
             'areas_affected' => 'CENTRAL/SOUTHERN AZ',
             'ugc_codes' => ['AZZ000'],
             'discussion_text' => 'Isolated storms are possible this evening.',
-            'risk_level' => 'SEVERE POTENTIAL...WATCH UNLIKELY',
+            'concerning' => 'SEVERE POTENTIAL...WATCH UNLIKELY',
             'polygon_mode' => 'point_radius',
             'polygon_center_lat' => 33.5,
             'polygon_center_lon' => -112.5,

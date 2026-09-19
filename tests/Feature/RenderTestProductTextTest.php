@@ -157,7 +157,7 @@ test('renders a discussion-shape product whose polygon round-trips through the f
         'areas_affected' => 'CENTRAL/SOUTHERN AZ',
         'ugc_codes' => ['AZZ000'],
         'discussion_text' => 'Isolated storms are possible this evening.',
-        'risk_level' => 'SEVERE POTENTIAL...WATCH UNLIKELY',
+        'concerning' => 'SEVERE POTENTIAL...WATCH UNLIKELY',
         'polygon_mode' => 'point_radius',
         'polygon_center_lat' => 33.5,
         'polygon_center_lon' => -112.5,
@@ -199,4 +199,23 @@ test('renders a plain-text-shape product with no UGC line when the product has n
 
     expect($text)->not->toContain('-')  // no UGC line rendered at all
         ->and($text)->toContain('AREA FORECAST DISCUSSION');
+});
+
+test('a discussion omits the AREAS AFFECTED and CONCERNING lines when those inputs are empty', function () {
+    Carbon::setTestNow('2026-09-18 23:55:00');
+    $product = Product::where('code', 'SPC.MD')->sole();
+
+    $text = (new RenderTestProductText)($product, [
+        'wfo' => 'WNS',
+        'ugc_codes' => ['AZZ000'],
+        'discussion_text' => 'Isolated storms are possible.',
+        'polygon_mode' => 'point_radius',
+        'polygon_center_lat' => 33.5,
+        'polygon_center_lon' => -112.5,
+        'polygon_radius_miles' => 20,
+    ]);
+
+    expect($text)->not->toContain('AREAS AFFECTED')
+        ->and($text)->not->toContain('CONCERNING')
+        ->and($text)->toContain('DISCUSSION...Isolated storms');
 });

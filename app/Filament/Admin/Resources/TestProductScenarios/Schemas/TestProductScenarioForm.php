@@ -9,6 +9,7 @@ use App\Enums\ProductFamily;
 use App\Models\ActiveWwa;
 use App\Models\Product;
 use App\Models\TestProductScenario;
+use Closure;
 use Fahiem\FilamentPinpoint\Pinpoint;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DateTimePicker;
@@ -161,6 +162,8 @@ class TestProductScenarioForm
                     ->label('Counties / zones (UGC)')
                     ->columns(2)
                     ->options(fn (Get $get): array => self::wfoScopedUgcOptions($get('input.wfo') ?? ''))
+                    ->required()
+                    ->minItems(1)
                     ->visible(fn (Get $get): bool => self::selectedProductHasUgc($get)),
                 Toggle::make('input.polygon_advanced')
                     ->label('Advanced: paste raw coordinates')
@@ -189,12 +192,25 @@ class TestProductScenarioForm
                 Textarea::make('input.polygon_raw')
                     ->label('Coordinates (one "lat,lon" pair per line)')
                     ->rows(4)
+                    ->required()
+                    ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                        if (app(GenerateTestProductPolygon::class)->fromRawText((string) $value) === null) {
+                            $fail('Enter at least 3 valid "lat,lon" pairs, one per line.');
+                        }
+                    })
                     ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && $get('input.polygon_advanced')),
                 // A real Field (not the deprecated Placeholder, which now
                 // extends Infolists\TextEntry rather than Forms\Field and so
                 // is invisible to getFlatFields()/assertFormFieldVisible())
                 // is required here so the advisory warning's visibility is
                 // actually testable.
+                ViewField::make('wfo_wide_note')
+                    ->label('')
+                    ->view('filament.forms.components.wfo-wide-note')
+                    ->dehydrated(false)
+                    ->visible(fn (Get $get): bool => self::selectedProduct($get) !== null
+                        && ! self::selectedProductHasUgc($get)
+                        && ! self::selectedProductHasPolygon($get)),
                 ViewField::make('wfo_sanity_warning')
                     ->label('')
                     ->view('filament.forms.components.wfo-sanity-warning')
@@ -249,6 +265,13 @@ class TestProductScenarioForm
                     ->label('Discussion text')
                     ->required()
                     ->rows(4)
+                    ->visible(fn (Get $get): bool => self::selectedProductIsDiscussion($get)),
+
+                TextInput::make('input.areas_affected')
+                    ->label('Areas affected')
+                    ->visible(fn (Get $get): bool => self::selectedProductIsDiscussion($get)),
+                TextInput::make('input.concerning')
+                    ->label('Concerning (e.g. "Severe potential...Watch unlikely")')
                     ->visible(fn (Get $get): bool => self::selectedProductIsDiscussion($get)),
 
                 // Plain-text-shaped (AFD, SPS)
@@ -403,13 +426,14 @@ class TestProductScenarioForm
      */
     protected static function wfoSanityWarning(Get $get): ?string
     {
-        $wfo = $get('input.wfo');
-        if (blank($wfo)) {
-            return null;
+        $points = self::resolveGeographyPolygon($get);
+
+        if ($points === null && $get('input.polygon_advanced') && filled($get('input.polygon_raw'))) {
+            return 'Could not read at least 3 valid "lat,lon" pairs from the coordinates, so the polygon cannot be checked against the WFO.';
         }
 
-        $points = self::resolveGeographyPolygon($get);
-        if ($points === null) {
+        $wfo = $get('input.wfo');
+        if (blank($wfo) || $points === null) {
             return null;
         }
 
