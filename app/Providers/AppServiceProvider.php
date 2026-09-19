@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\PipelineStack;
 use App\Listeners\ActivityAlertEventSubscriber;
 use App\Models\IngestedProduct;
 use App\Models\Location;
@@ -11,6 +12,7 @@ use App\Observers\IngestedProductObserver;
 use App\Observers\LocationZoneObserver;
 use App\Observers\UserActivityObserver;
 use App\Support\Filament\AdminLogoutResponse;
+use App\Support\Pipeline\UnmanagedPipelineStack;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -27,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(LogoutResponse::class, AdminLogoutResponse::class);
+        $this->app->bind(PipelineStack::class, UnmanagedPipelineStack::class);
     }
 
     /**
