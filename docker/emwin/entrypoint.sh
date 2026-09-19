@@ -6,11 +6,17 @@ RESTART_FLAG=/tmp/emwin-restart-requested
 REFRESH_HOURS="${EMWIN_SERVERS_REFRESH_HOURS:-6}"
 RETENTION_DAYS="${EMWIN_RETENTION_DAYS:-7}"
 
+# A container restart keeps the writable layer: drop stale state so rsyslogd starts and no phantom restart is honoured.
+rm -f /run/rsyslogd.pid "$RESTART_FLAG"
+
 rsyslogd -n -f /etc/rsyslog-emwin.conf &
 i=0
 while [ ! -S /dev/log ] && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
 
-/usr/local/bin/refresh-servers.sh || logger -t emwin -p user.warning "initial server refresh failed; using the existing list"
+/usr/local/bin/refresh-servers.sh
+if [ "$?" -eq 1 ]; then
+    logger -t emwin -p user.warning "initial server refresh failed; using the existing list"
+fi
 
 (
     while true; do
