@@ -119,6 +119,12 @@ test('the WFO sanity-check warning is advisory only and does not block the wizar
         ->set('data.input.polygon_center_lon', -40.0)
         ->set('data.input.polygon_radius_miles', 10)
         ->assertFormFieldVisible('wfo_sanity_warning')
+        // TO.W is has_vtec, so Step 3's warning-shaped fields are required
+        // to actually reach create() successfully.
+        ->set('data.input.hazard', 'Large hail.')
+        ->set('data.input.hazard_source', 'Radar indicated.')
+        ->set('data.input.impact', 'Damaging winds possible.')
+        ->set('data.input.call_to_action', 'Take shelter now.')
         ->call('create')
         ->assertHasNoFormErrors();
 

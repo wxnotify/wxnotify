@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources\TestProductScenarios\Schemas;
 
 use App\Actions\Testing\CheckPolygonWithinWfo;
 use App\Actions\Testing\GenerateTestProductPolygon;
+use App\Enums\ProductFamily;
 use App\Models\ActiveWwa;
 use App\Models\Product;
 use App\Models\TestProductScenario;
@@ -61,7 +62,7 @@ class TestProductScenarioForm
         return [
             self::productAndTimingStep(),
             self::geographyStep(),
-            Step::make('Content'),
+            self::contentStep(),
             Step::make('Review & Generate'),
         ];
     }
@@ -197,6 +198,90 @@ class TestProductScenarioForm
                     ->dehydrated(false)
                     ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && self::wfoSanityWarning($get) !== null),
             ]);
+    }
+
+    protected static function contentStep(): Step
+    {
+        return Step::make('Content')
+            ->schema([
+                // Warning-shaped
+                TextInput::make('input.hazard')
+                    ->label('Hazard')
+                    ->required()
+                    ->visible(fn (Get $get): bool => self::selectedProductHasVtec($get)),
+                TextInput::make('input.hazard_source')
+                    ->label('Source')
+                    ->required()
+                    ->visible(fn (Get $get): bool => self::selectedProductHasVtec($get)),
+                TextInput::make('input.impact')
+                    ->label('Impact')
+                    ->required()
+                    ->visible(fn (Get $get): bool => self::selectedProductHasVtec($get)),
+                TextInput::make('input.locations_impacted')
+                    ->label('Locations impacted (optional)')
+                    ->visible(fn (Get $get): bool => self::selectedProductHasVtec($get)),
+                Textarea::make('input.call_to_action')
+                    ->label('Call to action')
+                    ->required()
+                    ->visible(fn (Get $get): bool => self::selectedProductHasVtec($get)),
+                CheckboxList::make('input.damage_tags')
+                    ->label('Damage tags')
+                    ->options(fn (Get $get): array => self::selectedProductDamageTagOptions($get))
+                    ->visible(fn (Get $get): bool => self::selectedProductDamageTagOptions($get) !== []),
+                TextInput::make('input.motion_direction_degrees')
+                    ->label('Motion direction (degrees, optional)')
+                    ->numeric()
+                    ->minValue(0)
+                    ->maxValue(359)
+                    ->visible(fn (Get $get): bool => self::selectedProductHasVtec($get)),
+                TextInput::make('input.motion_speed_kt')
+                    ->label('Motion speed (knots, optional)')
+                    ->numeric()
+                    ->minValue(0)
+                    ->visible(fn (Get $get): bool => self::selectedProductHasVtec($get)),
+
+                // Discussion-shaped (SPC MD / WPC MPD)
+                Textarea::make('input.discussion_text')
+                    ->label('Discussion text')
+                    ->required()
+                    ->rows(4)
+                    ->visible(fn (Get $get): bool => self::selectedProductIsDiscussion($get)),
+                Select::make('input.risk_level')
+                    ->label('Risk level')
+                    ->options(fn (Get $get): array => collect(Product::find($get('product_id'))?->risk_level_options ?? [])->mapWithKeys(fn (string $l) => [$l => $l])->all())
+                    ->visible(fn (Get $get): bool => self::selectedProductIsDiscussion($get)
+                        && Product::find($get('product_id'))?->risk_level_options !== null),
+
+                // Plain-text-shaped (AFD, SPS)
+                Textarea::make('input.body_text')
+                    ->label('Body text')
+                    ->required()
+                    ->rows(6)
+                    ->visible(fn (Get $get): bool => self::selectedProductIsPlainText($get)),
+            ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected static function selectedProductDamageTagOptions(Get $get): array
+    {
+        $product = Product::find($get('product_id'));
+        $options = $product?->damage_tag_options ?? [];
+
+        return collect($options)->mapWithKeys(fn (string $tag): array => [$tag => $tag])->all();
+    }
+
+    protected static function selectedProductIsDiscussion(Get $get): bool
+    {
+        return Product::find($get('product_id'))?->family === ProductFamily::SpcWpc;
+    }
+
+    protected static function selectedProductIsPlainText(Get $get): bool
+    {
+        $product = Product::find($get('product_id'));
+
+        return $product !== null && ! $product->has_vtec && $product->family !== ProductFamily::SpcWpc;
     }
 
     /**

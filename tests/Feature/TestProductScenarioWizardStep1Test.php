@@ -113,6 +113,13 @@ test('choosing a continued event inherits its product, WFO, event number, and pr
             'input.ugc_codes' => ['AZC019'],
         ])
         ->set('data.input.vtec_action', 'CON')
+        // The rest of Step 3's warning-shaped fields are required whenever
+        // mode === 'continue' (selectedProductHasVtec() short-circuits true
+        // there), but only `hazard` was part of this fixture's inherited
+        // content -- these three still need filling in directly.
+        ->set('data.input.hazard_source', 'Radar indicated.')
+        ->set('data.input.impact', 'Damaging winds possible.')
+        ->set('data.input.call_to_action', 'Take shelter now.')
         ->call('create')
         ->assertHasNoFormErrors();
 
