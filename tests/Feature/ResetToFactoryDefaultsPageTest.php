@@ -191,3 +191,29 @@ test('the acknowledgment stays hidden and is not needed when the stack can stop'
 test('the reset action is not visible before re-authentication', function () {
     livewire(ResetToFactoryDefaults::class)->assertActionHidden('reset');
 });
+
+test('flipping the toggles after confirming cannot run a group the confirmation did not cover', function () {
+    config(['app.url' => 'https://alerts.example.com']);
+    $sub = User::factory()->create();
+
+    frReauthenticate(livewire(ResetToFactoryDefaults::class), ['pipeline' => true, 'pipeline_stopped' => true])
+        ->fillForm(['confirmation' => 'RESET'])
+        ->set('data.subscribers', true)
+        ->call('runReset')
+        ->assertHasFormErrors(['confirmation']);
+
+    expect(User::whereKey($sub->id)->exists())->toBeTrue();
+});
+
+test('runReset refuses a user who is no longer an owner', function () {
+    IngestedProduct::factory()->create();
+
+    $component = frReauthenticate(livewire(ResetToFactoryDefaults::class), ['pipeline' => true, 'pipeline_stopped' => true])
+        ->fillForm(['confirmation' => 'RESET']);
+
+    $this->owner->forceFill(['is_owner' => false]);
+
+    $component->call('runReset')->assertForbidden();
+
+    expect(IngestedProduct::count())->toBe(1);
+});

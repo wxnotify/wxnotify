@@ -9,6 +9,8 @@ use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\ChannelTypeSeeder;
 use Database\Seeders\ProductCatalogSeeder;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 use Spatie\Activitylog\Models\Activity;
 
 beforeEach(function () {
@@ -107,4 +109,15 @@ test('all three groups together work end to end on the seeded catalog', function
         ->and(IngestedProduct::count())->toBe(0)
         ->and(Location::count())->toBe(0)
         ->and(User::whereKey($this->owner->id)->exists())->toBeTrue();
+});
+
+test('a failing audit write is reported but does not make the completed reset fail', function () {
+    IngestedProduct::factory()->create();
+    Event::listen('eloquent.creating: '.Activity::class, fn () => throw new RuntimeException('audit down'));
+    Exceptions::fake();
+
+    $result = app(ResetToFactoryDefaults::class)(['pipeline' => true], $this->owner, pipelineStopped: true);
+
+    expect($result)->toHaveKey('pipeline')->and(IngestedProduct::count())->toBe(0);
+    Exceptions::assertReported(RuntimeException::class);
 });

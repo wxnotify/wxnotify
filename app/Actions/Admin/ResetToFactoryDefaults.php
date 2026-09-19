@@ -11,6 +11,7 @@ use DomainException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Spatie\Activitylog\Support\CauserResolver;
+use Throwable;
 
 class ResetToFactoryDefaults
 {
@@ -56,9 +57,15 @@ class ResetToFactoryDefaults
 
         // The app's CauserResolver override ignores an explicit causedBy() argument
         // (it always returns the authenticated/impersonating user), so pin the owner.
-        app(CauserResolver::class)->withCauser($by, fn () => activity()
-            ->withProperties(['toggles' => $selected, 'deleted' => $result])
-            ->log('Reset to factory defaults'));
+        // The data is already gone at this point, so a failed audit write must be
+        // reported loudly but must not make the completed reset look like it failed.
+        try {
+            app(CauserResolver::class)->withCauser($by, fn () => activity()
+                ->withProperties(['toggles' => $selected, 'deleted' => $result])
+                ->log('Reset to factory defaults'));
+        } catch (Throwable $e) {
+            report($e);
+        }
 
         return $result;
     }
