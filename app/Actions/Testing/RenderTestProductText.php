@@ -54,7 +54,7 @@ class RenderTestProductText
             'vtecOffice' => 'K'.$input['wfo'],
             'vtecPhenomenon' => $codeParts[0],
             'vtecSignificance' => $codeParts[1] ?? 'W',
-            'vtecEventNumber' => $input['vtec_event_number'],
+            'vtecEventNumber' => $input['vtec_event_number'] ?? '9000',
             'vtecBegin' => $vtecBegin,
             'vtecEnd' => $vtecEnd,
             'productName' => $product->name,

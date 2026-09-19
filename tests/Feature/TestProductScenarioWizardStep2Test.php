@@ -184,3 +184,16 @@ test('a WFO-wide product shows the nothing-to-fill-in note on the geography step
         ->set('data.product_id', $product->id)
         ->assertFormFieldVisible('wfo_wide_note');
 });
+
+test('the Review preview renders a Tornado Warning before an event number has been assigned', function () {
+    insertGeographyTwcBoundary();
+    $product = Product::where('code', 'TO.W')->sole();
+
+    $preview = TestProductScenarioForm::renderPreviewFor($product, [
+        'wfo' => 'TWC', 'issued_at' => now(), 'expires_minutes' => 30, 'ugc_codes' => ['AZZ019'],
+        'hazard' => 'Tornado.', 'hazard_source' => 'Radar indicated.', 'impact' => 'Damage.', 'call_to_action' => 'Take cover.',
+        'polygon_center_lat' => 32.5, 'polygon_center_lon' => -110.5, 'polygon_radius_miles' => 5,
+    ]);
+
+    expect($preview)->toContain('/O.NEW.KTWC.TO.W.')->not->toContain('Fill in the required fields');
+});

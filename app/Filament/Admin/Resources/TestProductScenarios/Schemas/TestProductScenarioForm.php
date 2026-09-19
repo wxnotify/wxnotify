@@ -304,9 +304,19 @@ class TestProductScenarioForm
             return 'Select a product to see a preview.';
         }
 
+        return self::renderPreviewFor($product, self::currentInput($get));
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    public static function renderPreviewFor(Product $product, array $input): string
+    {
         try {
-            return app(RenderTestProductText::class)($product, self::currentInput($get));
-        } catch (\Throwable) {
+            return app(RenderTestProductText::class)($product, $input);
+        } catch (\Throwable $e) {
+            report($e);
+
             return 'Fill in the required fields above to see a preview.';
         }
     }
