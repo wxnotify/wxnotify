@@ -135,3 +135,51 @@ test('the scenario name persists through Create and Edit', function () {
 
     expect($scenario->fresh()->name)->toBe('Renamed');
 });
+
+test('re-pointing a continuation at a different open event on Edit adopts that event identity', function () {
+    $product = Product::where('code', 'SV.W')->sole();
+    $newEvent = function () use ($product): TestProductScenario {
+        livewire(CreateTestProductScenario::class)
+            ->fillForm([
+                'product_id' => $product->id,
+                'input.wfo' => 'PIH',
+                'input.issued_at' => now(),
+                'input.expires_minutes' => 60,
+                'input.polygon_center_lat' => 42.87,
+                'input.polygon_center_lon' => -112.44,
+                'input.polygon_radius_miles' => 8,
+                'input.hazard' => '60 mph wind gusts.',
+                'input.hazard_source' => 'Radar indicated.',
+                'input.impact' => 'Tree damage possible.',
+                'input.call_to_action' => 'Move indoors.',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        return TestProductScenario::latest('id')->firstOrFail();
+    };
+
+    $eventA = $newEvent();
+    $eventB = $newEvent();
+    $numberB = ActiveWwa::query()
+        ->whereHas('latestIngestedProduct', fn ($q) => $q->where('test_product_scenario_id', $eventB->id))
+        ->value('vtec_event_number');
+
+    livewire(CreateTestProductScenario::class)
+        ->set('data.mode', 'continue')
+        ->set('data.continues_scenario_id', $eventA->id)
+        ->set('data.input.vtec_action', 'CON')
+        ->set('data.input.issued_at', now())
+        ->call('create')
+        ->assertHasNoFormErrors();
+    $continuation = TestProductScenario::latest('id')->firstOrFail();
+
+    livewire(EditTestProductScenario::class, ['record' => $continuation->id])
+        ->set('data.continues_scenario_id', $eventB->id)
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $continuation->refresh();
+    expect($continuation->continues_scenario_id)->toBe($eventB->id)
+        ->and($continuation->input['vtec_event_number'])->toBe($numberB);
+});

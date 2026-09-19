@@ -81,14 +81,19 @@ class EditTestProductScenario extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        if ($this->record->continues_scenario_id === null) {
+        $continuedId = $data['continues_scenario_id'] ?? $this->record->continues_scenario_id;
+        if ($continuedId === null) {
             return $data;
         }
 
-        $data['product_id'] = $this->record->product_id;
+        $identity = (int) $continuedId !== $this->record->continues_scenario_id
+            ? TestProductScenarioForm::dehydrationSafeInheritedFieldsFor((int) $continuedId)
+            : null;
+
+        $data['product_id'] = $identity['product_id'] ?? $this->record->product_id;
         $data['input'] = array_merge($data['input'] ?? [], array_filter([
-            'wfo' => $this->record->input['wfo'] ?? null,
-            'vtec_event_number' => $this->record->input['vtec_event_number'] ?? null,
+            'wfo' => $identity['input']['wfo'] ?? $this->record->input['wfo'] ?? null,
+            'vtec_event_number' => $identity['input']['vtec_event_number'] ?? $this->record->input['vtec_event_number'] ?? null,
         ], fn (mixed $value): bool => $value !== null));
 
         return $data;
