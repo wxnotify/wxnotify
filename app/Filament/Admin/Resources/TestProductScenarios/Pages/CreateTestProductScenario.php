@@ -2,8 +2,11 @@
 
 namespace App\Filament\Admin\Resources\TestProductScenarios\Pages;
 
+use App\Actions\Testing\GenerateTestProduct;
 use App\Filament\Admin\Resources\TestProductScenarios\Schemas\TestProductScenarioForm;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
+use App\Models\TestProductScenario;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
 use Filament\Schemas\Components\Wizard\Step;
@@ -74,5 +77,19 @@ class CreateTestProductScenario extends CreateRecord
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');
+    }
+
+    protected function afterCreate(): void
+    {
+        /** @var TestProductScenario $scenario */
+        $scenario = $this->record;
+
+        app(GenerateTestProduct::class)($scenario);
+
+        Notification::make()
+            ->title('Test product generated')
+            ->body('It was ingested through the real pipeline and matched against the fixture test account.')
+            ->success()
+            ->send();
     }
 }

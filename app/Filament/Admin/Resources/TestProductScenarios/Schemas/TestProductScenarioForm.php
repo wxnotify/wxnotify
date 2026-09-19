@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources\TestProductScenarios\Schemas;
 
 use App\Actions\Testing\CheckPolygonWithinWfo;
 use App\Actions\Testing\GenerateTestProductPolygon;
+use App\Actions\Testing\RenderTestProductText;
 use App\Enums\ProductFamily;
 use App\Models\ActiveWwa;
 use App\Models\Product;
@@ -63,7 +64,7 @@ class TestProductScenarioForm
             self::productAndTimingStep(),
             self::geographyStep(),
             self::contentStep(),
-            Step::make('Review & Generate'),
+            self::reviewStep(),
         ];
     }
 
@@ -254,6 +255,42 @@ class TestProductScenarioForm
                     ->rows(6)
                     ->visible(fn (Get $get): bool => self::selectedProductIsPlainText($get)),
             ]);
+    }
+
+    protected static function reviewStep(): Step
+    {
+        return Step::make('Review & Generate')
+            ->schema([
+                ViewField::make('rendered_preview')
+                    ->label('Preview')
+                    ->view('filament.forms.components.rendered-preview')
+                    ->viewData(fn (Get $get): array => [
+                        'text' => self::renderPreview($get),
+                    ])
+                    ->dehydrated(false),
+            ]);
+    }
+
+    protected static function renderPreview(Get $get): string
+    {
+        $product = self::selectedProduct($get) ?? Product::find($get('product_id'));
+        if ($product === null) {
+            return 'Select a product to see a preview.';
+        }
+
+        try {
+            return app(RenderTestProductText::class)($product, self::currentInput($get));
+        } catch (\Throwable) {
+            return 'Fill in the required fields above to see a preview.';
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function currentInput(Get $get): array
+    {
+        return $get('input') ?? [];
     }
 
     /**
