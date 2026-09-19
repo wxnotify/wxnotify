@@ -169,7 +169,7 @@ test('renders a discussion-shape product whose polygon round-trips through the f
 
     expect($metadata['product_id'])->toBe($product->id)
         ->and($metadata['polygon'])->toHaveCount(4)
-        ->and($text)->toContain('11:55 PM');
+        ->and($text)->toContain('1155 PM UTC');
 });
 
 test('renders a plain-text-shape product with no VTEC line and a UGC line when the product has one', function () {
@@ -250,4 +250,25 @@ test('a motion line is only rendered with a positive speed and a known location'
 
 test('the preview and ingested-product text views preserve line breaks with inline styles', function () {
     expect(view('filament.forms.components.rendered-preview', ['text' => "A\nB"])->render())->toContain('white-space: pre-wrap');
+});
+
+test('the header time has no colon and uses the WFO local time zone, while WMO and VTEC stay UTC', function () {
+    Carbon::setTestNow('2026-09-19 16:22:00');
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'BOU', 'cwa' => 'BOU', 'city' => 'Denver', 'st' => 'CO', 'citystate' => 'Denver CO',
+        'lon' => -104.9, 'lat' => 39.7,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-106 39, -104 39, -104 41, -106 41, -106 39))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $product = Product::where('code', 'TO.W')->sole();
+
+    $text = (new RenderTestProductText)($product, [
+        'wfo' => 'BOU', 'expires_minutes' => 60, 'ugc_codes' => ['COZ039'],
+        'hazard' => 'T.', 'hazard_source' => 'R.', 'impact' => 'D.', 'call_to_action' => 'C.',
+    ]);
+
+    expect($text)->toContain('WUUS53 KBOU 191622')
+        ->and($text)->toContain('1022 AM MDT Sat Sep 19 2026')
+        ->and($text)->toContain('* Until 1122 AM MDT.')
+        ->and($text)->toContain('/O.NEW.KBOU.TO.W.9000.260919T1622Z-260919T1722Z/');
 });

@@ -1,4 +1,4 @@
-{{-- $wfo, $ttaaii, $productAwipsAbbr, $issuedAt (Carbon), $vtecAction, $vtecOffice, $vtecPhenomenon,
+{{-- $wfo, $ttaaii, $productAwipsAbbr, $issuedAt (Carbon, UTC), $localIssuedAt (Carbon, WFO-local), $vtecAction, $vtecOffice, $vtecPhenomenon,
      $vtecSignificance, $vtecEventNumber, $vtecBegin (Carbon), $vtecEnd (Carbon),
      $productName, $officeCity, $ugcLine, $hazard, $hazardSource, $impact, $locationsImpacted,
      $callToAction, $polygonLine, $motionLine, $damageTagLines (array<string>) --}}
@@ -10,15 +10,15 @@
 BULLETIN - IMMEDIATE BROADCAST REQUESTED
 {{ $productName }}
 National Weather Service {{ $officeCity }}
-{{ $issuedAt->format('g:i A T D M j Y') }}
+{{ $localIssuedAt->format('gi A T D M j Y') }}
 
 The National Weather Service in {{ $officeCity }} has issued a
 
 * {{ $productName }}.
 
-* Until {{ $vtecEnd->format('g:i A T') }}.
+* Until {{ $localEnd->format('gi A T') }}.
 
-* At {{ $issuedAt->format('g:i A T') }}, this was located near the warned area.
+* At {{ $localIssuedAt->format('gi A T') }}, this was located near the warned area.
 
   HAZARD...{{ $hazard }}
 

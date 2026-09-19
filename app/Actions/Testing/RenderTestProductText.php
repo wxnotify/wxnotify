@@ -50,6 +50,8 @@ class RenderTestProductText
             'ttaaii' => 'wuus53',
             'productAwipsAbbr' => strtolower(str_replace('.', '', $product->code)),
             'issuedAt' => $issuedAt,
+            'localIssuedAt' => $issuedAt->copy()->setTimezone($this->timeZoneFor($input['wfo'])),
+            'localEnd' => $vtecEnd->copy()->setTimezone($this->timeZoneFor($input['wfo'])),
             'vtecAction' => $input['vtec_action'] ?? 'NEW',
             'vtecOffice' => 'K'.$input['wfo'],
             'vtecPhenomenon' => $codeParts[0],
@@ -79,6 +81,7 @@ class RenderTestProductText
             'ttaaii' => 'acus11',
             'wfo' => $input['wfo'],
             'issuedAt' => $issuedAt,
+            'localIssuedAt' => $issuedAt->copy()->setTimezone($this->timeZoneFor($input['wfo'])),
             'discussionNumber' => $input['discussion_number'] ?? '9001',
             'productLabel' => $product->code === 'WPC.MPD' ? 'MESOSCALE PRECIPITATION DISCUSSION' : 'MESOSCALE DISCUSSION',
             'officeName' => $product->code === 'WPC.MPD' ? 'NWS WEATHER PREDICTION CENTER COLLEGE PARK MD' : 'NWS STORM PREDICTION CENTER NORMAN OK',
@@ -99,6 +102,7 @@ class RenderTestProductText
             'ttaaii' => 'fxus61',
             'wfo' => $input['wfo'],
             'issuedAt' => $issuedAt,
+            'localIssuedAt' => $issuedAt->copy()->setTimezone($this->timeZoneFor($input['wfo'])),
             'productName' => $product->name,
             'officeCity' => $this->officeCityFor($input['wfo']),
             'ugcLine' => $ugcCodes !== [] ? $this->buildUgcLine($ugcCodes, $issuedAt->copy()->addHours(2)) : null,
@@ -246,6 +250,47 @@ class RenderTestProductText
         $text = preg_replace('/[ \t]+$/m', '', $text);
 
         return preg_replace('/\n{3,}/', "\n\n", $text);
+    }
+
+    private const TIME_ZONE_CODES = [
+        'E' => 'America/New_York', 'C' => 'America/Chicago', 'M' => 'America/Denver', 'P' => 'America/Los_Angeles',
+        'A' => 'America/Anchorage', 'H' => 'Pacific/Honolulu', 'G' => 'Pacific/Guam', 'S' => 'Pacific/Pago_Pago',
+        'V' => 'America/Puerto_Rico',
+    ];
+
+    private const STATE_TIME_ZONES = [
+        'CT' => 'America/New_York', 'DE' => 'America/New_York', 'DC' => 'America/New_York', 'FL' => 'America/New_York',
+        'GA' => 'America/New_York', 'IN' => 'America/Indiana/Indianapolis', 'ME' => 'America/New_York', 'MD' => 'America/New_York',
+        'MA' => 'America/New_York', 'MI' => 'America/Detroit', 'NH' => 'America/New_York', 'NJ' => 'America/New_York',
+        'NY' => 'America/New_York', 'NC' => 'America/New_York', 'OH' => 'America/New_York', 'PA' => 'America/New_York',
+        'RI' => 'America/New_York', 'SC' => 'America/New_York', 'VT' => 'America/New_York', 'VA' => 'America/New_York',
+        'WV' => 'America/New_York', 'KY' => 'America/New_York', 'TN' => 'America/Chicago',
+        'AL' => 'America/Chicago', 'AR' => 'America/Chicago', 'IL' => 'America/Chicago', 'IA' => 'America/Chicago',
+        'KS' => 'America/Chicago', 'LA' => 'America/Chicago', 'MN' => 'America/Chicago', 'MS' => 'America/Chicago',
+        'MO' => 'America/Chicago', 'NE' => 'America/Chicago', 'ND' => 'America/Chicago', 'OK' => 'America/Chicago',
+        'SD' => 'America/Chicago', 'TX' => 'America/Chicago', 'WI' => 'America/Chicago',
+        'AZ' => 'America/Phoenix', 'CO' => 'America/Denver', 'ID' => 'America/Boise', 'MT' => 'America/Denver',
+        'NM' => 'America/Denver', 'UT' => 'America/Denver', 'WY' => 'America/Denver',
+        'CA' => 'America/Los_Angeles', 'NV' => 'America/Los_Angeles', 'OR' => 'America/Los_Angeles', 'WA' => 'America/Los_Angeles',
+        'AK' => 'America/Anchorage', 'HI' => 'Pacific/Honolulu', 'PR' => 'America/Puerto_Rico', 'GU' => 'Pacific/Guam',
+    ];
+
+    /**
+     * The WFO's local time zone: the dominant public_zones.time_zone code
+     * for its CWA when zone data is loaded, else the office's state, else UTC.
+     */
+    private function timeZoneFor(string $wfo): string
+    {
+        $code = DB::table('public_zones')->where('cwa', 'like', "%{$wfo}%")->whereNotNull('time_zone')
+            ->selectRaw('substr(time_zone, 1, 1) as tz, count(*) as n')->groupBy('tz')->orderByDesc('n')->value('tz');
+
+        if ($code !== null && isset(self::TIME_ZONE_CODES[strtoupper($code)])) {
+            return self::TIME_ZONE_CODES[strtoupper($code)];
+        }
+
+        $state = DB::table('cwa_boundaries')->where('cwa', $wfo)->value('st');
+
+        return self::STATE_TIME_ZONES[strtoupper((string) $state)] ?? 'UTC';
     }
 
     private function officeCityFor(string $wfo): string

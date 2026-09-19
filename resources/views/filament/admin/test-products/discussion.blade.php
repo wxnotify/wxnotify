@@ -1,4 +1,4 @@
-{{-- $ttaaii, $wfo (SPC/WPC's own 3-letter office, e.g. WNS), $issuedAt (Carbon), $discussionNumber,
+{{-- $ttaaii, $wfo (SPC/WPC's own 3-letter office, e.g. WNS), $issuedAt (Carbon, UTC), $localIssuedAt (Carbon, WFO-local), $discussionNumber,
      $productLabel (e.g. "MESOSCALE DISCUSSION"), $officeName, $areasAffected, $ugcLine,
      $discussionText, $concerning, $polygonLine, $attnWfos (array<string>) --}}
 {{ strtoupper($ttaaii) }} K{{ $wfo }} {{ $issuedAt->format('dHi') }}
@@ -8,7 +8,7 @@ SPC MCD {{ $issuedAt->format('dHi') }}
 
 {{ $productLabel }} {{ $discussionNumber }}
 {{ $officeName }}
-{{ $issuedAt->format('g:i A T D M j Y') }}
+{{ $localIssuedAt->format('gi A T D M j Y') }}
 
 @if ($areasAffected !== '')
 AREAS AFFECTED...{{ $areasAffected }}
