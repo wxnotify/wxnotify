@@ -7,6 +7,7 @@ use App\Actions\Testing\NotifyGenerationOutcome;
 use App\Filament\Admin\Resources\TestProductScenarios\Schemas\TestProductScenarioForm;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\TestProductScenario;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
 use Filament\Schemas\Components\Wizard\Step;
@@ -16,6 +17,17 @@ class CreateTestProductScenario extends CreateRecord
     use HasWizard;
 
     protected static string $resource = TestProductScenarioResource::class;
+
+    protected static bool $canCreateAnother = false;
+
+    /**
+     * The wizard's final action generates and dispatches a product, not just
+     * saves a row -- so it's labeled "Generate".
+     */
+    protected function getCreateFormAction(): Action
+    {
+        return parent::getCreateFormAction()->label('Generate');
+    }
 
     /**
      * @return array<Step>

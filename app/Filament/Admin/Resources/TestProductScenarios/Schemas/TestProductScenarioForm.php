@@ -85,6 +85,9 @@ class TestProductScenarioForm
     {
         return Step::make('Product & Timing')
             ->schema([
+                TextInput::make('name')
+                    ->label('Scenario name (optional)')
+                    ->maxLength(255),
                 Radio::make('mode')
                     ->label('')
                     ->options(['new' => 'New event', 'continue' => 'Continue existing event'])
@@ -94,7 +97,7 @@ class TestProductScenarioForm
                     ->visible(fn (): bool => self::openSyntheticEventOptions() !== []),
                 Select::make('continues_scenario_id')
                     ->label('Continue which event?')
-                    ->options(fn (): array => self::openSyntheticEventOptions())
+                    ->options(fn (?TestProductScenario $record): array => self::continueEventOptionsFor($record))
                     ->required()
                     ->live()
                     ->afterStateUpdated(fn (Set $set, Get $get) => self::inheritFromContinuedScenario($set, $get))
@@ -498,6 +501,39 @@ class TestProductScenarioForm
                 ),
             ])
             ->all();
+    }
+
+    /**
+     * The open-event options, plus -- when editing an existing continuation --
+     * its own already-selected continued scenario. After a CAN/EXP the event
+     * is no longer "open", so without this the Select's saved value would
+     * fall outside its options and fail Filament's built-in "in options"
+     * validation on every Edit save. Other closed events stay unlisted.
+     *
+     * @return array<int, string>
+     */
+    public static function continueEventOptionsFor(?TestProductScenario $record): array
+    {
+        $options = self::openSyntheticEventOptions();
+
+        $continuedId = $record?->continues_scenario_id;
+        if ($continuedId === null || array_key_exists($continuedId, $options)) {
+            return $options;
+        }
+
+        $continued = TestProductScenario::with('product')->find($continuedId);
+        if ($continued === null) {
+            return $options;
+        }
+
+        $options[$continuedId] = sprintf(
+            '%s — %s — #%s (no longer open)',
+            $continued->product?->name ?? 'Product',
+            $record->input['wfo'] ?? '?',
+            $record->input['vtec_event_number'] ?? '?',
+        );
+
+        return $options;
     }
 
     /**

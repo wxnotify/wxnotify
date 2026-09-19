@@ -121,3 +121,16 @@ test('no scenario link is rendered when the scenario resource is inaccessible', 
     livewire(ListIngestedProducts::class)->assertDontSeeHtml('href="'.$prefix);
     livewire(ViewIngestedProduct::class, ['record' => $product->id])->assertDontSeeHtml('href="'.$prefix);
 });
+
+test('the scenario link shows the scenario name, falling back to "Scenario #id" when unnamed', function () {
+    $named = TestProductScenario::factory()->create(['name' => 'Squall line demo']);
+    $unnamed = TestProductScenario::factory()->create(['name' => null]);
+    $namedProduct = IngestedProduct::factory()->create(['is_test' => true, 'test_product_scenario_id' => $named->id]);
+    $unnamedProduct = IngestedProduct::factory()->create(['is_test' => true, 'test_product_scenario_id' => $unnamed->id]);
+
+    livewire(ListIngestedProducts::class)
+        ->assertSee('Squall line demo')
+        ->assertSee("Scenario #{$unnamed->id}");
+    livewire(ViewIngestedProduct::class, ['record' => $namedProduct->id])->assertSee('Squall line demo');
+    livewire(ViewIngestedProduct::class, ['record' => $unnamedProduct->id])->assertSee("Scenario #{$unnamed->id}");
+});

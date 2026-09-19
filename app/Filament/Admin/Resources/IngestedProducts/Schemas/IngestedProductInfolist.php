@@ -22,7 +22,7 @@ class IngestedProductInfolist
                 TextEntry::make('scenario')
                     ->label('Test scenario')
                     ->state(fn (IngestedProduct $record): ?string => $record->is_test && TestProductScenarioResource::canAccess()
-                        ? $record->scenario?->name
+                        ? ($record->scenario?->name ?? ($record->test_product_scenario_id !== null ? "Scenario #{$record->test_product_scenario_id}" : null))
                         : null)
                     ->url(fn (IngestedProduct $record): ?string => $record->is_test && $record->test_product_scenario_id !== null && TestProductScenarioResource::canAccess()
                         ? TestProductScenarioResource::getUrl('edit', ['record' => $record->test_product_scenario_id])
