@@ -2,13 +2,21 @@
 
 namespace App\Filament\Admin\Resources\TestProductScenarios\Schemas;
 
+use App\Actions\Testing\CheckPolygonWithinWfo;
+use App\Actions\Testing\GenerateTestProductPolygon;
 use App\Models\ActiveWwa;
 use App\Models\Product;
 use App\Models\TestProductScenario;
+use Fahiem\FilamentPinpoint\Pinpoint;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard;
@@ -52,7 +60,7 @@ class TestProductScenarioForm
     {
         return [
             self::productAndTimingStep(),
-            Step::make('Geography'),
+            self::geographyStep(),
             Step::make('Content'),
             Step::make('Review & Generate'),
         ];
@@ -125,6 +133,159 @@ class TestProductScenarioForm
                     ->required()
                     ->visible(fn (Get $get): bool => self::selectedProductHasVtec($get)),
             ]);
+    }
+
+    /**
+     * The lat/lon backing fields use Hidden (not TextInput->hidden()) --
+     * Filament's CanBeHidden trait treats an unconditional ->hidden() as
+     * permanently hidden regardless of any later ->visible() call
+     * (isHidden() short-circuits true before ->visible() is ever
+     * evaluated), which combined with the default isDehydratedWhenHidden
+     * (false) would strip these keys from dehydrated state every time --
+     * defeating the entire point of capturing a center point. Hidden
+     * doesn't touch CanBeHidden's flags at all (it only changes the
+     * rendered `<input type="hidden">`), so the ->visible() condition below
+     * is the only thing controlling dehydration, exactly like input.wfo
+     * elsewhere in this form.
+     */
+    protected static function geographyStep(): Step
+    {
+        return Step::make('Geography')
+            ->schema([
+                CheckboxList::make('input.ugc_codes')
+                    ->label('Counties / zones (UGC)')
+                    ->columns(2)
+                    ->options(fn (Get $get): array => self::wfoScopedUgcOptions($get('input.wfo') ?? ''))
+                    ->visible(fn (Get $get): bool => self::selectedProductHasUgc($get)),
+                Toggle::make('input.polygon_advanced')
+                    ->label('Advanced: paste raw coordinates')
+                    ->live()
+                    ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get)),
+                Pinpoint::make('input.polygon_center')
+                    ->label('Center point')
+                    ->provider('leaflet')
+                    ->latField('input.polygon_center_lat')
+                    ->lngField('input.polygon_center_lon')
+                    ->dehydrated(false)
+                    ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && ! $get('input.polygon_advanced')),
+                Hidden::make('input.polygon_center_lat')
+                    ->live()
+                    ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && ! $get('input.polygon_advanced')),
+                Hidden::make('input.polygon_center_lon')
+                    ->live()
+                    ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && ! $get('input.polygon_advanced')),
+                TextInput::make('input.polygon_radius_miles')
+                    ->label('Radius (miles)')
+                    ->numeric()
+                    ->minValue(1)
+                    ->default(10)
+                    ->live()
+                    ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && ! $get('input.polygon_advanced')),
+                Textarea::make('input.polygon_raw')
+                    ->label('Coordinates (one "lat,lon" pair per line)')
+                    ->rows(4)
+                    ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && $get('input.polygon_advanced')),
+                // A real Field (not the deprecated Placeholder, which now
+                // extends Infolists\TextEntry rather than Forms\Field and so
+                // is invisible to getFlatFields()/assertFormFieldVisible())
+                // is required here so the advisory warning's visibility is
+                // actually testable.
+                ViewField::make('wfo_sanity_warning')
+                    ->label('')
+                    ->view('filament.forms.components.wfo-sanity-warning')
+                    ->viewData(fn (Get $get): array => ['message' => self::wfoSanityWarning($get)])
+                    ->dehydrated(false)
+                    ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && self::wfoSanityWarning($get) !== null),
+            ]);
+    }
+
+    /**
+     * counties.cwa/public_zones.cwa can list more than one office for a
+     * shared boundary area, so `like` (not `=`) is deliberate here --
+     * mirrors AlertRuleForm::countyZoneOptions()'s county/zone code
+     * derivation, just scoped by WFO instead of state.
+     *
+     * @return array<string, string>
+     */
+    public static function wfoScopedUgcOptions(string $wfo): array
+    {
+        if ($wfo === '') {
+            return [];
+        }
+
+        $countyOptions = DB::table('counties')->where('cwa', 'like', "%{$wfo}%")->get(['fips', 'state', 'countyname'])
+            ->mapWithKeys(function ($c): array {
+                $code = strtoupper($c->state).'C'.substr($c->fips, -3);
+
+                return [$code => "{$code} — {$c->countyname} County, {$c->state}"];
+            });
+
+        $zoneOptions = DB::table('public_zones')->where('cwa', 'like', "%{$wfo}%")->get(['state_zone', 'state', 'zone', 'name'])
+            ->mapWithKeys(function ($z): array {
+                $code = strtoupper($z->state).'Z'.$z->zone;
+
+                return [$code => "{$code} — {$z->name}, {$z->state}"];
+            });
+
+        return $countyOptions->union($zoneOptions)->all();
+    }
+
+    protected static function selectedProductHasUgc(Get $get): bool
+    {
+        $product = Product::find($get('product_id'));
+
+        return $product?->has_ugc ?? false;
+    }
+
+    protected static function selectedProductHasPolygon(Get $get): bool
+    {
+        $product = Product::find($get('product_id'));
+
+        return $product?->has_polygon ?? false;
+    }
+
+    /**
+     * Non-blocking: a real warning legitimately spans multiple CWAs, so this
+     * is a signal surfaced to catch an obviously wrong point, never a hard
+     * validation rule. Returns null (no warning shown) whenever the WFO or
+     * polygon isn't resolvable yet, so an incomplete Step 2 doesn't show a
+     * false positive.
+     */
+    protected static function wfoSanityWarning(Get $get): ?string
+    {
+        $wfo = $get('input.wfo');
+        if (blank($wfo)) {
+            return null;
+        }
+
+        $points = self::resolveGeographyPolygon($get);
+        if ($points === null) {
+            return null;
+        }
+
+        $within = app(CheckPolygonWithinWfo::class)($points, $wfo);
+
+        return $within ? null : "This point falls outside {$wfo}'s forecast area — real warnings occasionally span multiple offices, but double check this is what you intended.";
+    }
+
+    /**
+     * @return ?array<int, array{lat: float, lon: float}>
+     */
+    protected static function resolveGeographyPolygon(Get $get): ?array
+    {
+        if ($get('input.polygon_advanced')) {
+            return app(GenerateTestProductPolygon::class)->fromRawText($get('input.polygon_raw') ?? '');
+        }
+
+        $lat = $get('input.polygon_center_lat');
+        $lon = $get('input.polygon_center_lon');
+        $radius = $get('input.polygon_radius_miles');
+
+        if (blank($lat) || blank($lon) || blank($radius)) {
+            return null;
+        }
+
+        return app(GenerateTestProductPolygon::class)->fromPointAndRadius((float) $lat, (float) $lon, (float) $radius);
     }
 
     /**

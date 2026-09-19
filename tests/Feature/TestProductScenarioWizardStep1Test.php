@@ -9,6 +9,7 @@ use App\Models\TestProductScenario;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -75,6 +76,19 @@ test('the "continue existing event" option only appears once an open synthetic e
 });
 
 test('choosing a continued event inherits its product, WFO, event number, and prior content, and persists them on create', function () {
+    // TestProductScenarioForm::geographyStep()'s `input.ugc_codes`
+    // CheckboxList validates any inherited selection against its own
+    // WFO-scoped options list (Filament's built-in "in" rule for
+    // multi-value fields) -- this fixture row is what makes 'AZC019' a
+    // valid option for WFO 'TWC', matching wfoScopedUgcOptions()'s own
+    // county-code derivation (state + "C" + last 3 digits of fips).
+    DB::table('counties')->insert([
+        'state' => 'AZ', 'cwa' => 'TWC', 'countyname' => 'Pima', 'fips' => '04019',
+        'lon' => -110.9, 'lat' => 32.2,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-112 31, -109 31, -109 34, -112 34, -112 31))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
     $product = Product::where('code', 'TO.W')->sole();
     $scenario = TestProductScenario::factory()->for($product)->create([
         'input' => ['hazard' => 'Large hail.', 'ugc_codes' => ['AZC019']],
