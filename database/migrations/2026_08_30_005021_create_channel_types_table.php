@@ -1,8 +1,8 @@
 <?php
 
+use Database\Seeders\ChannelTypeSeeder;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -21,13 +21,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::table('channel_types')->insert([
-            ['slug' => 'email', 'min_tier' => 'free', 'sort_order' => 1, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()],
-            ['slug' => 'ntfy', 'min_tier' => 'free', 'sort_order' => 2, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()],
-            ['slug' => 'discord', 'min_tier' => 'free', 'sort_order' => 3, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()],
-            ['slug' => 'slack', 'min_tier' => 'free', 'sort_order' => 4, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()],
-            ['slug' => 'telegram', 'min_tier' => 'free', 'sort_order' => 5, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        (new ChannelTypeSeeder)->run();
     }
 
     /**
