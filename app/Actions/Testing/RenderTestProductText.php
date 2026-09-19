@@ -45,7 +45,7 @@ class RenderTestProductText
         $ugcCodes = $input['ugc_codes'] ?? [];
         $codeParts = explode('.', $product->code);
 
-        return view('filament.admin.test-products.warning', [
+        return $this->clean(view('filament.admin.test-products.warning', [
             'wfo' => $input['wfo'],
             'ttaaii' => 'wuus53',
             'productAwipsAbbr' => strtolower(str_replace('.', '', $product->code)),
@@ -66,16 +66,16 @@ class RenderTestProductText
             'locationsImpacted' => $input['locations_impacted'] ?? null,
             'callToAction' => $input['call_to_action'] ?? '',
             'polygonLine' => $this->buildPolygonLine($polygonPoints),
-            'motionLine' => $this->buildMotionLine($input, $issuedAt),
+            'motionLine' => $this->buildMotionLine($input, $issuedAt, $polygonPoints),
             'damageTagLines' => $input['damage_tags'] ?? [],
-        ])->render();
+        ])->render());
     }
 
     private function renderDiscussion(Product $product, array $input, Carbon $issuedAt): string
     {
         $polygonPoints = $this->resolvePolygon($input);
 
-        return view('filament.admin.test-products.discussion', [
+        return $this->clean(view('filament.admin.test-products.discussion', [
             'ttaaii' => 'acus11',
             'wfo' => $input['wfo'],
             'issuedAt' => $issuedAt,
@@ -88,14 +88,14 @@ class RenderTestProductText
             'concerning' => $input['concerning'] ?? '',
             'polygonLine' => $this->buildCombinedPolygonLine($polygonPoints),
             'attnWfos' => $input['attn_wfos'] ?? [$input['wfo']],
-        ])->render();
+        ])->render());
     }
 
     private function renderPlainText(Product $product, array $input, Carbon $issuedAt): string
     {
         $ugcCodes = $input['ugc_codes'] ?? [];
 
-        return view('filament.admin.test-products.plain-text', [
+        return $this->clean(view('filament.admin.test-products.plain-text', [
             'ttaaii' => 'fxus61',
             'wfo' => $input['wfo'],
             'issuedAt' => $issuedAt,
@@ -103,7 +103,7 @@ class RenderTestProductText
             'officeCity' => $this->officeCityFor($input['wfo']),
             'ugcLine' => $ugcCodes !== [] ? $this->buildUgcLine($ugcCodes, $issuedAt->copy()->addHours(2)) : null,
             'bodyText' => $input['body_text'] ?? '',
-        ])->render();
+        ])->render());
     }
 
     /**
@@ -209,14 +209,21 @@ class RenderTestProductText
         return str_pad((string) $integerPart, $integerDigits, '0', STR_PAD_LEFT).str_pad((string) $fraction, 2, '0', STR_PAD_LEFT);
     }
 
-    private function buildMotionLine(array $input, Carbon $issuedAt): ?string
+    private function buildMotionLine(array $input, Carbon $issuedAt, ?array $polygonPoints): ?string
     {
-        if (! isset($input['motion_direction_degrees'], $input['motion_speed_kt'])) {
+        if (! isset($input['motion_direction_degrees'], $input['motion_speed_kt']) || (float) $input['motion_speed_kt'] <= 0) {
             return null;
         }
 
-        $lat = $input['polygon_center_lat'] ?? 0.0;
-        $lon = abs($input['polygon_center_lon'] ?? 0.0);
+        if (isset($input['polygon_center_lat'], $input['polygon_center_lon'])) {
+            $lat = (float) $input['polygon_center_lat'];
+            $lon = abs((float) $input['polygon_center_lon']);
+        } elseif ($polygonPoints !== null && $polygonPoints !== []) {
+            $lat = collect($polygonPoints)->avg('lat');
+            $lon = abs(collect($polygonPoints)->avg('lon'));
+        } else {
+            return null;
+        }
 
         return sprintf(
             'TIME...MOT...LOC %s %dDEG %dKT %s %s',
@@ -226,6 +233,19 @@ class RenderTestProductText
             $this->encodeCoordinatePart(abs($lat)),
             $this->encodeCoordinatePart($lon),
         );
+    }
+
+    /**
+     * Livewire's Blade precompiler injects `<!--[if BLOCK]><![endif]-->`
+     * morph markers around every @if/@foreach in any compiled view, which
+     * would otherwise leak into the raw product text.
+     */
+    private function clean(string $text): string
+    {
+        $text = preg_replace('/<!--\[if [A-Z]+\]><!\[endif\]-->/', '', $text);
+        $text = preg_replace('/[ \t]+$/m', '', $text);
+
+        return preg_replace('/\n{3,}/', "\n\n", $text);
     }
 
     private function officeCityFor(string $wfo): string

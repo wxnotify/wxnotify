@@ -219,3 +219,31 @@ test('a discussion omits the AREAS AFFECTED and CONCERNING lines when those inpu
         ->and($text)->not->toContain('CONCERNING')
         ->and($text)->toContain('DISCUSSION...Isolated storms');
 });
+
+test('a rendered warning inside a Livewire-marked Blade compile contains no morph markers and no bogus motion line', function () {
+    $product = Product::where('code', 'TO.W')->sole();
+
+    $text = (new RenderTestProductText)($product, [
+        'wfo' => 'TWC', 'expires_minutes' => 30, 'ugc_codes' => ['AZZ019'],
+        'hazard' => 'Tornado.', 'hazard_source' => 'Radar indicated.', 'impact' => 'Damage.', 'call_to_action' => 'Take cover.',
+        'locations_impacted' => 'Tucson', 'damage_tags' => ['tornado' => 'RADAR INDICATED'],
+        'motion_direction_degrees' => 0, 'motion_speed_kt' => 0,
+    ]);
+
+    expect($text)->not->toContain('<!--')
+        ->and($text)->not->toContain('TIME...MOT...LOC')
+        ->and($text)->toContain("Locations impacted include...\n  Tucson");
+});
+
+test('a motion line is only rendered with a positive speed and a known location', function () {
+    $product = Product::where('code', 'TO.W')->sole();
+    $base = [
+        'wfo' => 'TWC', 'expires_minutes' => 30, 'ugc_codes' => ['AZZ019'],
+        'hazard' => 'T.', 'hazard_source' => 'R.', 'impact' => 'D.', 'call_to_action' => 'C.',
+        'motion_direction_degrees' => 250, 'motion_speed_kt' => 30,
+    ];
+
+    expect((new RenderTestProductText)($product, $base))->not->toContain('TIME...MOT...LOC')
+        ->and((new RenderTestProductText)($product, $base + ['polygon_center_lat' => 32.5, 'polygon_center_lon' => -110.5]))
+        ->toContain('250DEG 30KT 3250 11050');
+});

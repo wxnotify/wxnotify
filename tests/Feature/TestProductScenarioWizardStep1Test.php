@@ -129,6 +129,8 @@ test('choosing a continued event inherits its product, WFO, event number, and pr
         ->set('data.input.hazard_source', 'Radar indicated.')
         ->set('data.input.impact', 'Damaging winds possible.')
         ->set('data.input.call_to_action', 'Take shelter now.')
+        ->set('data.input.polygon_center_lat', 32.5)
+        ->set('data.input.polygon_center_lon', -110.5)
         ->call('create')
         ->assertHasNoFormErrors();
 

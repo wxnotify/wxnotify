@@ -188,6 +188,11 @@ class TestProductScenarioForm
                     ->minValue(1)
                     ->default(10)
                     ->live()
+                    ->rule(fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                        if (blank($get('input.polygon_center_lat')) || blank($get('input.polygon_center_lon'))) {
+                            $fail('Place the center point on the map (or use raw coordinates) before continuing.');
+                        }
+                    })
                     ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && ! $get('input.polygon_advanced')),
                 Textarea::make('input.polygon_raw')
                     ->label('Coordinates (one "lat,lon" pair per line)')

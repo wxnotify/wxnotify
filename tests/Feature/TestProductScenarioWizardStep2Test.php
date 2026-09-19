@@ -197,3 +197,13 @@ test('the Review preview renders a Tornado Warning before an event number has be
 
     expect($preview)->toContain('/O.NEW.KTWC.TO.W.')->not->toContain('Fill in the required fields');
 });
+
+test('guided polygon mode requires a center point to have been placed', function () {
+    $product = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateTestProductScenario::class)
+        ->set('data.product_id', $product->id)
+        ->set('data.input.wfo', 'TWC')
+        ->call('create')
+        ->assertHasFormErrors(['input.polygon_radius_miles']);
+});
