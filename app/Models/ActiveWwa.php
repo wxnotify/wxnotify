@@ -56,7 +56,7 @@ class ActiveWwa extends Model
      */
     public function scopeForProduct(Builder $query, IngestedProduct $product): Builder
     {
-        return $query->where(static::vtecKeyFor($product));
+        return $query->where(static::vtecKeyFor($product))->where('is_test', (bool) $product->is_test);
     }
 
     /**

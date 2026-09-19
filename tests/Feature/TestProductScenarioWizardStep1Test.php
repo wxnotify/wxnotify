@@ -232,3 +232,16 @@ test('switching mode back to "new" clears inherited fields from live form state'
             'input.hazard' => null,
         ]);
 });
+
+test('an open synthetic event whose expiry has passed is not offered for continuation', function () {
+    $product = Product::where('code', 'TO.W')->sole();
+    $scenario = TestProductScenario::factory()->for($product)->create();
+    $ingestedProduct = IngestedProduct::factory()->create(['is_test' => true, 'test_product_scenario_id' => $scenario->id]);
+    ActiveWwa::factory()->create([
+        'product_id' => $product->id, 'is_test' => true, 'status' => 'Active', 'expires' => now()->subMinute(),
+        'vtec_office' => 'KTWC', 'vtec_phenomenon' => 'TO', 'vtec_significance' => 'W', 'vtec_event_number' => '9021', 'vtec_year' => now()->year,
+        'latest_ingested_product_id' => $ingestedProduct->id,
+    ]);
+
+    expect(TestProductScenarioForm::openSyntheticEventOptions())->toBeEmpty();
+});

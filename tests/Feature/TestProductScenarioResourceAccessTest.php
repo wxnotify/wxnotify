@@ -2,6 +2,7 @@
 
 use App\Filament\Admin\Resources\TestProductScenarios\Pages\ListTestProductScenarios;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
+use App\Models\TestProductScenario;
 use App\Models\User;
 use Filament\Facades\Filament;
 
@@ -36,4 +37,14 @@ test('a staff user can see the New scenario action on the list page', function (
 
     livewire(ListTestProductScenarios::class)
         ->assertActionExists('create');
+});
+
+test('the generator pages return 403 over HTTP in production', function () {
+    app()->instance('env', 'production');
+    $this->actingAs(User::factory()->create(['is_staff' => true]));
+    $scenario = TestProductScenario::factory()->create();
+
+    $this->get('/admin/test-product-scenarios')->assertForbidden();
+    $this->get('/admin/test-product-scenarios/create')->assertForbidden();
+    $this->get("/admin/test-product-scenarios/{$scenario->id}/edit")->assertForbidden();
 });

@@ -487,6 +487,7 @@ class TestProductScenarioForm
         return ActiveWwa::query()
             ->where('is_test', true)
             ->where('status', 'Active')
+            ->where(fn (Builder $q) => $q->whereNull('expires')->orWhere('expires', '>', now()))
             ->whereHas('latestIngestedProduct', fn (Builder $q) => $q->whereNotNull('test_product_scenario_id'))
             ->with(['product', 'latestIngestedProduct'])
             ->latest('updated_at')

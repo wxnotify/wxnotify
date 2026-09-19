@@ -178,3 +178,27 @@ test('a real, non-test ingestion still reaches real subscribers and is not restr
 
     expect(e2eDispatchedRuleIds())->toContain($realRule->id, $testRule->id);
 });
+
+test('a synthetic product with no flagged fixture account dispatches nothing to anyone', function () {
+    Queue::fake();
+
+    $product = Product::where('code', 'SV.W')->sole();
+    e2eCreateRuleFor(false, $product, ['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'PAH']);
+
+    $scenario = TestProductScenario::factory()->for($product)->create(['input' => e2eWarningInput()]);
+    app(GenerateTestProduct::class)($scenario);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('a real product sharing a synthetic event VTEC key does not resolve the synthetic active_wwas row', function () {
+    $product = Product::where('code', 'SV.W')->sole();
+    $scenario = TestProductScenario::factory()->for($product)->create(['input' => e2eWarningInput()]);
+    $synthetic = app(GenerateTestProduct::class)($scenario);
+
+    $real = $synthetic->replicate();
+    $real->is_test = false;
+
+    expect(ActiveWwa::query()->forProduct($synthetic)->count())->toBe(1)
+        ->and(ActiveWwa::query()->forProduct($real)->count())->toBe(0);
+});
