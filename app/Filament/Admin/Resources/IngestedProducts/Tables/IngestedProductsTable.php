@@ -18,6 +18,7 @@ class IngestedProductsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('scenario'))
             ->columns([
                 TextColumn::make('cccc')
                     ->label('Office')
@@ -50,7 +51,9 @@ class IngestedProductsTable
             ->defaultSort('received_at', 'desc')
             ->filters([
                 TernaryFilter::make('is_test')
-                    ->label('Test products'),
+                    ->label('Test products')
+                    ->trueLabel('Test only')
+                    ->falseLabel('Real only'),
                 SelectFilter::make('cccc')
                     ->label('Office')
                     ->options(fn (): array => IngestedProduct::query()

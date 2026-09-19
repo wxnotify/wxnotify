@@ -7,6 +7,7 @@ use App\Models\IngestedProduct;
 use App\Models\TestProductScenario;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -59,7 +60,26 @@ test('the is_test filter isolates synthetic test runs from real archived product
     livewire(ListIngestedProducts::class)
         ->filterTable('is_test', true)
         ->assertCanSeeTableRecords([$test])
-        ->assertCanNotSeeTableRecords([$real]);
+        ->assertCanNotSeeTableRecords([$real])
+        ->filterTable('is_test', false)
+        ->assertCanSeeTableRecords([$real])
+        ->assertCanNotSeeTableRecords([$test]);
+});
+
+test('the list page eager-loads scenarios instead of querying once per row', function () {
+    IngestedProduct::factory()->count(5)->create([
+        'is_test' => true,
+        'test_product_scenario_id' => fn () => TestProductScenario::factory()->create()->id,
+    ]);
+
+    DB::enableQueryLog();
+    livewire(ListIngestedProducts::class);
+    $scenarioQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $q): bool => str_contains($q['query'], 'from "test_product_scenarios"'))
+        ->count();
+    DB::disableQueryLog();
+
+    expect($scenarioQueries)->toBeLessThanOrEqual(1);
 });
 
 test('a test product links to its originating scenario from the list and view pages', function () {
