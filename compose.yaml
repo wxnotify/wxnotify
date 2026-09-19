@@ -21,6 +21,7 @@ services:
         volumes:
             - '.:/var/www/html'
             - 'nwws-products:/products'
+            - 'emwin-products:/emwin-products:ro'
         networks:
             - sail
             - docker-proxy
@@ -78,6 +79,26 @@ services:
             PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
         volumes:
             - 'glm-state:/state'
+        networks:
+            - sail
+        restart: unless-stopped
+        depends_on:
+            - laravel.test
+    emwin:
+        build:
+            context: .
+            dockerfile: docker/emwin/Dockerfile
+        container_name: wxnotify-emwin
+        environment:
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+            EMWIN_WEBHOOK_URL: 'http://laravel.test/api/pipeline/emwin-products'
+            EMWIN_SERVERS_REFRESH_HOURS: '${EMWIN_SERVERS_REFRESH_HOURS:-6}'
+            EMWIN_MAX_UNZIP_BYTES: '${EMWIN_MAX_UNZIP_BYTES:-5242880}'
+            EMWIN_RETENTION_DAYS: '${EMWIN_RETENTION_DAYS:-7}'
+        ports:
+            - '${EMWIN_WEB_PORT:-8016}:8016'
+        volumes:
+            - 'emwin-products:/var/npemwin/files'
         networks:
             - sail
         restart: unless-stopped
@@ -204,4 +225,6 @@ volumes:
     nwws-products:
         driver: local
     glm-state:
+        driver: local
+    emwin-products:
         driver: local
