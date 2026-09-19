@@ -257,16 +257,20 @@ class TestProductScenarioForm
     }
 
     /**
-     * Memoizes the Content step's repeated Product::find($get('product_id'))
-     * lookups within a single request -- a render of this step previously
-     * issued one query per helper call per field re-evaluation (measured at
-     * 20 for a single field change). Safe across the request/response
-     * lifecycle used here (plain PHP-FPM, no Octane): these static
-     * properties are reset for every fresh request, and within a request
-     * the cache is keyed by product id, so switching product_id (e.g. via a
-     * live Select, or a test driving multiple products through the same
-     * Livewire instance) always re-fetches rather than returning stale data
-     * for a different id.
+     * Memoizes the repeated Product::find($get('product_id')) lookups this
+     * form's visibility helpers all make -- selectedProductHasVtec()/
+     * selectedProductHasUgc()/selectedProductHasPolygon() (Steps 1/2) plus
+     * Step 3's own helpers below. A single field re-evaluation previously
+     * fired one query per helper call across all three steps (measured at
+     * 20, then still 15 after only Step 3's own helpers were routed through
+     * this cache -- selectedProductHasVtec() alone accounts for most of Step
+     * 3's field visibility and was still calling Product::find() directly).
+     * Safe across the request/response lifecycle used here (plain PHP-FPM,
+     * no Octane): these static properties are reset for every fresh
+     * request, and within a request the cache is keyed by product id, so
+     * switching product_id (e.g. via a live Select, or a test driving
+     * multiple products through the same Livewire instance) always
+     * re-fetches rather than returning stale data for a different id.
      */
     protected static ?Product $cachedProduct = null;
 
@@ -342,16 +346,12 @@ class TestProductScenarioForm
 
     protected static function selectedProductHasUgc(Get $get): bool
     {
-        $product = Product::find($get('product_id'));
-
-        return $product?->has_ugc ?? false;
+        return self::selectedProduct($get)?->has_ugc ?? false;
     }
 
     protected static function selectedProductHasPolygon(Get $get): bool
     {
-        $product = Product::find($get('product_id'));
-
-        return $product?->has_polygon ?? false;
+        return self::selectedProduct($get)?->has_polygon ?? false;
     }
 
     /**
@@ -632,8 +632,6 @@ class TestProductScenarioForm
             return true;
         }
 
-        $product = Product::find($get('product_id'));
-
-        return $product?->has_vtec ?? false;
+        return self::selectedProduct($get)?->has_vtec ?? false;
     }
 }
