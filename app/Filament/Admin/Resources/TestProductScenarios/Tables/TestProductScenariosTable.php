@@ -34,6 +34,11 @@ class TestProductScenariosTable
                     ->label('Send again')
                     ->icon('heroicon-o-paper-airplane')
                     ->action(function (TestProductScenario $record): void {
+                        // Render-only: the stored scenario stays exactly as saved, but a resend
+                        // should always look freshly issued, matching EditTestProductScenario's
+                        // mutateFormDataBeforeFill() reset for the wizard-based path.
+                        $record->input = [...$record->input, 'issued_at' => now()->toIso8601String()];
+
                         $result = app(GenerateTestProduct::class)($record);
 
                         if ($result === null) {
