@@ -30,9 +30,18 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['is_staff', 'tier_override', 'tier_override_reason'])
+            ->logOnly(['is_staff', 'is_owner', 'tier_override', 'tier_override_reason'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if ($user->is_owner && ! $user->is_staff) {
+                $user->is_staff = true;
+            }
+        });
     }
 
     public function canAccessPanel(Panel $panel): bool
@@ -169,6 +178,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_staff' => 'boolean',
+            'is_owner' => 'boolean',
             'is_test_account' => 'boolean',
             'tier_override' => Tier::class,
         ];

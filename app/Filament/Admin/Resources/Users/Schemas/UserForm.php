@@ -24,6 +24,10 @@ class UserForm
                 TextInput::make('email')
                     ->disabled(),
                 Toggle::make('is_staff'),
+                Toggle::make('is_owner')
+                    ->label('Owner')
+                    ->helperText('Owners can run Reset to Factory Defaults. Implies staff.')
+                    ->disabled(fn (): bool => ! auth()->user()?->is_owner),
                 Toggle::make('is_test_account')
                     ->label('Fixture test account')
                     ->helperText('The Test Product Generator only ever matches synthetic products against alert rules belonging to whichever user has this flag set.'),

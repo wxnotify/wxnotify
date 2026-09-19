@@ -28,6 +28,9 @@ class UsersTable
                     ->getStateUsing(fn (User $record): string => ucfirst($record->tier()->value)),
                 IconColumn::make('is_staff')
                     ->boolean(),
+                IconColumn::make('is_owner')
+                    ->label('Owner')
+                    ->boolean(),
                 IconColumn::make('is_test_account')
                     ->label('Fixture')
                     ->boolean(),
