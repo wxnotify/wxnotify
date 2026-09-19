@@ -2,6 +2,7 @@
 paths:
   - 'app/Models/**'
   - app/Models/Product.php
+  - app/Models/ActiveWwa.php
 ---
 
 # Models
@@ -15,3 +16,6 @@ Found while wiring AlertRule/Location for the Admin Tools audit log — both wer
 
 ## Product::family vs Product::category are different, non-overlapping axes
 `family` (warning/watch/advisory/statement/spc_wpc/forecast_discussion/informational/administrative/aviation) is a severity/structure tier and is live-wired into the subscriber Alert Rule wizard's product filtering (`AlertRuleForm::whereIn('family', [...])`). `category` (ProductCategory, 11 hazard-type groups like Marine, Fire Weather) is a separate hazard-domain taxonomy imported from the legacy `app_product_category` table. Never conflate them — a product's category does not determine its family, and vice versa. See database/seeders/ProductCatalogSeeder.php for the full legacy-catalog crosswalk and reasoning.
+
+## ActiveWwa::forProduct() is is_test-scoped
+scopeForProduct() matches the VTEC key AND is_test, so synthetic (Test Product Generator) events never resolve for real products or vice versa, even when the VTEC key collides. Any new lookup of active_wwas from an IngestedProduct must go through forProduct() rather than re-deriving the VTEC key.
