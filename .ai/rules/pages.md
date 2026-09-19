@@ -1,0 +1,9 @@
+---
+paths:
+  - 'app/Filament/Admin/Pages/**'
+---
+
+# Pages
+
+## Reset to Factory Defaults is owner-only and never wipes staff or the audit log
+The page's canAccess() requires users.is_owner (no environment gate; intentionally available in production). WipeSubscriberData deletes only is_staff=false users; no toggle may touch activity_log. If a table gains a foreign key to ingested_products/active_wwas/delivery_logs, add it to WipePipelineData's TRUNCATE and count. The committed database/data/shipped_product_catalog.php snapshot must be regenerated when ProductCatalogSeeder or product migrations change (ShippedProductCatalogTest fails otherwise). Re-authentication state lives in the session (factory_reset.reauthenticated_at), never in a public Livewire property.
