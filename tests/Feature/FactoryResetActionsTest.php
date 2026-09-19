@@ -1,7 +1,9 @@
 <?php
 
+use App\Actions\Admin\FactoryReset\FactoryResetConfirmation;
 use App\Actions\Admin\FactoryReset\PreviewFactoryReset;
 use App\Actions\Admin\FactoryReset\ResetCatalogs;
+use App\Actions\Admin\FactoryReset\VerifyOwnerReauthentication;
 use App\Actions\Admin\FactoryReset\WipePipelineData;
 use App\Actions\Admin\FactoryReset\WipeSubscriberData;
 use App\Contracts\PipelineStack;
@@ -17,8 +19,10 @@ use App\Models\User;
 use App\Notifications\AlertRuleDisabledNotification;
 use App\Support\Pipeline\UnmanagedPipelineStack;
 use Database\Seeders\ProductCatalogSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
+use PragmaRX\Google2FA\Google2FA;
 
 test('the default pipeline stack cannot stop services and refuses to pretend it did', function () {
     $stack = app(PipelineStack::class);
@@ -144,4 +148,35 @@ test('resetting catalogs restores a retired and renamed shipped product and refi
         ->and($restored->status)->toBe($original['status'])
         ->and($restored->description)->not->toBeNull()
         ->and($restored->example)->not->toBeNull();
+});
+
+test('the confirmation phrase is RESET, or the instance domain when subscriber data is selected', function () {
+    config(['app.url' => 'https://alerts.example.com']);
+
+    expect(FactoryResetConfirmation::expectedPhrase(['pipeline' => true, 'catalogs' => true]))->toBe('RESET')
+        ->and(FactoryResetConfirmation::expectedPhrase(['pipeline' => true, 'subscribers' => true]))->toBe('alerts.example.com')
+        ->and(FactoryResetConfirmation::matches(['pipeline' => true], 'RESET'))->toBeTrue()
+        ->and(FactoryResetConfirmation::matches(['pipeline' => true], 'reset'))->toBeFalse()
+        ->and(FactoryResetConfirmation::matches(['subscribers' => true], 'RESET'))->toBeFalse()
+        ->and(FactoryResetConfirmation::matches(['subscribers' => true], 'Alerts.Example.com'))->toBeTrue();
+});
+
+test('re-authentication needs the current password', function () {
+    $owner = User::factory()->create(['is_owner' => true, 'password' => 'correct-horse']);
+
+    expect(app(VerifyOwnerReauthentication::class)($owner, 'correct-horse', null))->toBeTrue()
+        ->and(app(VerifyOwnerReauthentication::class)($owner, 'wrong', null))->toBeFalse();
+});
+
+test('re-authentication also needs a valid authenticator code when 2FA is enabled', function () {
+    $owner = User::factory()->create(['is_owner' => true, 'password' => 'correct-horse']);
+    $owner->saveAppAuthenticationSecret('JBSWY3DPEHPK3PXP');
+    $this->actingAs($owner);
+    Filament::setCurrentPanel('admin');
+
+    expect(app(VerifyOwnerReauthentication::class)($owner, 'correct-horse', null))->toBeFalse()
+        ->and(app(VerifyOwnerReauthentication::class)($owner, 'correct-horse', '000000'))->toBeFalse();
+
+    $code = (new Google2FA)->getCurrentOtp('JBSWY3DPEHPK3PXP');
+    expect(app(VerifyOwnerReauthentication::class)($owner, 'correct-horse', $code))->toBeTrue();
 });
