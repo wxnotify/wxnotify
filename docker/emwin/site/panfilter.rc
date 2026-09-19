@@ -1,0 +1,5 @@
+# Call the delivery hook for every file received. It ignores non-text files itself.
+lappend cond {1}
+lappend action {
+  exec /pan-notify.sh $rc(fpath);
+}
