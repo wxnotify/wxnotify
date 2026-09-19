@@ -4,6 +4,7 @@ use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
 use App\Models\IngestedProduct;
 use App\Models\Product;
+use App\Support\Pipeline\PipelineHeartbeat;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -310,4 +311,25 @@ test('a newly ingested VTEC product dispatches SyncActiveWwa instead of MatchWea
 
     $syncSpy->shouldHaveReceived('__invoke')->once();
     $matchSpy->shouldNotHaveReceived('__invoke');
+});
+test('an NWWS product populates the header key and is skipped when EMWIN already ingested it', function () {
+    $text = "WFUS53 KBOU 191622\nTORBOU\nBody";
+    IngestedProduct::factory()->create(['file_path' => 'emwin/delivered/kbou/x.txt', 'source' => 'emwin', 'wmo_header_key' => 'wfus53 kbou 191622 torbou']);
+    File::makeDirectory($this->productsRoot.'/kbou', recursive: true, force: true);
+    File::put($this->productsRoot.'/kbou/kbou_wfus53-torbou.191622_1.txt', $text);
+
+    $this->postJson('/api/pipeline/nwws-products', ['path' => 'kbou/kbou_wfus53-torbou.191622_1.txt'], ['Authorization' => 'Bearer test-webhook-token'])->assertNoContent();
+
+    expect(IngestedProduct::count())->toBe(1);
+});
+
+test('a first-seen NWWS product stores source nwws and its header key and records the nwws heartbeat', function () {
+    File::makeDirectory($this->productsRoot.'/kbou', recursive: true, force: true);
+    File::put($this->productsRoot.'/kbou/kbou_wfus53-torbou.191622_1.txt', "WFUS53 KBOU 191622\nTORBOU\nBody");
+
+    $this->postJson('/api/pipeline/nwws-products', ['path' => 'kbou/kbou_wfus53-torbou.191622_1.txt'], ['Authorization' => 'Bearer test-webhook-token'])->assertNoContent();
+
+    expect(IngestedProduct::sole()->source)->toBe('nwws')
+        ->and(IngestedProduct::sole()->wmo_header_key)->toBe('wfus53 kbou 191622 torbou')
+        ->and(PipelineHeartbeat::lastReceivedAt('nwws'))->not->toBeNull();
 });

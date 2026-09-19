@@ -56,6 +56,7 @@ return [
         'webhook_token' => env('PIPELINE_WEBHOOK_TOKEN'),
         'products_path' => env('PIPELINE_PRODUCTS_PATH', '/products'),
         'emwin_products_path' => env('PIPELINE_EMWIN_PRODUCTS_PATH', '/emwin-products'),
+        'wmo_lock_wait_seconds' => 5,
     ],
 
     'docker' => [
