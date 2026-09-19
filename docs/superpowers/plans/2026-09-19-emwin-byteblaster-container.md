@@ -20,6 +20,16 @@
 
 ---
 
+## Plan adjustments from the Task 1 spike (these SUPERSEDE conflicting text in later tasks)
+
+Verified facts are in the spec's "Verified facts (spike)" section. Consequences:
+
+1. **Storage root is `/var/npemwin/files`, not `.../files/text`.** npemwind stores text products at `/var/npemwin/files/txt/<cccc>/<product>.<md5>.txt` (lowercase). Everywhere the plan says `/var/npemwin/files/text` / `EMWIN_FILES_ROOT` default / the Compose volume target, use **`/var/npemwin/files`**. The volume is `emwin-products:/var/npemwin/files`; Laravel mounts it read-only at `/emwin-products`; posted paths look like `txt/kbou/afdbou.<md5>.txt`.
+2. **npemwind already unzips and strips control characters itself** (its `qrunner`), so text products arrive as plain `.txt`, uniquely named by content MD5 (nothing is overwritten; identical retransmissions are dropped before panfilter). Therefore `pan-notify.sh` **delivers `.txt` files directly by their relative path — no copy**. The user still requires an unzip process, so the **`.zip` branch stays as a defensive path** for any zip that reaches panfilter: unzip (guards and error handling unchanged) into unique files under `$ROOT/delivered/<reldir of the zip>/` and deliver those. Task 3's tests change accordingly: a plain `.txt` under `txt/kbox/` posts the path `txt/kbox/<name>` (source untouched, no `delivered/` copy); the "two runs give distinct paths" test applies to **zip members** (via unique naming), and all zip/unzip tests stay as written. Only `.txt` and `.zip` are acted on; everything else is ignored.
+3. **Dockerfile:** the package creates and owns `/var/npemwin/*` and the `noaaport` user; only `mkdir -p /var/npemwin/files/delivered` (owned by noaaport) is needed. Keep the `id noaaport ||` fallback harmless.
+4. **`entrypoint.sh`:** the daemon's process pattern is `npemwind -F` — use `pkill -TERM -f 'npemwind -F'` and `pgrep -f 'npemwind -F'`. SIGHUP reload is unreliable, so keep stop-and-restart. The retention loop now only prunes `delivered/` (zip members). Expect a nonzero exit (status 1) after SIGTERM; the restart flag distinguishes an intentional restart.
+5. Laravel tasks are unaffected (posted paths are relative to the mount; `file_path` stays `emwin/<path>`).
+
 ## File Structure
 
 - `docker/emwin/Dockerfile`, `entrypoint.sh`, `pan-notify.sh`, `refresh-servers.sh`, `healthcheck.sh`, `rsyslog.conf`
