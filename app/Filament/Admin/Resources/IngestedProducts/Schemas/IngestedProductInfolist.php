@@ -31,7 +31,7 @@ class IngestedProductInfolist
                 TextEntry::make('text')
                     ->label('Product text')
                     ->columnSpanFull()
-                    ->extraAttributes(['class' => 'whitespace-pre-wrap font-mono text-xs']),
+                    ->extraAttributes(['style' => 'white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem;']),
             ]);
     }
 }

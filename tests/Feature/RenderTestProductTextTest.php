@@ -247,3 +247,7 @@ test('a motion line is only rendered with a positive speed and a known location'
         ->and((new RenderTestProductText)($product, $base + ['polygon_center_lat' => 32.5, 'polygon_center_lon' => -110.5]))
         ->toContain('250DEG 30KT 3250 11050');
 });
+
+test('the preview and ingested-product text views preserve line breaks with inline styles', function () {
+    expect(view('filament.forms.components.rendered-preview', ['text' => "A\nB"])->render())->toContain('white-space: pre-wrap');
+});

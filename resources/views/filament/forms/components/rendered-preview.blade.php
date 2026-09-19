@@ -9,5 +9,5 @@
             <span x-show="copied" x-cloak>Copied</span>
         </button>
     </div>
-    <div x-ref="previewText" class="font-mono text-xs whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">{{ $text }}</div>
+    <div x-ref="previewText" class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem;">{{ $text }}</div>
 </div>
