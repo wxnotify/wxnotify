@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Support\Pipeline\DockerEngineClient;
+use App\Support\Pipeline\PipelineHeartbeat;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -23,25 +24,30 @@ class PipelineControl extends Page
 
     private const NWWS_CONTAINER = 'wxnotify-nwws';
 
-    private ?string $nwwsStatusCache = null;
+    private const EMWIN_CONTAINER = 'wxnotify-emwin';
 
-    public function nwwsStatus(): string
+    /**
+     * @var array<string, string>
+     */
+    private array $statusCache = [];
+
+    private function statusOf(string $container): string
     {
-        return $this->nwwsStatusCache ??= $this->resolveNwwsStatus();
+        return $this->statusCache[$container] ??= $this->resolveStatus($container);
     }
 
-    private function resolveNwwsStatus(): string
+    private function resolveStatus(string $container): string
     {
         try {
-            return app(DockerEngineClient::class)->status(self::NWWS_CONTAINER);
+            return app(DockerEngineClient::class)->status($container);
         } catch (Throwable) {
             return 'unknown';
         }
     }
 
-    public function nwwsStatusColor(): string
+    private function colorFor(string $status): string
     {
-        return match ($this->nwwsStatus()) {
+        return match ($status) {
             'running' => 'success',
             'exited' => 'gray',
             'dead' => 'danger',
@@ -49,12 +55,47 @@ class PipelineControl extends Page
         };
     }
 
-    public function nwwsStatusLabel(): string
+    private function labelFor(string $status): string
     {
-        return match ($status = $this->nwwsStatus()) {
+        return match ($status) {
             'not_found' => 'Not found',
             default => ucfirst($status),
         };
+    }
+
+    public function nwwsStatus(): string
+    {
+        return $this->statusOf(self::NWWS_CONTAINER);
+    }
+
+    public function nwwsStatusColor(): string
+    {
+        return $this->colorFor($this->nwwsStatus());
+    }
+
+    public function nwwsStatusLabel(): string
+    {
+        return $this->labelFor($this->nwwsStatus());
+    }
+
+    public function emwinStatus(): string
+    {
+        return $this->statusOf(self::EMWIN_CONTAINER);
+    }
+
+    public function emwinStatusColor(): string
+    {
+        return $this->colorFor($this->emwinStatus());
+    }
+
+    public function emwinStatusLabel(): string
+    {
+        return $this->labelFor($this->emwinStatus());
+    }
+
+    public function emwinLastProductAt(): ?string
+    {
+        return PipelineHeartbeat::lastReceivedAt('emwin')?->diffForHumans();
     }
 
     public function startAction(): Action
@@ -63,7 +104,7 @@ class PipelineControl extends Page
             ->label('Start')
             ->color('success')
             ->visible(fn (): bool => $this->nwwsStatus() !== 'running')
-            ->action(fn () => $this->runDockerAction('start', fn () => app(DockerEngineClient::class)->start(self::NWWS_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('NWWS', self::NWWS_CONTAINER, 'start', fn () => app(DockerEngineClient::class)->start(self::NWWS_CONTAINER)));
     }
 
     public function stopAction(): Action
@@ -74,7 +115,7 @@ class PipelineControl extends Page
             ->requiresConfirmation()
             ->modalDescription('This stops the live NWWS-OI feed connection until it is started again.')
             ->visible(fn (): bool => $this->nwwsStatus() === 'running')
-            ->action(fn () => $this->runDockerAction('stop', fn () => app(DockerEngineClient::class)->stop(self::NWWS_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('NWWS', self::NWWS_CONTAINER, 'stop', fn () => app(DockerEngineClient::class)->stop(self::NWWS_CONTAINER)));
     }
 
     public function restartAction(): Action
@@ -84,10 +125,40 @@ class PipelineControl extends Page
             ->color('warning')
             ->requiresConfirmation()
             ->modalDescription('This briefly drops the live NWWS-OI feed connection.')
-            ->action(fn () => $this->runDockerAction('restart', fn () => app(DockerEngineClient::class)->restart(self::NWWS_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('NWWS', self::NWWS_CONTAINER, 'restart', fn () => app(DockerEngineClient::class)->restart(self::NWWS_CONTAINER)));
     }
 
-    private function runDockerAction(string $verb, callable $callback): void
+    public function startEmwinAction(): Action
+    {
+        return Action::make('startEmwin')
+            ->label('Start')
+            ->color('success')
+            ->visible(fn (): bool => $this->emwinStatus() !== 'running')
+            ->action(fn () => $this->runDockerAction('EMWIN', self::EMWIN_CONTAINER, 'start', fn () => app(DockerEngineClient::class)->start(self::EMWIN_CONTAINER)));
+    }
+
+    public function stopEmwinAction(): Action
+    {
+        return Action::make('stopEmwin')
+            ->label('Stop')
+            ->color('danger')
+            ->requiresConfirmation()
+            ->modalDescription('This stops the live EMWIN Byteblaster feed connection until it is started again.')
+            ->visible(fn (): bool => $this->emwinStatus() === 'running')
+            ->action(fn () => $this->runDockerAction('EMWIN', self::EMWIN_CONTAINER, 'stop', fn () => app(DockerEngineClient::class)->stop(self::EMWIN_CONTAINER)));
+    }
+
+    public function restartEmwinAction(): Action
+    {
+        return Action::make('restartEmwin')
+            ->label('Restart')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalDescription('This briefly drops the live EMWIN Byteblaster feed connection.')
+            ->action(fn () => $this->runDockerAction('EMWIN', self::EMWIN_CONTAINER, 'restart', fn () => app(DockerEngineClient::class)->restart(self::EMWIN_CONTAINER)));
+    }
+
+    private function runDockerAction(string $label, string $container, string $verb, callable $callback): void
     {
         try {
             $callback();
@@ -96,15 +167,15 @@ class PipelineControl extends Page
             // per-request status cache from before this call ran (Filament
             // re-checks visibility as part of authorizing the action) — the
             // subsequent re-render needs a fresh read, not that stale value.
-            $this->nwwsStatusCache = null;
+            unset($this->statusCache[$container]);
 
             Notification::make()
-                ->title("NWWS {$verb} succeeded")
+                ->title("{$label} {$verb} succeeded")
                 ->success()
                 ->send();
         } catch (Throwable $e) {
             Notification::make()
-                ->title("Failed to {$verb} NWWS")
+                ->title("Failed to {$verb} {$label}")
                 ->body($e->getMessage())
                 ->danger()
                 ->send();

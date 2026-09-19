@@ -18,7 +18,26 @@
             </div>
         </div>
 
-        @foreach (['EMWIN Byteblaster', 'EMWIN HTTP backup'] as $client)
+        <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-gray-900">
+            <div class="flex items-center gap-3">
+                <span class="font-medium text-gray-700 dark:text-gray-200">EMWIN Byteblaster</span>
+                <x-filament::badge :color="$this->emwinStatusColor()">
+                    {{ $this->emwinStatusLabel() }}
+                </x-filament::badge>
+                <span class="text-xs text-gray-500 dark:text-gray-400">Last product: {{ $this->emwinLastProductAt() ?? 'never' }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+                @if ($this->startEmwinAction->isVisible())
+                    {{ $this->startEmwinAction }}
+                @endif
+                @if ($this->stopEmwinAction->isVisible())
+                    {{ $this->stopEmwinAction }}
+                @endif
+                {{ $this->restartEmwinAction }}
+            </div>
+        </div>
+
+        @foreach (['EMWIN HTTP backup'] as $client)
             <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-gray-900">
                 <span class="font-medium text-gray-700 dark:text-gray-200">{{ $client }}</span>
                 <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500 dark:bg-white/5 dark:text-gray-400">
