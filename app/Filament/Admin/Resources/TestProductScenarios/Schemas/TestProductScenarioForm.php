@@ -169,11 +169,12 @@ class TestProductScenarioForm
                     ->label('Advanced: paste raw coordinates')
                     ->live()
                     ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get)),
+                // Pinpoint resolves latField/lngField as SIBLINGS of its own state path (client-side), so these are bare keys, not 'input.'-prefixed.
                 Pinpoint::make('input.polygon_center')
                     ->label('Center point')
                     ->provider('leaflet')
-                    ->latField('input.polygon_center_lat')
-                    ->lngField('input.polygon_center_lon')
+                    ->latField('polygon_center_lat')
+                    ->lngField('polygon_center_lon')
                     ->dehydrated(false)
                     ->visible(fn (Get $get): bool => self::selectedProductHasPolygon($get) && ! $get('input.polygon_advanced')),
                 Hidden::make('input.polygon_center_lat')

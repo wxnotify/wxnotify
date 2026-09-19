@@ -207,3 +207,18 @@ test('guided polygon mode requires a center point to have been placed', function
         ->call('create')
         ->assertHasFormErrors(['input.polygon_radius_miles']);
 });
+
+test('the map field writes to the same state paths as the hidden center-point fields', function () {
+    $product = Product::where('code', 'TO.W')->sole();
+
+    $component = livewire(CreateTestProductScenario::class)
+        ->set('data.product_id', $product->id)
+        ->instance();
+
+    $fields = collect($component->getSchema('form')->getFlatFields(withHidden: true));
+    $pinpoint = $fields->get('input.polygon_center');
+    $base = substr($pinpoint->getStatePath(), 0, strrpos($pinpoint->getStatePath(), '.') + 1);
+
+    expect($base.$pinpoint->getLatField())->toBe($fields->get('input.polygon_center_lat')->getStatePath())
+        ->and($base.$pinpoint->getLngField())->toBe($fields->get('input.polygon_center_lon')->getStatePath());
+});
