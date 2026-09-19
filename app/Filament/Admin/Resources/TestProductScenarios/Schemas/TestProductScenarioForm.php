@@ -446,7 +446,12 @@ class TestProductScenarioForm
      * continues, so it has no meaningful "New event" shape of its own; it's
      * only ever reachable through the "Continue existing event" flow
      * (inheritFromContinuedScenario() below), which is exactly how a real
-     * SVS comes to exist. Every status, including draft, is included for
+     * SVS comes to exist. VTEC-flagged warning/watch/advisory products are
+     * further limited to codes shaped like a real VTEC
+     * phenomenon.significance pair (e.g. TO.W): the catalog also holds
+     * legacy dotless AWIPS abbreviations (FAW, SEW...) flagged has_vtec, for
+     * which no parseable VTEC line can be rendered (and which the real
+     * pipeline can't resolve from a VTEC line either). Every status, including draft, is included for
      * the eligible families -- this is the concrete use case draft status
      * was built for.
      */
@@ -454,7 +459,8 @@ class TestProductScenarioForm
     {
         return Product::query()
             ->where(function (Builder $q): void {
-                $q->whereIn('family', ['warning', 'watch', 'advisory'])
+                $q->where(fn (Builder $q3) => $q3->whereIn('family', ['warning', 'watch', 'advisory'])
+                    ->where(fn (Builder $q4) => $q4->where('has_vtec', false)->orWhereRaw("code ~ '^[A-Z]{2}\\.[A-Z]$'")))
                     ->orWhere(fn (Builder $q2) => $q2->where('family', 'spc_wpc')->where('has_polygon', true))
                     ->orWhere('family', 'forecast_discussion')
                     ->orWhere('code', 'SPS');

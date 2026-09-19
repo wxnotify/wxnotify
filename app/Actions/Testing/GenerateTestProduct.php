@@ -8,6 +8,7 @@ use App\Models\ActiveWwa;
 use App\Models\IngestedProduct;
 use App\Models\Product;
 use App\Models\TestProductScenario;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -34,17 +35,32 @@ class GenerateTestProduct
     public function __invoke(TestProductScenario $scenario): ?IngestedProduct
     {
         $product = $scenario->product;
+
+        if ($product === null) {
+            Log::warning('Test product generation skipped: the scenario\'s product no longer exists.', ['scenario_id' => $scenario->id]);
+
+            return null;
+        }
+
+        if ($product->has_vtec && ! self::hasVtecPairCode($product)) {
+            Log::warning('Test product generation skipped: a VTEC product needs a PP.S code to render a parseable VTEC line.', [
+                'scenario_id' => $scenario->id,
+                'product_code' => $product->code,
+            ]);
+
+            return null;
+        }
+
         $input = $scenario->input;
         $wfo = $input['wfo'];
 
-        if (($input['mode'] ?? 'new') === 'new' && $product->has_vtec && blank($input['vtec_event_number'] ?? null)) {
+        if ($scenario->continues_scenario_id === null && $product->has_vtec && blank($input['vtec_event_number'] ?? null)) {
             $input['vtec_event_number'] = (string) $this->nextReservedEventNumber($product, $wfo);
             $input['vtec_action'] = 'NEW';
         }
 
         $text = ($this->renderTestProductText)($product, $input);
 
-        $isCap = false;
         $filePath = "test-generated/{$scenario->id}/".Str::uuid()->toString().'.txt';
 
         $identity = [
@@ -59,7 +75,7 @@ class GenerateTestProduct
             'nwws_id' => 'TEST-'.Str::random(8),
         ];
 
-        return ($this->ingestProductText)($text, $filePath, $identity, $isCap, [
+        return ($this->ingestProductText)($text, $filePath, $identity, false, [
             'is_test' => true,
             'test_product_scenario_id' => $scenario->id,
         ]);
@@ -112,8 +128,17 @@ class GenerateTestProduct
         return ActiveWwa::where([
             ...$vtecKey,
             'vtec_event_number' => (string) $candidate,
-            'status' => 'Active',
         ])->exists();
+    }
+
+    /**
+     * True when the product code is a real VTEC phenomenon.significance
+     * pair (e.g. "TO.W"); legacy dotless AWIPS abbreviations (FAW, SEW...)
+     * can't produce a line ParseVtecString accepts.
+     */
+    public static function hasVtecPairCode(Product $product): bool
+    {
+        return preg_match('/^[A-Z]{2}\.[A-Z]$/', $product->code) === 1;
     }
 
     /**

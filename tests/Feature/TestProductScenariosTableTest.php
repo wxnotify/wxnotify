@@ -144,3 +144,24 @@ test('the Times sent column reflects how many products a scenario has spawned', 
         ->callAction(TestAction::make('send_again')->table($scenario))
         ->assertTableColumnStateSet('ingested_products_count', 1, $scenario);
 });
+
+test('send again is hidden for a scenario whose product was deleted', function () {
+    $scenario = TestProductScenario::factory()->create();
+    $scenario->product->delete();
+
+    livewire(ListTestProductScenarios::class)
+        ->assertActionHidden(TestAction::make('send_again')->table($scenario->fresh()));
+});
+
+test('send again warns when the pipeline ingested the product but could not resolve it to a catalog product', function () {
+    $product = Product::where('code', 'SPS')->sole();
+    $scenario = TestProductScenario::factory()->for($product)->create([
+        'input' => ['wfo' => 'TOP', 'ugc_codes' => ['KSZ038'], 'body_text' => 'Strong thunderstorms are moving through the area.'],
+    ]);
+
+    livewire(ListTestProductScenarios::class)
+        ->callAction(TestAction::make('send_again')->table($scenario))
+        ->assertNotified('Test product generated, but not recognized');
+
+    expect(IngestedProduct::sole()->product_id)->toBeNull();
+});

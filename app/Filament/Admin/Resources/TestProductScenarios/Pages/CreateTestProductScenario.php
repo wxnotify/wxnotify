@@ -3,10 +3,10 @@
 namespace App\Filament\Admin\Resources\TestProductScenarios\Pages;
 
 use App\Actions\Testing\GenerateTestProduct;
+use App\Actions\Testing\NotifyGenerationOutcome;
 use App\Filament\Admin\Resources\TestProductScenarios\Schemas\TestProductScenarioForm;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\TestProductScenario;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
 use Filament\Schemas\Components\Wizard\Step;
@@ -84,22 +84,6 @@ class CreateTestProductScenario extends CreateRecord
         /** @var TestProductScenario $scenario */
         $scenario = $this->record;
 
-        $result = app(GenerateTestProduct::class)($scenario);
-
-        if ($result === null) {
-            Notification::make()
-                ->title('Failed to generate the test product')
-                ->body('The synthetic text could not be parsed. Check the scenario\'s fields and try again.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        Notification::make()
-            ->title('Test product generated')
-            ->body('It was ingested through the real pipeline and matched against the fixture test account.')
-            ->success()
-            ->send();
+        app(NotifyGenerationOutcome::class)(app(GenerateTestProduct::class)($scenario));
     }
 }

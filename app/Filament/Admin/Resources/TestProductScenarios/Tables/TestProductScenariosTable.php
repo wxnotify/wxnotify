@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\TestProductScenarios\Tables;
 
 use App\Actions\Testing\GenerateTestProduct;
+use App\Actions\Testing\NotifyGenerationOutcome;
 use App\Models\TestProductScenario;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -39,23 +40,9 @@ class TestProductScenariosTable
                         // mutateFormDataBeforeFill() reset for the wizard-based path.
                         $record->input = [...$record->input, 'issued_at' => now()->toIso8601String()];
 
-                        $result = app(GenerateTestProduct::class)($record);
-
-                        if ($result === null) {
-                            Notification::make()
-                                ->title('Failed to generate the test product')
-                                ->body('The synthetic text could not be parsed. Check the scenario\'s fields and try again.')
-                                ->danger()
-                                ->send();
-
-                            return;
-                        }
-
-                        Notification::make()
-                            ->title('Test product generated')
-                            ->success()
-                            ->send();
-                    }),
+                        app(NotifyGenerationOutcome::class)(app(GenerateTestProduct::class)($record));
+                    })
+                    ->hidden(fn (TestProductScenario $record): bool => $record->product_id === null),
                 EditAction::make()
                     ->label('Edit & resend'),
                 Action::make('duplicate')

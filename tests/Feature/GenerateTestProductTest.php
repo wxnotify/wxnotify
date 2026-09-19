@@ -121,3 +121,47 @@ test('draws warning-family event numbers from the reserved 9000-9999 range, neve
     expect((int) $result->vtec_event_number)->toBeGreaterThanOrEqual(9000)
         ->and((int) $result->vtec_event_number)->toBeLessThanOrEqual(9999);
 });
+
+test('returns null without ingesting anything for a has_vtec product whose code is not a dotted VTEC pair', function () {
+    $product = Product::factory()->create(['code' => 'FAW', 'family' => 'warning', 'has_vtec' => true]);
+    $scenario = TestProductScenario::factory()->for($product)->create([
+        'input' => ['wfo' => 'PAH', 'ugc_codes' => [], 'expires_minutes' => 30],
+    ]);
+
+    expect(app(GenerateTestProduct::class)($scenario))->toBeNull()
+        ->and(IngestedProduct::count())->toBe(0);
+});
+
+test('returns null instead of throwing when the scenario product was deleted', function () {
+    $scenario = TestProductScenario::factory()->create([
+        'input' => ['wfo' => 'PAH', 'ugc_codes' => []],
+    ]);
+    $scenario->product->delete();
+
+    expect(app(GenerateTestProduct::class)($scenario->fresh()))->toBeNull()
+        ->and(IngestedProduct::count())->toBe(0);
+});
+
+test('a cancelled or expired event still counts as a taken reserved event number', function () {
+    $action = app(GenerateTestProduct::class);
+    $year = (int) now()->year;
+
+    ActiveWwa::factory()->create([
+        'vtec_office' => 'KPAH',
+        'vtec_phenomenon' => 'SV',
+        'vtec_significance' => 'W',
+        'vtec_event_number' => '9098',
+        'vtec_year' => $year,
+        'status' => 'Cancelled',
+    ]);
+
+    $method = new ReflectionMethod($action, 'reservedEventNumberIsTaken');
+    $method->setAccessible(true);
+
+    expect($method->invoke($action, [
+        'vtec_office' => 'KPAH',
+        'vtec_phenomenon' => 'SV',
+        'vtec_significance' => 'W',
+        'vtec_year' => $year,
+    ], 9098))->toBeTrue();
+});

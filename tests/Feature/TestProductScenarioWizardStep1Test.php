@@ -20,7 +20,7 @@ beforeEach(function () {
 });
 
 test('the product select only offers v1-eligible products, including draft ones', function () {
-    $draftWarning = Product::factory()->create(['family' => 'warning', 'status' => 'draft', 'has_vtec' => true]);
+    $draftWarning = Product::factory()->create(['code' => 'ZZ.W', 'family' => 'warning', 'status' => 'draft', 'has_vtec' => true]);
     $outOfScope = Product::factory()->create(['family' => 'aviation']);
     $tornadoWarning = Product::where('code', 'TO.W')->sole();
 
@@ -42,6 +42,15 @@ test('the product select only offers v1-eligible products, including draft ones'
         ->toContain($tornadoWarning->id)
         ->toContain($draftWarning->id)
         ->not->toContain($outOfScope->id);
+});
+
+test('the product select excludes has_vtec products whose code is not a dotted VTEC phenomenon.significance pair', function () {
+    $dotless = Product::factory()->create(['code' => 'FAW', 'family' => 'warning', 'has_vtec' => true]);
+    $dotted = Product::where('code', 'TO.W')->sole();
+
+    expect(TestProductScenarioForm::eligibleProductsQuery()->pluck('id'))
+        ->not->toContain($dotless->id)
+        ->toContain($dotted->id);
 });
 
 test('the "continue existing event" option only appears once an open synthetic event exists, keyed by its originating scenario', function () {
