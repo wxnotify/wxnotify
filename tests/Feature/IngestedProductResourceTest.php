@@ -1,7 +1,10 @@
 <?php
 
 use App\Filament\Admin\Resources\IngestedProducts\Pages\ListIngestedProducts;
+use App\Filament\Admin\Resources\IngestedProducts\Pages\ViewIngestedProduct;
+use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\IngestedProduct;
+use App\Models\TestProductScenario;
 use App\Models\User;
 use Filament\Facades\Filament;
 
@@ -47,4 +50,54 @@ test('there are no create, edit, or delete actions', function () {
         ->assertActionDoesNotExist('create')
         ->assertTableActionDoesNotExist('edit')
         ->assertTableActionDoesNotExist('delete');
+});
+
+test('the is_test filter isolates synthetic test runs from real archived products', function () {
+    $real = IngestedProduct::factory()->create(['is_test' => false]);
+    $test = IngestedProduct::factory()->create(['is_test' => true]);
+
+    livewire(ListIngestedProducts::class)
+        ->filterTable('is_test', true)
+        ->assertCanSeeTableRecords([$test])
+        ->assertCanNotSeeTableRecords([$real]);
+});
+
+test('a test product links to its originating scenario from the list and view pages', function () {
+    $scenario = TestProductScenario::factory()->create();
+    $product = IngestedProduct::factory()->create(['is_test' => true, 'test_product_scenario_id' => $scenario->id]);
+    $href = TestProductScenarioResource::getUrl('edit', ['record' => $scenario->id]);
+
+    livewire(ListIngestedProducts::class)->assertSeeHtml('href="'.$href.'"');
+    livewire(ViewIngestedProduct::class, ['record' => $product->id])->assertSeeHtml('href="'.$href.'"');
+});
+
+test('a real product shows no scenario link', function () {
+    $product = IngestedProduct::factory()->create(['is_test' => false]);
+    $prefix = TestProductScenarioResource::getUrl('index');
+
+    livewire(ListIngestedProducts::class)->assertDontSeeHtml('href="'.$prefix);
+    livewire(ViewIngestedProduct::class, ['record' => $product->id])->assertDontSeeHtml('href="'.$prefix);
+});
+
+test('a test product whose scenario was deleted shows no link and does not error', function () {
+    $scenario = TestProductScenario::factory()->create();
+    $product = IngestedProduct::factory()->create(['is_test' => true, 'test_product_scenario_id' => $scenario->id]);
+    $scenario->delete();
+    $prefix = TestProductScenarioResource::getUrl('index');
+
+    expect($product->fresh()->test_product_scenario_id)->toBeNull();
+
+    livewire(ListIngestedProducts::class)->assertSuccessful()->assertDontSeeHtml('href="'.$prefix);
+    livewire(ViewIngestedProduct::class, ['record' => $product->id])->assertSuccessful()->assertDontSeeHtml('href="'.$prefix);
+});
+
+test('no scenario link is rendered when the scenario resource is inaccessible', function () {
+    $scenario = TestProductScenario::factory()->create();
+    $product = IngestedProduct::factory()->create(['is_test' => true, 'test_product_scenario_id' => $scenario->id]);
+    $prefix = TestProductScenarioResource::getUrl('index');
+
+    app()->instance('env', 'production');
+
+    livewire(ListIngestedProducts::class)->assertDontSeeHtml('href="'.$prefix);
+    livewire(ViewIngestedProduct::class, ['record' => $product->id])->assertDontSeeHtml('href="'.$prefix);
 });

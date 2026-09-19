@@ -2,12 +2,14 @@
 
 namespace App\Filament\Admin\Resources\IngestedProducts\Tables;
 
+use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\IngestedProduct;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -36,9 +38,19 @@ class IngestedProductsTable
                 TextColumn::make('received_at')
                     ->dateTime()
                     ->sortable(),
+                TextColumn::make('scenario')
+                    ->label('Test scenario')
+                    ->state(fn (IngestedProduct $record): ?string => $record->is_test && TestProductScenarioResource::canAccess()
+                        ? $record->scenario?->name
+                        : null)
+                    ->url(fn (IngestedProduct $record): ?string => $record->is_test && $record->test_product_scenario_id !== null && TestProductScenarioResource::canAccess()
+                        ? TestProductScenarioResource::getUrl('edit', ['record' => $record->test_product_scenario_id])
+                        : null),
             ])
             ->defaultSort('received_at', 'desc')
             ->filters([
+                TernaryFilter::make('is_test')
+                    ->label('Test products'),
                 SelectFilter::make('cccc')
                     ->label('Office')
                     ->options(fn (): array => IngestedProduct::query()
