@@ -64,3 +64,43 @@ test('clicking Generate on Edit updates the stored input and creates a second In
     expect($scenario->fresh()->input['body_text'])->toBe('Updated text.')
         ->and($scenario->fresh()->ingestedProducts)->toHaveCount(2);
 });
+
+test('a failed generation on Create shows a danger notification instead of the success one', function () {
+    $product = Product::where('code', 'AFD')->sole();
+
+    $this->partialMock(GenerateTestProduct::class, function ($mock) {
+        $mock->shouldReceive('__invoke')->once()->andReturn(null);
+    });
+
+    livewire(CreateTestProductScenario::class)
+        ->fillForm([
+            'product_id' => $product->id,
+            'input.wfo' => 'PIH',
+            'input.issued_at' => now(),
+            'input.body_text' => 'Clear skies expected through the week.',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors()
+        ->assertNotified('Failed to generate the test product');
+
+    expect(IngestedProduct::count())->toBe(0);
+});
+
+test('a failed generation on Edit shows a danger notification instead of the success one', function () {
+    $product = Product::where('code', 'AFD')->sole();
+    $scenario = TestProductScenario::factory()->for($product)->create([
+        'input' => ['mode' => 'new', 'wfo' => 'PIH', 'ugc_codes' => [], 'body_text' => 'Original text.'],
+    ]);
+
+    $this->partialMock(GenerateTestProduct::class, function ($mock) {
+        $mock->shouldReceive('__invoke')->once()->andReturn(null);
+    });
+
+    livewire(EditTestProductScenario::class, ['record' => $scenario->id])
+        ->fillForm(['input.body_text' => 'Updated text.'])
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertNotified('Failed to generate the test product');
+
+    expect(IngestedProduct::count())->toBe(0);
+});

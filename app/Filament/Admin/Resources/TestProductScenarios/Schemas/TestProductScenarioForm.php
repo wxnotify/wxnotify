@@ -273,7 +273,7 @@ class TestProductScenarioForm
 
     protected static function renderPreview(Get $get): string
     {
-        $product = self::selectedProduct($get) ?? Product::find($get('product_id'));
+        $product = self::selectedProduct($get);
         if ($product === null) {
             return 'Select a product to see a preview.';
         }

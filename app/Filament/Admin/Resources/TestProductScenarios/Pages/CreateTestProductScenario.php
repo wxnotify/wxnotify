@@ -84,7 +84,17 @@ class CreateTestProductScenario extends CreateRecord
         /** @var TestProductScenario $scenario */
         $scenario = $this->record;
 
-        app(GenerateTestProduct::class)($scenario);
+        $result = app(GenerateTestProduct::class)($scenario);
+
+        if ($result === null) {
+            Notification::make()
+                ->title('Failed to generate the test product')
+                ->body('The synthetic text could not be parsed. Check the scenario\'s fields and try again.')
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         Notification::make()
             ->title('Test product generated')
