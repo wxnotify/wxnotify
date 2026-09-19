@@ -24,6 +24,9 @@ class UserForm
                 TextInput::make('email')
                     ->disabled(),
                 Toggle::make('is_staff'),
+                Toggle::make('is_test_account')
+                    ->label('Fixture test account')
+                    ->helperText('The Test Product Generator only ever matches synthetic products against alert rules belonging to whichever user has this flag set.'),
                 Select::make('tier_override')
                     ->label('Tier override')
                     ->options(collect(Tier::cases())->mapWithKeys(fn (Tier $tier) => [$tier->value => ucfirst($tier->value)]))

@@ -122,3 +122,23 @@ test('staff cannot delete their own account', function () {
 
     expect(User::find($this->staff->id))->not->toBeNull();
 });
+
+test('staff can flag a user as the fixture test account', function () {
+    $target = User::factory()->create(['is_test_account' => false]);
+
+    livewire(EditUser::class, ['record' => $target->id])
+        ->fillForm(['is_test_account' => true])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($target->fresh()->is_test_account)->toBeTrue();
+});
+
+test('the users table shows which account is the fixture test account', function () {
+    $fixture = User::factory()->create(['is_test_account' => true]);
+
+    livewire(ListUsers::class)
+        ->assertTableColumnExists('is_test_account')
+        ->assertTableColumnStateSet('is_test_account', true, $fixture)
+        ->assertTableColumnStateSet('is_test_account', false, $this->staff);
+});
