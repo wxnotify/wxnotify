@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Pipeline\GenerateViewSlug;
 use Database\Factories\IngestedProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -35,6 +36,15 @@ class IngestedProduct extends Model
             'vtec_end' => 'datetime',
             'is_test' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::created(function (IngestedProduct $product): void {
+            if ($product->view_slug === null) {
+                $product->forceFill(['view_slug' => app(GenerateViewSlug::class)($product)])->saveQuietly();
+            }
+        });
     }
 
     public function product(): BelongsTo
