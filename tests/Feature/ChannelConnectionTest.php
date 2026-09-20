@@ -5,6 +5,7 @@ use App\Filament\Dashboard\Pages\ConnectChannel;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\Delivery\WebhookUrlGuard;
+use Filament\Forms\Components\TextInput;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Http;
 
@@ -15,6 +16,7 @@ use function Pest\Livewire\livewire;
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
+    chanFakePauser();
 });
 
 test('completing the wizard creates a pending channel and dispatches a code', function () {
@@ -134,13 +136,60 @@ test('completing the wizard for teams stores the workflows url', function () {
         ->toBe('workflows://prod-12.westus.logic.azure.com/0123456789abcdef0123456789abcdef/SIGNATUREabc-_123');
 });
 
-test('the webhook wizard creates a channel with a secret, shows it on the confirm step, and sends the code to the endpoint', function () {
+test('the webhook wizard step 2 opens with every option at its default and a fresh revealable secret', function () {
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
+
+    $component->assertFormSet([
+        'method' => 'POST',
+        'sign' => true,
+        'verify_ssl' => true,
+        'use_timestamp' => true,
+        'tries' => 3,
+        'timeout' => 5,
+        'headers' => [],
+        'use_proxy' => false,
+    ]);
+
+    expect($component->get('data.secret'))->toMatch('/^[0-9a-f]{64}$/');
+
+    $component->assertFormFieldExists('secret', fn (TextInput $field): bool => $field->isPassword() && $field->isPasswordRevealable());
+});
+
+test('the wizard explains the webhook payload, and only for the webhook type', function () {
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
+    $component->assertSchemaComponentVisible('payload_description');
+
+    $component->fillForm(['channel_type' => 'ntfy']);
+    $component->assertSchemaComponentDoesNotExist('payload_description');
+});
+
+test('the signing secret is hidden when signing is off and the proxy url is hidden until the proxy is on', function () {
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
+
+    $component->assertFormFieldVisible('secret')->assertFormFieldHidden('proxy_url');
+
+    $component->fillForm(['sign' => false, 'use_proxy' => true]);
+
+    $component->assertFormFieldHidden('secret')->assertFormFieldVisible('proxy_url');
+});
+
+test('the webhook wizard stores the chosen options and sends the code to the endpoint', function () {
     app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
     $history = chanFakeWebhookEndpoint([new Response(200)]);
 
     $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
     goToConnectChannelStep($component, 0);
-    $component->assertWizardCurrentStep(2)->fillForm(['url' => 'https://hooks.example.com/wx']);
+    $component->assertWizardCurrentStep(2)->fillForm([
+        'url' => 'https://hooks.example.com/wx',
+        'method' => 'PUT',
+        'use_timestamp' => false,
+        'tries' => 2,
+        'timeout' => 9,
+        'headers' => ['X-Api-Key' => 'abc123'],
+    ]);
+    $secret = $component->get('data.secret');
     goToConnectChannelStep($component, 1);
     $component->assertWizardCurrentStep(3);
 
@@ -148,13 +197,63 @@ test('the webhook wizard creates a channel with a secret, shows it on the confir
     $payload = json_decode((string) $history[0]['request']->getBody(), true);
 
     expect($channel->channel_type)->toBe('webhook')->and($channel->apprise_url)->toBeNull()
-        ->and($payload['type'])->toBe('confirmation')->and($payload['code'])->toBe($channel->confirmation_code);
-    $component->assertFormSet(['webhook_secret' => $channel->config['secret']]);
+        ->and($channel->config)->toMatchArray([
+            'url' => 'https://hooks.example.com/wx',
+            'method' => 'PUT',
+            'sign' => true,
+            'secret' => $secret,
+            'verify_ssl' => true,
+            'use_timestamp' => false,
+            'tries' => 2,
+            'timeout' => 9,
+            'headers' => ['X-Api-Key' => 'abc123'],
+            'use_proxy' => false,
+            'proxy_url' => null,
+        ])
+        ->and($payload['type'])->toBe('confirmation')->and($payload['code'])->toBe($channel->confirmation_code)
+        ->and($history[0]['request']->getMethod())->toBe('PUT')
+        ->and($history[0]['request']->getHeaderLine('X-Api-Key'))->toBe('abc123');
+
+    // The secret is now shown in step 2, so the confirm step no longer carries one.
+    expect($component->get('data.webhook_secret'))->toBeNull();
+});
+
+test('the wizard refuses a private proxy url as a form error', function () {
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+    chanFakeWebhookEndpoint([new Response(200)]);
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm([
+        'url' => 'https://hooks.example.com/wx',
+        'use_proxy' => true,
+        'proxy_url' => 'http://127.0.0.1:3128',
+    ]);
+    goToConnectChannelStep($component, 1);
+
+    $component->assertHasFormErrors(['proxy_url']);
+    expect(NotificationChannel::count())->toBe(0);
+});
+
+test('the wizard refuses a reserved extra header as a form error', function () {
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+    chanFakeWebhookEndpoint([new Response(200)]);
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm([
+        'url' => 'https://hooks.example.com/wx',
+        'headers' => ['Content-Type' => 'text/x-secret-value'],
+    ]);
+    goToConnectChannelStep($component, 1);
+
+    $component->assertHasFormErrors(['headers']);
+    expect(NotificationChannel::count())->toBe(0);
 });
 
 test('a webhook whose endpoint rejects the confirmation message is not left behind', function () {
     app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
-    chanFakeWebhookEndpoint([new Response(500)]);
+    chanFakeWebhookEndpoint(array_fill(0, 3, new Response(500)));
 
     $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
     goToConnectChannelStep($component, 0);
@@ -175,7 +274,7 @@ test('creating a non-webhook channel after a webhook one clears the signing secr
     $component->fillForm(['url' => 'https://hooks.example.com/wx']);
     goToConnectChannelStep($component, 1);
 
-    expect($component->get('data.webhook_secret'))->not->toBeNull();
+    expect($component->get('data.secret'))->not->toBeNull();
 
     // Back to step 1 in the same wizard instance, then pick a non-webhook type.
     $component->fillForm(['channel_type' => 'ntfy']);
@@ -183,7 +282,8 @@ test('creating a non-webhook channel after a webhook one clears the signing secr
     $component->fillForm(['topic' => 'wxnotify-test-topic']);
     goToConnectChannelStep($component, 1);
 
-    expect($component->get('data.webhook_secret'))->toBeNull();
+    expect($component->get('data.secret'))->toBeNull()
+        ->and($component->get('data.url'))->toBeNull();
 });
 
 test('the web push wizard creates a channel from a browser subscription and pushes the confirmation code', function () {

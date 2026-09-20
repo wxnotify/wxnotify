@@ -6,6 +6,7 @@ use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Actions\Channels\VerifyChannelConfirmationCode;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\WebhookChannelType;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -85,12 +86,10 @@ class NotificationChannelsTable
                             ->send();
                     }),
                 EditAction::make()
-                    // The form's 'config.secret' field is dehydrated(false), which
-                    // forgets only that leaf and leaves an empty 'config' array
-                    // behind — mass-assigning it would wipe the webhook's URL and
-                    // signing secret. Nothing on this form is allowed to write
-                    // config, so drop the key outright.
-                    ->mutateDataUsing(fn (array $data): array => Arr::except($data, ['config'])),
+                    ->mutateRecordDataUsing(fn (array $data, NotificationChannel $record): array => $record->channel_type === 'webhook'
+                        ? [...$data, ...WebhookChannelType::formFromConfig($record->config)]
+                        : $data)
+                    ->using(self::saveChannel(...)),
                 DeleteAction::make(),
             ])
             ->toolbarActions([
@@ -98,5 +97,59 @@ class NotificationChannelsTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * Persist an edited channel.
+     *
+     * For a webhook channel the flat option fields are folded back into the
+     * existing encrypted `config` through the channel type, so a key the form
+     * didn't show (the secret while signing is off) survives and `config` is
+     * never replaced wholesale. Both subscriber-controlled URLs were already
+     * re-checked by the fields' own guard rules, which surface as ordinary form
+     * errors before this runs.
+     *
+     * For every other channel type `config` is still dropped outright: nothing
+     * on their form is allowed to write it.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function saveChannel(NotificationChannel $record, array $data): NotificationChannel
+    {
+        if ($record->channel_type !== 'webhook') {
+            $record->update(Arr::except($data, ['config']));
+
+            return $record;
+        }
+
+        $previousUrl = $record->config['url'] ?? null;
+        $config = WebhookChannelType::configFromForm($data, $record->config ?? []);
+        $urlChanged = ($config['url'] ?? null) !== $previousUrl;
+
+        $record->forceFill([
+            'label' => $data['label'],
+            'config' => $config,
+            // A new endpoint has proved nothing: the subscriber confirms it again.
+            ...$urlChanged ? ['verified_at' => null] : [],
+        ])->save();
+
+        if ($urlChanged) {
+            // Deliberately not deleting or rolling back when this fails: unlike the
+            // connect wizard there is an existing channel here, and the subscriber
+            // can resend the code from this same table.
+            $dispatched = app(DispatchChannelConfirmationCode::class)($record);
+
+            Notification::make()
+                ->title($dispatched
+                    ? 'Confirmation code sent to the new endpoint'
+                    : 'Couldn\'t send a confirmation code to the new endpoint')
+                ->body($dispatched
+                    ? 'Enter it with the Verify action to start delivering again.'
+                    : 'The channel is saved but unverified. Use "Resend code" once the endpoint is reachable.')
+                ->status($dispatched ? 'success' : 'warning')
+                ->send();
+        }
+
+        return $record;
     }
 }

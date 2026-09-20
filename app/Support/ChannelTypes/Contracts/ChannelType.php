@@ -3,7 +3,7 @@
 namespace App\Support\ChannelTypes\Contracts;
 
 use App\Enums\ChannelTransport;
-use Filament\Forms\Components\Field;
+use Filament\Schemas\Components\Component;
 
 interface ChannelType
 {
@@ -18,7 +18,10 @@ interface ChannelType
     public function icon(): string;
 
     /**
-     * @return array<Field>
+     * The guided form's setup step. Mostly Fields, but a type may include
+     * presentational components (a Callout explaining its payload, say).
+     *
+     * @return array<Component>
      */
     public function formSchema(): array;
 

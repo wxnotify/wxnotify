@@ -19,6 +19,17 @@ class WebhookUrlGuard
      */
     private const BLOCKED_IPV6_PREFIXES = [['64:ff9b::', 96], ['2002::', 16], ['fec0::', 10], ['2001::', 32], ['::ffff:0:0:0', 96]];
 
+    /**
+     * A proxy is reached over http as often as https, and low ports below 1024
+     * are otherwise refused outright — but 80 and 443 are ordinary web ports a
+     * proxy legitimately listens on, unlike the service ports (22, 25, 6379, …)
+     * the low-port rule exists to keep out. Anything at or above 1024 (3128,
+     * 8080, 8443, …) is allowed as usual.
+     *
+     * @var list<int>
+     */
+    private const ALLOWED_LOW_PROXY_PORTS = [80, 443];
+
     public function __construct(private readonly ?Closure $resolver = null) {}
 
     /** A human-readable reason the URL must not be called, or null when it is safe. */
@@ -41,29 +52,81 @@ class WebhookUrlGuard
             return 'That port is not allowed; use 443 or a port above 1023.';
         }
 
+        return match ($this->hostRisk($parts['host'])) {
+            'name' => 'That host name points at a private network address.',
+            'unresolved' => 'That host name could not be resolved.',
+            'private' => 'That address resolves to a private or reserved network, which is not allowed.',
+            default => null,
+        };
+    }
+
+    /**
+     * A human-readable reason the outbound proxy must not be used, or null when
+     * it is safe.
+     *
+     * The same IP classification as violation(), with three deliberate
+     * differences: http is allowed as well as https (proxies commonly speak
+     * plain http on the hop the server controls), credentials in the URL are
+     * allowed (that is how a proxy is authenticated), and ports 80/443 are
+     * allowed alongside everything at or above 1024.
+     *
+     * Nothing this returns ever repeats the proxy URL back: it is a stored
+     * secret, and these messages end up in form errors and delivery logs.
+     */
+    public function proxyViolation(string $url): ?string
+    {
+        $parts = parse_url($url);
+
+        if ($parts === false || ! isset($parts['scheme'], $parts['host']) || $parts['host'] === '') {
+            return 'Enter a full http:// or https:// proxy URL.';
+        }
+        if (! in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
+            return 'The proxy URL must start with http:// or https://.';
+        }
+
+        $port = $parts['port'] ?? null;
+        if ($port !== null && ($port < 1 || $port > 65535 || ($port < 1024 && ! in_array($port, self::ALLOWED_LOW_PROXY_PORTS, true)))) {
+            return 'That proxy port is not allowed; use 80, 443, or a port above 1023.';
+        }
+
+        return match ($this->hostRisk($parts['host'])) {
+            'name' => 'That proxy host name points at a private network address.',
+            'unresolved' => 'The proxy host name could not be resolved.',
+            'private' => 'The proxy address resolves to a private or reserved network, which is not allowed.',
+            default => null,
+        };
+    }
+
+    /**
+     * Why the host must not be reached — 'name', 'unresolved' or 'private' —
+     * or null when it is safe. Callers turn the reason into their own wording;
+     * the classification itself is shared so the IP-range rules exist once.
+     */
+    private function hostRisk(string $host): ?string
+    {
         if ($this->privateNetworksAllowed()) {
             return null;
         }
 
-        $host = strtolower(trim($parts['host'], '[]'));
+        $host = strtolower(trim($host, '[]'));
 
         if (in_array($host, self::BLOCKED_HOSTS, true)) {
-            return 'That host name points at a private network address.';
+            return 'name';
         }
         foreach (self::BLOCKED_HOST_SUFFIXES as $suffix) {
             if (str_ends_with($host, $suffix)) {
-                return 'That host name points at a private network address.';
+                return 'name';
             }
         }
 
         $ips = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : $this->resolve($host);
 
         if ($ips === []) {
-            return 'That host name could not be resolved.';
+            return 'unresolved';
         }
         foreach ($ips as $ip) {
             if (! $this->isPublicIp($ip)) {
-                return 'That address resolves to a private or reserved network, which is not allowed.';
+                return 'private';
             }
         }
 

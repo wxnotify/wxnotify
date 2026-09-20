@@ -8,6 +8,7 @@ use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\NoRedirectCallWebhookJob;
 use App\Support\Delivery\WebhookUrlGuard;
 use Database\Seeders\ChannelTypeSeeder;
+use Filament\Forms\Components\Field;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
@@ -20,6 +21,7 @@ use Spatie\Activitylog\Models\Activity;
 beforeEach(function () {
     // Every hostname resolves to a public address unless a test says otherwise.
     app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+    chanFakePauser();
 });
 
 test('the webhook type is a free-slot, non-inline, webhook-transport type', function () {
@@ -49,7 +51,8 @@ test('building the destination generates a 64-character secret and keeps the url
 
 test('the url field rejects http and private targets', function () {
     app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['10.0.0.5']));
-    $field = collect((new WebhookChannelType)->formSchema())->firstWhere(fn ($f) => $f->getName() === 'url');
+    $field = collect((new WebhookChannelType)->formSchema())
+        ->firstWhere(fn ($f) => $f instanceof Field && $f->getName() === 'url');
 
     foreach (['http://hooks.example.com/wx', 'https://hooks.example.com/wx', 'https://10.0.0.5/wx'] as $url) {
         expect(Validator::make(['url' => $url], ['url' => $field->getValidationRules()])->fails())->toBeTrue();
@@ -110,14 +113,19 @@ test('a confirmation message carries the code in the payload', function () {
         ->and($payload)->not->toHaveKey('alert');
 });
 
-test('a non-2xx response is a failure with a useful message and only one attempt is made', function () {
-    $history = chanFakeWebhookEndpoint([new Response(500), new Response(200)]);
+// Spatie is deliberately given maximumTries(1) on every call — with dispatchSync()
+// a failing multi-try call releases itself back onto the queue and looks successful
+// to the caller. Retrying is this app's own loop instead (WebhookChannelOptionsTest
+// covers the retry semantics); here we only pin that the default of 3 tries is what
+// gets spent, and that the final failure is reported with its HTTP status.
+test('a non-2xx response is a failure with a useful message after the default three attempts', function () {
+    $history = chanFakeWebhookEndpoint([new Response(500), new Response(500), new Response(500), new Response(200)]);
     $channel = NotificationChannel::factory()->webhook()->create();
 
     $result = app(ChannelDispatcher::class)->send($channel, 'body', 'title');
 
     expect($result->success)->toBeFalse()->and($result->error)->toContain('500')
-        ->and(count($history))->toBe(1);
+        ->and(count($history))->toBe(3);
 });
 
 test('a redirect is never followed, so a public endpoint cannot bounce the request at a private address', function () {
@@ -146,7 +154,8 @@ test('the webhook job is pinned to the no-redirect subclass', function () {
 });
 
 test('a connection error is a failure, not an exception', function () {
-    chanFakeWebhookEndpoint([new ConnectException('boom', new Request('POST', 'https://hooks.example.com/wx'))]);
+    $request = new Request('POST', 'https://hooks.example.com/wx');
+    chanFakeWebhookEndpoint(array_fill(0, 3, new ConnectException('boom', $request)));
     $channel = NotificationChannel::factory()->webhook()->create();
 
     expect(app(ChannelDispatcher::class)->send($channel, 'body')->success)->toBeFalse();
@@ -170,7 +179,7 @@ test('a webhook channel with a missing config is a failure', function () {
 });
 
 test('neither the signing secret nor the endpoint path or query reaches the activity log or the error message', function () {
-    chanFakeWebhookEndpoint([new Response(500, [], 'echoing s3cret')]);
+    chanFakeWebhookEndpoint(array_fill(0, 3, new Response(500, [], 'echoing s3cret')));
     $url = 'https://hooks.example.com/wx?token=abc123';
     // The real auto-generated label, not the factory's fake()->word(): the label
     // is activity-logged, so anything the label embeds is in the log by design.

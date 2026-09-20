@@ -8,6 +8,7 @@ use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use BackedEnum;
+use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -77,7 +78,8 @@ class ConnectChannel extends Page implements HasForms
                                 ->hiddenIndicator()
                                 ->columns(3)
                                 ->required()
-                                ->live(),
+                                ->live()
+                                ->afterStateUpdated(fn (?string $state, Set $set) => $this->resetSetupStep($state, $set)),
                         ]),
                     Step::make('Set it up')
                         ->schema(fn (Get $get) => $get('channel_type')
@@ -121,28 +123,17 @@ class ConnectChannel extends Page implements HasForms
                             }
 
                             $set('channel_id', $channel->id);
-
-                            // Unconditional: stepping back and connecting a different
-                            // type in the same wizard must not leave the previous
-                            // channel's secret on the Confirm step.
-                            $set('webhook_secret', $destination['config']['secret'] ?? null);
                         }),
                     Step::make('Confirm')
                         ->schema([
                             Hidden::make('channel_id'),
-                            TextInput::make('webhook_secret')
-                                ->label('Signing secret')
-                                ->password()
-                                ->revealable()
-                                ->readOnly()
-                                ->dehydrated(false)
-                                ->helperText('Verify each request by computing HMAC-SHA256 of the raw request body with this secret and comparing it to the "Signature" header. Copy it now; you can reveal it again from the channel\'s edit form.')
-                                ->visible(fn (Get $get): bool => filled($get('webhook_secret'))),
                             TextInput::make('confirmation_code')
                                 ->label('Confirmation code')
                                 ->required()
-                                ->helperText(fn (Get $get): string => filled($get('webhook_secret'))
-                                    ? 'We just POSTed a confirmation message to your endpoint; enter the 6-digit code from its "code" field.'
+                                // The signing secret is shown on step 2 now, so the
+                                // only thing left to say here is where the code went.
+                                ->helperText(fn (Get $get): string => $get('channel_type') === 'webhook'
+                                    ? 'We just sent a confirmation message to your endpoint; enter the 6-digit code from its "code" field.'
                                     : 'We just sent a 6-digit code to the channel you configured.'),
                         ]),
                 ])
@@ -152,6 +143,39 @@ class ConnectChannel extends Page implements HasForms
                         </x-filament::button>
                     BLADE))),
             ]);
+    }
+
+    /**
+     * Point step 2 at the newly-chosen channel type.
+     *
+     * Step 2's schema is built from the picked type, so its fields only come
+     * into existence after this request — and Schema::fill() (the only thing
+     * that applies a field's ->default()) ran back at mount(), when the step
+     * was still empty. Wizard::nextStep() fills the arriving step's paths with
+     * NULL, not with defaults. So the defaults are seeded here instead,
+     * otherwise every option would open blank and save as null.
+     *
+     * Every other type's setup fields are cleared first: stepping back and
+     * connecting a different type in the same wizard must not leave the
+     * previous type's URL or signing secret sitting in the form state.
+     */
+    private function resetSetupStep(?string $slug, Set $set): void
+    {
+        $registry = app(ChannelTypeRegistry::class);
+
+        foreach ($registry->all() as $type) {
+            foreach ($type->formSchema() as $component) {
+                if ($component instanceof Field) {
+                    $set($component->getName(), null);
+                }
+            }
+        }
+
+        foreach ($registry->find((string) $slug)?->formSchema() ?? [] as $component) {
+            if ($component instanceof Field) {
+                $set($component->getName(), $component->getDefaultState());
+            }
+        }
     }
 
     /**

@@ -31,6 +31,21 @@ class ChannelTypeRegistry
     }
 
     /**
+     * Every registered type, regardless of whether the catalog currently
+     * offers it — used where the caller has to reason about all of them at
+     * once, such as clearing one type's setup fields before another's.
+     *
+     * @return Collection<int, ChannelType>
+     */
+    public function all(): Collection
+    {
+        return collect(array_keys(static::$classes))
+            ->map(fn (string $slug): ?ChannelType => $this->find($slug))
+            ->filter()
+            ->values();
+    }
+
+    /**
      * All channel types the picker should render, in configured sort order —
      * enabled ones with their PHP class present, joined with DB-editable
      * enabled/min_tier/sort_order metadata.

@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\NotificationChannel;
+use App\Support\Delivery\Pauser;
 use Filament\Schemas\Components\Wizard;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
@@ -99,6 +101,42 @@ function chanFakeWebhookEndpoint(array $responses): ArrayObject
     app()->bind(Client::class, fn () => new Client(['handler' => $stack]));
 
     return $history;
+}
+
+/**
+ * Replace the delivery Pauser with a recording no-op, so the webhook
+ * transport's between-attempt waits never actually sleep in a test.
+ *
+ * @return ArrayObject<int, int> The seconds asked for, in order.
+ */
+function chanFakePauser(): ArrayObject
+{
+    $pauses = new ArrayObject;
+
+    app()->instance(Pauser::class, new class($pauses) extends Pauser
+    {
+        public function __construct(private ArrayObject $pauses) {}
+
+        public function pause(int $seconds): void
+        {
+            $this->pauses[] = $seconds;
+        }
+    });
+
+    return $pauses;
+}
+
+/**
+ * A verified webhook channel whose config is the legacy url+secret pair
+ * overlaid with whatever options the test cares about.
+ *
+ * @param  array<string, mixed>  $config
+ */
+function chanWebhookChannel(array $config = []): NotificationChannel
+{
+    return NotificationChannel::factory()->webhook()->create([
+        'config' => [...['url' => 'https://hooks.example.com/wx', 'secret' => 's3cret'], ...$config],
+    ]);
 }
 
 const CHAN_VAPID_PUBLIC = 'BFbRVvYSUiZyN3mXneDDJEjejmTXvjDA8TMDLCD_aUW3GKOA-ohT-uHQDGm3pQqeK4YrmmZlfjwE7XyqTVSzAAM';
