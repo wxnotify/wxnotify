@@ -2,12 +2,15 @@
 
 namespace App\Support\ChannelTypes;
 
+use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Closure;
 use Filament\Forms\Components\TextInput;
 
 class TeamsChannelType implements ChannelType
 {
+    use UsesAppriseTransport;
+
     public function slug(): string
     {
         return 'msteams';

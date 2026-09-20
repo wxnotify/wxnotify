@@ -3,7 +3,7 @@
 namespace App\Actions\Channels;
 
 use App\Models\NotificationChannel;
-use App\Support\Apprise\AppriseApiClient;
+use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Http\Client\ConnectionException;
 
 class DispatchChannelConfirmationCode
@@ -28,11 +28,12 @@ class DispatchChannelConfirmationCode
         ])->save();
 
         try {
-            return app(AppriseApiClient::class)->notify(
-                url: $channel->apprise_url,
-                body: "Your WxNotify confirmation code is: {$code}\n\nEnter this code in the dashboard to finish connecting this channel. It expires in 15 minutes.",
-                title: 'Confirm your WxNotify channel',
-            );
+            return app(ChannelDispatcher::class)->send(
+                $channel,
+                "Your WxNotify confirmation code is: {$code}\n\nEnter this code in the dashboard to finish connecting this channel. It expires in 15 minutes.",
+                'Confirm your WxNotify channel',
+                ['type' => 'confirmation', 'code' => $code],
+            )->success;
         } catch (ConnectionException $e) {
             logger()->error('Could not reach the Apprise API to dispatch a channel confirmation code', [
                 'notification_channel_id' => $channel->id,

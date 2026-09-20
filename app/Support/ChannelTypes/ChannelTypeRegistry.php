@@ -45,7 +45,7 @@ class ChannelTypeRegistry
                 'model' => $model,
                 'type' => $this->find($model->slug),
             ])
-            ->filter(fn (array $row) => $row['type'] !== null)
+            ->filter(fn (array $row) => $row['type'] !== null && $row['type']->isAvailable())
             ->values();
     }
 }

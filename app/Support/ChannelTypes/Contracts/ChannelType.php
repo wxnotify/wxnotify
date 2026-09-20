@@ -2,6 +2,7 @@
 
 namespace App\Support\ChannelTypes\Contracts;
 
+use App\Enums\ChannelTransport;
 use Filament\Forms\Components\Field;
 
 interface ChannelType
@@ -22,11 +23,28 @@ interface ChannelType
     public function formSchema(): array;
 
     /**
-     * Build the Apprise URL for this channel from the guided form's data.
+     * The delivery transport this channel type sends through.
+     */
+    public function transport(): ChannelTransport;
+
+    /**
+     * Build the stored destination from the guided form's data.
      *
      * @param  array<string, mixed>  $data
+     * @return array{apprise_url?: string, config?: array<string, mixed>, label?: string}
      */
-    public function buildAppriseUrl(array $data): string;
+    public function buildDestination(array $data): array;
+
+    /**
+     * Whether the inline "add a channel" action in the alert wizard can
+     * create this type.
+     */
+    public function supportsInlineCreate(): bool;
+
+    /**
+     * Whether this type is currently offered in the picker.
+     */
+    public function isAvailable(): bool;
 
     /**
      * Whether this channel counts against Free's single no-cost-channel

@@ -9,7 +9,7 @@ use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
-use App\Support\Apprise\AppriseApiClient;
+use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -20,7 +20,7 @@ test('it delivers via apprise and writes a success DeliveryLog row', function ()
     $channel = NotificationChannel::factory()->for($rule->user)->create(['apprise_url' => 'discord://token/id']);
     $product = IngestedProduct::factory()->create(['text' => 'Tornado Warning issued for...']);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['urls'] === 'discord://token/id');
 
@@ -39,7 +39,7 @@ test('a non-delivery from apprise writes a failure DeliveryLog row instead of th
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $product = IngestedProduct::factory()->create();
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     $log = DeliveryLog::sole();
     expect($log->status)->toBe('failure')
@@ -52,7 +52,7 @@ test('a missing rule sends nothing and logs a warning, since no channel_type is 
     $channel = NotificationChannel::factory()->create();
     $product = IngestedProduct::factory()->create();
 
-    (new DeliverWeatherAlert(999999, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert(999999, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertNothingSent();
     expect(DeliveryLog::count())->toBe(0);
@@ -67,7 +67,7 @@ test('a missing channel sends nothing and logs a warning, since no channel_type 
     $rule = AlertRule::factory()->create();
     $product = IngestedProduct::factory()->create();
 
-    (new DeliverWeatherAlert($rule->id, 999999, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, 999999, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertNothingSent();
     expect(DeliveryLog::count())->toBe(0);
@@ -81,7 +81,7 @@ test('a missing product sends nothing but writes a skipped DeliveryLog row', fun
     $rule = AlertRule::factory()->create();
     $channel = NotificationChannel::factory()->for($rule->user)->create();
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, 999999))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, 999999))->handle(app(ChannelDispatcher::class));
 
     Http::assertNothingSent();
     $log = DeliveryLog::sole();
@@ -98,7 +98,7 @@ test('a deactivated rule sends nothing but writes a skipped DeliveryLog row', fu
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $product = IngestedProduct::factory()->create();
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertNothingSent();
     $log = DeliveryLog::sole();
@@ -121,7 +121,7 @@ test('a custom subject template is used as the Apprise title instead of displayN
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $ingested = IngestedProduct::factory()->create(['product_id' => $product->id]);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $ingested->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $ingested->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['title'] === 'Alert: Tornado Warning');
 });
@@ -138,7 +138,7 @@ test('message_body_style Brief truncates the body to 280 characters', function (
     $longText = str_repeat('Tornado Warning issued for the area. ', 30);
     $product = IngestedProduct::factory()->create(['text' => $longText]);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => strlen($request['body']) <= 280);
 });
@@ -155,7 +155,7 @@ test('message_body_style Full (or null) preserves today\'s 1500-character behavi
     $longText = str_repeat('Tornado Warning issued for the area. ', 60);
     $product = IngestedProduct::factory()->create(['text' => $longText]);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => strlen($request['body']) > 280 && strlen($request['body']) <= 1500);
 });
@@ -173,7 +173,7 @@ test('a Free-tier owner\'s custom subject and Brief style are ignored at deliver
     $longText = str_repeat('Tornado Warning issued for the area. ', 60);
     $product = IngestedProduct::factory()->create(['text' => $longText]);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['title'] === $rule->displayName() && strlen($request['body']) > 280);
 });
@@ -190,7 +190,7 @@ test('the default title (no custom template) still reaches Apprise as displayNam
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $ingested = IngestedProduct::factory()->create(['product_id' => $product->id]);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $ingested->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $ingested->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['title'] === $rule->displayName());
 });
@@ -208,7 +208,7 @@ test('a CAP-sourced product with no paired text uses its description as the mess
         'description' => 'Flash flooding is ongoing across the warned area. Seek higher ground immediately.',
     ]);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['body'] === 'Flash flooding is ongoing across the warned area. Seek higher ground immediately.');
 });
@@ -226,7 +226,7 @@ test('a CAP-sourced product with no description falls back to its raw text rathe
         'description' => null,
     ]);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['body'] === 'Raw CAP XML content used as the last-resort fallback.');
 });
@@ -247,7 +247,7 @@ test('a rule with an attached weather_alerts template sends the composed labeled
         'hazard_source' => 'Radar indicated.',
     ]);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['body'] === "Hazard: Flash flooding caused by thunderstorms.\nSource: Radar indicated.");
 });
@@ -264,7 +264,7 @@ test('a rule with a template that composes to null (e.g. spc_wpc) falls back to 
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $product = IngestedProduct::factory()->create(['text' => 'Convective outlook raw text.']);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['body'] === 'Convective outlook raw text.');
 });
@@ -285,7 +285,7 @@ test('a composed template body still respects a fixed 1500-character safety-net 
         'locations_impacted' => $longSentence, 'call_to_action' => $longSentence,
     ]);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => strlen($request['body']) <= 1500);
 });
@@ -299,7 +299,7 @@ test('a text-sourced product still uses its raw text as the message body, unaffe
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $product = IngestedProduct::factory()->create(['format' => 'text', 'text' => 'Tornado Warning issued for the area.']);
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(AppriseApiClient::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['body'] === 'Tornado Warning issued for the area.');
 });

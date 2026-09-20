@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ChannelTransport;
 use App\Enums\Tier;
 use App\Models\NotificationChannel;
 use App\Models\User;
@@ -150,5 +151,24 @@ test('pushover validates the key and token shape', function () {
 
         $validator = Validator::make([$name => 'abcdefghijklmnopqrstuvwxyz1234'], [$name => $fields[$name]->getValidationRules()]);
         expect($validator->passes())->toBeTrue();
+    }
+});
+
+test('every registered channel type implements the transport contract', function () {
+    $sharedData = ['topic' => 'x', 'to' => 'a@b.co', 'bot_token' => '1:a', 'chat_id' => '1', 'user_key' => str_repeat('a', 30), 'api_token' => str_repeat('b', 30)];
+    $perType = [
+        'discord' => ['webhook_url' => 'https://discord.com/api/webhooks/1/a'],
+        'slack' => ['webhook_url' => 'https://hooks.slack.com/services/T000/B000/XXXX'],
+        'msteams' => ['webhook_url' => 'https://prod-00.westus.logic.azure.com:443/workflows/'.str_repeat('a', 32).'/triggers/manual/paths/invoke?sig=abc_DEF-123'],
+    ];
+
+    foreach (['email', 'ntfy', 'discord', 'slack', 'telegram', 'pushover', 'msteams'] as $slug) {
+        $type = app(ChannelTypeRegistry::class)->find($slug);
+
+        expect($type->transport())->toBe(ChannelTransport::Apprise)
+            ->and($type->supportsInlineCreate())->toBeTrue()
+            ->and($type->isAvailable())->toBeTrue()
+            ->and($type->buildDestination([...$sharedData, ...($perType[$slug] ?? [])]))->toHaveKey('apprise_url')
+            ->not->toHaveKey('config');
     }
 });

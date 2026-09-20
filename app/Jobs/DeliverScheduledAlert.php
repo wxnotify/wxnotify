@@ -7,7 +7,7 @@ use App\Enums\MessageBodyStyle;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
-use App\Support\Apprise\AppriseApiClient;
+use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -34,7 +34,7 @@ class DeliverScheduledAlert implements ShouldQueue
         public readonly string $body,
     ) {}
 
-    public function handle(AppriseApiClient $client): void
+    public function handle(ChannelDispatcher $dispatcher): void
     {
         $rule = AlertRule::find($this->ruleId);
 
@@ -77,19 +77,18 @@ class DeliverScheduledAlert implements ShouldQueue
             ? Str::limit($this->body, 280, preserveWords: true)
             : $this->body;
 
-        $delivered = $client->notify(
-            url: $channel->apprise_url,
-            body: $body,
-            title: $title,
-        );
+        $result = $dispatcher->send($channel, $body, $title, [
+            'type' => 'alert',
+            'rule' => $rule->name,
+        ]);
 
         DeliveryLog::create([
             'alert_rule_id' => $rule->id,
             'notification_channel_id' => $channel->id,
             'user_id' => $rule->user_id,
             'channel_type' => $channel->channel_type,
-            'status' => $delivered ? 'success' : 'failure',
-            'error_detail' => $delivered ? null : 'Apprise reported non-delivery.',
+            'status' => $result->success ? 'success' : 'failure',
+            'error_detail' => $result->error,
             'dispatched_at' => now(),
         ]);
     }

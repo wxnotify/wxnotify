@@ -19,6 +19,7 @@ use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
 use ToneGabes\BetterOptions\Forms\Components\RadioCards;
@@ -83,13 +84,13 @@ class ConnectChannel extends Page implements HasForms
                             : [])
                         ->afterValidation(function (Get $get, Set $set) {
                             $type = app(ChannelTypeRegistry::class)->find($get('channel_type'));
-                            $appriseUrl = $type->buildAppriseUrl($get());
+                            $destination = $type->buildDestination($get());
 
                             $channel = NotificationChannel::create([
                                 'user_id' => auth()->id(),
                                 'channel_type' => $type->slug(),
-                                'label' => $type->label(),
-                                'apprise_url' => $appriseUrl,
+                                'label' => $destination['label'] ?? $type->label(),
+                                ...Arr::only($destination, ['apprise_url', 'config']),
                             ]);
 
                             $dispatched = app(DispatchChannelConfirmationCode::class)($channel);

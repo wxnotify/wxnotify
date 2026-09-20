@@ -6,7 +6,7 @@ use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
 use App\Models\User;
-use App\Support\Apprise\AppriseApiClient;
+use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -17,7 +17,7 @@ test('it delivers via apprise and writes a success DeliveryLog row', function ()
     $channel = NotificationChannel::factory()->for($rule->user)->create(['apprise_url' => 'discord://token/id']);
 
     (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'Today: Sunny, high 88.'))
-        ->handle(app(AppriseApiClient::class));
+        ->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['urls'] === 'discord://token/id' && $request['body'] === 'Today: Sunny, high 88.');
 
@@ -35,7 +35,7 @@ test('a non-delivery from apprise writes a failure DeliveryLog row instead of th
     $rule = AlertRule::factory()->dailySummary()->create();
     $channel = NotificationChannel::factory()->for($rule->user)->create();
 
-    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'body'))->handle(app(AppriseApiClient::class));
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'body'))->handle(app(ChannelDispatcher::class));
 
     $log = DeliveryLog::sole();
     expect($log->status)->toBe('failure')
@@ -48,7 +48,7 @@ test('a deactivated rule is skipped and logged rather than delivered', function 
     $rule = AlertRule::factory()->dailySummary()->create(['is_active' => false]);
     $channel = NotificationChannel::factory()->for($rule->user)->create();
 
-    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'body'))->handle(app(AppriseApiClient::class));
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'body'))->handle(app(ChannelDispatcher::class));
 
     Http::assertNothingSent();
     $log = DeliveryLog::sole();
@@ -60,7 +60,7 @@ test('a missing rule sends nothing and logs a warning', function () {
     Log::spy();
     $channel = NotificationChannel::factory()->create();
 
-    (new DeliverScheduledAlert(999999, $channel->id, 'title', 'body'))->handle(app(AppriseApiClient::class));
+    (new DeliverScheduledAlert(999999, $channel->id, 'title', 'body'))->handle(app(ChannelDispatcher::class));
 
     Http::assertNothingSent();
     expect(DeliveryLog::count())->toBe(0);
@@ -73,7 +73,7 @@ test('a missing channel sends nothing and logs a warning', function () {
     Log::spy();
     $rule = AlertRule::factory()->dailySummary()->create();
 
-    (new DeliverScheduledAlert($rule->id, 999999, 'title', 'body'))->handle(app(AppriseApiClient::class));
+    (new DeliverScheduledAlert($rule->id, 999999, 'title', 'body'))->handle(app(ChannelDispatcher::class));
 
     Http::assertNothingSent();
     expect(DeliveryLog::count())->toBe(0);
@@ -89,7 +89,7 @@ test('a custom subject template is used as the Apprise title instead of the pass
     $channel = NotificationChannel::factory()->for($rule->user)->create();
 
     (new DeliverScheduledAlert($rule->id, $channel->id, 'Ignored default title', 'Today: Sunny, high 88.'))
-        ->handle(app(AppriseApiClient::class));
+        ->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['title'] === 'My custom title');
 });
@@ -103,7 +103,7 @@ test('message_body_style Brief truncates the passed-in body to 280 characters', 
     $longBody = str_repeat('Sunny with a high of 88 degrees. ', 30);
 
     (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', $longBody))
-        ->handle(app(AppriseApiClient::class));
+        ->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => strlen($request['body']) <= 280);
 });
@@ -116,7 +116,7 @@ test('message_body_style Full (or null) preserves the passed-in body unchanged',
     $channel = NotificationChannel::factory()->for($rule->user)->create();
 
     (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'Today: Sunny, high 88.'))
-        ->handle(app(AppriseApiClient::class));
+        ->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['body'] === 'Today: Sunny, high 88.');
 });
@@ -133,7 +133,7 @@ test('a Free-tier owner\'s custom subject and Brief style are ignored at deliver
     $longBody = str_repeat('Sunny with a high of 88 degrees. ', 30);
 
     (new DeliverScheduledAlert($rule->id, $channel->id, 'Ignored default title', $longBody))
-        ->handle(app(AppriseApiClient::class));
+        ->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['title'] === $rule->displayName() && $request['body'] === $longBody);
 });
@@ -146,7 +146,7 @@ test('the default title (no custom template) still reaches Apprise as displayNam
     $channel = NotificationChannel::factory()->for($rule->user)->create();
 
     (new DeliverScheduledAlert($rule->id, $channel->id, 'Ignored default title', 'Today: Sunny, high 88.'))
-        ->handle(app(AppriseApiClient::class));
+        ->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['title'] === $rule->displayName());
 });

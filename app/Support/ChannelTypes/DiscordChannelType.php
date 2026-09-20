@@ -2,11 +2,14 @@
 
 namespace App\Support\ChannelTypes;
 
+use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Filament\Forms\Components\TextInput;
 
 class DiscordChannelType implements ChannelType
 {
+    use UsesAppriseTransport;
+
     public function slug(): string
     {
         return 'discord';

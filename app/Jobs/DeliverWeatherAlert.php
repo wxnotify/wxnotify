@@ -9,7 +9,7 @@ use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
-use App\Support\Apprise\AppriseApiClient;
+use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -55,7 +55,7 @@ class DeliverWeatherAlert implements ShouldQueue
         public readonly int $ingestedProductId,
     ) {}
 
-    public function handle(AppriseApiClient $client): void
+    public function handle(ChannelDispatcher $dispatcher): void
     {
         $rule = AlertRule::find($this->ruleId);
 
@@ -99,19 +99,19 @@ class DeliverWeatherAlert implements ShouldQueue
         $bodySource = $templatedBody ?? ($product->format === 'cap' ? ($product->description ?? $product->text) : $product->text);
         $maxLength = $templatedBody === null && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500;
 
-        $delivered = $client->notify(
-            url: $channel->apprise_url,
-            body: Str::limit($bodySource, $maxLength, preserveWords: true),
-            title: app(RenderAlertSubject::class)($rule, $product->product),
-        );
+        $result = $dispatcher->send($channel, Str::limit($bodySource, $maxLength, preserveWords: true), app(RenderAlertSubject::class)($rule, $product->product), [
+            'type' => 'alert',
+            'rule' => $rule->name,
+            'product' => $product->product?->name,
+        ]);
 
         DeliveryLog::create([
             'alert_rule_id' => $rule->id,
             'notification_channel_id' => $channel->id,
             'user_id' => $rule->user_id,
             'channel_type' => $channel->channel_type,
-            'status' => $delivered ? 'success' : 'failure',
-            'error_detail' => $delivered ? null : 'Apprise reported non-delivery.',
+            'status' => $result->success ? 'success' : 'failure',
+            'error_detail' => $result->error,
             'dispatched_at' => now(),
         ]);
     }

@@ -32,6 +32,7 @@ use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Exists;
 use Jbuitt\FilamentToggleList\ToggleList;
@@ -191,6 +192,8 @@ class AlertRuleForm
                 ->all())
             ->helperText('A channel can\'t actually deliver until it\'s verified — add one here and finish confirming it from Notification Channels.')
             ->suffixActions($registry->forPicker()
+                ->filter(fn (array $row): bool => $row['type']->supportsInlineCreate())
+                ->values()
                 ->map(fn (array $row): Action => self::connectChannelAction($row['type']))
                 ->all());
     }
@@ -207,10 +210,12 @@ class AlertRuleForm
             ->schema($type->formSchema())
             ->modalHeading("Add a {$type->label()} channel")
             ->action(function (array $data, Set $set, Get $get) use ($type, $slug): void {
+                $destination = $type->buildDestination($data);
+
                 $channel = auth()->user()->notificationChannels()->create([
                     'channel_type' => $slug,
-                    'label' => $type->label(),
-                    'apprise_url' => $type->buildAppriseUrl($data),
+                    'label' => $destination['label'] ?? $type->label(),
+                    ...Arr::only($destination, ['apprise_url', 'config']),
                 ]);
 
                 app(DispatchChannelConfirmationCode::class)($channel);

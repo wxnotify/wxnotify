@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['user_id', 'channel_type', 'label', 'apprise_url'])]
+#[Fillable(['user_id', 'channel_type', 'label', 'apprise_url', 'config'])]
 class NotificationChannel extends Model
 {
     /** @use HasFactory<NotificationChannelFactory> */
@@ -18,8 +18,8 @@ class NotificationChannel extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        // Deliberately excludes apprise_url: it's an encrypted column that can
-        // carry webhook secrets/tokens, and activitylog logs the decrypted
+        // Deliberately excludes apprise_url and config: they're encrypted columns
+        // that can carry webhook secrets/tokens, and activitylog logs the decrypted
         // attribute value into a plain-text properties column.
         return LogOptions::defaults()
             ->logOnly(['user_id', 'channel_type', 'label', 'verified_at'])
@@ -31,6 +31,7 @@ class NotificationChannel extends Model
     {
         return [
             'apprise_url' => 'encrypted',
+            'config' => 'encrypted:array',
             'verified_at' => 'datetime',
             'confirmation_code_expires_at' => 'datetime',
         ];
