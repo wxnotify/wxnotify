@@ -10,6 +10,9 @@ class WebhookUrlGuard
 
     private const BLOCKED_HOSTS = ['localhost', 'metadata.google.internal'];
 
+    /** @var list<array{string, int}> */
+    private const BLOCKED_IPV6_PREFIXES = [['64:ff9b::', 96], ['2002::', 16], ['fec0::', 10], ['2001::', 32]];
+
     public function __construct(private readonly ?Closure $resolver = null) {}
 
     /** A human-readable reason the URL must not be called, or null when it is safe. */
@@ -75,12 +78,28 @@ class WebhookUrlGuard
             return array_values(($this->resolver)($host));
         }
 
-        $ips = gethostbynamel($host) ?: [];
-        foreach (dns_get_record($host, DNS_AAAA) ?: [] as $record) {
+        // Resolver failures raise warnings (which Laravel turns into exceptions); fail closed instead.
+        $ips = @gethostbynamel($host) ?: [];
+        foreach (@dns_get_record($host, DNS_AAAA) ?: [] as $record) {
             $ips[] = $record['ipv6'];
         }
 
         return $ips;
+    }
+
+    private function matchesPrefix(string $packed, string $prefix, int $bits): bool
+    {
+        $bytes = intdiv($bits, 8);
+        if (substr($packed, 0, $bytes) !== substr($prefix, 0, $bytes)) {
+            return false;
+        }
+        $remainder = $bits % 8;
+        if ($remainder === 0) {
+            return true;
+        }
+        $mask = (0xFF << (8 - $remainder)) & 0xFF;
+
+        return (ord($packed[$bytes]) & $mask) === (ord($prefix[$bytes]) & $mask);
     }
 
     private function isPublicIp(string $ip): bool
@@ -92,6 +111,16 @@ class WebhookUrlGuard
 
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
             return false;
+        }
+
+        // IPv6 ranges that embed or tunnel to IPv4 space (NAT64, 6to4, Teredo) or are deprecated site-local.
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            $packed = inet_pton($ip);
+            foreach (self::BLOCKED_IPV6_PREFIXES as [$prefix, $bits]) {
+                if ($this->matchesPrefix($packed, inet_pton($prefix), $bits)) {
+                    return false;
+                }
+            }
         }
 
         // Carrier-grade NAT 100.64.0.0/10 is not covered by PHP's range flags.

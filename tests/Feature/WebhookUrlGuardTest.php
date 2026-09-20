@@ -28,7 +28,7 @@ test('non-https, credentials, bad ports and missing hosts are rejected', functio
 
 test('private, loopback, link-local, metadata, cgnat and reserved addresses are rejected', function (string $ip) {
     expect(chanGuard([$ip])->violation('https://hooks.example.com/wx'))->not->toBeNull();
-})->with(['10.0.0.5', '172.16.4.4', '192.168.1.10', '127.0.0.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '240.0.0.1', '::1', 'fe80::1', 'fc00::1', '::ffff:10.0.0.1', '::ffff:127.0.0.1']);
+})->with(['10.0.0.5', '172.16.4.4', '192.168.1.10', '127.0.0.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '240.0.0.1', '::1', 'fe80::1', 'fc00::1', '::ffff:10.0.0.1', '::ffff:127.0.0.1', '64:ff9b::7f00:1', '64:ff9b::a9fe:a9fe', '2002:7f00:1::', 'fec0::1', '2001:0:4136:e378:8000:63bf:3fff:fdd2']);
 
 test('ip literals in the url are checked without dns', function () {
     expect(chanGuard()->violation('https://10.0.0.5/wx'))->not->toBeNull()
@@ -67,4 +67,10 @@ test('the validation rule reports the guard message', function () {
 
     expect($validator->fails())->toBeTrue()
         ->and($validator->errors()->first('url'))->toContain('private');
+});
+
+test('an over-long host name is rejected instead of throwing from the resolver', function () {
+    $host = implode('.', array_fill(0, 30, str_repeat('a', 10))).'.example.com';
+
+    expect((new WebhookUrlGuard)->violation("https://{$host}/wx"))->toBeString();
 });
