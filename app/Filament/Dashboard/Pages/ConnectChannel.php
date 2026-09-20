@@ -114,9 +114,10 @@ class ConnectChannel extends Page implements HasForms
 
                             $set('channel_id', $channel->id);
 
-                            if (isset($destination['config']['secret'])) {
-                                $set('webhook_secret', $destination['config']['secret']);
-                            }
+                            // Unconditional: stepping back and connecting a different
+                            // type in the same wizard must not leave the previous
+                            // channel's secret on the Confirm step.
+                            $set('webhook_secret', $destination['config']['secret'] ?? null);
                         }),
                     Step::make('Confirm')
                         ->schema([

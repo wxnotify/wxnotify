@@ -91,6 +91,22 @@ test('a non-2xx response is a failure with a useful message and only one attempt
         ->and(count($history))->toBe(1);
 });
 
+test('a redirect is never followed, so a public endpoint cannot bounce the request at a private address', function () {
+    $history = chanFakeWebhookEndpoint([
+        new Response(302, ['Location' => 'http://10.0.0.5/latest/meta-data/']),
+        new Response(200, [], 'internal-metadata-contents'),
+    ]);
+    $channel = NotificationChannel::factory()->webhook('https://hooks.example.com/wx', 's3cret')->create();
+
+    $result = app(ChannelDispatcher::class)->send($channel, 'body');
+
+    expect(count($history))->toBe(1)
+        ->and((string) $history[0]['request']->getUri())->toBe('https://hooks.example.com/wx')
+        ->and($result->success)->toBeFalse()
+        ->and($result->error)->not->toContain('internal-metadata-contents')
+        ->and($result->error)->not->toContain('10.0.0.5');
+});
+
 test('a connection error is a failure, not an exception', function () {
     chanFakeWebhookEndpoint([new ConnectException('boom', new Request('POST', 'https://hooks.example.com/wx'))]);
     $channel = NotificationChannel::factory()->webhook()->create();
@@ -115,12 +131,18 @@ test('a webhook channel with a missing config is a failure', function () {
     expect(app(ChannelDispatcher::class)->send($channel, 'body')->success)->toBeFalse();
 });
 
-test('the signing secret never reaches the activity log or the error message', function () {
+test('neither the signing secret nor the endpoint url reaches the activity log or the error message', function () {
     chanFakeWebhookEndpoint([new Response(500, [], 'echoing s3cret')]);
-    $channel = NotificationChannel::factory()->webhook('https://hooks.example.com/wx', 's3cret')->create();
+    $channel = NotificationChannel::factory()->webhook('https://hooks.example.com/wx?token=abc123', 's3cret')->create();
 
     $result = app(ChannelDispatcher::class)->send($channel, 'body');
+    $activity = json_encode(Activity::all()->toArray());
 
     expect($result->error)->not->toContain('s3cret')
-        ->and(json_encode(Activity::all()->toArray()))->not->toContain('s3cret');
+        ->and($result->error)->not->toContain('hooks.example.com')
+        ->and($result->error)->not->toContain('token=abc123')
+        ->and($result->error)->not->toContain('abc123')
+        ->and($activity)->not->toContain('s3cret')
+        ->and($activity)->not->toContain('hooks.example.com')
+        ->and($activity)->not->toContain('abc123');
 });

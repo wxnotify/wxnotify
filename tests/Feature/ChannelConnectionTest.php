@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Tier;
 use App\Filament\Dashboard\Pages\ConnectChannel;
 use App\Models\NotificationChannel;
 use App\Models\User;
@@ -161,4 +162,26 @@ test('a webhook whose endpoint rejects the confirmation message is not left behi
     goToConnectChannelStep($component, 1);
 
     expect(NotificationChannel::count())->toBe(0);
+});
+
+test('creating a non-webhook channel after a webhook one clears the signing secret from the wizard', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+    chanFakeWebhookEndpoint([new Response(200)]);
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm(['url' => 'https://hooks.example.com/wx']);
+    goToConnectChannelStep($component, 1);
+
+    expect($component->get('data.webhook_secret'))->not->toBeNull();
+
+    // Back to step 1 in the same wizard instance, then pick a non-webhook type.
+    $component->fillForm(['channel_type' => 'ntfy']);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm(['topic' => 'wxnotify-test-topic']);
+    goToConnectChannelStep($component, 1);
+
+    expect($component->get('data.webhook_secret'))->toBeNull();
 });

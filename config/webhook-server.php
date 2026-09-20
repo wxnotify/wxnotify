@@ -1,7 +1,7 @@
 <?php
 
+use App\Support\Delivery\NoRedirectCallWebhookJob;
 use Spatie\WebhookServer\BackoffStrategy\ExponentialBackoffStrategy;
-use Spatie\WebhookServer\CallWebhookJob;
 use Spatie\WebhookServer\Signer\DefaultSigner;
 
 return [
@@ -70,8 +70,12 @@ return [
 
     /*
      * This class is used to dispatch webhooks onto the queue.
+     *
+     * Deliberately NOT Spatie's CallWebhookJob: that leaves Guzzle's default
+     * redirect following on, which would let a subscriber-supplied endpoint
+     * bounce the request at a private address the SSRF guard just rejected.
      */
-    'webhook_job' => CallWebhookJob::class,
+    'webhook_job' => NoRedirectCallWebhookJob::class,
 
     /*
      * By default we will verify that the ssl certificate of the destination

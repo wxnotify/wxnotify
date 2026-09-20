@@ -5,7 +5,8 @@ namespace App\Support\Delivery\Transports;
 use App\Models\NotificationChannel;
 use App\Support\Delivery\DeliveryResult;
 use App\Support\Delivery\WebhookUrlGuard;
-use Illuminate\Support\Str;
+use GuzzleHttp\Exception\BadResponseException;
+use GuzzleHttp\Exception\ConnectException;
 use Spatie\WebhookServer\WebhookCall;
 use Throwable;
 
@@ -54,13 +55,34 @@ class WebhookTransport implements Transport
                 ->throwExceptionOnFailure()
                 ->dispatchSync();
         } catch (Throwable $e) {
-            // Guzzle's message quotes the endpoint's response body, which could echo the
-            // secret back: redact before truncating, so a straddling match can't survive.
-            return DeliveryResult::failed(
-                'Webhook delivery failed: '.Str::limit(str_replace($secret, '[redacted]', $e->getMessage()), 200)
-            );
+            return DeliveryResult::failed($this->failureMessage($e));
         }
 
         return DeliveryResult::delivered();
+    }
+
+    /**
+     * Built from the exception's type and HTTP status, never from its message.
+     *
+     * Guzzle renders the full request URI (which routinely carries the subscriber's
+     * only credential in its query string) and ~120 characters of the endpoint's
+     * response body into every message, and this string ends up in
+     * delivery_logs.error_detail, which staff can read. Redacting known substrings
+     * would only catch the spellings we thought of; composing the message ourselves
+     * cannot leak anything at all.
+     */
+    private function failureMessage(Throwable $e): string
+    {
+        if ($e instanceof BadResponseException) {
+            return 'Webhook delivery failed: the endpoint returned HTTP '.$e->getResponse()->getStatusCode().'.';
+        }
+
+        if ($e instanceof ConnectException) {
+            return 'Webhook delivery failed: the endpoint could not be reached.';
+        }
+
+        // Spatie raises a plain exception for any other non-2xx it sees itself —
+        // notably a 3xx, which this app refuses to follow.
+        return 'Webhook delivery failed: the endpoint did not accept the message.';
     }
 }
