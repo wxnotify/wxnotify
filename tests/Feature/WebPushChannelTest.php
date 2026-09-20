@@ -171,3 +171,20 @@ test('redirects from the push service are not followed and count as a failure', 
         ->and(count($history))->toBe(1)
         ->and($mock->count())->toBe(1);
 });
+
+test('the service worker handles push and notification click events', function () {
+    $js = file_get_contents(public_path('dashboard-sw.js'));
+
+    expect($js)->toContain("addEventListener('push'")
+        ->and($js)->toContain("addEventListener('notificationclick'")
+        ->and($js)->toContain('showNotification')
+        ->and($js)->toContain('openWindow');
+});
+
+test('the setup view embeds the vapid public key, the service worker path, and never the private key', function () {
+    config(['webpush.vapid.public_key' => 'PUBLICKEY123', 'webpush.vapid.private_key' => 'PRIVATEKEY456']);
+
+    $html = view('filament.dashboard.channels.web-push-setup')->render();
+
+    expect($html)->toContain('PUBLICKEY123')->toContain('/dashboard-sw.js')->not->toContain('PRIVATEKEY456');
+});
