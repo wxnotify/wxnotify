@@ -3,32 +3,18 @@
 use App\Filament\Dashboard\Pages\ConnectChannel;
 use App\Models\NotificationChannel;
 use App\Models\User;
-use Filament\Schemas\Components\Wizard;
+use App\Support\Delivery\WebhookUrlGuard;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Http;
-use Livewire\Features\SupportTesting\Testable;
 
 use function Pest\Livewire\livewire;
+
+// goToConnectChannelStep() and chanFakeWebhookEndpoint() live in tests/Pest.php.
 
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
 });
-
-/**
- * Wizard::getCurrentStepIndex() lives on a plain runtime property, not
- * Livewire's persisted state — every Testable::call()/fillForm() rehydrates
- * the page fresh and resets it to the start step. goToNextWizardStep()
- * trusts that (reset) value to pick which step it's advancing, so a second
- * chained call silently re-validates step 0 instead of the step the test is
- * actually on. Driving nextStep() with an explicit index sidesteps it.
- */
-function goToConnectChannelStep(Testable $component, int $fromIndex): Testable
-{
-    $schema = $component->instance()->{$component->instance()->getDefaultTestingSchemaName()};
-    $wizard = $schema->getComponent(fn ($c) => $c instanceof Wizard);
-
-    return $component->call('callSchemaComponentMethod', $wizard->getKey(), 'nextStep', [$fromIndex]);
-}
 
 test('completing the wizard creates a pending channel and dispatches a code', function () {
     Http::fake([
@@ -145,4 +131,34 @@ test('completing the wizard for teams stores the workflows url', function () {
 
     expect(NotificationChannel::where('user_id', $this->user->id)->sole()->apprise_url)
         ->toBe('workflows://prod-12.westus.logic.azure.com/0123456789abcdef0123456789abcdef/SIGNATUREabc-_123');
+});
+
+test('the webhook wizard creates a channel with a secret, shows it on the confirm step, and sends the code to the endpoint', function () {
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+    $history = chanFakeWebhookEndpoint([new Response(200)]);
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
+    goToConnectChannelStep($component, 0);
+    $component->assertWizardCurrentStep(2)->fillForm(['url' => 'https://hooks.example.com/wx']);
+    goToConnectChannelStep($component, 1);
+    $component->assertWizardCurrentStep(3);
+
+    $channel = NotificationChannel::where('user_id', $this->user->id)->sole();
+    $payload = json_decode((string) $history[0]['request']->getBody(), true);
+
+    expect($channel->channel_type)->toBe('webhook')->and($channel->apprise_url)->toBeNull()
+        ->and($payload['type'])->toBe('confirmation')->and($payload['code'])->toBe($channel->confirmation_code);
+    $component->assertFormSet(['webhook_secret' => $channel->config['secret']]);
+});
+
+test('a webhook whose endpoint rejects the confirmation message is not left behind', function () {
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+    chanFakeWebhookEndpoint([new Response(500)]);
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm(['url' => 'https://hooks.example.com/wx']);
+    goToConnectChannelStep($component, 1);
+
+    expect(NotificationChannel::count())->toBe(0);
 });

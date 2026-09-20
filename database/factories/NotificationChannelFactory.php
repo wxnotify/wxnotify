@@ -27,6 +27,15 @@ class NotificationChannelFactory extends Factory
         ];
     }
 
+    public function webhook(string $url = 'https://hooks.example.com/wx', string $secret = 'test-secret'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'webhook',
+            'apprise_url' => null,
+            'config' => ['url' => $url, 'secret' => $secret],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

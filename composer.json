@@ -27,6 +27,7 @@
         "owenvoke/blade-fontawesome": "^3.3",
         "phpmyadmin/shapefile": "^4.0",
         "spatie/laravel-activitylog": "^5.1",
+        "spatie/laravel-webhook-server": "^3.11",
         "ssbityukov/filament-command-center": "^1.0",
         "stechstudio/filament-impersonate": "^5.6",
         "swisnl/filament-backgrounds": "^2.0",

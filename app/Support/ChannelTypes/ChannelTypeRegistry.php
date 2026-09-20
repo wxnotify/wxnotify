@@ -19,6 +19,7 @@ class ChannelTypeRegistry
         'telegram' => TelegramChannelType::class,
         'pushover' => PushoverChannelType::class,
         'msteams' => TeamsChannelType::class,
+        'webhook' => WebhookChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType

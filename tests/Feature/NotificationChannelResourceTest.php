@@ -87,3 +87,30 @@ test('the label is required and cannot be cleared out', function () {
 
     expect($channel->fresh()->label)->toBe('Old label');
 });
+
+test('the edit form reveals the signing secret for a webhook channel', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->webhook('https://hooks.example.com/wx', 's3cret')->create();
+
+    livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->assertSchemaStateSet(['config.secret' => 's3cret']);
+});
+
+test('the signing secret field is hidden for a non-webhook channel', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['channel_type' => 'discord']);
+
+    livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->assertFormFieldHidden('config.secret');
+});
+
+test('editing a webhook channel label leaves its config untouched', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->webhook('https://hooks.example.com/wx', 's3cret')->create();
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('edit')->table($channel), data: ['label' => 'Renamed hook'])
+        ->assertHasNoActionErrors();
+
+    expect($channel->fresh()->label)->toBe('Renamed hook')
+        ->and($channel->fresh()->config)->toBe(['url' => 'https://hooks.example.com/wx', 'secret' => 's3cret']);
+});

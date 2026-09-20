@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Arr;
 
 class NotificationChannelsTable
 {
@@ -83,7 +84,13 @@ class NotificationChannelsTable
                             ->success()
                             ->send();
                     }),
-                EditAction::make(),
+                EditAction::make()
+                    // The form's 'config.secret' field is dehydrated(false), which
+                    // forgets only that leaf and leaves an empty 'config' array
+                    // behind — mass-assigning it would wipe the webhook's URL and
+                    // signing secret. Nothing on this form is allowed to write
+                    // config, so drop the key outright.
+                    ->mutateDataUsing(fn (array $data): array => Arr::except($data, ['config'])),
                 DeleteAction::make(),
             ])
             ->toolbarActions([

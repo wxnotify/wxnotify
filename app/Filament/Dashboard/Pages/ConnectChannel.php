@@ -113,14 +113,28 @@ class ConnectChannel extends Page implements HasForms
                             }
 
                             $set('channel_id', $channel->id);
+
+                            if (isset($destination['config']['secret'])) {
+                                $set('webhook_secret', $destination['config']['secret']);
+                            }
                         }),
                     Step::make('Confirm')
                         ->schema([
                             Hidden::make('channel_id'),
+                            TextInput::make('webhook_secret')
+                                ->label('Signing secret')
+                                ->password()
+                                ->revealable()
+                                ->readOnly()
+                                ->dehydrated(false)
+                                ->helperText('Verify each request by computing HMAC-SHA256 of the raw request body with this secret and comparing it to the "Signature" header. Copy it now; you can reveal it again from the channel\'s edit form.')
+                                ->visible(fn (Get $get): bool => filled($get('webhook_secret'))),
                             TextInput::make('confirmation_code')
                                 ->label('Confirmation code')
                                 ->required()
-                                ->helperText('We just sent a 6-digit code to the channel you configured.'),
+                                ->helperText(fn (Get $get): string => filled($get('webhook_secret'))
+                                    ? 'We just POSTed a confirmation message to your endpoint; enter the 6-digit code from its "code" field.'
+                                    : 'We just sent a 6-digit code to the channel you configured.'),
                         ]),
                 ])
                     ->submitAction(new HtmlString(Blade::render(<<<'BLADE'
