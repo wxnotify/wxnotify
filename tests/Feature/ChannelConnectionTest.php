@@ -185,3 +185,33 @@ test('creating a non-webhook channel after a webhook one clears the signing secr
 
     expect($component->get('data.webhook_secret'))->toBeNull();
 });
+
+test('the web push wizard creates a channel from a browser subscription and pushes the confirmation code', function () {
+    chanConfigureVapid();
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+    $sent = chanFakePushService();
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webpush']);
+    goToConnectChannelStep($component, 0);
+    $component->assertWizardCurrentStep(2)->fillForm(['subscription' => chanPushSubscriptionJson()]);
+    goToConnectChannelStep($component, 1);
+    $component->assertWizardCurrentStep(3);
+
+    $channel = NotificationChannel::where('user_id', $this->user->id)->sole();
+    expect($channel->channel_type)->toBe('webpush')->and($channel->apprise_url)->toBeNull()
+        ->and(json_decode($sent[0]['payload'], true)['body'])->toContain($channel->confirmation_code);
+});
+
+test('the web push wizard rejects an invalid subscription without creating a channel', function () {
+    chanConfigureVapid();
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['10.0.0.5']));
+    chanFakePushService();
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webpush']);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm(['subscription' => chanPushSubscriptionJson('https://push.evil.example/x')]);
+    goToConnectChannelStep($component, 1);
+
+    $component->assertNotified('That browser subscription is not valid.');
+    expect(NotificationChannel::count())->toBe(0);
+});

@@ -84,7 +84,14 @@ class ConnectChannel extends Page implements HasForms
                             : [])
                         ->afterValidation(function (Get $get, Set $set) {
                             $type = app(ChannelTypeRegistry::class)->find($get('channel_type'));
-                            $destination = $type->buildDestination($get());
+
+                            try {
+                                $destination = $type->buildDestination($get());
+                            } catch (\InvalidArgumentException $e) {
+                                Notification::make()->title($e->getMessage())->danger()->send();
+
+                                throw new Halt;
+                            }
 
                             $channel = NotificationChannel::create([
                                 'user_id' => auth()->id(),

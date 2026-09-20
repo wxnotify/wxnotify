@@ -36,6 +36,16 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    public function webPush(): static
+    {
+        return $this->state(fn () => ['channel_type' => 'webpush', 'apprise_url' => null, 'config' => [
+            'endpoint' => 'https://fcm.googleapis.com/fcm/send/abc123',
+            'public_key' => str_repeat('B', 87),
+            'auth_token' => str_repeat('a', 22),
+            'content_encoding' => 'aes128gcm',
+        ]]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

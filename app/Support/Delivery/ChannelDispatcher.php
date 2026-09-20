@@ -8,7 +8,7 @@ use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\Delivery\Transports\AppriseTransport;
 use App\Support\Delivery\Transports\Transport;
 use App\Support\Delivery\Transports\WebhookTransport;
-use LogicException;
+use App\Support\Delivery\Transports\WebPushTransport;
 
 class ChannelDispatcher
 {
@@ -33,8 +33,7 @@ class ChannelDispatcher
         return match ($transport) {
             ChannelTransport::Apprise => app(AppriseTransport::class),
             ChannelTransport::Webhook => app(WebhookTransport::class),
-            // The WebPush transport is registered by its own task.
-            default => throw new LogicException("No transport registered for [{$transport->value}]."),
+            ChannelTransport::WebPush => app(WebPushTransport::class),
         };
     }
 }

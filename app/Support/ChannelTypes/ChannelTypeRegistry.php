@@ -20,6 +20,7 @@ class ChannelTypeRegistry
         'pushover' => PushoverChannelType::class,
         'msteams' => TeamsChannelType::class,
         'webhook' => WebhookChannelType::class,
+        'webpush' => WebPushChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType
