@@ -2,6 +2,7 @@
 
 use App\Models\NotificationChannel;
 use App\Support\Delivery\Pauser;
+use Carbon\Carbon;
 use Filament\Schemas\Components\Wizard;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
@@ -107,6 +108,10 @@ function chanFakeWebhookEndpoint(array $responses): ArrayObject
  * Replace the delivery Pauser with a recording no-op, so the webhook
  * transport's between-attempt waits never actually sleep in a test.
  *
+ * When the test has frozen time, the pause is also charged to that frozen
+ * clock — the transport reads its wall-clock budget through now(), so a
+ * budget test can watch the seconds add up without waiting for any of them.
+ *
  * @return ArrayObject<int, int> The seconds asked for, in order.
  */
 function chanFakePauser(): ArrayObject
@@ -120,10 +125,38 @@ function chanFakePauser(): ArrayObject
         public function pause(int $seconds): void
         {
             $this->pauses[] = $seconds;
+
+            if (Carbon::hasTestNow()) {
+                Carbon::setTestNow(Carbon::now()->addSeconds($seconds));
+            }
         }
     });
 
     return $pauses;
+}
+
+/**
+ * Like chanFakeWebhookEndpoint(), but every request also charges its own Guzzle
+ * `timeout` to the frozen test clock — i.e. it behaves like an endpoint that
+ * always takes the full timeout to answer. Freeze time before calling it.
+ *
+ * @param  array<int, mixed>  $responses  Guzzle MockHandler queue entries (Response or Throwable).
+ * @return ArrayObject<int, array{request: RequestInterface, response: mixed}>
+ */
+function chanFakeSlowWebhookEndpoint(array $responses): ArrayObject
+{
+    $history = new ArrayObject;
+    $stack = HandlerStack::create(new MockHandler($responses));
+    $stack->push(Middleware::history($history));
+    $stack->push(fn (callable $handler): Closure => function (RequestInterface $request, array $options) use ($handler) {
+        Carbon::setTestNow(Carbon::now()->addSeconds((int) ($options['timeout'] ?? 0)));
+
+        return $handler($request, $options);
+    });
+
+    app()->bind(Client::class, fn () => new Client(['handler' => $stack]));
+
+    return $history;
 }
 
 /**

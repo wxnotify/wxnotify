@@ -8,6 +8,7 @@ use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\Transports\WebhookTransport;
 use App\Support\Delivery\WebhookHeaderGuard;
 use App\Support\Delivery\WebhookUrlGuard;
+use Carbon\Carbon;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
@@ -182,6 +183,8 @@ test('headers the transport controls itself are refused whatever their casing', 
     'Content-Type', 'CONTENT-TYPE',
     'Transfer-Encoding', 'transfer-encoding',
     'Connection', 'Upgrade', 'TE', 'te', 'Trailer',
+    'Proxy-Authorization', 'proxy-authorization',
+    'Proxy-Connection', 'PROXY-CONNECTION',
     'Signature', 'signature', 'Timestamp', 'TIMESTAMP',
 ]);
 
@@ -574,6 +577,76 @@ test('one try means exactly one attempt and no pause', function () {
     expect($result->success)->toBeFalse()
         ->and(count($history))->toBe(1)
         ->and($this->pauses->getArrayCopy())->toBe([]);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Transport: the wall-clock delivery budget
+|--------------------------------------------------------------------------
+|
+| Time is frozen and moved only by the fake pauser and the slow endpoint, so
+| these assert real seconds without waiting for any of them.
+*/
+
+test('the slowest possible channel never holds its caller past the delivery budget', function () {
+    Carbon::setTestNow(Carbon::now());
+    $startedAt = Carbon::now();
+    $history = chanFakeSlowWebhookEndpoint(array_fill(0, 5, new Response(500)));
+
+    $result = app(ChannelDispatcher::class)->send(chanWebhookChannel(['tries' => 5, 'timeout' => 30]), 'body');
+
+    // One 30s attempt; a second would be 30 + 1 + 30 = 61s, over the budget.
+    expect($result->success)->toBeFalse()
+        ->and($result->error)->toContain('500')
+        ->and(count($history))->toBe(1)
+        ->and($this->pauses->getArrayCopy())->toBe([])
+        ->and((int) $startedAt->diffInSeconds(Carbon::now()))->toBeLessThanOrEqual(WebhookTransport::DELIVERY_BUDGET_SECONDS);
+});
+
+test('a slow channel spends the tries that fit inside the budget and stops there', function () {
+    Carbon::setTestNow(Carbon::now());
+    $startedAt = Carbon::now();
+    $history = chanFakeSlowWebhookEndpoint(array_fill(0, 5, new Response(500)));
+
+    $result = app(ChannelDispatcher::class)->send(chanWebhookChannel(['tries' => 5, 'timeout' => 10]), 'body');
+
+    // 10 + 1 + 10 + 3 + 10 + 3 + 10 = 47s; a fifth attempt would reach 60s.
+    expect($result->success)->toBeFalse()
+        ->and(count($history))->toBe(4)
+        ->and($this->pauses->getArrayCopy())->toBe([1, 3, 3])
+        ->and((int) $startedAt->diffInSeconds(Carbon::now()))->toBe(47)
+        ->and((int) $startedAt->diffInSeconds(Carbon::now()))->toBeLessThanOrEqual(WebhookTransport::DELIVERY_BUDGET_SECONDS);
+});
+
+test('a fast-failing endpoint still gets every configured try', function () {
+    Carbon::setTestNow(Carbon::now());
+    $startedAt = Carbon::now();
+    $history = chanFakeSlowWebhookEndpoint(array_fill(0, 5, new Response(500)));
+
+    app(ChannelDispatcher::class)->send(chanWebhookChannel(['tries' => 5, 'timeout' => 1]), 'body');
+
+    // 5 x 1s of endpoint plus 1 + 3 + 3 + 3 of pauses = 15s, well inside the budget.
+    expect(count($history))->toBe(5)
+        ->and($this->pauses->getArrayCopy())->toBe([1, 3, 3, 3])
+        ->and((int) $startedAt->diffInSeconds(Carbon::now()))->toBe(15);
+});
+
+test('a confirmation message is attempted exactly once however many tries the channel has', function () {
+    $history = chanFakeWebhookEndpoint([new Response(500), new Response(200)]);
+
+    $result = app(ChannelDispatcher::class)->send(chanWebhookChannel(['tries' => 5]), 'Your code', 'Confirm', ['type' => 'confirmation', 'code' => '123456']);
+
+    expect($result->success)->toBeFalse()
+        ->and(count($history))->toBe(1)
+        ->and($this->pauses->getArrayCopy())->toBe([]);
+});
+
+test('an alert on that same channel still spends every try', function () {
+    $history = chanFakeWebhookEndpoint(array_fill(0, 5, new Response(500)));
+
+    app(ChannelDispatcher::class)->send(chanWebhookChannel(['tries' => 5]), 'body', 'title', ['type' => 'alert', 'rule' => 'My rule']);
+
+    expect(count($history))->toBe(5)->and($this->pauses->getArrayCopy())->toBe([1, 3, 3, 3]);
 });
 
 test('the send-time url guard still blocks a now-private target before any attempt', function () {

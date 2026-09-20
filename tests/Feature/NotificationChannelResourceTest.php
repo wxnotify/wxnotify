@@ -312,14 +312,17 @@ test('leaving the webhook url alone keeps the channel verified and sends nothing
 });
 
 test('a url change whose confirmation cannot be delivered leaves the channel unverified, not deleted', function () {
-    chanFakeWebhookEndpoint(array_fill(0, 3, new Response(500)));
+    // A confirmation is a single attempt even at tries=5, so this edit can never
+    // hold the request longer than one timeout.
+    $history = chanFakeWebhookEndpoint([new Response(500)]);
     $channel = NotificationChannel::factory()->for($this->user)->webhook('https://hooks.example.com/wx', 's3cret')->create();
 
     livewire(ListNotificationChannels::class)
-        ->callAction(TestAction::make('edit')->table($channel), data: chanEditFormData(['url' => 'https://hooks.example.com/new']))
+        ->callAction(TestAction::make('edit')->table($channel), data: chanEditFormData(['url' => 'https://hooks.example.com/new', 'tries' => 5]))
         ->assertHasNoActionErrors();
 
-    expect(NotificationChannel::whereKey($channel->getKey())->exists())->toBeTrue()
+    expect(count($history))->toBe(1)
+        ->and(NotificationChannel::whereKey($channel->getKey())->exists())->toBeTrue()
         ->and($channel->fresh()->isVerified())->toBeFalse()
         ->and($channel->fresh()->config['url'])->toBe('https://hooks.example.com/new');
 });

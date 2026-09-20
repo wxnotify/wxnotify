@@ -19,8 +19,11 @@ class WebhookHeaderGuard
     /**
      * Headers the transport, Guzzle or the signer sets itself. Letting a
      * subscriber override any of them would either break the request framing
-     * (Content-Length, Transfer-Encoding), retarget it (Host), or forge the
-     * very header a receiver authenticates with.
+     * (Content-Length, Transfer-Encoding), retarget it (Host), interfere with
+     * the proxy hop rather than the endpoint (Proxy-Authorization,
+     * Proxy-Connection — those belong to the connection the proxy setting
+     * establishes, not to the message), or forge the very header a receiver
+     * authenticates with.
      *
      * @var list<string>
      */
@@ -33,6 +36,8 @@ class WebhookHeaderGuard
         'upgrade',
         'te',
         'trailer',
+        'proxy-authorization',
+        'proxy-connection',
     ];
 
     /** RFC 7230 token: the only characters a header field-name may contain. */

@@ -53,6 +53,25 @@ class WebhookTransport implements Transport
     /** HTTP statuses worth another attempt; everything else 4xx/3xx is final. */
     private const RETRYABLE_STATUSES = [408, 429];
 
+    /**
+     * The longest one send() may hold its caller, across every attempt and pause.
+     *
+     * Both callers are synchronous and both have a shorter leash than the
+     * subscriber's own settings imply: DeliverWeatherAlert runs on the
+     * `database` queue connection, whose retry_after is 90s (a longer delivery
+     * lets a second worker re-pick the job and deliver the alert twice) under a
+     * worker whose default --timeout is 60s (a longer delivery is SIGKILLed
+     * mid-flight, losing the DeliveryLog write); and the confirmation-code path
+     * runs inside a web request, where php-fpm gives up first and skips the
+     * caller's own cleanup. Unbounded, tries=5 x timeout=30 plus 10s of pauses
+     * would be 160s — all of it subscriber-chosen.
+     *
+     * The first attempt always runs; it is already capped at `timeout` <= 30s.
+     * A later attempt only starts when it provably fits, so the worst case is
+     * this budget and never the sum of the settings.
+     */
+    public const DELIVERY_BUDGET_SECONDS = 50;
+
     public function __construct(
         private readonly WebhookUrlGuard $guard,
         private readonly WebhookHeaderGuard $headerGuard,
@@ -109,7 +128,16 @@ class WebhookTransport implements Transport
             return DeliveryResult::failed('Webhook delivery failed: this channel\'s extra headers are no longer valid.');
         }
 
-        return $this->attempt($config, $proxy, $this->payload($body, $title, $meta));
+        $payload = $this->payload($body, $title, $meta);
+
+        // A confirmation is sent from inside a web request (the connect wizard
+        // and the channel's edit form), so it gets one attempt no matter how
+        // many tries the channel is configured for: that bounds the submit at a
+        // single `timeout`, and the subscriber has a "Resend code" button one
+        // click away, which an alert has no equivalent of.
+        $tries = $payload['type'] === 'confirmation' ? 1 : $config['tries'];
+
+        return $this->attempt($config, $proxy, $payload, $tries);
     }
 
     /**
@@ -124,11 +152,12 @@ class WebhookTransport implements Transport
      * @param  array<string, mixed>  $config
      * @param  array<string, mixed>  $payload
      */
-    private function attempt(array $config, ?string $proxy, array $payload): DeliveryResult
+    private function attempt(array $config, ?string $proxy, array $payload, int $tries): DeliveryResult
     {
         $error = 'Webhook delivery failed: the endpoint did not accept the message.';
+        $startedAt = $this->secondsNow();
 
-        for ($attempt = 1; $attempt <= $config['tries']; $attempt++) {
+        for ($attempt = 1; $attempt <= $tries; $attempt++) {
             try {
                 $call = WebhookCall::create()
                     ->url($config['url'])
@@ -153,15 +182,38 @@ class WebhookTransport implements Transport
             } catch (Throwable $e) {
                 $error = $this->failureMessage($e);
 
-                if ($attempt >= $config['tries'] || ! $this->isRetryable($e)) {
+                if ($attempt >= $tries || ! $this->isRetryable($e)) {
                     break;
                 }
 
-                $this->pauser->pause($attempt === 1 ? self::FIRST_RETRY_PAUSE : self::LATER_RETRY_PAUSE);
+                $pause = $attempt === 1 ? self::FIRST_RETRY_PAUSE : self::LATER_RETRY_PAUSE;
+
+                // Projected, not measured after the fact: a retry that could
+                // still be running when the budget runs out must never be
+                // started, or the caller is already over its leash by the time
+                // we notice.
+                if (($this->secondsNow() - $startedAt) + $pause + $config['timeout'] > self::DELIVERY_BUDGET_SECONDS) {
+                    break;
+                }
+
+                $this->pauser->pause($pause);
             }
         }
 
         return DeliveryResult::failed($error);
+    }
+
+    /**
+     * The wall clock, in seconds, as a float.
+     *
+     * Read through now() rather than microtime() so a test can freeze it with
+     * Carbon::setTestNow() and advance it itself — together with the injectable
+     * Pauser, that lets the budget be exercised without a test waiting for any
+     * of the seconds it is reasoning about.
+     */
+    private function secondsNow(): float
+    {
+        return now()->getPreciseTimestamp(3) / 1000;
     }
 
     /**

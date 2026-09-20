@@ -253,14 +253,16 @@ test('the wizard refuses a reserved extra header as a form error', function () {
 
 test('a webhook whose endpoint rejects the confirmation message is not left behind', function () {
     app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
-    chanFakeWebhookEndpoint(array_fill(0, 3, new Response(500)));
+    // One response, not several: a confirmation is deliberately a single
+    // attempt, so the wizard submit can never outlast one timeout.
+    $history = chanFakeWebhookEndpoint([new Response(500)]);
 
     $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webhook']);
     goToConnectChannelStep($component, 0);
-    $component->fillForm(['url' => 'https://hooks.example.com/wx']);
+    $component->fillForm(['url' => 'https://hooks.example.com/wx', 'tries' => 5]);
     goToConnectChannelStep($component, 1);
 
-    expect(NotificationChannel::count())->toBe(0);
+    expect(NotificationChannel::count())->toBe(0)->and(count($history))->toBe(1);
 });
 
 test('creating a non-webhook channel after a webhook one clears the signing secret from the wizard', function () {
