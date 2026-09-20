@@ -19,6 +19,8 @@ class ChannelTypeSeeder extends Seeder
         ['slug' => 'discord', 'min_tier' => 'free', 'sort_order' => 3, 'enabled' => true],
         ['slug' => 'slack', 'min_tier' => 'free', 'sort_order' => 4, 'enabled' => true],
         ['slug' => 'telegram', 'min_tier' => 'free', 'sort_order' => 5, 'enabled' => true],
+        ['slug' => 'pushover', 'min_tier' => 'free', 'sort_order' => 6, 'enabled' => true],
+        ['slug' => 'msteams', 'min_tier' => 'free', 'sort_order' => 7, 'enabled' => true],
     ];
 
     public function run(): void

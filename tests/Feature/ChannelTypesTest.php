@@ -3,11 +3,15 @@
 use App\Enums\Tier;
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\DiscordChannelType;
 use App\Support\ChannelTypes\EmailChannelType;
 use App\Support\ChannelTypes\NtfyChannelType;
+use App\Support\ChannelTypes\PushoverChannelType;
 use App\Support\ChannelTypes\SlackChannelType;
+use App\Support\ChannelTypes\TeamsChannelType;
 use App\Support\ChannelTypes\TelegramChannelType;
+use Illuminate\Support\Facades\Validator;
 
 test('email builds a mailto url from mail config', function () {
     config([
@@ -90,4 +94,61 @@ test('a Plus subscriber can add more than one no-cost channel', function () {
     NotificationChannel::factory()->for($user)->create(['channel_type' => 'discord']);
 
     expect($user->fresh()->canAddChannel('slack'))->toBeTrue();
+});
+
+test('pushover builds a pover url from user key and application token', function () {
+    $url = (new PushoverChannelType)->buildAppriseUrl([
+        'user_key' => 'abcdefghijklmnopqrstuvwxyz1234',
+        'api_token' => 'zyxwvutsrqponmlkjihgfedcba4321',
+    ]);
+
+    expect($url)->toBe('pover://abcdefghijklmnopqrstuvwxyz1234@zyxwvutsrqponmlkjihgfedcba4321');
+});
+
+test('teams converts a power automate workflows url to an apprise workflows url', function () {
+    $url = (new TeamsChannelType)->buildAppriseUrl([
+        'webhook_url' => 'https://prod-12.westus.logic.azure.com:443/workflows/0123456789abcdef0123456789abcdef/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SIGNATUREabc-_123',
+    ]);
+
+    expect($url)->toBe('workflows://prod-12.westus.logic.azure.com/0123456789abcdef0123456789abcdef/SIGNATUREabc-_123');
+});
+
+test('teams keeps a non-default port', function () {
+    $url = (new TeamsChannelType)->buildAppriseUrl([
+        'webhook_url' => 'https://prod-12.westus.logic.azure.com:8443/workflows/0123456789abcdef0123456789abcdef/triggers/manual/paths/invoke?sig=abc123',
+    ]);
+
+    expect($url)->toBe('workflows://prod-12.westus.logic.azure.com:8443/0123456789abcdef0123456789abcdef/abc123');
+});
+
+test('teams rejects retired office 365 connector urls and other hosts', function (string $url) {
+    expect(TeamsChannelType::parseWorkflowUrl($url))->toBeNull();
+})->with([
+    'legacy connector' => 'https://contoso.webhook.office.com/webhookb2/aaaa@bbbb/IncomingWebhook/cccc/dddd',
+    'outlook connector' => 'https://outlook.office.com/webhook/aaaa@bbbb/IncomingWebhook/cccc/dddd',
+    'wrong host' => 'https://example.com/workflows/0123456789abcdef0123456789abcdef/triggers/manual/paths/invoke?sig=abc',
+    'http' => 'http://prod-12.westus.logic.azure.com/workflows/0123456789abcdef0123456789abcdef/triggers/manual/paths/invoke?sig=abc',
+    'no signature' => 'https://prod-12.westus.logic.azure.com/workflows/0123456789abcdef0123456789abcdef/triggers/manual/paths/invoke',
+]);
+
+test('the picker offers pushover and teams and they count toward the free slot', function () {
+    $slugs = app(ChannelTypeRegistry::class)->forPicker()->map(fn ($row) => $row['type']->slug())->all();
+
+    expect($slugs)->toContain('pushover')->toContain('msteams')
+        ->and((new PushoverChannelType)->countsTowardFreeSlot())->toBeTrue()
+        ->and((new TeamsChannelType)->countsTowardFreeSlot())->toBeTrue();
+});
+
+test('pushover validates the key and token shape', function () {
+    $fields = collect((new PushoverChannelType)->formSchema())->keyBy(fn ($f) => $f->getName());
+
+    expect($fields->keys()->all())->toBe(['user_key', 'api_token']);
+
+    foreach (['user_key', 'api_token'] as $name) {
+        $validator = Validator::make([$name => 'too-short'], [$name => $fields[$name]->getValidationRules()]);
+        expect($validator->fails())->toBeTrue();
+
+        $validator = Validator::make([$name => 'abcdefghijklmnopqrstuvwxyz1234'], [$name => $fields[$name]->getValidationRules()]);
+        expect($validator->passes())->toBeTrue();
+    }
 });

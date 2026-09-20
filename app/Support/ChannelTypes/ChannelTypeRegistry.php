@@ -17,6 +17,8 @@ class ChannelTypeRegistry
         'discord' => DiscordChannelType::class,
         'slack' => SlackChannelType::class,
         'telegram' => TelegramChannelType::class,
+        'pushover' => PushoverChannelType::class,
+        'msteams' => TeamsChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType

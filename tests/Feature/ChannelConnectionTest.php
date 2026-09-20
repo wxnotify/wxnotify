@@ -115,3 +115,34 @@ test('a Free subscriber cannot pick a second no-cost channel type', function () 
 
     expect($this->user->fresh()->canAddChannel('slack'))->toBeFalse();
 });
+
+test('completing the wizard for pushover stores the pover url', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'pushover']);
+    goToConnectChannelStep($component, 0);
+    $component->assertWizardCurrentStep(2)
+        ->fillForm(['user_key' => 'abcdefghijklmnopqrstuvwxyz1234', 'api_token' => 'zyxwvutsrqponmlkjihgfedcba4321']);
+    goToConnectChannelStep($component, 1);
+    $component->assertWizardCurrentStep(3);
+
+    $channel = NotificationChannel::where('user_id', $this->user->id)->sole();
+
+    expect($channel->channel_type)->toBe('pushover')
+        ->and($channel->apprise_url)->toBe('pover://abcdefghijklmnopqrstuvwxyz1234@zyxwvutsrqponmlkjihgfedcba4321');
+});
+
+test('completing the wizard for teams stores the workflows url', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'msteams']);
+    goToConnectChannelStep($component, 0);
+    $component->assertWizardCurrentStep(2)->fillForm([
+        'webhook_url' => 'https://prod-12.westus.logic.azure.com:443/workflows/0123456789abcdef0123456789abcdef/triggers/manual/paths/invoke?api-version=2016-06-01&sig=SIGNATUREabc-_123',
+    ]);
+    goToConnectChannelStep($component, 1);
+    $component->assertWizardCurrentStep(3);
+
+    expect(NotificationChannel::where('user_id', $this->user->id)->sole()->apprise_url)
+        ->toBe('workflows://prod-12.westus.logic.azure.com/0123456789abcdef0123456789abcdef/SIGNATUREabc-_123');
+});
