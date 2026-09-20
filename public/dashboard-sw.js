@@ -22,7 +22,14 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    const url = (event.notification.data && event.notification.data.url) || '/dashboard';
+    let url = (event.notification.data && event.notification.data.url) || '/dashboard';
+    try {
+        if (new URL(url, self.location.origin).origin !== self.location.origin) {
+            url = '/dashboard';
+        }
+    } catch (e) {
+        url = '/dashboard';
+    }
 
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {

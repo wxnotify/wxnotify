@@ -188,3 +188,19 @@ test('the setup view embeds the vapid public key, the service worker path, and n
 
     expect($html)->toContain('PUBLICKEY123')->toContain('/dashboard-sw.js')->not->toContain('PRIVATEKEY456');
 });
+
+test('the service worker only follows same-origin notification urls', function () {
+    $js = file_get_contents(public_path('dashboard-sw.js'));
+
+    expect($js)->toContain('self.location.origin')->toContain("url = '/dashboard'");
+});
+
+test('the setup view replaces a stale subscription and guards a missing public key', function () {
+    config(['webpush.vapid.public_key' => 'PUBLICKEY123']);
+
+    $html = view('filament.dashboard.channels.web-push-setup')->render();
+
+    expect($html)->toContain('applicationServerKey')
+        ->toContain('unsubscribe()')
+        ->toContain('configured on this server yet');
+});

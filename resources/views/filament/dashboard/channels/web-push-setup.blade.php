@@ -10,8 +10,17 @@
             const raw = atob(base64);
             return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
         },
+        matchesPublicKey(subscription) {
+            const current = this.urlBase64ToUint8Array(this.publicKey);
+            const stored = new Uint8Array(subscription.options.applicationServerKey || []);
+            return stored.length === current.length && stored.every((byte, index) => byte === current[index]);
+        },
         async enable() {
             this.error = null;
+            if (!this.publicKey) {
+                this.error = 'Web Push isn\'t configured on this server yet.';
+                return;
+            }
             this.status = 'working';
             try {
                 const permission = await Notification.requestPermission();
@@ -20,8 +29,12 @@
                 }
                 const registration = await navigator.serviceWorker.register('/dashboard-sw.js', { scope: '/dashboard/' });
                 await navigator.serviceWorker.ready;
-                const existing = await registration.pushManager.getSubscription();
-                const subscription = existing ?? await registration.pushManager.subscribe({
+                let subscription = await registration.pushManager.getSubscription();
+                if (subscription && !this.matchesPublicKey(subscription)) {
+                    await subscription.unsubscribe();
+                    subscription = null;
+                }
+                subscription = subscription ?? await registration.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: this.urlBase64ToUint8Array(this.publicKey),
                 });
