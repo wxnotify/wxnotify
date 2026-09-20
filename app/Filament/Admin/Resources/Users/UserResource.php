@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Users;
 
+use App\Filament\Admin\Resources\Users\Pages\CreateUser;
 use App\Filament\Admin\Resources\Users\Pages\EditUser;
 use App\Filament\Admin\Resources\Users\Pages\ListUsers;
 use App\Filament\Admin\Resources\Users\RelationManagers\AlertRulesRelationManager;
@@ -39,11 +40,6 @@ class UserResource extends Resource
         return UsersTable::configure($table);
     }
 
-    public static function canCreate(): bool
-    {
-        return false;
-    }
-
     public static function getRelations(): array
     {
         return [
@@ -57,6 +53,7 @@ class UserResource extends Resource
     {
         return [
             'index' => ListUsers::route('/'),
+            'create' => CreateUser::route('/create'),
             'edit' => EditUser::route('/{record}/edit'),
         ];
     }
