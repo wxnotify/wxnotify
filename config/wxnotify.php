@@ -15,4 +15,10 @@ return [
 
     'mode' => env('WXNOTIFY_MODE', 'cloud'),
 
+    'webhooks' => [
+        // Honored only when mode === 'selfhost': lets a self-hosted instance
+        // deliver to services on its own private network.
+        'allow_private_networks' => env('WXNOTIFY_WEBHOOKS_ALLOW_PRIVATE', false),
+    ],
+
 ];

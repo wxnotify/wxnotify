@@ -1,0 +1,107 @@
+<?php
+
+namespace App\Support\Delivery;
+
+use Closure;
+
+class WebhookUrlGuard
+{
+    private const BLOCKED_HOST_SUFFIXES = ['.local', '.internal', '.localhost', '.lan', '.home.arpa'];
+
+    private const BLOCKED_HOSTS = ['localhost', 'metadata.google.internal'];
+
+    public function __construct(private readonly ?Closure $resolver = null) {}
+
+    /** A human-readable reason the URL must not be called, or null when it is safe. */
+    public function violation(string $url): ?string
+    {
+        $parts = parse_url($url);
+
+        if ($parts === false || ! isset($parts['scheme'], $parts['host'])) {
+            return 'Enter a full https:// URL.';
+        }
+        if (strtolower($parts['scheme']) !== 'https') {
+            return 'The URL must start with https://.';
+        }
+        if (isset($parts['user']) || isset($parts['pass'])) {
+            return 'The URL must not contain a username or password.';
+        }
+
+        $port = $parts['port'] ?? 443;
+        if ($port !== 443 && $port < 1024) {
+            return 'That port is not allowed; use 443 or a port above 1023.';
+        }
+
+        if ($this->privateNetworksAllowed()) {
+            return null;
+        }
+
+        $host = strtolower(trim($parts['host'], '[]'));
+
+        if (in_array($host, self::BLOCKED_HOSTS, true)) {
+            return 'That host name points at a private network address.';
+        }
+        foreach (self::BLOCKED_HOST_SUFFIXES as $suffix) {
+            if (str_ends_with($host, $suffix)) {
+                return 'That host name points at a private network address.';
+            }
+        }
+
+        $ips = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : $this->resolve($host);
+
+        if ($ips === []) {
+            return 'That host name could not be resolved.';
+        }
+        foreach ($ips as $ip) {
+            if (! $this->isPublicIp($ip)) {
+                return 'That address resolves to a private or reserved network, which is not allowed.';
+            }
+        }
+
+        return null;
+    }
+
+    private function privateNetworksAllowed(): bool
+    {
+        return config('wxnotify.mode') === 'selfhost' && (bool) config('wxnotify.webhooks.allow_private_networks');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function resolve(string $host): array
+    {
+        if ($this->resolver !== null) {
+            return array_values(($this->resolver)($host));
+        }
+
+        $ips = gethostbynamel($host) ?: [];
+        foreach (dns_get_record($host, DNS_AAAA) ?: [] as $record) {
+            $ips[] = $record['ipv6'];
+        }
+
+        return $ips;
+    }
+
+    private function isPublicIp(string $ip): bool
+    {
+        // IPv4-mapped IPv6 (::ffff:a.b.c.d): judge the embedded IPv4 address.
+        if (preg_match('/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i', $ip, $m)) {
+            $ip = $m[1];
+        }
+
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return false;
+        }
+
+        // Carrier-grade NAT 100.64.0.0/10 is not covered by PHP's range flags.
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            $long = ip2long($ip);
+            if ($long >= ip2long('100.64.0.0') && $long <= ip2long('100.127.255.255')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
