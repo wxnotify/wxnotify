@@ -121,6 +121,41 @@ test('completing the wizard for pushover stores the pover url', function () {
         ->and($channel->apprise_url)->toBe('pover://abcdefghijklmnopqrstuvwxyz1234@zyxwvutsrqponmlkjihgfedcba4321');
 });
 
+test('the pushover options show the emergency fields only for emergency priority and the sound has a play button', function () {
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'pushover']);
+    goToConnectChannelStep($component, 0);
+    $component->assertWizardCurrentStep(2)
+        ->assertFormFieldHidden('retry_interval')
+        ->assertFormFieldHidden('expire')
+        ->assertFormSet(['priority' => '0', 'sound' => 'pushover'])
+        ->assertFormComponentActionExists('sound', 'playPushoverSound')
+        ->fillForm(['priority' => '2'])
+        ->assertFormFieldVisible('retry_interval')
+        ->assertFormFieldVisible('expire')
+        ->assertFormSet(['retry_interval' => 900, 'expire' => 3600]);
+});
+
+test('completing the wizard for pushover with options stores them in the pover url', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'pushover']);
+    goToConnectChannelStep($component, 0);
+    $component->assertWizardCurrentStep(2)->fillForm([
+        'user_key' => 'abcdefghijklmnopqrstuvwxyz1234',
+        'api_token' => 'zyxwvutsrqponmlkjihgfedcba4321',
+        'devices' => "iphone\nipad",
+        'priority' => '2',
+        'sound' => 'siren',
+        'retry_interval' => 60,
+        'expire' => 7200,
+    ]);
+    goToConnectChannelStep($component, 1);
+    $component->assertWizardCurrentStep(3);
+
+    expect(NotificationChannel::where('user_id', $this->user->id)->sole()->apprise_url)
+        ->toBe('pover://abcdefghijklmnopqrstuvwxyz1234@zyxwvutsrqponmlkjihgfedcba4321/iphone/ipad?priority=2&sound=siren&interval=60&expire=7200');
+});
+
 test('completing the wizard for teams stores the workflows url', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 

@@ -143,7 +143,7 @@ test('the picker offers pushover and teams and they count toward the free slot',
 test('pushover validates the key and token shape', function () {
     $fields = collect((new PushoverChannelType)->formSchema())->keyBy(fn ($f) => $f->getName());
 
-    expect($fields->keys()->all())->toBe(['user_key', 'api_token']);
+    expect($fields->keys()->all())->toBe(['user_key', 'api_token', 'devices', 'priority', 'sound', 'retry_interval', 'expire']);
 
     foreach (['user_key', 'api_token'] as $name) {
         $validator = Validator::make([$name => 'too-short'], [$name => $fields[$name]->getValidationRules()]);
@@ -171,4 +171,47 @@ test('every registered channel type implements the transport contract', function
             ->and($type->buildDestination([...$sharedData, ...($perType[$slug] ?? [])]))->toHaveKey('apprise_url')
             ->not->toHaveKey('config');
     }
+});
+
+$pushoverBase = ['user_key' => 'abcdefghijklmnopqrstuvwxyz1234', 'api_token' => 'zyxwvutsrqponmlkjihgfedcba4321'];
+
+test('pushover adds devices, priority and sound to the pover url only when they differ from the defaults', function () use ($pushoverBase) {
+    $type = new PushoverChannelType;
+    $base = 'pover://abcdefghijklmnopqrstuvwxyz1234@zyxwvutsrqponmlkjihgfedcba4321';
+
+    expect($type->buildAppriseUrl($pushoverBase + ['devices' => '', 'priority' => '0', 'sound' => 'pushover']))->toBe($base)
+        ->and($type->buildAppriseUrl($pushoverBase + ['devices' => "iphone, pixel_7\nipad-2 iphone", 'priority' => '-1', 'sound' => 'siren']))
+        ->toBe($base.'/iphone/pixel_7/ipad-2?priority=-1&sound=siren');
+});
+
+test('pushover only sends the emergency retry interval and expiry for emergency priority', function () use ($pushoverBase) {
+    $type = new PushoverChannelType;
+    $base = 'pover://abcdefghijklmnopqrstuvwxyz1234@zyxwvutsrqponmlkjihgfedcba4321';
+
+    expect($type->buildAppriseUrl($pushoverBase + ['priority' => '2', 'retry_interval' => 900, 'expire' => 3600]))->toBe($base.'?priority=2')
+        ->and($type->buildAppriseUrl($pushoverBase + ['priority' => '2', 'retry_interval' => 60, 'expire' => 7200]))
+        ->toBe($base.'?priority=2&interval=60&expire=7200')
+        ->and($type->buildAppriseUrl($pushoverBase + ['priority' => '1', 'retry_interval' => 60, 'expire' => 7200]))
+        ->toBe($base.'?priority=1');
+});
+
+test('pushover validates device names, priority, sound and emergency bounds', function () {
+    $fields = collect((new PushoverChannelType)->formSchema())->keyBy(fn ($f) => $f->getName());
+    $passes = fn (string $name, mixed $value): bool => Validator::make([$name => $value], [$name => $fields[$name]->getValidationRules()])->passes();
+
+    expect($passes('devices', "iphone, pixel_7\nipad-2"))->toBeTrue()
+        ->and($passes('devices', 'bad device!'))->toBeFalse()
+        ->and($passes('devices', str_repeat('a', 26)))->toBeFalse()
+        ->and($passes('retry_interval', 29))->toBeFalse()
+        ->and($passes('retry_interval', 30))->toBeTrue()
+        ->and($passes('retry_interval', 10801))->toBeFalse()
+        ->and($passes('expire', 10800))->toBeTrue()
+        ->and($passes('expire', 10801))->toBeFalse()
+        ->and($passes('expire', 1.5))->toBeFalse()
+        ->and(array_map('strval', array_keys($fields['priority']->getOptions())))->toBe(['-2', '-1', '0', '1', '2'])
+        ->and($fields['priority']->getDefaultState())->toBe('0')
+        ->and($fields['sound']->getDefaultState())->toBe('pushover')
+        ->and(array_keys($fields['sound']->getOptions()))->toHaveCount(23)
+        ->and($fields['retry_interval']->getDefaultState())->toBe(900)
+        ->and($fields['expire']->getDefaultState())->toBe(3600);
 });
