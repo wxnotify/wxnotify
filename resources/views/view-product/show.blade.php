@@ -10,25 +10,39 @@
 
 @section('content')
     @if ($product->is_test)
-        <div class="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-            TEST PRODUCT — generated for testing, not a real weather product.
-        </div>
+        <x-filament::callout
+            color="warning"
+            icon="heroicon-o-exclamation-triangle"
+            heading="TEST PRODUCT"
+            description="Generated for testing, not a real weather product."
+            class="mb-6"
+        />
     @endif
 
-    <h1 class="text-2xl font-semibold">{{ $title }}</h1>
+    <h1 class="text-2xl font-semibold text-gray-950 dark:text-white">{{ $title }}</h1>
 
     @if (filled($product->headline))
-        <p class="mt-2 text-slate-700">{{ $product->headline }}</p>
+        <p class="mt-2 text-gray-700 dark:text-gray-300">{{ $product->headline }}</p>
     @endif
 
-    <dl class="mt-6 grid grid-cols-1 gap-x-8 gap-y-3 rounded-lg border border-slate-200 bg-white p-4 text-sm sm:grid-cols-2">
-        @foreach ($details as $label => $value)
-            <div>
-                <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">{{ $label }}</dt>
-                <dd class="mt-0.5 font-medium">{{ $value }}</dd>
-            </div>
-        @endforeach
-    </dl>
+    <x-filament::section heading="Product details" class="mt-6">
+        <dl class="grid grid-cols-1 gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
+            @foreach ($details as $label => $value)
+                <div>
+                    <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ $label }}</dt>
+                    <dd class="mt-1 font-medium text-gray-950 dark:text-white">
+                        @if ($label === 'Source')
+                            <x-filament::badge>{{ $value }}</x-filament::badge>
+                        @else
+                            {{ $value }}
+                        @endif
+                    </dd>
+                </div>
+            @endforeach
+        </dl>
+    </x-filament::section>
 
-    <pre class="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ $product->text }}</pre>
+    <x-filament::section heading="Product text" class="mt-6">
+        <pre class="overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-950 dark:text-white">{{ $product->text }}</pre>
+    </x-filament::section>
 @endsection

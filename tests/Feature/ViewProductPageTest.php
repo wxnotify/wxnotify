@@ -168,3 +168,23 @@ test('the page is served only from the configured product domain', function () {
 
     expect($product->fresh()->viewUrl())->toBe("https://products.example.test/view-product/{$product->view_slug}");
 });
+
+test('the page uses the dashboard panel theme, colors and Filament components', function () {
+    $product = pageProduct();
+
+    $this->get(route('view-product.show', $product->view_slug))
+        ->assertOk()
+        ->assertSee('fi-body', false)
+        ->assertSee('--primary-500', false)
+        ->assertSee('fi-section', false)
+        ->assertSee('fi-badge', false)
+        ->assertSee("localStorage.getItem('theme')", false)
+        ->assertDontSee('livewire', false);
+});
+
+test('the test product banner and the not-found page use Filament components', function () {
+    $test = pageProduct(['is_test' => true]);
+
+    $this->get(route('view-product.show', $test->view_slug))->assertOk()->assertSee('fi-callout', false);
+    $this->get('/view-product/does-not-exist')->assertNotFound()->assertSee('fi-empty-state', false);
+});

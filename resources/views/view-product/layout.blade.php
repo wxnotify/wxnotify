@@ -1,21 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="fi">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>@yield('title', 'WxNotify')</title>
         @yield('head')
-        @vite('resources/css/app.css')
+
+        @filamentStyles
+        {{ filament()->getTheme()->getHtml() }}
+        {{ filament()->getFontHtml() }}
+        {{ filament()->getMonoFontHtml() }}
+
+        <style>
+            :root {
+                --font-family: '{!! filament()->getFontFamily() !!}';
+                --mono-font-family: '{!! filament()->getMonoFontFamily() !!}';
+                --serif-font-family: '{!! filament()->getSerifFontFamily() !!}';
+                --default-theme-mode: {{ filament()->getDefaultThemeMode()->value }};
+            }
+        </style>
+
+        <script>
+            window.theme = localStorage.getItem('theme') ?? @js(filament()->getDefaultThemeMode()->value)
+
+            if (
+                window.theme === 'dark' ||
+                (window.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+            ) {
+                document.documentElement.classList.add('dark')
+            }
+        </script>
     </head>
-    <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
-        <header class="border-b border-slate-200 bg-white">
+    <body class="fi-body fi-panel-dashboard">
+        <header class="border-b border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
             <div class="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-                <a href="{{ config('app.url') }}" class="flex items-center gap-2 font-semibold">
-                    <img src="{{ asset('images/logo.png') }}" alt="" class="h-8 w-8">
-                    WxNotify
+                <a href="{{ config('app.url') }}" class="text-lg font-semibold text-gray-950 dark:text-white">
+                    {{ generateBrandName() }}
                 </a>
                 @isset($loginUrl)
-                    <a href="{{ $loginUrl }}" class="text-sm font-medium text-blue-600 hover:underline">Log in</a>
+                    <x-filament::button tag="a" :href="$loginUrl" size="sm">Log in</x-filament::button>
                 @endisset
             </div>
         </header>
@@ -24,7 +47,7 @@
             @yield('content')
         </main>
 
-        <footer class="mx-auto max-w-4xl px-4 pb-8 text-xs text-slate-500">
+        <footer class="mx-auto max-w-4xl px-4 pb-8 text-xs text-gray-500 dark:text-gray-400">
             Weather product text is published by the National Weather Service.
         </footer>
     </body>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Pipeline\GenerateViewSlug;
 use App\Models\IngestedProduct;
 use Carbon\CarbonInterface;
+use Filament\Facades\Filament;
 use Illuminate\Http\Response;
 
 class ViewProductController extends Controller
@@ -15,6 +16,10 @@ class ViewProductController extends Controller
 
     public function __invoke(string $slug, GenerateViewSlug $generateViewSlug): Response
     {
+        // Registers the dashboard panel's colors, fonts and theme for the layout.
+        Filament::setCurrentPanel('dashboard');
+        Filament::bootCurrentPanel();
+
         $product = IngestedProduct::with('product')->where('view_slug', $slug)->first();
 
         if ($product === null || ($product->is_test && app()->isProduction())) {

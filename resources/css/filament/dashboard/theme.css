@@ -3,6 +3,7 @@
 
 @source '../../../../app/Filament/Dashboard/**/*';
 @source '../../../../resources/views/filament/dashboard/**/*';
+@source '../../../../resources/views/view-product/**/*';
 @source '../../../../resources/views/vendor/filament-toggle-list/**/*';
 
 @plugin "@tailwindcss/typography";
