@@ -34,7 +34,7 @@ Out (later stages): polygon map, issuance-time radar snapshot (needs a pipeline 
 ## Page
 
 - Standalone public Blade page (not Filament) with the WxNotify branding and a login link to `/dashboard`.
-- Shows: catalog product name (`products.name` via `product_id`, falling back to the AWIPS ID), issuing office code, issued time (UTC), WMO header, AWIPS ID; VTEC details and headline when present; the product text in monospace.
+- Shows: catalog product name (`products.name` via `product_id`, falling back to the AWIPS ID), issuing office code, issued time (UTC), WMO header, AWIPS ID, and the product's source (the `source` column, shown as a label: NWWS or EMWIN, since the URL no longer says which feed carried it); VTEC details and headline when present; the product text in monospace.
 - Product text is external content and is always HTML-escaped, never rendered raw.
 - SEO: `<title>`, meta description, canonical link, `index` for real products.
 
@@ -50,7 +50,7 @@ Out (later stages): polygon map, issuance-time radar snapshot (needs a pipeline 
 
 ## Testing
 
-Slug: normal, correction marker, no AWIPS ID, no header, month rollover (header day later than received day), collision suffix; backfill. Route: 200 with expected content and headers, 404 for unknown slug, test-product rules in production vs non-production, product text escaped (a `<script>` in the text is not emitted), optional-domain routing.
+Slug: normal, correction marker, no AWIPS ID, no header, month rollover (header day later than received day), collision suffix; backfill. Route: 200 with expected content (including the source label for both an NWWS and an EMWIN product) and headers, 404 for unknown slug, test-product rules in production vs non-production, product text escaped (a `<script>` in the text is not emitted), optional-domain routing.
 
 ## Known separate issue
 
