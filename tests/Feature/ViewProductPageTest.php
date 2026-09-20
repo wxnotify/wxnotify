@@ -72,6 +72,31 @@ test('the product text is escaped, never rendered as markup', function () {
         ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', false);
 });
 
+test('the headline and catalog product name are escaped', function () {
+    $catalog = Product::factory()->create(['name' => '<script>alert("name")</script>']);
+    $product = pageProduct(['product_id' => $catalog->id, 'headline' => '<script>alert("headline")</script>']);
+
+    $this->get(route('view-product.show', $product->view_slug))
+        ->assertOk()
+        ->assertDontSee('<script>alert("headline")</script>', false)
+        ->assertDontSee('<script>alert("name")</script>', false)
+        ->assertSee('&lt;script&gt;alert(&quot;headline&quot;)&lt;/script&gt;', false)
+        ->assertSee('&lt;script&gt;alert(&quot;name&quot;)&lt;/script&gt;', false);
+});
+
+test('the canonical url ignores the request host', function () {
+    config(['wxnotify.product_domain' => null]);
+    $product = pageProduct();
+    $expected = rtrim(config('app.url'), '/').'/view-product/'.$product->view_slug;
+
+    $response = $this->get("http://evil.example.test/view-product/{$product->view_slug}")->assertOk();
+
+    $response->assertSee('<link rel="canonical" href="'.$expected.'">', false);
+    preg_match('/<link rel="canonical"[^>]*>/', $response->getContent(), $canonical);
+    expect($canonical[0])->not->toContain('evil.example.test');
+    expect($product->viewUrl())->toBe($expected);
+});
+
 test('the page links to the dashboard login', function () {
     $product = pageProduct();
 
@@ -141,5 +166,5 @@ test('the page is served only from the configured product domain', function () {
     $this->get("http://products.example.test/view-product/{$product->view_slug}")->assertOk();
     $this->get("http://other.example.test/view-product/{$product->view_slug}")->assertNotFound();
 
-    expect($product->fresh()->viewUrl())->toBe("http://products.example.test/view-product/{$product->view_slug}");
+    expect($product->fresh()->viewUrl())->toBe("https://products.example.test/view-product/{$product->view_slug}");
 });

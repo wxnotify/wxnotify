@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 #[Fillable([
     'cccc', 'ttaaii', 'awipsid', 'nwws_id', 'wmo_ddhhmm', 'text', 'file_path', 'source', 'wmo_header_key', 'received_at',
@@ -41,8 +43,14 @@ class IngestedProduct extends Model
     protected static function booted(): void
     {
         static::created(function (IngestedProduct $product): void {
-            if ($product->view_slug === null) {
+            if ($product->view_slug !== null) {
+                return;
+            }
+
+            try {
                 $product->forceFill(['view_slug' => app(GenerateViewSlug::class)($product)])->saveQuietly();
+            } catch (Throwable $e) {
+                Log::warning('Failed to generate a view slug', ['id' => $product->getKey(), 'exception' => $e->getMessage()]);
             }
         });
     }
@@ -59,7 +67,14 @@ class IngestedProduct extends Model
 
     public function viewUrl(): ?string
     {
-        return $this->view_slug === null ? null : route('view-product.show', ['slug' => $this->view_slug]);
+        if ($this->view_slug === null) {
+            return null;
+        }
+
+        $productDomain = config('wxnotify.product_domain');
+        $base = $productDomain ? 'https://'.$productDomain : rtrim((string) config('app.url'), '/');
+
+        return $base.route('view-product.show', ['slug' => $this->view_slug], absolute: false);
     }
 
     /**

@@ -24,7 +24,13 @@ test('rows without a slug get one, oldest first, and existing slugs are untouche
 });
 
 test('running the backfill again changes nothing', function () {
-    IngestedProduct::factory()->count(3)->create();
+    $products = IngestedProduct::factory()->count(3)->create();
+    DB::table('ingested_products')->whereIn('id', $products->modelKeys())->update(['view_slug' => null]);
 
-    expect(app(BackfillViewSlugs::class)())->toBe(0);
+    expect(app(BackfillViewSlugs::class)())->toBe(3);
+    $slugs = IngestedProduct::query()->orderBy('id')->pluck('view_slug', 'id')->all();
+
+    expect(app(BackfillViewSlugs::class)())->toBe(0)
+        ->and(IngestedProduct::query()->orderBy('id')->pluck('view_slug', 'id')->all())->toBe($slugs)
+        ->and(array_filter($slugs))->toHaveCount(3);
 });

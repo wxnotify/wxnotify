@@ -3,6 +3,7 @@
 use App\Actions\Pipeline\GenerateViewSlug;
 use App\Models\IngestedProduct;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Log;
 
 function slugProduct(array $attributes = []): IngestedProduct
 {
@@ -77,4 +78,24 @@ test('issuedAt returns the derived UTC time, or null when unusable', function ()
     expect($generator->issuedAt(slugProduct())?->equalTo(CarbonImmutable::parse('2026-09-20 06:25:00', 'UTC')))->toBeTrue()
         ->and($generator->issuedAt(slugProduct(['awipsid' => 'x', 'wmo_ddhhmm' => null])))->toBeNull()
         ->and($generator->issuedAt(slugProduct(['awipsid' => 'y', 'wmo_ddhhmm' => '202575'])))->toBeNull();
+});
+
+test('a slug generation failure is logged and never blocks later created listeners', function () {
+    Log::spy();
+    app()->bind(GenerateViewSlug::class, fn () => throw new RuntimeException('boom'));
+    $laterListenerRan = false;
+    IngestedProduct::created(function () use (&$laterListenerRan): void {
+        $laterListenerRan = true;
+    });
+
+    $product = IngestedProduct::factory()->create();
+
+    expect($product->fresh())->not->toBeNull()
+        ->and($product->fresh()->view_slug)->toBeNull()
+        ->and($laterListenerRan)->toBeTrue();
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn ($message, $context) => $message === 'Failed to generate a view slug'
+            && $context['id'] === $product->id
+            && $context['exception'] === 'boom');
 });
