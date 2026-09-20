@@ -1,0 +1,53 @@
+# Tier 1 Notification Channels (Pushover, Microsoft Teams, Custom Webhooks, Web Push) — Design
+
+Source: master plan (`wxnotify-nextgen-plan.html`, FEAT "Notification channels" table — all four are "Tier 1"; Custom Webhooks via Spatie webhook-server, Web Push via `laravel-notification-channels/webpush`, both outside the Apprise catalog). Email, ntfy, Discord, Slack and Telegram already exist (`app/Support/ChannelTypes/`).
+
+## Goal
+
+Add the remaining four Tier 1 channel types to the channel picker, with the same guided create → confirmation-code flow as the existing channels, without breaking any existing delivery path.
+
+## Decisions (user-approved)
+
+- **Custom Webhooks:** Spatie `spatie/laravel-webhook-server` (new Composer dependency, approved) — HMAC-signed requests sent directly from the queue worker.
+- **Web Push:** `laravel-notification-channels/webpush` (new Composer dependency, approved). A channel is verified by delivering the 6-digit confirmation code as a real push notification which the subscriber types back.
+- **Delivery architecture:** a `ChannelDispatcher` with pluggable transports (`apprise`, `webhook`, `webpush`). Rejected: faking Apprise URLs and intercepting them inside `AppriseApiClient`.
+- **Tiers:** all four are free-tier (`min_tier = free`) and count toward Free's single no-cost-channel slot (`countsTowardFreeSlot() === true`), per the master plan's TIER rules.
+- **Rollout order (staged plan):** (1) Pushover + Teams, (2) dispatcher + Custom Webhooks, (3) Web Push. Each stage ships working software and is independently testable.
+
+## Delivery layer
+
+- `App\Support\Delivery\ChannelDispatcher::send(NotificationChannel $channel, string $body, ?string $title = null): DeliveryResult`. `DeliveryResult` = `{success: bool, error: ?string}`. The transport is chosen from the channel type.
+- Transports (`App\Support\Delivery\Transports\*`): `AppriseTransport` (wraps the existing `AppriseApiClient`; behavior identical, including letting `ConnectionException` surface so queued jobs keep retrying transient outages), `WebhookTransport`, `WebPushTransport`.
+- Callers move from `AppriseApiClient::notify()` to the dispatcher: `DeliverWeatherAlert`, `DeliverScheduledAlert`, `SendActivityAlert`, `DispatchChannelConfirmationCode`. `DeliveryLog.error_detail` records the transport's own error text instead of the fixed "Apprise reported non-delivery." string (Apprise failures keep a message of that shape).
+- Channel-type contract: `ChannelType` gains `transport(): string` (`'apprise' | 'webhook' | 'webpush'`). Apprise types keep `buildAppriseUrl()`. A `DirectChannelType` sub-contract (webhook, web push) adds `buildConfig(array $data): array` and does not implement `buildAppriseUrl`. The two creation sites — `ConnectChannel` (wizard) and `AlertRuleForm`'s inline create (`apprise_url => $type->buildAppriseUrl($data)`) — build either `apprise_url` or `config` based on the type.
+- Data: migration makes `notification_channels.apprise_url` nullable and adds `config` (`text`, `encrypted:array` cast, nullable). `NotificationChannel::$fillable` gains `config`. Neither `apprise_url` nor `config` is written to the activity log (the model's `logOnly` list already excludes `apprise_url` because it can carry secrets; `config` is excluded the same way). Callers that assume `apprise_url` is non-null (grep `apprise_url`: `ConnectChannel`, `AlertRuleForm`, the three jobs, `DispatchChannelConfirmationCode`, `TraccarServer`) are updated or verified.
+- **Retry semantics preserved:** `DeliverWeatherAlert` treats a failed delivery as terminal and records it; `SendActivityAlert` relies on exceptions for queue retry. The dispatcher returns a failed `DeliveryResult` for a definitive failure and lets transient transport exceptions (connection errors) propagate, so each caller keeps its existing behavior.
+- **Spike (first step of stage 2):** Spatie sends webhooks asynchronously via its own job, but `DeliveryLog` needs a definitive success/failure. Determine from the package whether `WebhookCall::dispatchSync()` plus its `WebhookCallSucceededEvent`/`WebhookCallFailedEvent`/`FinalWebhookCallFailedEvent` gives a reliable synchronous result inside the queued delivery job (and how its own retry/backoff interacts with ours); adjust the transport accordingly.
+
+## Channels
+
+**Pushover** (`transport = apprise`, slug `pushover`, `fab-pushover`-style icon or a Heroicon fallback). Fields: `user_key` (30 alphanumeric characters), `api_token` (application token, 30 alphanumeric characters, with helper text pointing to pushover.net/apps). Builds `pover://{user_key}@{api_token}`. Both fields validated with a regex; never logged.
+
+**Microsoft Teams** (`transport = apprise`, slug `msteams`). Apprise v1.13 lists only `workflow(s)://` (Power Automate / Workflows), because Microsoft retired Office 365 connector webhooks. Field: `webhook_url` — the Workflows URL (`https://<host>.logic.azure.com[:port]/workflows/<workflow>/triggers/manual/paths/invoke?...&sig=<signature>`). The type parses host, workflow id and `sig` and builds `workflows://{host}/{workflow}/{signature}`. Legacy connector URLs (`outlook.office.com/webhook`, `*.webhook.office.com`) fail validation with an explanatory message. (Verify the exact URL-to-`workflows://` mapping against the running Apprise container during implementation.)
+
+**Custom Webhooks** (`transport = webhook`, slug `webhook`). Fields: `url` (must be `https://`), optional `label`. WxNotify generates a random 32-byte signing secret at creation, stores it in `config`, and shows it on the confirmation step and on the channel's edit page (revealable, since the subscriber must configure their receiver). Payload (JSON): `{"type": "alert"|"confirmation", "title", "body", "sent_at" (ISO 8601 UTC), "alert": {rule, product, url...}}`; a confirmation message carries `{"type": "confirmation", "code": "123456", ...}`. Signed by Spatie with the channel secret (default `Signature` header, HMAC-SHA256). Timeout 10 s.
+- **SSRF protection:** reject at save time and re-check at send time (defeats DNS rebinding) any URL whose host resolves to loopback, private (RFC 1918 / ULA), link-local (including 169.254.169.254 and cloud metadata hostnames), CGNAT or otherwise non-public addresses; only `https://`, ports 443 and >1024 (no 22/25/etc. — small deny-list). Self-hosted instances may allow private targets with `config('wxnotify.webhooks.allow_private_networks')` (default `false`; a documented env override for `selfhost` mode only).
+
+**Web Push** (`transport = webpush`, slug `webpush`). Not a text form: the channel-creation step shows an "Enable browser notifications" button. JavaScript (a small Alpine/Livewire hook on the dashboard) requests notification permission, registers a service worker served from `/dashboard-sw.js` (scoped to the dashboard), subscribes with the VAPID public key, and posts the subscription (endpoint, `p256dh`, `auth`) to Livewire, which creates a `NotificationChannel` with `config` referencing the subscription and a label derived from the browser/OS (e.g. "Chrome on macOS"). One channel per browser. Verification delivers the confirmation code as a push notification; the subscriber types it back. The service worker shows `title`/`body` and opens the dashboard (or the alert link in the payload) on click. VAPID keys come from `php artisan webpush:vapid` into `.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`); the Web Push type is hidden/disabled in the picker when they are missing. A push endpoint returning 404/410 (subscription gone) marks the delivery failed and the channel unverified/flagged so the subscriber can re-enable it. Constraints to document: HTTPS required in production (localhost exempt); iOS Safari only works for an installed web app; corporate browsers may block push.
+- Backend uses `laravel-notification-channels/webpush` (VAPID signing, `push_subscriptions` table). Because that package targets a notifiable's own subscriptions, the transport sends to the single subscription a channel references (verified during implementation; if the package can't target one subscription cleanly, the transport sends through its underlying `minishlink/web-push` client directly).
+
+## Catalog and tiers
+
+- New migration inserts `pushover`, `msteams`, `webhook`, `webpush` into `channel_types` (`enabled`, `min_tier = free`, `sort_order` after telegram); `ChannelTypeSeeder::SHIPPED` gains the same rows (so `ResetCatalogs`/Reset to Factory Defaults and `ChannelTypeSeederTest` stay correct); `ChannelTypeRegistry::$classes` registers the new classes.
+- `User::canAddChannel()` needs no change: all four return `countsTowardFreeSlot() === true`.
+- Picker icons: `fab-*` names where blade-fontawesome has them (`fab-microsoft` for Teams; Pushover/Web Push/Webhook use Heroicons if no brand icon exists).
+
+## Testing
+
+- **Stage 1:** per-type unit/feature tests (form validation, URL building, rejection of retired Teams connector URLs, Pushover key/token regex, picker shows the new tiles, Free slot behavior) and an end-to-end wizard test through `ConnectChannel` for each; the Apprise container is faked with `Http::fake` as existing channel tests do.
+- **Stage 2:** dispatcher unit tests (transport selection, `DeliveryResult` mapping, exceptions propagate for transient failures); the four callers still behave identically for Apprise channels (existing Deliver*/SendActivityAlert/confirmation tests keep passing unchanged); webhook tests with `Http::fake`/Spatie faking: signature header present and verifiable with the secret, payload shape, https-only, SSRF rejection at save and at send (including a host that resolves to a private IP, and DNS rebinding simulated by swapping the resolver), timeout/failure recorded in `DeliveryLog`, confirmation code payload, secret never in activity log or logs.
+- **Stage 3:** Web Push backend tests with a faked push client (subscription creation via the Livewire endpoint, VAPID-missing hides the type, 404/410 handling, confirmation code push). The browser half (permission prompt, service worker, notification display) is verified manually in a real browser on localhost and documented as such; tests cover the server contract and that the service worker file is served with the correct headers.
+
+## Out of scope
+
+Firebase native-app push and any Tier 2 (BYO-cost) channels; retry policy changes for existing channels; webhook secret rotation UI; per-webhook custom headers or payload templates; a subscriber-facing delivery-log view for these channels beyond the existing `DeliveryLog`.
