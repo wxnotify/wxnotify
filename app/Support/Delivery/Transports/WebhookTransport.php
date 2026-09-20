@@ -19,6 +19,9 @@ use Throwable;
  */
 class WebhookTransport implements Transport
 {
+    /** @var list<string> */
+    private const RESERVED_KEYS = ['type', 'title', 'body', 'sent_at'];
+
     public function __construct(private readonly WebhookUrlGuard $guard) {}
 
     /**
@@ -38,12 +41,7 @@ class WebhookTransport implements Transport
             return DeliveryResult::failed($violation);
         }
 
-        $payload = [
-            'type' => $meta['type'] ?? 'alert',
-            'title' => $title,
-            'body' => $body,
-            'sent_at' => now()->utc()->toIso8601String(),
-        ] + array_diff_key($meta, ['type' => true]);
+        $payload = $this->payload($body, $title, $meta);
 
         try {
             WebhookCall::create()
@@ -59,6 +57,36 @@ class WebhookTransport implements Transport
         }
 
         return DeliveryResult::delivered();
+    }
+
+    /**
+     * The documented webhook body shape.
+     *
+     * `type`, `title`, `body` and `sent_at` are reserved: they are always the
+     * transport's own values, never a caller's meta key of the same name. An
+     * alert's remaining meta (rule, product, …) is nested under `alert`; a
+     * confirmation keeps its `code` at the top level.
+     *
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function payload(string $body, ?string $title, array $meta): array
+    {
+        $type = is_string($meta['type'] ?? null) ? $meta['type'] : 'alert';
+        $details = array_diff_key($meta, array_flip(self::RESERVED_KEYS));
+
+        $payload = [
+            'type' => $type,
+            'title' => $title,
+            'body' => $body,
+            'sent_at' => now()->utc()->toIso8601String(),
+        ];
+
+        // Always present for an alert, so consumers can read payload.alert.*
+        // without first testing whether the key exists at all.
+        return $type === 'alert'
+            ? $payload + ['alert' => $details]
+            : $payload + $details;
     }
 
     /**

@@ -10,8 +10,14 @@ class WebhookUrlGuard
 
     private const BLOCKED_HOSTS = ['localhost', 'metadata.google.internal'];
 
-    /** @var list<array{string, int}> */
-    private const BLOCKED_IPV6_PREFIXES = [['64:ff9b::', 96], ['2002::', 16], ['fec0::', 10], ['2001::', 32]];
+    /**
+     * `::ffff:0:0:0/96` is the deprecated IPv4-translated block: written in hex
+     * (`::ffff:0:7f00:1`) it sidesteps the dotted `::ffff:a.b.c.d` form handled
+     * below, yet still carries an IPv4 address such as 127.0.0.1 or 10.0.0.5.
+     *
+     * @var list<array{string, int}>
+     */
+    private const BLOCKED_IPV6_PREFIXES = [['64:ff9b::', 96], ['2002::', 16], ['fec0::', 10], ['2001::', 32], ['::ffff:0:0:0', 96]];
 
     public function __construct(private readonly ?Closure $resolver = null) {}
 

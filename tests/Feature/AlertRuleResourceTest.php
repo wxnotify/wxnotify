@@ -11,6 +11,7 @@ use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
 use Database\Seeders\ProductCatalogSeeder;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\DB;
@@ -388,6 +389,28 @@ test('the inline channel action for a no-cost type is hidden once a Free subscri
         ->fillForm(['category' => 'lightning'])
         ->assertFormComponentActionHidden('channel_ids', 'connect_slack')
         ->assertFormComponentActionVisible('channel_ids', 'connect_email');
+});
+
+test('channel types that cannot be created inline get no suffix action on the channels field', function () {
+    // Webhook and Web Push both return supportsInlineCreate() === false: a
+    // webhook has to show its signing secret once on a Confirm step, and Web
+    // Push needs the browser's own subscribe flow, so neither fits a one-shot
+    // modal -- the full ConnectChannel wizard is the only way in. VAPID keys
+    // are configured and the tier is raised so both types really are in the
+    // picker; otherwise isAvailable()/canAddChannel() would filter them out and
+    // this test would pass for the wrong reason.
+    chanConfigureVapid();
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+
+    expect(app(ChannelTypeRegistry::class)->forPicker()->map(fn (array $row) => $row['type']->slug())->all())
+        ->toContain('webhook')
+        ->toContain('webpush');
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'lightning'])
+        ->assertFormComponentActionDoesNotExist('channel_ids', 'connect_webhook')
+        ->assertFormComponentActionDoesNotExist('channel_ids', 'connect_webpush')
+        ->assertFormComponentActionExists('channel_ids', 'connect_discord');
 });
 
 test('the CountyZone picker options include real counties and zones for the filtered state', function () {

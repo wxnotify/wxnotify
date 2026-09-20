@@ -202,6 +202,70 @@ test('the web push wizard creates a channel from a browser subscription and push
         ->and(json_decode($sent[0]['payload'], true)['body'])->toContain($channel->confirmation_code);
 });
 
+/**
+ * Drive the Web Push wizard from the picker through step 2 with the given
+ * browser PushSubscription JSON.
+ */
+function chanRunWebPushWizard(string $subscriptionJson): void
+{
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'webpush']);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm(['subscription' => $subscriptionJson]);
+    goToConnectChannelStep($component, 1);
+}
+
+test('re-running the web push wizard in the same browser refreshes the one channel instead of duplicating it', function () {
+    // The subscribe component deliberately reuses the browser's live
+    // PushSubscription, so a second run returns the same endpoint with freshly
+    // exported keys. Two channels on one endpoint would deliver every alert twice.
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    chanConfigureVapid();
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+    $sent = chanFakePushService();
+
+    chanRunWebPushWizard(chanPushSubscriptionJson());
+
+    $channel = NotificationChannel::where('user_id', $this->user->id)->sole();
+    $firstCode = $channel->confirmation_code;
+    $channel->forceFill(['verified_at' => now()])->save();
+
+    chanRunWebPushWizard(json_encode([
+        'endpoint' => 'https://fcm.googleapis.com/fcm/send/abc123',
+        'keys' => ['p256dh' => str_repeat('C', 87), 'auth' => str_repeat('d', 22)],
+    ]));
+
+    expect(NotificationChannel::where('user_id', $this->user->id)->count())->toBe(1);
+
+    $refreshed = NotificationChannel::where('user_id', $this->user->id)->sole();
+
+    expect($refreshed->id)->toBe($channel->id)
+        ->and($refreshed->config['public_key'])->toBe(str_repeat('C', 87))
+        ->and($refreshed->config['auth_token'])->toBe(str_repeat('d', 22))
+        ->and($refreshed->isVerified())->toBeFalse()
+        ->and($refreshed->confirmation_code)->not->toBe($firstCode)
+        ->and(count($sent))->toBe(2)
+        ->and(json_decode($sent[1]['payload'], true)['body'])->toContain($refreshed->confirmation_code);
+});
+
+test('a web push subscription from a different browser still gets its own channel', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    chanConfigureVapid();
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['93.184.216.34']));
+    chanFakePushService();
+
+    chanRunWebPushWizard(chanPushSubscriptionJson());
+    chanRunWebPushWizard(chanPushSubscriptionJson('https://fcm.googleapis.com/fcm/send/different999'));
+
+    $endpoints = NotificationChannel::where('user_id', $this->user->id)->get()
+        ->map(fn (NotificationChannel $channel) => $channel->config['endpoint'])
+        ->all();
+
+    expect($endpoints)->toEqualCanonicalizing([
+        'https://fcm.googleapis.com/fcm/send/abc123',
+        'https://fcm.googleapis.com/fcm/send/different999',
+    ]);
+});
+
 test('the web push wizard rejects an invalid subscription without creating a channel', function () {
     chanConfigureVapid();
     app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => ['10.0.0.5']));

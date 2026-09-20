@@ -195,6 +195,23 @@ test('the service worker only follows same-origin notification urls', function (
     expect($js)->toContain('self.location.origin')->toContain("url = '/dashboard'");
 });
 
+test('the service worker click handler targets a dashboard tab, awaits navigate, and falls back to a new window', function () {
+    // Content contract only: the suite has no JS runtime, so nothing here
+    // executes the service worker -- this pins the shape of the fix (an
+    // in-scope client is preferred, navigate() is awaited inside a try/catch,
+    // and openWindow() is the fallback), not its runtime behaviour. The real
+    // behaviour was checked by hand in a browser.
+    $js = file_get_contents(public_path('dashboard-sw.js'));
+
+    expect($js)->toContain("startsWith('/dashboard')")
+        ->toContain('await')
+        ->toContain('catch')
+        ->toContain('self.clients.openWindow(url)')
+        // The un-awaited navigate() on the first arbitrary match is what focused
+        // an unrelated tab and swallowed a TypeError; it must be gone.
+        ->not->toContain('client.navigate(url);');
+});
+
 test('the setup view replaces a stale subscription and guards a missing public key', function () {
     config(['webpush.vapid.public_key' => 'PUBLICKEY123']);
 

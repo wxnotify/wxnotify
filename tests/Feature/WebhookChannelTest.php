@@ -5,6 +5,7 @@ use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\WebhookChannelType;
 use App\Support\Delivery\ChannelDispatcher;
+use App\Support\Delivery\NoRedirectCallWebhookJob;
 use App\Support\Delivery\WebhookUrlGuard;
 use Database\Seeders\ChannelTypeSeeder;
 use GuzzleHttp\Exception\ConnectException;
@@ -67,9 +68,33 @@ test('delivery posts a signed json payload and reports success', function () {
     $payload = json_decode($body, true);
 
     expect((string) $request->getUri())->toBe('https://hooks.example.com/wx')
-        ->and($payload)->toMatchArray(['type' => 'alert', 'title' => 'Tornado Warning', 'body' => 'Tornado Warning text', 'rule' => 'My rule', 'product' => 'Tornado Warning'])
+        ->and($payload)->toMatchArray(['type' => 'alert', 'title' => 'Tornado Warning', 'body' => 'Tornado Warning text'])
+        // Alert details live under a nested "alert" object, not at the top level.
+        ->and($payload['alert'])->toBe(['rule' => 'My rule', 'product' => 'Tornado Warning'])
+        ->and($payload)->not->toHaveKey('rule')
+        ->and($payload)->not->toHaveKey('product')
         ->and($payload['sent_at'])->toMatch('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/')
         ->and($request->getHeaderLine('Signature'))->toBe(hash_hmac('sha256', $body, 's3cret'));
+});
+
+test('caller meta can never overwrite the reserved top-level payload keys', function () {
+    $history = chanFakeWebhookEndpoint([new Response(200)]);
+    $channel = NotificationChannel::factory()->webhook()->create();
+
+    app(ChannelDispatcher::class)->send($channel, 'real body', 'real title', [
+        'type' => 'alert',
+        'title' => 'spoofed',
+        'body' => 'spoofed',
+        'sent_at' => 'spoofed',
+        'rule' => 'My rule',
+    ]);
+
+    $payload = json_decode((string) $history[0]['request']->getBody(), true);
+
+    expect($payload['title'])->toBe('real title')
+        ->and($payload['body'])->toBe('real body')
+        ->and($payload['sent_at'])->not->toBe('spoofed')
+        ->and($payload['alert'])->toBe(['rule' => 'My rule']);
 });
 
 test('a confirmation message carries the code in the payload', function () {
@@ -78,7 +103,11 @@ test('a confirmation message carries the code in the payload', function () {
 
     app(ChannelDispatcher::class)->send($channel, 'Your code', 'Confirm', ['type' => 'confirmation', 'code' => '123456']);
 
-    expect(json_decode((string) $history[0]['request']->getBody(), true))->toMatchArray(['type' => 'confirmation', 'code' => '123456']);
+    $payload = json_decode((string) $history[0]['request']->getBody(), true);
+
+    // A confirmation keeps "code" at the top level and carries no "alert" object.
+    expect($payload)->toMatchArray(['type' => 'confirmation', 'code' => '123456'])
+        ->and($payload)->not->toHaveKey('alert');
 });
 
 test('a non-2xx response is a failure with a useful message and only one attempt is made', function () {
@@ -107,6 +136,15 @@ test('a redirect is never followed, so a public endpoint cannot bounce the reque
         ->and($result->error)->not->toContain('10.0.0.5');
 });
 
+// Pins the load-bearing half of the test above: the redirect can only be refused
+// because Spatie is configured to run this app's NoRedirectCallWebhookJob. A
+// `vendor:publish --force` or a bad merge that restored Spatie's own
+// CallWebhookJob would silently reopen the redirect-SSRF hole, and the redirect
+// test would keep passing on a mock handler that never redirects for real.
+test('the webhook job is pinned to the no-redirect subclass', function () {
+    expect(config('webhook-server.webhook_job'))->toBe(NoRedirectCallWebhookJob::class);
+});
+
 test('a connection error is a failure, not an exception', function () {
     chanFakeWebhookEndpoint([new ConnectException('boom', new Request('POST', 'https://hooks.example.com/wx'))]);
     $channel = NotificationChannel::factory()->webhook()->create();
@@ -131,18 +169,28 @@ test('a webhook channel with a missing config is a failure', function () {
     expect(app(ChannelDispatcher::class)->send($channel, 'body')->success)->toBeFalse();
 });
 
-test('neither the signing secret nor the endpoint url reaches the activity log or the error message', function () {
+test('neither the signing secret nor the endpoint path or query reaches the activity log or the error message', function () {
     chanFakeWebhookEndpoint([new Response(500, [], 'echoing s3cret')]);
-    $channel = NotificationChannel::factory()->webhook('https://hooks.example.com/wx?token=abc123', 's3cret')->create();
+    $url = 'https://hooks.example.com/wx?token=abc123';
+    // The real auto-generated label, not the factory's fake()->word(): the label
+    // is activity-logged, so anything the label embeds is in the log by design.
+    // Option (a) of the review: the derived label deliberately carries the
+    // endpoint HOST (a subscriber needs to tell their channels apart), so this
+    // asserts the secret and the URL's path/query -- the parts that can carry a
+    // credential -- stay out, rather than the host.
+    $label = (new WebhookChannelType)->buildDestination(['url' => $url])['label'];
+    $channel = NotificationChannel::factory()->webhook($url, 's3cret')->create(['label' => $label]);
 
     $result = app(ChannelDispatcher::class)->send($channel, 'body');
     $activity = json_encode(Activity::all()->toArray());
 
-    expect($result->error)->not->toContain('s3cret')
+    expect($label)->toBe('Webhook (hooks.example.com)')
+        ->and($result->error)->not->toContain('s3cret')
         ->and($result->error)->not->toContain('hooks.example.com')
         ->and($result->error)->not->toContain('token=abc123')
         ->and($result->error)->not->toContain('abc123')
         ->and($activity)->not->toContain('s3cret')
-        ->and($activity)->not->toContain('hooks.example.com')
+        ->and($activity)->not->toContain('/wx')
+        ->and($activity)->not->toContain('token=abc123')
         ->and($activity)->not->toContain('abc123');
 });
