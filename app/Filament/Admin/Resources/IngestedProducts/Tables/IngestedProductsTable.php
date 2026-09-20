@@ -32,6 +32,8 @@ class IngestedProductsTable
                 TextColumn::make('awipsid')
                     ->label('AWIPS ID')
                     ->searchable(),
+                TextColumn::make('source')
+                    ->sortable(),
                 TextColumn::make('wmo_ddhhmm')
                     ->label('Issued (DDHHMM)')
                     ->toggleable(isToggledHiddenByDefault: true)
