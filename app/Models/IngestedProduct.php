@@ -57,6 +57,11 @@ class IngestedProduct extends Model
         return $this->belongsTo(TestProductScenario::class, 'test_product_scenario_id');
     }
 
+    public function viewUrl(): ?string
+    {
+        return $this->view_slug === null ? null : route('view-product.show', ['slug' => $this->view_slug]);
+    }
+
     /**
      * Decodes cccc/ttaaii/awipsid/wmo_ddhhmm/nwws_id from an nwws-go-client
      * archive filename: [cccc]_[ttaaii]-[awipsid].[ddHHMM]_[id].txt — see

@@ -15,6 +15,11 @@ return [
 
     'mode' => env('WXNOTIFY_MODE', 'cloud'),
 
+    // Optional dedicated host for the public View Product pages (e.g. a
+    // subdomain behind Cloudflare caching). Unset serves them from the main
+    // domain, which is what local development and self-hosting use.
+    'product_domain' => env('WXNOTIFY_PRODUCT_DOMAIN'),
+
     'webhooks' => [
         // Honored only when mode === 'selfhost': lets a self-hosted instance
         // deliver to services on its own private network.
