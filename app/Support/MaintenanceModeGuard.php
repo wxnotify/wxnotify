@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Exceptions\MaintenanceModeException;
 use App\Settings\GeneralSettings;
+use Spatie\LaravelSettings\Exceptions\MissingSettings;
 use STS\FilamentImpersonate\ImpersonateManager;
 
 class MaintenanceModeGuard
@@ -17,20 +18,26 @@ class MaintenanceModeGuard
 
     public function isMaintenanceActive(): bool
     {
-        return app(GeneralSettings::class)->maintenance_mode;
+        try {
+            return app(GeneralSettings::class)->maintenance_mode;
+        } catch (MissingSettings) {
+            return false;
+        }
     }
 
     public function isBlocking(): bool
     {
-        if (! $this->isMaintenanceActive()) {
+        $user = auth()->user();
+
+        if ($user === null || $user->is_staff) {
             return false;
         }
 
-        $user = auth()->user();
+        if (app(ImpersonateManager::class)->isImpersonating()) {
+            return false;
+        }
 
-        return $user !== null
-            && ! $user->is_staff
-            && ! app(ImpersonateManager::class)->isImpersonating();
+        return $this->isMaintenanceActive();
     }
 
     public function assertWritable(): void

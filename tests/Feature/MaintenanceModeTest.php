@@ -9,6 +9,8 @@ use App\Models\TraccarServer;
 use App\Models\User;
 use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use STS\FilamentImpersonate\ImpersonateManager;
 
 function setMaintenance(bool $on, ?string $message = null): void
@@ -120,4 +122,29 @@ test('the default banner message is used when none is set', function () {
     setMaintenance(true);
 
     $this->get('/dashboard')->assertSee('read-only')->assertSee('Alerts continue to be delivered as normal.');
+});
+
+function removeGeneralSettingsRows(): void
+{
+    DB::table('settings')->where('group', 'general')->delete();
+    Cache::flush();
+    app()->forgetInstance(GeneralSettings::class);
+}
+
+test('a write with no signed-in user never reads settings, even when the settings rows are missing', function () {
+    removeGeneralSettingsRows();
+    expect(auth()->check())->toBeFalse();
+
+    $this->location->update(['label' => 'System edit']);
+
+    expect($this->location->fresh()->label)->toBe('System edit');
+});
+
+test('a signed-in subscriber write fails open when the settings rows are missing', function () {
+    $this->actingAs($this->subscriber);
+    removeGeneralSettingsRows();
+
+    $this->location->update(['label' => 'Open edit']);
+
+    expect($this->location->fresh()->label)->toBe('Open edit');
 });
