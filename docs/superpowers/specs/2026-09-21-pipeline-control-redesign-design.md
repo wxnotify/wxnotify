@@ -2,7 +2,7 @@
 
 ## Goal
 
-Turn the Pipeline Control admin page from three plain rows into a live operations view: one health verdict per feed that combines Docker state with data freshness, a summary banner, a 24-hour throughput sparkline, per-feed recent products (with a cross-feed check that Byteblaster and HTTP deliver the same products), and on-demand container logs.
+Turn the Pipeline Control admin page from three plain rows into a live operations view: one health verdict per feed that combines Docker state with data freshness, a summary banner, a 24-hour throughput sparkline, recent products (including a shared EMWIN table that verifies Byteblaster and HTTP deliver the same products), and on-demand container logs.
 
 ## Scope
 
