@@ -35,7 +35,9 @@ class PipelineActivity
                 ->selectRaw("date_trunc('hour', received_at) as bucket, count(*) as total")
                 ->groupBy('bucket')
                 ->pluck('total', 'bucket');
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            report($e);
+
             return $empty;
         }
 
@@ -65,7 +67,9 @@ class PipelineActivity
                 ->orderByDesc('id')
                 ->limit($limit)
                 ->get();
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            report($e);
+
             return collect();
         }
     }
@@ -96,7 +100,9 @@ class PipelineActivity
             $deliveries = PipelineDelivery::query()
                 ->whereIn('feed', $feeds)->whereIn('wmo_header_key', $keyed->keys())->where('received_at', '>=', $since)
                 ->get()->groupBy('wmo_header_key');
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            report($e);
+
             return collect();
         }
 
@@ -104,7 +110,13 @@ class PipelineActivity
 
         foreach ($keyed as $key => $firstSeen) {
             $firstSeen = Carbon::parse($firstSeen);
-            $byFeed = $deliveries[$key]->groupBy('feed')->map(fn (Collection $group) => $group->min('received_at'));
+            $group = $deliveries[$key] ?? collect();
+
+            if ($group->isEmpty()) {
+                continue;
+            }
+
+            $byFeed = $group->groupBy('feed')->map(fn (Collection $group) => $group->min('received_at'));
             $cells = [];
 
             foreach ($feeds as $feed) {
@@ -144,7 +156,9 @@ class PipelineActivity
                 ->where('outcome', PipelineDelivery::OUTCOME_INGESTED)
                 ->where('received_at', '>=', now()->startOfDay())
                 ->count();
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            report($e);
+
             return 0;
         }
     }

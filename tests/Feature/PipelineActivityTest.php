@@ -4,6 +4,8 @@ use App\Enums\PipelineFeed;
 use App\Models\PipelineDelivery;
 use App\Support\Pipeline\PipelineActivity;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Schema;
 
 beforeEach(fn () => Carbon::setTestNow('2026-09-21 12:30:00'));
@@ -117,4 +119,22 @@ test('every query degrades to empty when the table does not exist', function () 
         ->and($activity->recent(PipelineFeed::Nwws))->toHaveCount(0)
         ->and($activity->emwinComparison())->toHaveCount(0)
         ->and($activity->ingestedToday())->toBe(0);
+});
+
+test('a real query failure is reported while the queries still return their empty values', function () {
+    Exceptions::fake();
+    DB::listen(function ($query) {
+        if (str_contains($query->sql, 'from "pipeline_deliveries"')) {
+            throw new RuntimeException('query failed');
+        }
+    });
+    $activity = app(PipelineActivity::class);
+
+    expect($activity->hourlyCounts(PipelineFeed::Nwws))->toBe(array_fill(0, 24, 0))
+        ->and($activity->ingestedToday())->toBe(0)
+        ->and($activity->recent(PipelineFeed::Nwws))->toHaveCount(0)
+        ->and($activity->emwinComparison())->toHaveCount(0);
+
+    Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'query failed');
+    expect(collect(Exceptions::reported()))->toHaveCount(4);
 });
