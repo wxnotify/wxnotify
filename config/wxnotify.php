@@ -28,6 +28,11 @@ return [
 
     'pipeline' => [
         'delivery_retention_hours' => (int) env('PIPELINE_DELIVERY_RETENTION_HOURS', 48),
+        'stale_minutes' => [
+            'nwws' => (int) env('PIPELINE_STALE_MINUTES_NWWS', 15),
+            'emwin' => (int) env('PIPELINE_STALE_MINUTES_EMWIN', 15),
+            'emwin_http' => (int) env('PIPELINE_STALE_MINUTES_EMWIN_HTTP', 30),
+        ],
     ],
 
 ];
