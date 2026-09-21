@@ -63,4 +63,22 @@ return [
         'proxy_url' => env('DOCKER_PROXY_URL', 'http://docker-socket-proxy:2375'),
     ],
 
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
+    'paddle' => [
+        'api_key' => env('PADDLE_API_KEY'),
+        'webhook_secret' => env('PADDLE_WEBHOOK_SECRET'),
+    ],
+
+    'firebase' => [
+        'service_account' => env('FIREBASE_SERVICE_ACCOUNT'),
+    ],
+
+    'traccar' => [
+        'polling_token' => env('TRACCAR_POLLING_TOKEN'),
+    ],
+
 ];
