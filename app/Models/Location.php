@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\LocationType;
 use App\Enums\MobileSource;
+use App\Models\Concerns\BlockedDuringMaintenance;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,7 +21,7 @@ use Spatie\Activitylog\Support\LogOptions;
 class Location extends Model
 {
     /** @use HasFactory<LocationFactory> */
-    use HasFactory, LogsActivity;
+    use BlockedDuringMaintenance, HasFactory, LogsActivity;
 
     public function getActivitylogOptions(): LogOptions
     {

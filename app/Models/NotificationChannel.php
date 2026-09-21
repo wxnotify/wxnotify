@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlockedDuringMaintenance;
 use Database\Factories\NotificationChannelFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Spatie\Activitylog\Support\LogOptions;
 class NotificationChannel extends Model
 {
     /** @use HasFactory<NotificationChannelFactory> */
-    use HasFactory, LogsActivity;
+    use BlockedDuringMaintenance, HasFactory, LogsActivity;
 
     public function getActivitylogOptions(): LogOptions
     {

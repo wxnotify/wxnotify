@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlockedDuringMaintenance;
 use Database\Factories\TraccarServerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +16,7 @@ use Spatie\Activitylog\Support\LogOptions;
 class TraccarServer extends Model
 {
     /** @use HasFactory<TraccarServerFactory> */
-    use HasFactory, LogsActivity;
+    use BlockedDuringMaintenance, HasFactory, LogsActivity;
 
     public function getActivitylogOptions(): LogOptions
     {

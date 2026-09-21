@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AlertCategory;
+use App\Models\Concerns\BlockedDuringMaintenance;
 use Database\Factories\AlertTemplateFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class AlertTemplate extends Model
 {
     /** @use HasFactory<AlertTemplateFactory> */
-    use HasFactory;
+    use BlockedDuringMaintenance, HasFactory;
 
     protected function casts(): array
     {

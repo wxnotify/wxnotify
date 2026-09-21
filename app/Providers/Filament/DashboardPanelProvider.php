@@ -8,6 +8,7 @@ use App\Filament\Dashboard\Pages\Auth\Register;
 use App\Filament\Dashboard\Widgets\AnnouncementsWidget;
 use App\Http\Middleware\RedirectAdmins;
 use App\Models\User;
+use App\Support\MaintenanceModeGuard;
 use Awcodes\Gravatar\GravatarPlugin;
 use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
@@ -84,6 +85,12 @@ class DashboardPanelProvider extends PanelProvider
                 // Know?" above "Documentation" in the sidebar.
                 PanelsRenderHook::SIDEBAR_FOOTER,
                 fn (): View => view('filament.dashboard.did-you-know'),
+            )
+            ->renderHook(
+                PanelsRenderHook::CONTENT_START,
+                fn (): string => app(MaintenanceModeGuard::class)->isMaintenanceActive()
+                    ? view('filament.dashboard.maintenance-banner', ['message' => app(MaintenanceModeGuard::class)->message()])->render()
+                    : '',
             )
             ->plugins([
                 FilamentSocialitePlugin::make()

@@ -9,6 +9,7 @@ use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
 use App\Enums\Tier;
+use App\Models\Concerns\BlockedDuringMaintenance;
 use Database\Factories\AlertRuleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -45,7 +46,7 @@ use Spatie\Activitylog\Support\LogOptions;
 class AlertRule extends Model
 {
     /** @use HasFactory<AlertRuleFactory> */
-    use HasFactory, LogsActivity;
+    use BlockedDuringMaintenance, HasFactory, LogsActivity;
 
     public function getActivitylogOptions(): LogOptions
     {
