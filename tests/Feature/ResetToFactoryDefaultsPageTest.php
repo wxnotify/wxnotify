@@ -54,6 +54,12 @@ test('the pipeline acknowledgment appears only while services cannot be stopped'
         ->assertFormFieldVisible('pipeline_stopped');
 });
 
+test('the pipeline acknowledgment label lists the EMWIN HTTP service', function () {
+    livewire(ResetToFactoryDefaults::class)
+        ->fillForm(['pipeline' => true])
+        ->assertSee('I have stopped the pipeline services (Downloader, EMWIN HTTP, Alert Engine, GLM, Threshold evaluator, Traccar poller)');
+});
+
 function frReauthenticate($component, array $toggles)
 {
     return $component->fillForm($toggles)->callAction('reauth', ['password' => 'correct-horse']);

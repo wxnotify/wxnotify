@@ -196,18 +196,6 @@ test('the emwin http stop and restart actions call the emwin http container and 
     Http::assertSent(fn ($r) => $r->method() === 'POST' && str_contains($r->url(), '/containers/wxnotify-emwin-http/restart'));
 });
 
-test('the emwin http row last product comes from its own heartbeat', function () {
-    Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
-    Cache::forget('pipeline.heartbeat.emwin');
-    Cache::forget('pipeline.heartbeat.emwin_http');
-
-    expect(substr_count(livewire(PipelineControl::class)->html(), 'Last product: never'))->toBe(2);
-
-    PipelineHeartbeat::record('emwin_http');
-
-    expect(substr_count(livewire(PipelineControl::class)->html(), 'Last product: never'))->toBe(1);
-});
-
 test('the emwin byteblaster row shows its docker status and start is hidden while it runs', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
@@ -276,13 +264,6 @@ test('the emwin status after an action is not a stale cached read', function () 
         ->assertActionHidden('stopEmwin');
 });
 
-test('the emwin row shows the last product received from the heartbeat', function () {
-    Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
-    PipelineHeartbeat::record('emwin');
-
-    expect(substr_count(livewire(PipelineControl::class)->html(), 'Last product: never'))->toBe(1);
-});
-
 test('the emwin row shows never when no product has been received', function () {
     Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
     Cache::forget('pipeline.heartbeat.emwin');
@@ -297,4 +278,53 @@ test('a missing emwin container degrades to Not found without breaking the nwws 
     ]);
 
     livewire(PipelineControl::class)->assertSuccessful()->assertSee('Not found')->assertActionVisible('stop');
+});
+
+function pipelineLastProduct(string $html, string $rowLabel): ?string
+{
+    preg_match('/'.preg_quote($rowLabel, '/').'.*?Last product:\s*([^<]+?)\s*</s', $html, $matches);
+
+    return $matches[1] ?? null;
+}
+
+test('with no heartbeat recorded both rows show never', function () {
+    Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
+    Cache::forget('pipeline.heartbeat.emwin');
+    Cache::forget('pipeline.heartbeat.emwin_http');
+
+    $component = livewire(PipelineControl::class);
+    $html = $component->html();
+
+    expect(pipelineLastProduct($html, 'EMWIN Byteblaster'))->toBe('never')
+        ->and(pipelineLastProduct($html, 'EMWIN HTTP backup'))->toBe('never')
+        ->and($component->instance()->emwinLastProductAt())->toBeNull()
+        ->and($component->instance()->emwinHttpLastProductAt())->toBeNull();
+});
+
+test('only the http heartbeat updates the http row and never the byteblaster row', function () {
+    Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
+    Cache::forget('pipeline.heartbeat.emwin');
+    PipelineHeartbeat::record('emwin_http');
+
+    $component = livewire(PipelineControl::class);
+    $html = $component->html();
+
+    expect($component->instance()->emwinHttpLastProductAt())->not->toBeNull()
+        ->and($component->instance()->emwinLastProductAt())->toBeNull()
+        ->and(pipelineLastProduct($html, 'EMWIN HTTP backup'))->not->toBe('never')
+        ->and(pipelineLastProduct($html, 'EMWIN Byteblaster'))->toBe('never');
+});
+
+test('only the byteblaster heartbeat updates the byteblaster row and never the http row', function () {
+    Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
+    Cache::forget('pipeline.heartbeat.emwin_http');
+    PipelineHeartbeat::record('emwin');
+
+    $component = livewire(PipelineControl::class);
+    $html = $component->html();
+
+    expect($component->instance()->emwinLastProductAt())->not->toBeNull()
+        ->and($component->instance()->emwinHttpLastProductAt())->toBeNull()
+        ->and(pipelineLastProduct($html, 'EMWIN Byteblaster'))->not->toBe('never')
+        ->and(pipelineLastProduct($html, 'EMWIN HTTP backup'))->toBe('never');
 });
