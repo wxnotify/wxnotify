@@ -4,8 +4,11 @@ namespace App\Filament\Admin\Pages;
 
 use App\Settings\FeatureFlagsSettings;
 use App\Settings\GeneralSettings;
+use App\Settings\IntegrationSettings;
 use App\Settings\TierThresholdSettings;
 use BackedEnum;
+use Closure;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -16,6 +19,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Arr;
@@ -36,6 +40,20 @@ class AppSettings extends Page implements HasForms
 
     protected static ?string $title = 'App settings';
 
+    private const NULLABLE_STRINGS = [
+        'maintenance_message',
+        'translation_endpoint',
+        'short_urls_endpoint',
+        'heartbeat_endpoint',
+        'archival_provider',
+        'archival_endpoint',
+        'archival_bucket',
+        'status_page_url',
+        'email_mailer',
+        'email_from_address',
+        'email_from_name',
+    ];
+
     /**
      * @var array<string, mixed>|null
      */
@@ -52,6 +70,7 @@ class AppSettings extends Page implements HasForms
             ...app(GeneralSettings::class)->toArray(),
             ...app(TierThresholdSettings::class)->toArray(),
             ...app(FeatureFlagsSettings::class)->toArray(),
+            ...app(IntegrationSettings::class)->toArray(),
         ]);
     }
 
@@ -105,6 +124,7 @@ class AppSettings extends Page implements HasForms
                                     Toggle::make('heads_up_enabled')->label('Heads Up enabled'),
                                 ]),
                         ]),
+                        $this->integrationsTab(),
                     ]),
             ]);
     }
@@ -112,10 +132,15 @@ class AppSettings extends Page implements HasForms
     public function save(): void
     {
         $data = $this->form->getState();
-        $data['maintenance_message'] = filled($data['maintenance_message'] ?? null) ? $data['maintenance_message'] : null;
+
+        foreach (self::NULLABLE_STRINGS as $key) {
+            if (array_key_exists($key, $data)) {
+                $data[$key] = filled($data[$key]) ? $data[$key] : null;
+            }
+        }
 
         DB::transaction(function () use ($data): void {
-            foreach ([GeneralSettings::class, TierThresholdSettings::class, FeatureFlagsSettings::class] as $class) {
+            foreach ([GeneralSettings::class, TierThresholdSettings::class, FeatureFlagsSettings::class, IntegrationSettings::class] as $class) {
                 $settings = app($class);
                 $settings->fill(Arr::only($data, array_keys($settings->toArray())));
                 $settings->save();
@@ -134,5 +159,97 @@ class AppSettings extends Page implements HasForms
             ->minValue($min)
             ->maxValue($max)
             ->required();
+    }
+
+    private function integrationsTab(): Tab
+    {
+        $mailers = collect(array_keys(config('mail.mailers')))
+            ->diff(['array', 'log', 'failover', 'roundrobin'])
+            ->mapWithKeys(fn (string $name): array => [$name => $name])
+            ->all();
+
+        $whenEnabled = fn (string $toggle): Closure => fn (Get $get): bool => (bool) $get($toggle);
+
+        return Tab::make('Integrations')->schema([
+            Section::make('Translation')
+                ->description('Machine translation of alert text.')
+                ->schema([
+                    Toggle::make('translation_enabled')->label('Translation enabled')->live(),
+                    $this->endpointField('translation_endpoint', 'Translation endpoint', 'translation_enabled'),
+                ]),
+            Section::make('Short URLs')
+                ->schema([
+                    Toggle::make('short_urls_enabled')->label('Short URLs enabled')->live(),
+                    $this->endpointField('short_urls_endpoint', 'Short URL endpoint', 'short_urls_enabled'),
+                ]),
+            Section::make('Heartbeat')
+                ->schema([
+                    Toggle::make('heartbeat_enabled')->label('Heartbeat enabled')->live(),
+                    $this->endpointField('heartbeat_endpoint', 'Heartbeat endpoint', 'heartbeat_enabled'),
+                ]),
+            Section::make('Exception reporting')
+                ->schema([
+                    Toggle::make('exception_reporting_enabled')->label('Exception reporting enabled'),
+                ]),
+            Section::make('Archival')
+                ->schema([
+                    Toggle::make('archival_enabled')->label('Archival enabled')->live(),
+                    Select::make('archival_provider')
+                        ->label('Provider')
+                        ->native()
+                        ->options([
+                            'b2' => 'Backblaze B2',
+                            's3' => 'Amazon S3',
+                            'other' => 'Other S3-compatible',
+                        ])
+                        ->required($whenEnabled('archival_enabled'))
+                        ->visible($whenEnabled('archival_enabled')),
+                    $this->endpointField('archival_endpoint', 'Endpoint', 'archival_enabled'),
+                    TextInput::make('archival_bucket')
+                        ->label('Bucket')
+                        ->maxLength(255)
+                        ->required($whenEnabled('archival_enabled'))
+                        ->visible($whenEnabled('archival_enabled')),
+                ]),
+            Section::make('Status page')
+                ->schema([
+                    Toggle::make('status_page_enabled')->label('Status page link enabled')->live(),
+                    $this->endpointField('status_page_url', 'Status page URL', 'status_page_enabled'),
+                ]),
+            Section::make('Email')
+                ->description('Credentials for the chosen mailer stay in .env. A long-lived queue:work needs a restart to pick up a change (queue:listen, as in this stack, does not).')
+                ->schema([
+                    Toggle::make('email_relay_enabled')
+                        ->label('Email relay enabled')
+                        ->helperText('Turning this off in production stops password resets and email verification.')
+                        ->live(),
+                    Select::make('email_mailer')
+                        ->label('Mailer')
+                        ->native()
+                        ->placeholder('Use the .env setting')
+                        ->options($mailers)
+                        ->in(array_keys($mailers))
+                        ->visible($whenEnabled('email_relay_enabled')),
+                    TextInput::make('email_from_address')
+                        ->label('From address')
+                        ->email()
+                        ->maxLength(255)
+                        ->visible($whenEnabled('email_relay_enabled')),
+                    TextInput::make('email_from_name')
+                        ->label('From name')
+                        ->maxLength(255)
+                        ->visible($whenEnabled('email_relay_enabled')),
+                ]),
+        ]);
+    }
+
+    private function endpointField(string $name, string $label, string $toggle): TextInput
+    {
+        return TextInput::make($name)
+            ->label($label)
+            ->maxLength(255)
+            ->rules(['url:http,https'])
+            ->required(fn (Get $get): bool => (bool) $get($toggle))
+            ->visible(fn (Get $get): bool => (bool) $get($toggle));
     }
 }
