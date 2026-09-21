@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('shapefile:scan')->daily();
         $schedule->command('alerts:dispatch-scheduled')->everyFifteenMinutes();
         $schedule->command('traccar:poll-positions')->everyFiveMinutes()->withoutOverlapping();
+        $schedule->command('pipeline:prune-deliveries')->hourly();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

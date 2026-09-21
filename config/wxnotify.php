@@ -26,4 +26,8 @@ return [
         'allow_private_networks' => env('WXNOTIFY_WEBHOOKS_ALLOW_PRIVATE', false),
     ],
 
+    'pipeline' => [
+        'delivery_retention_hours' => (int) env('PIPELINE_DELIVERY_RETENTION_HOURS', 48),
+    ],
+
 ];
