@@ -6,6 +6,7 @@ use App\Settings\FeatureFlagsSettings;
 use App\Settings\GeneralSettings;
 use App\Settings\IntegrationSettings;
 use App\Settings\TierThresholdSettings;
+use App\Support\ApplyEmailSettings;
 use BackedEnum;
 use Closure;
 use Filament\Forms\Components\Select;
@@ -164,7 +165,7 @@ class AppSettings extends Page implements HasForms
     private function integrationsTab(): Tab
     {
         $mailers = collect(array_keys(config('mail.mailers')))
-            ->diff(['array', 'log', 'failover', 'roundrobin'])
+            ->diff(ApplyEmailSettings::EXCLUDED_MAILERS)
             ->mapWithKeys(fn (string $name): array => [$name => $name])
             ->all();
 
@@ -202,6 +203,7 @@ class AppSettings extends Page implements HasForms
                             's3' => 'Amazon S3',
                             'other' => 'Other S3-compatible',
                         ])
+                        ->in(['b2', 's3', 'other'])
                         ->required($whenEnabled('archival_enabled'))
                         ->visible($whenEnabled('archival_enabled')),
                     $this->endpointField('archival_endpoint', 'Endpoint', 'archival_enabled'),
@@ -227,6 +229,7 @@ class AppSettings extends Page implements HasForms
                         ->label('Mailer')
                         ->native()
                         ->placeholder('Use the .env setting')
+                        ->helperText('The chosen mailer\'s credentials must already be set in .env.')
                         ->options($mailers)
                         ->in(array_keys($mailers))
                         ->visible($whenEnabled('email_relay_enabled')),

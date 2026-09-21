@@ -108,6 +108,13 @@ test('archival stores its provider, endpoint and bucket', function () {
         ->and($settings->archival_bucket)->toBe('wxnotify-products');
 });
 
+test('an unknown archival provider is rejected while archival is enabled', function () {
+    livewire(AppSettings::class)
+        ->fillForm(['archival_enabled' => true, 'archival_provider' => 'bogus'])
+        ->call('save')
+        ->assertHasFormErrors(['archival_provider']);
+});
+
 test('the email mailer choices come from the configured mailers and exclude the internal ones', function () {
     $options = collect(livewire(AppSettings::class)->instance()->getForm('form')->getComponent('email_mailer')?->getOptions() ?? []);
 

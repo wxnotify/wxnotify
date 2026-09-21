@@ -113,3 +113,49 @@ test('the app applies the email settings when it boots', function () {
 
     expect(config('mail.default'))->toBe('smtp');
 });
+
+test('config caching commands leave the .env mail configuration untouched', function (string $command) {
+    $default = config('mail.default');
+    $from = config('mail.from');
+    setEmailSettings([
+        'email_relay_enabled' => false,
+        'email_mailer' => 'smtp',
+        'email_from_address' => 'alerts@example.test',
+    ]);
+
+    $originalArgv = $_SERVER['argv'] ?? null;
+    $_SERVER['argv'] = ['artisan', $command];
+
+    try {
+        app(ApplyEmailSettings::class)();
+    } finally {
+        $_SERVER['argv'] = $originalArgv;
+    }
+
+    expect(config('mail.default'))->toBe($default)
+        ->and(config('mail.from'))->toBe($from);
+})->with(['config:cache', 'optimize']);
+
+test('other console commands still apply the email settings', function () {
+    setEmailSettings(['email_relay_enabled' => false]);
+
+    $originalArgv = $_SERVER['argv'] ?? null;
+    $_SERVER['argv'] = ['artisan', 'queue:work'];
+
+    try {
+        app(ApplyEmailSettings::class)();
+    } finally {
+        $_SERVER['argv'] = $originalArgv;
+    }
+
+    expect(config('mail.default'))->toBe('log');
+});
+
+test('a stored excluded mailer is ignored', function (string $mailer) {
+    $default = config('mail.default');
+    setEmailSettings(['email_mailer' => $mailer]);
+
+    app(ApplyEmailSettings::class)();
+
+    expect(config('mail.default'))->toBe($default);
+})->with(['array', 'log']);
