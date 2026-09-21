@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Settings\FeatureFlagsSettings;
 use App\Settings\GeneralSettings;
 use App\Settings\TierThresholdSettings;
 use BackedEnum;
@@ -50,6 +51,7 @@ class AppSettings extends Page implements HasForms
         $this->form->fill([
             ...app(GeneralSettings::class)->toArray(),
             ...app(TierThresholdSettings::class)->toArray(),
+            ...app(FeatureFlagsSettings::class)->toArray(),
         ]);
     }
 
@@ -96,6 +98,13 @@ class AppSettings extends Page implements HasForms
                                     ->helperText('Applies when a Lightning rule is created or edited; existing rules keep their stored radius.'),
                             ]),
                         ]),
+                        Tab::make('Feature flags')->schema([
+                            Section::make('Heads Up')
+                                ->description('An emergency off switch for the predictive Heads Up alerts. Turning it off hides Heads Up dashboard-wide and stops it from firing, but keeps each subscriber\'s per-location opt-ins and disclaimer acknowledgments, so turning it back on restores them without anyone re-confirming. This is independent of the Plus/Pro entitlement that gates who can use it.')
+                                ->schema([
+                                    Toggle::make('heads_up_enabled')->label('Heads Up enabled'),
+                                ]),
+                        ]),
                     ]),
             ]);
     }
@@ -106,7 +115,7 @@ class AppSettings extends Page implements HasForms
         $data['maintenance_message'] = filled($data['maintenance_message'] ?? null) ? $data['maintenance_message'] : null;
 
         DB::transaction(function () use ($data): void {
-            foreach ([GeneralSettings::class, TierThresholdSettings::class] as $class) {
+            foreach ([GeneralSettings::class, TierThresholdSettings::class, FeatureFlagsSettings::class] as $class) {
                 $settings = app($class);
                 $settings->fill(Arr::only($data, array_keys($settings->toArray())));
                 $settings->save();
