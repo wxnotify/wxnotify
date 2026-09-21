@@ -1,0 +1,9 @@
+{
+  "server_host": "tgftp.nws.noaa.gov",
+  "server_path": "/SL.us008001/CU.EMWIN/DF.xt/DC.gsatR/OPS/",
+  "storage_dir": "/emwin-products/http",
+  "download_text": true,
+  "download_images": false,
+  "text_zip": "txtmin02.zip",
+  "image_zip": "imgmin15.zip"
+}
