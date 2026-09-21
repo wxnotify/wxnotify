@@ -47,7 +47,7 @@ Cadence comes from the file name: `txtmin02` → 2 minutes, `txtmin06` → 6, `t
 ### Each cycle (text)
 
 1. Conditional GET to a temp file with a size cap (default 20 MB; text zips are ~0.3–4 MB).
-2. Safe unzip: reject entries with path separators or `..`, sanitize names to `[A-Za-z0-9._-]`, cap member count and total uncompressed bytes (defaults mirroring the Byteblaster hook: 5 MiB per member, 50 members per *new* file batch is not required here — HTTP batches are larger, so use a per-member cap and a generous total cap, configurable by env).
+2. Safe unzip: reject entries with path separators or `..`, sanitize names to `[A-Za-z0-9._-]`, and enforce limits, each overridable by env: 5 MiB per member (matching the Byteblaster hook), 100 MiB total uncompressed, 20,000 members per zip. HTTP batches are much larger than the Byteblaster hook's per-file zips, which is why the member and total limits are generous. A zip that breaches a limit is discarded and logged, not partially processed.
 3. For each member not in the seen-set: write it into `storage_dir` and POST `{"path": "http/<name>", "feed": "http"}` with the bearer token. A file is added to the seen-set only after a 2xx.
 4. If every POST in the cycle succeeded, persist the zip's `Last-Modified` / `ETag`; if any failed, do not, so the next cycle re-fetches and posts only the unseen files.
 5. Delete the temp zip. Files in `storage_dir` older than the retention period (env, default 7 days) are removed.
