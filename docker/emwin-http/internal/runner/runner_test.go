@@ -267,3 +267,59 @@ func TestRetryableStatusesFailTheCycleAndStayUnseen(t *testing.T) {
 		}
 	}
 }
+
+func TestAllRejectedBatchIsAFailureAndStaysUnseen(t *testing.T) {
+	cases := map[string][]string{"single": {"A.TXT"}, "several": {"A.TXT", "B.TXT", "C.TXT"}}
+	for label, names := range cases {
+		for _, code := range []int{400, 410, 413, 422} {
+			status := map[string]int{}
+			for _, n := range names {
+				status["http/"+n] = code
+			}
+			f := &fakeFetcher{zipBytes: zipOf(t, names...)}
+			d, store := newDeps(t, f, &fakePoster{status: status})
+
+			if err := RunCycle(context.Background(), d); err == nil {
+				t.Fatalf("%s/%d: an all-rejected cycle must fail", label, code)
+			}
+			for _, n := range names {
+				if store.Seen(n) {
+					t.Fatalf("%s/%d: %s must stay unseen", label, code, n)
+				}
+			}
+			if lm, _ := store.Validators(); lm != "" {
+				t.Fatalf("%s/%d: validators must not be recorded", label, code)
+			}
+		}
+	}
+}
+
+func TestLoopCapsBackoffAfterManyFailures(t *testing.T) {
+	cadence := 2 * time.Minute
+	n := 0
+	var sleeps []time.Duration
+	sleep := func(ctx context.Context, d time.Duration) bool {
+		sleeps = append(sleeps, d)
+		return len(sleeps) < 200
+	}
+	Loop(context.Background(), "z", cadence, func(context.Context) error { n++; return errors.New("x") }, func() {}, sleep, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	for i, d := range sleeps {
+		if d <= 0 || d > cadence {
+			t.Fatalf("sleep %d = %v", i, d)
+		}
+	}
+}
+
+func TestLoopDoesNotSleepOrLogFailureOnShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	var buf bytes.Buffer
+	slept := false
+	Loop(ctx, "z", time.Minute, func(context.Context) error { cancel(); return errors.New("ctx canceled") }, func() {},
+		func(context.Context, time.Duration) bool { slept = true; return false }, slog.New(slog.NewTextHandler(&buf, nil)))
+	if slept {
+		t.Fatal("must not back off after cancellation")
+	}
+	if bytes.Contains(buf.Bytes(), []byte("cycle failed")) {
+		t.Fatalf("shutdown logged as failure: %s", buf.String())
+	}
+}

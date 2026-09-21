@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -45,6 +46,8 @@ func (p *Poster) Post(ctx context.Context, relPath string) error {
 		return fmt.Errorf("post %q: %w", relPath, err)
 	}
 	defer resp.Body.Close()
+	// Drain (bounded) so the keep-alive connection can be reused; never surfaced in errors.
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return &StatusError{Code: resp.StatusCode, Path: relPath}

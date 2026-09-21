@@ -15,6 +15,10 @@ import (
 	"wxnotify.local/emwin-http/internal/cadence"
 )
 
+// ProductsRoot is the shared products volume; storage_dir must live strictly inside it so the
+// path posted to the pipeline (relative to this root) is always derivable.
+const ProductsRoot = "/emwin-products"
+
 type Config struct {
 	ServerHost     string `json:"server_host"`
 	ServerPath     string `json:"server_path"`
@@ -78,6 +82,9 @@ func (c Config) Validate() error {
 	if !filepath.IsAbs(c.StorageDir) {
 		return fmt.Errorf("storage_dir %q must be an absolute path", c.StorageDir)
 	}
+	if !strings.HasPrefix(path.Clean(c.StorageDir), ProductsRoot+"/") {
+		return fmt.Errorf("storage_dir %q must be a subdirectory of %s", c.StorageDir, ProductsRoot)
+	}
 	for field, zip := range map[string]string{"text_zip": c.TextZip, "image_zip": c.ImageZip} {
 		if !zipPattern.MatchString(zip) {
 			return fmt.Errorf("%s %q must look like txtmin02.zip", field, zip)
@@ -96,7 +103,12 @@ func (c Config) URLFor(zip string) string {
 
 // ImagesDir is where image zips are unzipped, beside storage_dir.
 func (c Config) ImagesDir() string {
-	return path.Join(path.Dir(c.StorageDir), "http-images")
+	return path.Join(path.Dir(path.Clean(c.StorageDir)), "http-images")
+}
+
+// RelPrefix is storage_dir relative to ProductsRoot: the prefix of every posted path.
+func (c Config) RelPrefix() string {
+	return strings.TrimPrefix(path.Clean(c.StorageDir), ProductsRoot+"/")
 }
 
 // Env holds the settings that come from the environment, not the config file.
@@ -109,6 +121,23 @@ type Env struct {
 	MaxMemberBytes int64
 	MaxTotalBytes  int64
 	MaxMembers     int
+}
+
+// String redacts the webhook token so formatting an Env never prints it.
+func (e Env) String() string {
+	e.WebhookToken = redact(e.WebhookToken)
+	type plain Env
+	return fmt.Sprintf("%+v", plain(e))
+}
+
+// GoString redacts the webhook token for %#v.
+func (e Env) GoString() string { return e.String() }
+
+func redact(token string) string {
+	if token == "" {
+		return ""
+	}
+	return "[redacted]"
 }
 
 func FromEnv(getenv func(string) string) (Env, error) {

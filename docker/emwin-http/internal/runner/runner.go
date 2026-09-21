@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"time"
 
 	"wxnotify.local/emwin-http/internal/fetch"
@@ -63,18 +64,26 @@ func RunCycle(ctx context.Context, d Deps) error {
 		return fmt.Errorf("unzip: %w", err)
 	}
 	if len(skipped) > 0 {
-		d.Log.Warn("skipped unsafe zip members", "count", len(skipped))
+		names := skipped
+		more := 0
+		if len(names) > maxLoggedSkipped {
+			more = len(names) - maxLoggedSkipped
+			names = names[:maxLoggedSkipped]
+		}
+		d.Log.Warn("skipped unsafe zip members", "count", len(skipped), "names", names, "and_more", more)
 	}
 
-	failures, rejected := 0, 0
+	failures := 0
+	var rejectedNames []string
+	rejectedCodes := map[int]bool{}
 	for _, name := range written {
 		if d.Poster != nil {
 			if err := d.Poster.Post(ctx, d.RelPrefix+"/"+name); err != nil {
 				var se *poster.StatusError
 				if errors.As(err, &se) && isPermanentRejection(se.Code) {
 					d.Log.Warn("product rejected by the pipeline; not retrying", "file", name, "status", se.Code)
-					d.Store.MarkSeen(name)
-					rejected++
+					rejectedNames = append(rejectedNames, name)
+					rejectedCodes[se.Code] = true
 					continue
 				}
 				d.Log.Warn("post failed", "file", name, "error", err.Error())
@@ -85,7 +94,24 @@ func RunCycle(ctx context.Context, d Deps) error {
 		d.Store.MarkSeen(name)
 	}
 
-	if failures == 0 {
+	rejected := len(rejectedNames)
+	// A batch where every product is rejected is a failure (a lone poison file retries until it
+	// rolls out of the source zip, staying loud).
+	allRejected := len(written) > 0 && rejected == len(written)
+	if allRejected {
+		codes := make([]int, 0, len(rejectedCodes))
+		for c := range rejectedCodes {
+			codes = append(codes, c)
+		}
+		sort.Ints(codes)
+		d.Log.Error("every product in the batch was rejected by the pipeline", "count", rejected, "statuses", codes)
+	} else {
+		for _, name := range rejectedNames {
+			d.Store.MarkSeen(name)
+		}
+	}
+
+	if failures == 0 && !allRejected {
 		d.Store.SetValidators(res.LastModified, res.ETag)
 	}
 	if err := d.Store.Save(); err != nil {
@@ -96,6 +122,9 @@ func RunCycle(ctx context.Context, d Deps) error {
 
 	if failures > 0 {
 		return fmt.Errorf("%d of %d products failed to post", failures, len(written))
+	}
+	if allRejected {
+		return fmt.Errorf("all %d products were rejected by the pipeline", rejected)
 	}
 	return nil
 }
@@ -110,7 +139,11 @@ func isPermanentRejection(code int) bool {
 	return false
 }
 
-const backoffBase = 30 * time.Second
+const (
+	backoffBase      = 30 * time.Second
+	maxBackoffShift  = 10
+	maxLoggedSkipped = 10
+)
 
 // Loop repeats cycle until sleep reports cancellation. After a success it waits one cadence;
 // after a failure it waits 30s, 60s, 120s... capped at the cadence, resetting on success.
@@ -120,10 +153,13 @@ func Loop(ctx context.Context, name string, cadence time.Duration, cycle func(co
 	for {
 		wait := cadence
 		if err := cycle(ctx); err != nil {
+			if ctx.Err() != nil {
+				log.Info("shutting down", "zip", name)
+				return
+			}
 			failures++
-			wait = backoffBase << (failures - 1)
-			if wait > cadence || wait <= 0 {
-				wait = cadence
+			if failures <= maxBackoffShift {
+				wait = min(backoffBase<<(failures-1), cadence)
 			}
 			log.Error("cycle failed", "zip", name, "error", err.Error(), "retry_in", wait.String())
 		} else {

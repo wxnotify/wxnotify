@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,17 +43,21 @@ func TestLoadOverridesAndExplicitFalse(t *testing.T) {
 
 func TestLoadRejectsBadConfigs(t *testing.T) {
 	bad := map[string]string{
-		"unknown key":      `{"nope": 1}`,
-		"not json":         `{`,
-		"host with scheme": `{"server_host":"https://example.test"}`,
-		"host with path":   `{"server_host":"example.test/x"}`,
-		"host empty":       `{"server_host":""}`,
-		"path traversal":   `{"server_path":"/a/../b/"}`,
-		"path no slash":    `{"server_path":"OPS/"}`,
-		"relative storage": `{"storage_dir":"products/http"}`,
-		"bad text zip":     `{"text_zip":"../txtmin02.zip"}`,
-		"unknown cadence":  `{"text_zip":"foo.zip"}`,
-		"bad image zip":    `{"image_zip":"IMG.zip"}`,
+		"unknown key":           `{"nope": 1}`,
+		"not json":              `{`,
+		"host with scheme":      `{"server_host":"https://example.test"}`,
+		"host with path":        `{"server_host":"example.test/x"}`,
+		"host empty":            `{"server_host":""}`,
+		"path traversal":        `{"server_path":"/a/../b/"}`,
+		"path no slash":         `{"server_path":"OPS/"}`,
+		"relative storage":      `{"storage_dir":"products/http"}`,
+		"storage outside root":  `{"storage_dir":"/etc/x"}`,
+		"storage is the root":   `{"storage_dir":"/emwin-products"}`,
+		"storage is root slash": `{"storage_dir":"/emwin-products/"}`,
+		"storage escapes root":  `{"storage_dir":"/emwin-products/../x"}`,
+		"bad text zip":          `{"text_zip":"../txtmin02.zip"}`,
+		"unknown cadence":       `{"text_zip":"foo.zip"}`,
+		"bad image zip":         `{"image_zip":"IMG.zip"}`,
 	}
 	for name, body := range bad {
 		if _, err := Load(writeConfig(t, body)); err == nil {
@@ -114,5 +119,27 @@ func TestFromEnvRejectsNonNumbers(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "EMWIN_RETENTION_DAYS") {
 		t.Fatalf("expected an error naming the variable, got %v", err)
+	}
+}
+
+func TestRelPrefixAndImagesDirFollowStorageDir(t *testing.T) {
+	if got := Defaults().RelPrefix(); got != "http" {
+		t.Fatalf("default RelPrefix = %q", got)
+	}
+	cfg, err := Load(writeConfig(t, `{"storage_dir":"/emwin-products/feeds/http/"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RelPrefix() != "feeds/http" || cfg.ImagesDir() != "/emwin-products/feeds/http-images" {
+		t.Fatalf("RelPrefix=%q ImagesDir=%q", cfg.RelPrefix(), cfg.ImagesDir())
+	}
+}
+
+func TestEnvFormattingRedactsTheToken(t *testing.T) {
+	env := Env{WebhookURL: "http://x", WebhookToken: "sekret-token", StateDir: "/state"}
+	for _, out := range []string{fmt.Sprintf("%v", env), fmt.Sprintf("%+v", env), fmt.Sprintf("%#v", env), fmt.Sprint(&env)} {
+		if strings.Contains(out, "sekret-token") || !strings.Contains(out, "[redacted]") {
+			t.Fatalf("token not redacted: %s", out)
+		}
 	}
 }

@@ -79,3 +79,50 @@ func TestFetchEnforcesTheSizeCapAndLeavesNoFile(t *testing.T) {
 		t.Fatal("partial file left behind")
 	}
 }
+
+func TestFetchFollowsSameHostRedirectButRefusesOtherHosts(t *testing.T) {
+	other := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("cross-host redirect must not be followed")
+	}))
+	defer other.Close()
+
+	var srv *httptest.Server
+	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/same":
+			http.Redirect(w, r, srv.URL+"/final", http.StatusFound)
+		case "/final":
+			w.Write([]byte("ok"))
+		default:
+			http.Redirect(w, r, other.URL+"/x", http.StatusFound)
+		}
+	}))
+	defer srv.Close()
+
+	f := &Fetcher{Client: srv.Client(), URL: srv.URL + "/same", MaxBytes: 1 << 10}
+	dest := filepath.Join(t.TempDir(), "o.zip")
+	if _, err := f.Fetch(context.Background(), "", "", dest); err != nil {
+		t.Fatalf("same-host redirect: %v", err)
+	}
+
+	f.URL = srv.URL + "/away"
+	if _, err := f.Fetch(context.Background(), "", "", dest); err == nil || !strings.Contains(err.Error(), "different host") {
+		t.Fatalf("cross-host redirect: err = %v", err)
+	}
+}
+
+func TestFetchRefusesRedirectToPlainHTTP(t *testing.T) {
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("downgrade must not be followed")
+	}))
+	defer plain.Close()
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, plain.URL, http.StatusFound)
+	}))
+	defer srv.Close()
+
+	f := &Fetcher{Client: srv.Client(), URL: srv.URL, MaxBytes: 1 << 10}
+	if _, err := f.Fetch(context.Background(), "", "", filepath.Join(t.TempDir(), "o.zip")); err == nil {
+		t.Fatal("expected the downgrade redirect to be refused")
+	}
+}

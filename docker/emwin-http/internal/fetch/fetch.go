@@ -28,6 +28,22 @@ type Fetcher struct {
 	MaxBytes int64
 }
 
+// sameHostHTTPS refuses redirects to another host or to a non-https URL, and caps the chain at 10.
+func sameHostHTTPS(host string) func(*http.Request, []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		if req.URL.Scheme != "https" {
+			return fmt.Errorf("refusing redirect to non-https URL scheme %q", req.URL.Scheme)
+		}
+		if req.URL.Host != host {
+			return fmt.Errorf("refusing redirect to a different host %q", req.URL.Host)
+		}
+		return nil
+	}
+}
+
 // Fetch downloads the file to dest. When lastModified or etag are set they are sent as
 // conditional headers; a 304 returns NotModified without touching dest. A body larger than
 // MaxBytes fails with ErrTooLarge and leaves no file behind.
@@ -44,7 +60,9 @@ func (f *Fetcher) Fetch(ctx context.Context, lastModified, etag, dest string) (R
 		req.Header.Set("If-None-Match", etag)
 	}
 
-	resp, err := f.Client.Do(req)
+	client := *f.Client
+	client.CheckRedirect = sameHostHTTPS(req.URL.Host)
+	resp, err := client.Do(req)
 	if err != nil {
 		return Result{}, err
 	}

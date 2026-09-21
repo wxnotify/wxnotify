@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -57,5 +58,31 @@ func TestPostReturnsTypedStatusErrorWithoutToken(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "sekret") {
 		t.Fatalf("leaked: %v", err)
+	}
+}
+
+func TestPostDrainsTheBodySoConnectionsAreReused(t *testing.T) {
+	newConns := 0
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(strings.Repeat("e", 4096)))
+	}))
+	srv.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+		if s == http.StateNew {
+			newConns++
+		}
+	}
+	srv.Start()
+	defer srv.Close()
+
+	p := &Poster{Client: &http.Client{Transport: &http.Transport{}}, URL: srv.URL, Token: "sekret"}
+	for i := 0; i < 3; i++ {
+		err := p.Post(context.Background(), "http/x")
+		if err == nil || strings.Contains(err.Error(), "eeee") || strings.Contains(err.Error(), "sekret") {
+			t.Fatalf("err = %v", err)
+		}
+	}
+	if newConns != 1 {
+		t.Fatalf("connections opened = %d, want 1 (reused)", newConns)
 	}
 }
