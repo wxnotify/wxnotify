@@ -215,7 +215,7 @@ test('creating a lightning alert at the minimum radius succeeds', function () {
         ->fillForm([
             'category' => 'lightning',
             'location_id' => $this->location->id,
-            'radius_miles' => 5,
+            'radius_miles' => 10,
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -223,8 +223,8 @@ test('creating a lightning alert at the minimum radius succeeds', function () {
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->radius_miles)->toBe(5)
-        ->and($rule->displayName())->toBe('Lightning within 5 mi of Home');
+    expect($rule->radius_miles)->toBe(10)
+        ->and($rule->displayName())->toBe('Lightning within 10 mi of Home');
 });
 
 test('creating a forecast discussion rule picks a real office from the WFO picker', function () {

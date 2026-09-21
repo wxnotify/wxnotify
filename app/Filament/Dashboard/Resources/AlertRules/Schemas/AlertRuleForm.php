@@ -15,6 +15,7 @@ use App\Filament\Dashboard\Resources\AlertTemplates\Schemas\AlertTemplateForm;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
 use App\Models\NotificationChannel;
 use App\Models\Product;
+use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Closure;
@@ -478,11 +479,11 @@ class AlertRuleForm
             TextInput::make('radius_miles')
                 ->label('Alert radius (miles)')
                 ->numeric()
-                ->minValue(5)
+                ->minValue(fn (): int => app(TierThresholdSettings::class)->lightning_min_radius_miles)
                 ->maxValue(50)
                 ->default(15)
                 ->required()
-                ->helperText('Minimum 5 miles — tighter radii outrun what satellite lightning detection can reliably pinpoint.'),
+                ->helperText(fn (): string => 'Minimum '.app(TierThresholdSettings::class)->lightning_min_radius_miles.' miles — tighter radii outrun what satellite lightning detection can reliably pinpoint.'),
         ];
     }
 

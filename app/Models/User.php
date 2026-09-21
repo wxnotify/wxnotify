@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Tier;
+use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use Database\Factories\UserFactory;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
@@ -67,9 +68,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     public function locationLimit(): ?int
     {
+        $limits = app(TierThresholdSettings::class);
+
         return match ($this->tier()) {
-            Tier::Free => 1,
-            Tier::Plus => 5,
+            Tier::Free => $limits->free_locations,
+            Tier::Plus => $limits->plus_locations,
             Tier::Pro => null,
         };
     }
@@ -99,8 +102,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             return true;
         }
 
-        return ! $this->notificationChannels
-            ->contains(fn (NotificationChannel $channel) => $registry->find($channel->channel_type)?->countsTowardFreeSlot() ?? false);
+        $used = $this->notificationChannels
+            ->filter(fn (NotificationChannel $channel) => $registry->find($channel->channel_type)?->countsTowardFreeSlot() ?? false)
+            ->count();
+
+        return $used < app(TierThresholdSettings::class)->free_no_cost_channels;
     }
 
     public function traccarServers(): HasMany
@@ -116,10 +122,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     public function traccarServerLimit(): ?int
     {
+        $limits = app(TierThresholdSettings::class);
+
         return match ($this->tier()) {
-            Tier::Free => 0,
-            Tier::Plus => 1,
-            Tier::Pro => 3,
+            Tier::Free => $limits->free_traccar_servers,
+            Tier::Plus => $limits->plus_traccar_servers,
+            Tier::Pro => $limits->pro_traccar_servers,
         };
     }
 
@@ -139,10 +147,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     public function traccarDeviceLimitPerServer(): ?int
     {
+        $limits = app(TierThresholdSettings::class);
+
         return match ($this->tier()) {
-            Tier::Free => 0,
-            Tier::Plus => 5,
-            Tier::Pro => 10,
+            Tier::Free => $limits->free_traccar_devices_per_server,
+            Tier::Plus => $limits->plus_traccar_devices_per_server,
+            Tier::Pro => $limits->pro_traccar_devices_per_server,
         };
     }
 
