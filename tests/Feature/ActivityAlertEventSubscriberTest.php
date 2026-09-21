@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Visibility\MatchActivityAlertRules;
 use App\Enums\ActivityAlertType;
 use App\Jobs\SendActivityAlert;
 use App\Models\ActivityAlertRule;
@@ -51,4 +52,24 @@ test('a logout event with no authenticated user dispatches nothing', function ()
     event(new Logout('web', null));
 
     Queue::assertNotPushed(SendActivityAlert::class);
+});
+
+test('each auth event invokes the matcher exactly once', function () {
+    $user = User::factory()->create();
+    $calls = [];
+
+    app()->instance(MatchActivityAlertRules::class, new class($calls)
+    {
+        public function __construct(public array &$calls) {}
+
+        public function __invoke(User $user, ActivityAlertType $type): void
+        {
+            $this->calls[] = $type;
+        }
+    });
+
+    event(new Login('web', $user, false));
+    event(new Logout('web', $user));
+
+    expect($calls)->toBe([ActivityAlertType::SignedIn, ActivityAlertType::SignedOut]);
 });

@@ -6,7 +6,6 @@ use App\Actions\Visibility\MatchActivityAlertRules;
 use App\Enums\ActivityAlertType;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
-use Illuminate\Events\Dispatcher;
 
 class ActivityAlertEventSubscriber
 {
@@ -22,11 +21,5 @@ class ActivityAlertEventSubscriber
         }
 
         app(MatchActivityAlertRules::class)($event->user, ActivityAlertType::SignedOut);
-    }
-
-    public function subscribe(Dispatcher $events): void
-    {
-        $events->listen(Login::class, [self::class, 'handleLogin']);
-        $events->listen(Logout::class, [self::class, 'handleLogout']);
     }
 }

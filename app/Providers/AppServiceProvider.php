@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Contracts\PipelineStack;
-use App\Listeners\ActivityAlertEventSubscriber;
 use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\User;
@@ -14,7 +13,6 @@ use App\Observers\UserActivityObserver;
 use App\Support\Filament\AdminLogoutResponse;
 use App\Support\Pipeline\UnmanagedPipelineStack;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
@@ -54,7 +52,6 @@ class AppServiceProvider extends ServiceProvider
         User::observe(UserActivityObserver::class);
         IngestedProduct::observe(IngestedProductObserver::class);
         Location::observe(LocationZoneObserver::class);
-        Event::subscribe(ActivityAlertEventSubscriber::class);
 
         Gate::define('command-center:access', fn ($user) => $user->is_staff);
         Gate::define('command-center:manage-commands', fn ($user) => $user->is_staff);
