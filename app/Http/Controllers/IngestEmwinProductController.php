@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Pipeline\ExtractWmoHeaderIdentity;
 use App\Actions\Pipeline\IngestOncePerWmoHeader;
 use App\Actions\Pipeline\IngestProductText;
+use App\Actions\Pipeline\RecordPipelineDelivery;
 use App\Support\Pipeline\PipelineHeartbeat;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -15,6 +16,7 @@ class IngestEmwinProductController extends Controller
         private readonly IngestProductText $ingestProductText,
         private readonly ExtractWmoHeaderIdentity $extractWmoHeaderIdentity,
         private readonly IngestOncePerWmoHeader $ingestOncePerWmoHeader,
+        private readonly RecordPipelineDelivery $recordPipelineDelivery,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -24,7 +26,9 @@ class IngestEmwinProductController extends Controller
             'feed' => ['nullable', 'string', 'in:byteblaster,http'],
         ]);
 
-        PipelineHeartbeat::record(($validated['feed'] ?? 'byteblaster') === 'http' ? 'emwin_http' : 'emwin');
+        $feed = ($validated['feed'] ?? 'byteblaster') === 'http' ? 'emwin_http' : 'emwin';
+
+        PipelineHeartbeat::record($feed);
 
         $root = realpath((string) config('services.pipeline.emwin_products_path'));
         $absolutePath = $root !== false ? realpath($root.DIRECTORY_SEPARATOR.$validated['path']) : false;
@@ -36,7 +40,7 @@ class IngestEmwinProductController extends Controller
         $text = file_get_contents($absolutePath);
         $identity = ($this->extractWmoHeaderIdentity)($text);
 
-        ($this->ingestOncePerWmoHeader)($identity['key'] ?? null, fn () => ($this->ingestProductText)(
+        $ingested = ($this->ingestOncePerWmoHeader)($identity['key'] ?? null, fn () => ($this->ingestProductText)(
             $text,
             'emwin/'.$validated['path'],
             [
@@ -49,6 +53,8 @@ class IngestEmwinProductController extends Controller
             false,
             ['source' => 'emwin', 'wmo_header_key' => $identity['key'] ?? null],
         ));
+
+        ($this->recordPipelineDelivery)($feed, $identity['key'] ?? null, $validated['path'], $ingested);
 
         return response()->noContent();
     }

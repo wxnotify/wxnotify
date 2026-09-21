@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Pipeline\ExtractWmoHeaderIdentity;
 use App\Actions\Pipeline\IngestOncePerWmoHeader;
 use App\Actions\Pipeline\IngestProductText;
+use App\Actions\Pipeline\RecordPipelineDelivery;
 use App\Models\IngestedProduct;
 use App\Support\Pipeline\PipelineHeartbeat;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ class IngestNwwsProductController extends Controller
         private readonly IngestProductText $ingestProductText,
         private readonly ExtractWmoHeaderIdentity $extractWmoHeaderIdentity,
         private readonly IngestOncePerWmoHeader $ingestOncePerWmoHeader,
+        private readonly RecordPipelineDelivery $recordPipelineDelivery,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -49,7 +51,9 @@ class IngestNwwsProductController extends Controller
 
         $key = $isCap ? null : (($this->extractWmoHeaderIdentity)($text)['key'] ?? null);
 
-        ($this->ingestOncePerWmoHeader)($key, fn () => ($this->ingestProductText)($text, $validated['path'], $parsed, $isCap, ['source' => 'nwws', 'wmo_header_key' => $key]));
+        $ingested = ($this->ingestOncePerWmoHeader)($key, fn () => ($this->ingestProductText)($text, $validated['path'], $parsed, $isCap, ['source' => 'nwws', 'wmo_header_key' => $key]));
+
+        ($this->recordPipelineDelivery)('nwws', $key, $validated['path'], $ingested);
 
         return response()->noContent();
     }

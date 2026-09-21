@@ -3,6 +3,7 @@
 use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
 use App\Models\IngestedProduct;
+use App\Models\PipelineDelivery;
 use App\Models\Product;
 use App\Support\Pipeline\PipelineHeartbeat;
 use Illuminate\Support\Facades\Config;
@@ -332,4 +333,19 @@ test('a first-seen NWWS product stores source nwws and its header key and record
     expect(IngestedProduct::sole()->source)->toBe('nwws')
         ->and(IngestedProduct::sole()->wmo_header_key)->toBe('wfus53 kbou 191622 torbou')
         ->and(PipelineHeartbeat::lastReceivedAt('nwws'))->not->toBeNull();
+});
+
+test('an ingested nwws product records a delivery for the nwws feed', function () {
+    File::put($this->productsRoot.'/kkci/kkci_ftus21-tafkord.221432_12345.txt', "FTUS21 KKCI 221432\nTAFORD\nsample");
+
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'kkci/kkci_ftus21-tafkord.221432_12345.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    expect(PipelineDelivery::sole())
+        ->feed->toBe('nwws')
+        ->file_name->toBe('kkci_ftus21-tafkord.221432_12345.txt')
+        ->outcome->toBe('ingested');
 });

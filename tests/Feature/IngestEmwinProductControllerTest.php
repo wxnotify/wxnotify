@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\IngestedProduct;
+use App\Models\PipelineDelivery;
 use App\Support\Pipeline\PipelineHeartbeat;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
@@ -151,4 +152,42 @@ test('the same bulletin arriving on both feeds is ingested once', function () {
     emwinApiPost($this, 'http/b.txt', 'http')->assertNoContent();
 
     expect(IngestedProduct::count())->toBe(1);
+});
+
+test('an ingested byteblaster post records an ingested delivery for the emwin feed', function () {
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();
+
+    expect(PipelineDelivery::sole())
+        ->feed->toBe('emwin')
+        ->wmo_header_key->toBe('wfus53 kbou 191622 torbou')
+        ->file_name->toBe('a.txt')
+        ->outcome->toBe('ingested');
+});
+
+test('an http post records the emwin_http feed and a deduplicated one records a duplicate', function () {
+    IngestedProduct::factory()->create(['file_path' => 'x/y.txt', 'wmo_header_key' => 'wfus53 kbou 191622 torbou']);
+    File::put($this->emwinRoot.'/delivered/kbou/dup.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/dup.txt', 'http')->assertNoContent();
+
+    expect(PipelineDelivery::sole())
+        ->feed->toBe('emwin_http')
+        ->outcome->toBe('duplicate');
+});
+
+test('a failure to record a delivery never fails the ingest request', function () {
+    PipelineDelivery::creating(fn () => throw new RuntimeException('boom'));
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();
+
+    expect(IngestedProduct::count())->toBe(1);
+});
+
+test('a rejected path records no delivery', function () {
+    emwinApiPost($this, 'missing.txt')->assertNotFound();
+
+    expect(PipelineDelivery::count())->toBe(0);
 });
