@@ -1,11 +1,13 @@
 <?php
 
 use App\Filament\Admin\Pages\PipelineControl;
+use App\Models\PipelineDelivery;
 use App\Models\User;
 use App\Support\Pipeline\PipelineHeartbeat;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 use function Pest\Livewire\livewire;
 
@@ -131,7 +133,7 @@ test('the status shown after a successful action reflects the new state, not a s
 
     livewire(PipelineControl::class)
         ->callAction('stop')
-        ->assertSee('Exited')
+        ->assertSee('Stopped')
         ->assertActionVisible('start')
         ->assertActionHidden('stop');
 });
@@ -157,7 +159,7 @@ test('the emwin http backup row shows its docker status and start is hidden whil
     livewire(PipelineControl::class)
         ->assertSee('EMWIN HTTP backup')
         ->assertDontSee('Status unknown')
-        ->assertSee('Running')
+        ->assertSee('Stale')
         ->assertActionHidden('startEmwinHttp')
         ->assertActionVisible('stopEmwinHttp');
 });
@@ -204,7 +206,7 @@ test('the emwin byteblaster row shows its docker status and start is hidden whil
 
     livewire(PipelineControl::class)
         ->assertSee('EMWIN Byteblaster')
-        ->assertSee('Running')
+        ->assertSee('Stale')
         ->assertActionHidden('startEmwin')
         ->assertActionVisible('stopEmwin');
 });
@@ -259,7 +261,7 @@ test('the emwin status after an action is not a stale cached read', function () 
 
     livewire(PipelineControl::class)
         ->callAction('stopEmwin')
-        ->assertSee('Exited')
+        ->assertSee('Stopped')
         ->assertActionVisible('startEmwin')
         ->assertActionHidden('stopEmwin');
 });
@@ -268,7 +270,9 @@ test('the emwin row shows never when no product has been received', function () 
     Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
     Cache::forget('pipeline.heartbeat.emwin');
 
-    livewire(PipelineControl::class)->assertSee('Last product: never');
+    $html = livewire(PipelineControl::class)->assertSee('Last product:', escape: false)->html();
+
+    expect(pipelineLastProduct($html, 'EMWIN Byteblaster'))->toBe('never');
 });
 
 test('a missing emwin container degrades to Not found without breaking the nwws row', function () {
@@ -282,7 +286,7 @@ test('a missing emwin container degrades to Not found without breaking the nwws 
 
 function pipelineLastProduct(string $html, string $rowLabel): ?string
 {
-    preg_match('/'.preg_quote($rowLabel, '/').'.*?Last product:\s*([^<]+?)\s*</s', $html, $matches);
+    preg_match('/'.preg_quote($rowLabel, '/').'.*?Last product:\s*<span[^>]*>\s*([^<]+?)\s*</s', $html, $matches);
 
     return $matches[1] ?? null;
 }
@@ -327,4 +331,99 @@ test('only the byteblaster heartbeat updates the byteblaster row and never the h
         ->and($component->instance()->emwinHttpLastProductAt())->toBeNull()
         ->and(pipelineLastProduct($html, 'EMWIN Byteblaster'))->not->toBe('never')
         ->and(pipelineLastProduct($html, 'EMWIN HTTP backup'))->toBe('never');
+});
+
+function fakeDockerRunning(array $overrides = []): void
+{
+    $default = ['State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']]];
+
+    Http::fake(array_merge([
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response($default),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response($default),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/json' => Http::response($default),
+    ], $overrides));
+}
+
+test('the summary banner is green when every feed is healthy and fresh', function () {
+    fakeDockerRunning();
+    foreach (['nwws', 'emwin', 'emwin_http'] as $feed) {
+        PipelineHeartbeat::record($feed);
+    }
+
+    livewire(PipelineControl::class)->assertSee('All feeds healthy');
+});
+
+test('a running feed with no product yet is stale and the banner asks for attention', function () {
+    fakeDockerRunning();
+    Cache::forget('pipeline.heartbeat.emwin_http');
+    PipelineHeartbeat::record('nwws');
+    PipelineHeartbeat::record('emwin');
+
+    $component = livewire(PipelineControl::class)->assertSee('Stale')->assertSee('Needs attention: EMWIN HTTP backup (Stale)');
+
+    expect($component->instance()->summary()->color)->toBe('warning');
+});
+
+test('an unhealthy primary feed turns the banner red', function () {
+    fakeDockerRunning(['docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running', 'Health' => ['Status' => 'unhealthy']]])]);
+    foreach (['nwws', 'emwin', 'emwin_http'] as $feed) {
+        PipelineHeartbeat::record($feed);
+    }
+
+    $component = livewire(PipelineControl::class)->assertSee('Unhealthy');
+
+    expect($component->instance()->summary()->color)->toBe('danger');
+});
+
+test('a stopped backup is a note and leaves the banner green', function () {
+    fakeDockerRunning(['docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/json' => Http::response(['State' => ['Status' => 'exited']])]);
+    PipelineHeartbeat::record('nwws');
+    PipelineHeartbeat::record('emwin');
+
+    livewire(PipelineControl::class)->assertSee('All running feeds healthy')->assertSee('EMWIN HTTP backup is stopped');
+});
+
+test('the page polls every ten seconds', function () {
+    fakeDockerRunning();
+
+    livewire(PipelineControl::class)->assertSeeHtml('wire:poll.10s');
+});
+
+test('each card shows how many products the feed received in the last 24 hours', function () {
+    fakeDockerRunning();
+    PipelineDelivery::factory()->count(3)->create(['received_at' => now()->subMinutes(5)]);
+
+    livewire(PipelineControl::class)->assertSee('3 received in 24h');
+});
+
+test('the nwws card lists its recent deliveries', function () {
+    fakeDockerRunning();
+    PipelineDelivery::factory()->create(['wmo_header_key' => 'ftus21 kkci 221432 taford']);
+
+    livewire(PipelineControl::class)->assertSee('FTUS21 KKCI 221432 TAFORD');
+});
+
+test('the shared emwin table shows both feeds delivery state per product', function () {
+    fakeDockerRunning();
+    PipelineDelivery::factory()->forFeed('emwin')->create(['wmo_header_key' => 'both', 'received_at' => now()->subMinutes(30)]);
+    PipelineDelivery::factory()->forFeed('emwin_http')->create(['wmo_header_key' => 'both', 'received_at' => now()->subMinutes(29)]);
+    PipelineDelivery::factory()->forFeed('emwin')->create(['wmo_header_key' => 'lonely', 'received_at' => now()->subMinutes(20)]);
+    PipelineDelivery::factory()->forFeed('emwin')->create(['wmo_header_key' => 'fresh', 'received_at' => now()->subMinutes(2)]);
+    PipelineDelivery::factory()->forFeed('emwin_http')->create(['wmo_header_key' => null, 'file_name' => 'nohdr.txt']);
+
+    livewire(PipelineControl::class)
+        ->assertSee('Recent EMWIN products')
+        ->assertSee('BOTH')
+        ->assertSee('Not received')
+        ->assertSee('Waiting')
+        ->assertSee('No header to compare')
+        ->assertSee('nohdr.txt');
+});
+
+test('the page renders with no deliveries and without the deliveries table', function () {
+    fakeDockerRunning();
+    livewire(PipelineControl::class)->assertSuccessful();
+
+    Schema::drop('pipeline_deliveries');
+    livewire(PipelineControl::class)->assertSuccessful()->assertSee('0 received in 24h');
 });

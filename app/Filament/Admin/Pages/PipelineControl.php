@@ -2,13 +2,19 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Enums\PipelineFeed;
 use App\Support\Pipeline\DockerEngineClient;
+use App\Support\Pipeline\FeedHealth;
+use App\Support\Pipeline\PipelineActivity;
 use App\Support\Pipeline\PipelineHeartbeat;
+use App\Support\Pipeline\PipelineSummary;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Throwable;
 use UnitEnum;
 
@@ -29,95 +35,115 @@ class PipelineControl extends Page
     private const EMWIN_HTTP_CONTAINER = 'wxnotify-emwin-http';
 
     /**
-     * @var array<string, string>
+     * @var array<string, array{status: string, health: ?string}>
      */
-    private array $statusCache = [];
+    private array $stateCache = [];
+
+    private ?PipelineActivity $activity = null;
+
+    /**
+     * @return array{status: string, health: ?string}
+     */
+    private function stateOf(string $container): array
+    {
+        return $this->stateCache[$container] ??= $this->resolveState($container);
+    }
 
     private function statusOf(string $container): string
     {
-        return $this->statusCache[$container] ??= $this->resolveStatus($container);
+        return $this->stateOf($container)['status'];
     }
 
-    private function resolveStatus(string $container): string
+    /**
+     * @return array{status: string, health: ?string}
+     */
+    private function resolveState(string $container): array
     {
         try {
-            return app(DockerEngineClient::class)->status($container);
+            return app(DockerEngineClient::class)->state($container);
         } catch (Throwable) {
-            return 'unknown';
+            return ['status' => 'unknown', 'health' => null];
         }
     }
 
-    private function colorFor(string $status): string
+    private function activity(): PipelineActivity
     {
-        return match ($status) {
-            'running' => 'success',
-            'exited' => 'gray',
-            'dead' => 'danger',
-            default => 'warning',
-        };
+        return $this->activity ??= app(PipelineActivity::class);
     }
 
-    private function labelFor(string $status): string
+    private function lastProductFor(PipelineFeed $feed): ?Carbon
     {
-        return match ($status) {
-            'not_found' => 'Not found',
-            default => ucfirst($status),
-        };
+        return PipelineHeartbeat::lastReceivedAt($feed->value);
+    }
+
+    private function healthFor(PipelineFeed $feed): FeedHealth
+    {
+        $state = $this->stateOf($feed->container());
+
+        return FeedHealth::evaluate($state['status'], $state['health'], $this->lastProductFor($feed), $feed->staleMinutes());
+    }
+
+    /**
+     * @return array<int, array{feed: PipelineFeed, health: FeedHealth, lastProduct: ?string, counts: array<int, int>, recent: ?Collection}>
+     */
+    public function cards(): array
+    {
+        return array_map(fn (PipelineFeed $feed): array => [
+            'feed' => $feed,
+            'health' => $this->healthFor($feed),
+            'lastProduct' => $this->lastProductFor($feed)?->diffForHumans(),
+            'counts' => $this->activity()->hourlyCounts($feed),
+            'recent' => $feed === PipelineFeed::Nwws ? $this->activity()->recent($feed) : null,
+        ], PipelineFeed::cases());
+    }
+
+    public function summary(): PipelineSummary
+    {
+        $health = [];
+
+        foreach (PipelineFeed::cases() as $feed) {
+            $health[$feed->value] = $this->healthFor($feed);
+        }
+
+        return PipelineSummary::evaluate($health);
+    }
+
+    public function ingestedToday(): int
+    {
+        return $this->activity()->ingestedToday();
+    }
+
+    /**
+     * @return Collection<int, array{label: string, comparable: bool, first_seen: Carbon, cells: array<string, array{state: string, at: ?Carbon}>}>
+     */
+    public function emwinComparison(): Collection
+    {
+        return $this->activity()->emwinComparison();
     }
 
     public function nwwsStatus(): string
     {
-        return $this->statusOf(self::NWWS_CONTAINER);
-    }
-
-    public function nwwsStatusColor(): string
-    {
-        return $this->colorFor($this->nwwsStatus());
-    }
-
-    public function nwwsStatusLabel(): string
-    {
-        return $this->labelFor($this->nwwsStatus());
+        return $this->statusOf(PipelineFeed::Nwws->container());
     }
 
     public function emwinStatus(): string
     {
-        return $this->statusOf(self::EMWIN_CONTAINER);
-    }
-
-    public function emwinStatusColor(): string
-    {
-        return $this->colorFor($this->emwinStatus());
-    }
-
-    public function emwinStatusLabel(): string
-    {
-        return $this->labelFor($this->emwinStatus());
+        return $this->statusOf(PipelineFeed::Emwin->container());
     }
 
     public function emwinLastProductAt(): ?string
     {
-        return PipelineHeartbeat::lastReceivedAt('emwin')?->diffForHumans();
+        return $this->lastProductFor(PipelineFeed::Emwin)?->diffForHumans();
     }
 
     public function emwinHttpStatus(): string
     {
-        return $this->statusOf(self::EMWIN_HTTP_CONTAINER);
-    }
-
-    public function emwinHttpStatusColor(): string
-    {
-        return $this->colorFor($this->emwinHttpStatus());
-    }
-
-    public function emwinHttpStatusLabel(): string
-    {
-        return $this->labelFor($this->emwinHttpStatus());
+        return $this->statusOf(PipelineFeed::EmwinHttp->container());
     }
 
     public function emwinHttpLastProductAt(): ?string
     {
-        return PipelineHeartbeat::lastReceivedAt('emwin_http')?->diffForHumans();
+        return $this->lastProductFor(PipelineFeed::EmwinHttp)?->diffForHumans();
     }
 
     public function startAction(): Action
@@ -219,7 +245,7 @@ class PipelineControl extends Page
             // per-request status cache from before this call ran (Filament
             // re-checks visibility as part of authorizing the action) — the
             // subsequent re-render needs a fresh read, not that stale value.
-            unset($this->statusCache[$container]);
+            unset($this->stateCache[$container]);
 
             Notification::make()
                 ->title("{$label} {$verb} succeeded")
