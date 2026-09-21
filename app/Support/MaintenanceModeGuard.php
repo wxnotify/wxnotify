@@ -13,7 +13,13 @@ class MaintenanceModeGuard
 
     public function message(): string
     {
-        return filled($message = app(GeneralSettings::class)->maintenance_message) ? $message : self::DEFAULT_MESSAGE;
+        try {
+            $message = app(GeneralSettings::class)->maintenance_message;
+        } catch (MissingSettings) {
+            return self::DEFAULT_MESSAGE;
+        }
+
+        return filled($message) ? $message : self::DEFAULT_MESSAGE;
     }
 
     public function isMaintenanceActive(): bool

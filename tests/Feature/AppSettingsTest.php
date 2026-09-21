@@ -2,6 +2,7 @@
 
 use App\Settings\GeneralSettings;
 use App\Settings\TierThresholdSettings;
+use Illuminate\Support\Facades\Cache;
 
 test('general settings default to maintenance off with no custom message', function () {
     $settings = app(GeneralSettings::class);
@@ -35,4 +36,10 @@ test('a saved setting is read back', function () {
 
 test('settings values are cached', function () {
     expect(config('settings.cache.enabled'))->toBeTrue();
+
+    Cache::flush();
+    app()->forgetInstance(TierThresholdSettings::class);
+    app(TierThresholdSettings::class)->plus_locations;
+
+    expect(Cache::has('settings.'.TierThresholdSettings::cacheKey()))->toBeTrue();
 });

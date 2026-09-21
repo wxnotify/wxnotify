@@ -2,6 +2,8 @@
 
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
+use App\Filament\Dashboard\Resources\AlertRules\Pages\EditAlertRule;
+use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\User;
@@ -102,4 +104,38 @@ test('the lightning radius floor follows the setting on create', function () {
         ])
         ->call('create')
         ->assertHasNoFormErrors();
+});
+
+test('the lightning radius floor follows the setting on edit', function () {
+    $this->seed(ProductCatalogSeeder::class);
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    $location = Location::factory()->for($user)->create(['label' => 'Home']);
+    $channel = NotificationChannel::factory()->for($user)->create();
+    $rule = AlertRule::factory()->for($user)->for($location)->lightning()->create(['radius_miles' => 15]);
+    $rule->notificationChannels()->attach($channel);
+
+    setTierSetting('lightning_min_radius_miles', 12);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->fillForm(['radius_miles' => 11])
+        ->call('save')
+        ->assertHasFormErrors(['radius_miles' => 'min']);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->fillForm(['radius_miles' => 12])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->radius_miles)->toBe(12);
+});
+
+test('raising the lightning floor does not rewrite an existing rule', function () {
+    $user = User::factory()->create();
+    $location = Location::factory()->for($user)->create();
+    $rule = AlertRule::factory()->for($user)->for($location)->lightning()->create(['radius_miles' => 6]);
+
+    setTierSetting('lightning_min_radius_miles', 15);
+
+    expect($rule->fresh()->radius_miles)->toBe(6);
 });

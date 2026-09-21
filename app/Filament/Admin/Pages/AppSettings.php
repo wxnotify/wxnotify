@@ -18,6 +18,7 @@ use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use UnitEnum;
 
 class AppSettings extends Page implements HasForms
@@ -104,11 +105,13 @@ class AppSettings extends Page implements HasForms
         $data = $this->form->getState();
         $data['maintenance_message'] = filled($data['maintenance_message'] ?? null) ? $data['maintenance_message'] : null;
 
-        foreach ([GeneralSettings::class, TierThresholdSettings::class] as $class) {
-            $settings = app($class);
-            $settings->fill(Arr::only($data, array_keys($settings->toArray())));
-            $settings->save();
-        }
+        DB::transaction(function () use ($data): void {
+            foreach ([GeneralSettings::class, TierThresholdSettings::class] as $class) {
+                $settings = app($class);
+                $settings->fill(Arr::only($data, array_keys($settings->toArray())));
+                $settings->save();
+            }
+        });
 
         Notification::make()->success()->title('Settings saved')->send();
     }

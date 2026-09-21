@@ -4,6 +4,15 @@ namespace App\Listeners;
 
 use Spatie\LaravelSettings\Events\SavingSettings;
 
+/**
+ * Audit-logs changed settings properties.
+ *
+ * Registered by Laravel's event discovery; do NOT also register it in
+ * AppServiceProvider, or every change is logged twice.
+ *
+ * The `!==` comparison assumes scalar settings (bool/int/?string); a future
+ * array or object property would need a different comparison.
+ */
 class LogSettingsChange
 {
     public function handle(SavingSettings $event): void

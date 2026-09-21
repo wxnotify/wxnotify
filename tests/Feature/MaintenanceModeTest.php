@@ -8,6 +8,8 @@ use App\Models\NotificationChannel;
 use App\Models\TraccarServer;
 use App\Models\User;
 use App\Settings\GeneralSettings;
+use App\Support\MaintenanceModeGuard;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -147,4 +149,14 @@ test('a signed-in subscriber write fails open when the settings rows are missing
     $this->location->update(['label' => 'Open edit']);
 
     expect($this->location->fresh()->label)->toBe('Open edit');
+});
+
+test('the banner message falls back to the default when the settings rows are missing', function () {
+    removeGeneralSettingsRows();
+
+    expect(app(MaintenanceModeGuard::class)->message())->toBe(MaintenanceModeGuard::DEFAULT_MESSAGE);
+});
+
+test('blocked writes are not reported to the log', function () {
+    expect(app(ExceptionHandler::class)->shouldReport(new MaintenanceModeException('blocked')))->toBeFalse();
 });

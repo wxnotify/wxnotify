@@ -43,7 +43,10 @@ test('saving writes both groups', function () {
 test('an empty maintenance message is stored as null', function () {
     livewire(AppSettings::class)
         ->fillForm(['maintenance_message' => 'Temp'])
-        ->call('save');
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(app(GeneralSettings::class)->refresh()->maintenance_message)->toBe('Temp');
 
     livewire(AppSettings::class)
         ->fillForm(['maintenance_message' => ''])
@@ -54,12 +57,14 @@ test('an empty maintenance message is stored as null', function () {
 });
 
 test('out-of-range and non-integer values are rejected and nothing is saved', function (string $field, mixed $value) {
+    $original = app(TierThresholdSettings::class)->refresh()->{$field};
+
     livewire(AppSettings::class)
         ->fillForm([$field => $value])
         ->call('save')
         ->assertHasFormErrors([$field]);
 
-    expect(app(TierThresholdSettings::class)->refresh()->{$field})->not->toBe($value);
+    expect(app(TierThresholdSettings::class)->refresh()->{$field})->toBe($original);
 })->with([
     'lightning floor below range' => ['lightning_min_radius_miles', 4],
     'lightning floor above range' => ['lightning_min_radius_miles', 16],
@@ -91,4 +96,6 @@ test('only staff can open the page', function () {
     $this->actingAs(User::factory()->create(['is_staff' => false]));
 
     expect(AppSettings::canAccess())->toBeFalse();
+
+    livewire(AppSettings::class)->assertForbidden();
 });
