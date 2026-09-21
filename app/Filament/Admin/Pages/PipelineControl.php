@@ -28,12 +28,6 @@ class PipelineControl extends Page
 
     protected static ?string $navigationLabel = 'Pipeline Control';
 
-    private const NWWS_CONTAINER = 'wxnotify-nwws';
-
-    private const EMWIN_CONTAINER = 'wxnotify-emwin-byteblaster';
-
-    private const EMWIN_HTTP_CONTAINER = 'wxnotify-emwin-http';
-
     /**
      * @var array<string, array{status: string, health: ?string}>
      */
@@ -152,7 +146,7 @@ class PipelineControl extends Page
             ->label('Start')
             ->color('success')
             ->visible(fn (): bool => $this->nwwsStatus() !== 'running')
-            ->action(fn () => $this->runDockerAction('NWWS', self::NWWS_CONTAINER, 'start', fn () => app(DockerEngineClient::class)->start(self::NWWS_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('NWWS', PipelineFeed::Nwws->container(), 'start', fn () => app(DockerEngineClient::class)->start(PipelineFeed::Nwws->container())));
     }
 
     public function stopAction(): Action
@@ -163,7 +157,7 @@ class PipelineControl extends Page
             ->requiresConfirmation()
             ->modalDescription('This stops the live NWWS-OI feed connection until it is started again.')
             ->visible(fn (): bool => $this->nwwsStatus() === 'running')
-            ->action(fn () => $this->runDockerAction('NWWS', self::NWWS_CONTAINER, 'stop', fn () => app(DockerEngineClient::class)->stop(self::NWWS_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('NWWS', PipelineFeed::Nwws->container(), 'stop', fn () => app(DockerEngineClient::class)->stop(PipelineFeed::Nwws->container())));
     }
 
     public function restartAction(): Action
@@ -173,7 +167,7 @@ class PipelineControl extends Page
             ->color('warning')
             ->requiresConfirmation()
             ->modalDescription('This briefly drops the live NWWS-OI feed connection.')
-            ->action(fn () => $this->runDockerAction('NWWS', self::NWWS_CONTAINER, 'restart', fn () => app(DockerEngineClient::class)->restart(self::NWWS_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('NWWS', PipelineFeed::Nwws->container(), 'restart', fn () => app(DockerEngineClient::class)->restart(PipelineFeed::Nwws->container())));
     }
 
     public function startEmwinAction(): Action
@@ -182,7 +176,7 @@ class PipelineControl extends Page
             ->label('Start')
             ->color('success')
             ->visible(fn (): bool => $this->emwinStatus() !== 'running')
-            ->action(fn () => $this->runDockerAction('EMWIN', self::EMWIN_CONTAINER, 'start', fn () => app(DockerEngineClient::class)->start(self::EMWIN_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('EMWIN', PipelineFeed::Emwin->container(), 'start', fn () => app(DockerEngineClient::class)->start(PipelineFeed::Emwin->container())));
     }
 
     public function stopEmwinAction(): Action
@@ -193,7 +187,7 @@ class PipelineControl extends Page
             ->requiresConfirmation()
             ->modalDescription('This stops the live EMWIN Byteblaster feed connection until it is started again.')
             ->visible(fn (): bool => $this->emwinStatus() === 'running')
-            ->action(fn () => $this->runDockerAction('EMWIN', self::EMWIN_CONTAINER, 'stop', fn () => app(DockerEngineClient::class)->stop(self::EMWIN_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('EMWIN', PipelineFeed::Emwin->container(), 'stop', fn () => app(DockerEngineClient::class)->stop(PipelineFeed::Emwin->container())));
     }
 
     public function restartEmwinAction(): Action
@@ -203,7 +197,7 @@ class PipelineControl extends Page
             ->color('warning')
             ->requiresConfirmation()
             ->modalDescription('This briefly drops the live EMWIN Byteblaster feed connection.')
-            ->action(fn () => $this->runDockerAction('EMWIN', self::EMWIN_CONTAINER, 'restart', fn () => app(DockerEngineClient::class)->restart(self::EMWIN_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('EMWIN', PipelineFeed::Emwin->container(), 'restart', fn () => app(DockerEngineClient::class)->restart(PipelineFeed::Emwin->container())));
     }
 
     public function startEmwinHttpAction(): Action
@@ -212,7 +206,7 @@ class PipelineControl extends Page
             ->label('Start')
             ->color('success')
             ->visible(fn (): bool => $this->emwinHttpStatus() !== 'running')
-            ->action(fn () => $this->runDockerAction('EMWIN HTTP', self::EMWIN_HTTP_CONTAINER, 'start', fn () => app(DockerEngineClient::class)->start(self::EMWIN_HTTP_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('EMWIN HTTP', PipelineFeed::EmwinHttp->container(), 'start', fn () => app(DockerEngineClient::class)->start(PipelineFeed::EmwinHttp->container())));
     }
 
     public function stopEmwinHttpAction(): Action
@@ -223,7 +217,7 @@ class PipelineControl extends Page
             ->requiresConfirmation()
             ->modalDescription('This stops the EMWIN HTTP backup downloader until it is started again.')
             ->visible(fn (): bool => $this->emwinHttpStatus() === 'running')
-            ->action(fn () => $this->runDockerAction('EMWIN HTTP', self::EMWIN_HTTP_CONTAINER, 'stop', fn () => app(DockerEngineClient::class)->stop(self::EMWIN_HTTP_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('EMWIN HTTP', PipelineFeed::EmwinHttp->container(), 'stop', fn () => app(DockerEngineClient::class)->stop(PipelineFeed::EmwinHttp->container())));
     }
 
     public function restartEmwinHttpAction(): Action
@@ -233,7 +227,7 @@ class PipelineControl extends Page
             ->color('warning')
             ->requiresConfirmation()
             ->modalDescription('This briefly interrupts the EMWIN HTTP backup downloader.')
-            ->action(fn () => $this->runDockerAction('EMWIN HTTP', self::EMWIN_HTTP_CONTAINER, 'restart', fn () => app(DockerEngineClient::class)->restart(self::EMWIN_HTTP_CONTAINER)));
+            ->action(fn () => $this->runDockerAction('EMWIN HTTP', PipelineFeed::EmwinHttp->container(), 'restart', fn () => app(DockerEngineClient::class)->restart(PipelineFeed::EmwinHttp->container())));
     }
 
     private function runDockerAction(string $label, string $container, string $verb, callable $callback): void

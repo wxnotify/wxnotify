@@ -80,6 +80,15 @@ test('a stopped backup is a note and does not change the color', function () {
         ->and($summary->notes)->toBe(['EMWIN HTTP backup is stopped']);
 });
 
+test('a backup whose container is not found is noted as not deployed', function () {
+    $health = healthMap('healthy', 'healthy', 'healthy');
+    $health['emwin_http'] = FeedHealth::evaluate('not_found', null, null, 15);
+
+    $summary = PipelineSummary::evaluate($health);
+
+    expect($summary->color)->toBe('success')->and($summary->notes)->toBe(['EMWIN HTTP backup is not deployed']);
+});
+
 test('a stale feed makes the summary amber and names the feed', function () {
     $summary = PipelineSummary::evaluate(healthMap('healthy', 'healthy', 'stale'));
 

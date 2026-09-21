@@ -269,10 +269,13 @@ test('the emwin status after an action is not a stale cached read', function () 
 test('the emwin row shows never when no product has been received', function () {
     Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
     Cache::forget('pipeline.heartbeat.emwin');
+    PipelineHeartbeat::record('nwws');
+    PipelineHeartbeat::record('emwin_http');
 
-    $html = livewire(PipelineControl::class)->assertSee('Last product:', escape: false)->html();
+    $html = livewire(PipelineControl::class)->assertSee('never')->html();
 
-    expect(pipelineLastProduct($html, 'EMWIN Byteblaster'))->toBe('never');
+    expect(pipelineLastProduct($html, 'EMWIN Byteblaster'))->toBe('never')
+        ->and(pipelineLastProduct($html, 'NWWS'))->not->toBe('never');
 });
 
 test('a missing emwin container degrades to Not found without breaking the nwws row', function () {
@@ -286,7 +289,7 @@ test('a missing emwin container degrades to Not found without breaking the nwws 
 
 function pipelineLastProduct(string $html, string $rowLabel): ?string
 {
-    preg_match('/'.preg_quote($rowLabel, '/').'.*?Last product:\s*<span[^>]*>\s*([^<]+?)\s*</s', $html, $matches);
+    preg_match('/>\s*'.preg_quote($rowLabel, '/').'\s*<\/span>.*?Last product:\s*<span[^>]*>\s*([^<]+?)\s*</s', $html, $matches);
 
     return $matches[1] ?? null;
 }
@@ -426,4 +429,17 @@ test('the page renders with no deliveries and without the deliveries table', fun
 
     Schema::drop('pipeline_deliveries');
     livewire(PipelineControl::class)->assertSuccessful()->assertSee('0 received in 24h');
+});
+
+test('each card shows its own last product even when the banner names the feeds first', function () {
+    fakeDockerRunning();
+    Cache::forget('pipeline.heartbeat.nwws');
+    Cache::forget('pipeline.heartbeat.emwin');
+    PipelineHeartbeat::record('emwin_http');
+
+    $html = livewire(PipelineControl::class)->assertSee('Needs attention: NWWS (Stale), EMWIN Byteblaster (Stale)')->html();
+
+    expect(pipelineLastProduct($html, 'NWWS'))->toBe('never')
+        ->and(pipelineLastProduct($html, 'EMWIN Byteblaster'))->toBe('never')
+        ->and(pipelineLastProduct($html, 'EMWIN HTTP backup'))->not->toBe('never')->not->toBeNull();
 });

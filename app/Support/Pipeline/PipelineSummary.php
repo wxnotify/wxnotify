@@ -29,7 +29,7 @@ final class PipelineSummary
             $stoppedLike = in_array($health->state, ['stopped', 'not_found'], true);
 
             if ($stoppedLike && ! $feed->isPrimary()) {
-                $notes[] = $feed->label().' is '.strtolower($health->label);
+                $notes[] = $feed->label().' is '.($health->state === 'not_found' ? 'not deployed' : 'stopped');
 
                 continue;
             }
