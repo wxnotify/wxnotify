@@ -9,6 +9,16 @@ import (
 	"net/http"
 )
 
+// StatusError is a non-2xx answer from the pipeline. It carries no token and no response body.
+type StatusError struct {
+	Code int
+	Path string
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("post %q: pipeline answered HTTP %d", e.Path, e.Code)
+}
+
 type Poster struct {
 	Client *http.Client
 	URL    string
@@ -37,7 +47,7 @@ func (p *Poster) Post(ctx context.Context, relPath string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return fmt.Errorf("post %q: pipeline answered HTTP %d", relPath, resp.StatusCode)
+		return &StatusError{Code: resp.StatusCode, Path: relPath}
 	}
 	return nil
 }

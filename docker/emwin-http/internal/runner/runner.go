@@ -3,12 +3,14 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"time"
 
 	"wxnotify.local/emwin-http/internal/fetch"
+	"wxnotify.local/emwin-http/internal/poster"
 	"wxnotify.local/emwin-http/internal/state"
 	"wxnotify.local/emwin-http/internal/unzip"
 )
@@ -64,10 +66,17 @@ func RunCycle(ctx context.Context, d Deps) error {
 		d.Log.Warn("skipped unsafe zip members", "count", len(skipped))
 	}
 
-	failures := 0
+	failures, rejected := 0, 0
 	for _, name := range written {
 		if d.Poster != nil {
 			if err := d.Poster.Post(ctx, d.RelPrefix+"/"+name); err != nil {
+				var se *poster.StatusError
+				if errors.As(err, &se) && isPermanentRejection(se.Code) {
+					d.Log.Warn("product rejected by the pipeline; not retrying", "file", name, "status", se.Code)
+					d.Store.MarkSeen(name)
+					rejected++
+					continue
+				}
 				d.Log.Warn("post failed", "file", name, "error", err.Error())
 				failures++
 				continue
@@ -83,12 +92,22 @@ func RunCycle(ctx context.Context, d Deps) error {
 		return fmt.Errorf("save state: %w", err)
 	}
 
-	d.Log.Info("cycle complete", "new_files", len(written), "failed", failures)
+	d.Log.Info("cycle complete", "new_files", len(written), "failed", failures, "rejected", rejected)
 
 	if failures > 0 {
 		return fmt.Errorf("%d of %d products failed to post", failures, len(written))
 	}
 	return nil
+}
+
+// isPermanentRejection reports whether the pipeline refused this one product for good. 404 is
+// deliberately excluded (it can mean a misconfigured shared volume), as are 401/403/429/5xx.
+func isPermanentRejection(code int) bool {
+	switch code {
+	case 400, 410, 413, 422:
+		return true
+	}
+	return false
 }
 
 const backoffBase = 30 * time.Second

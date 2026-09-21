@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"wxnotify.local/emwin-http/internal/fetch"
+	"wxnotify.local/emwin-http/internal/poster"
 	"wxnotify.local/emwin-http/internal/state"
 	"wxnotify.local/emwin-http/internal/unzip"
 )
@@ -44,9 +45,13 @@ func (f *fakeFetcher) Fetch(ctx context.Context, lm, etag, dest string) (fetch.R
 type fakePoster struct {
 	posted []string
 	fail   map[string]bool
+	status map[string]int
 }
 
 func (p *fakePoster) Post(ctx context.Context, rel string) error {
+	if code := p.status[rel]; code != 0 {
+		return &poster.StatusError{Code: code, Path: rel}
+	}
 	if p.fail[rel] {
 		return errors.New("pipeline unavailable")
 	}
@@ -221,5 +226,44 @@ func TestLoopBacksOffOnFailureAndResetsOnSuccess(t *testing.T) {
 	}
 	if successes != 1 {
 		t.Fatalf("successes = %d", successes)
+	}
+}
+
+func TestPermanentRejectionsAreMarkedSeenAndDoNotFailTheCycle(t *testing.T) {
+	for _, code := range []int{400, 410, 413, 422} {
+		f := &fakeFetcher{zipBytes: zipOf(t, "A.TXT", "B.TXT")}
+		p := &fakePoster{status: map[string]int{"http/B.TXT": code}}
+		d, store := newDeps(t, f, p)
+
+		if err := RunCycle(context.Background(), d); err != nil {
+			t.Fatalf("%d: %v", code, err)
+		}
+		if len(p.posted) != 1 || p.posted[0] != "http/A.TXT" {
+			t.Fatalf("%d: posted = %v", code, p.posted)
+		}
+		if !store.Seen("B.TXT") {
+			t.Fatalf("%d: rejected file must be marked seen", code)
+		}
+		if lm, _ := store.Validators(); lm != "LM1" {
+			t.Fatalf("%d: validators must be recorded", code)
+		}
+	}
+}
+
+func TestRetryableStatusesFailTheCycleAndStayUnseen(t *testing.T) {
+	for _, code := range []int{401, 403, 404, 408, 429, 500, 503} {
+		f := &fakeFetcher{zipBytes: zipOf(t, "A.TXT", "B.TXT")}
+		p := &fakePoster{status: map[string]int{"http/B.TXT": code}}
+		d, store := newDeps(t, f, p)
+
+		if err := RunCycle(context.Background(), d); err == nil {
+			t.Fatalf("%d: expected an error", code)
+		}
+		if store.Seen("B.TXT") {
+			t.Fatalf("%d: file must stay unseen", code)
+		}
+		if lm, _ := store.Validators(); lm != "" {
+			t.Fatalf("%d: validators must not be recorded", code)
+		}
 	}
 }

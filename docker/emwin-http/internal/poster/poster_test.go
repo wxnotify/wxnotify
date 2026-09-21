@@ -3,6 +3,7 @@ package poster
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -39,5 +40,22 @@ func TestPostFailsOnNon2xxWithoutLeakingTheToken(t *testing.T) {
 	err := (&Poster{Client: http.DefaultClient, URL: srv.URL, Token: "sekret"}).Post(context.Background(), "http/x")
 	if err == nil || strings.Contains(err.Error(), "sekret") || !strings.Contains(err.Error(), "500") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestPostReturnsTypedStatusErrorWithoutToken(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte("sekret in body"))
+	}))
+	defer srv.Close()
+
+	err := (&Poster{Client: http.DefaultClient, URL: srv.URL, Token: "sekret"}).Post(context.Background(), "http/x")
+	var se *StatusError
+	if !errors.As(err, &se) || se.Code != 422 || se.Path != "http/x" {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(err.Error(), "sekret") {
+		t.Fatalf("leaked: %v", err)
 	}
 }
