@@ -11,9 +11,11 @@ function emwinApiWarning(string $extra = ''): string
     return "WFUS53 KBOU 191622{$extra}\nTORBOU\nCOZ039-191722-\n/O.NEW.KBOU.TO.W.0009.260919T1622Z-260919T1722Z/\n\nBULLETIN\nTornado Warning";
 }
 
-function emwinApiPost(object $t, string $path)
+function emwinApiPost(object $t, string $path, mixed $feed = null)
 {
-    return $t->postJson('/api/pipeline/emwin-products', ['path' => $path], ['Authorization' => 'Bearer test-webhook-token']);
+    $body = ['path' => $path] + ($feed === null ? [] : ['feed' => $feed]);
+
+    return $t->postJson('/api/pipeline/emwin-products', $body, ['Authorization' => 'Bearer test-webhook-token']);
 }
 
 beforeEach(function () {
@@ -100,4 +102,53 @@ test('it returns 503 when another feed holds the lock for the same header key', 
 
     expect(IngestedProduct::count())->toBe(0);
     $lock->release();
+});
+
+test('a post with no feed records the byteblaster heartbeat only', function () {
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();
+
+    expect(PipelineHeartbeat::lastReceivedAt('emwin'))->not->toBeNull()
+        ->and(PipelineHeartbeat::lastReceivedAt('emwin_http'))->toBeNull();
+});
+
+test('feed byteblaster behaves like the default', function () {
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt', 'byteblaster')->assertNoContent();
+
+    expect(PipelineHeartbeat::lastReceivedAt('emwin'))->not->toBeNull()
+        ->and(PipelineHeartbeat::lastReceivedAt('emwin_http'))->toBeNull();
+});
+
+test('feed http records the http heartbeat only and still ingests with source emwin', function () {
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt', 'http')->assertNoContent();
+
+    expect(PipelineHeartbeat::lastReceivedAt('emwin_http'))->not->toBeNull()
+        ->and(PipelineHeartbeat::lastReceivedAt('emwin'))->toBeNull()
+        ->and(IngestedProduct::sole()->source)->toBe('emwin');
+});
+
+test('an invalid feed is rejected with 422 and records no heartbeat', function (mixed $feed) {
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt', $feed)->assertUnprocessable();
+
+    expect(PipelineHeartbeat::lastReceivedAt('emwin'))->toBeNull()
+        ->and(PipelineHeartbeat::lastReceivedAt('emwin_http'))->toBeNull()
+        ->and(IngestedProduct::count())->toBe(0);
+})->with(['unknown value' => 'ftp', 'array' => [['http']], 'integer' => 5]);
+
+test('the same bulletin arriving on both feeds is ingested once', function () {
+    File::makeDirectory($this->emwinRoot.'/http', recursive: true);
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+    File::put($this->emwinRoot.'/http/b.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt', 'byteblaster')->assertNoContent();
+    emwinApiPost($this, 'http/b.txt', 'http')->assertNoContent();
+
+    expect(IngestedProduct::count())->toBe(1);
 });

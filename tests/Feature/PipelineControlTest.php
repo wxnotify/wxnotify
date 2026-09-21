@@ -147,13 +147,65 @@ test('the hidden action is genuinely absent from the rendered page, not just dis
         ->assertSeeHtml("mountAction('stop')");
 });
 
-test('the emwin http backup row remains a static placeholder', function () {
+test('the emwin http backup row shows its docker status and start is hidden while it runs', function () {
+    Http::fake([
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'exited']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/json' => Http::response(['State' => ['Status' => 'running']], 200),
+    ]);
+
+    livewire(PipelineControl::class)
+        ->assertSee('EMWIN HTTP backup')
+        ->assertDontSee('Status unknown')
+        ->assertSee('Running')
+        ->assertActionHidden('startEmwinHttp')
+        ->assertActionVisible('stopEmwinHttp');
+});
+
+test('the emwin http start action is visible and stop hidden when it is not running', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/json' => Http::response(['State' => ['Status' => 'exited']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/start' => Http::response('', 204),
     ]);
 
-    livewire(PipelineControl::class)->assertSee('EMWIN HTTP backup')->assertSee('Status unknown');
+    livewire(PipelineControl::class)
+        ->assertActionVisible('startEmwinHttp')
+        ->assertActionHidden('stopEmwinHttp')
+        ->callAction('startEmwinHttp')
+        ->assertNotified('EMWIN HTTP start succeeded');
+
+    Http::assertSent(fn ($r) => $r->method() === 'POST' && str_contains($r->url(), '/containers/wxnotify-emwin-http/start'));
+});
+
+test('the emwin http stop and restart actions call the emwin http container and notify', function () {
+    Http::fake([
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/stop' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/restart' => Http::response('', 204),
+    ]);
+
+    livewire(PipelineControl::class)
+        ->callAction('stopEmwinHttp')->assertNotified('EMWIN HTTP stop succeeded')
+        ->callAction('restartEmwinHttp')->assertNotified('EMWIN HTTP restart succeeded');
+
+    Http::assertSent(fn ($r) => $r->method() === 'POST' && str_contains($r->url(), '/containers/wxnotify-emwin-http/stop'));
+    Http::assertSent(fn ($r) => $r->method() === 'POST' && str_contains($r->url(), '/containers/wxnotify-emwin-http/restart'));
+});
+
+test('the emwin http row last product comes from its own heartbeat', function () {
+    Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
+    Cache::forget('pipeline.heartbeat.emwin');
+    Cache::forget('pipeline.heartbeat.emwin_http');
+
+    expect(substr_count(livewire(PipelineControl::class)->html(), 'Last product: never'))->toBe(2);
+
+    PipelineHeartbeat::record('emwin_http');
+
+    expect(substr_count(livewire(PipelineControl::class)->html(), 'Last product: never'))->toBe(1);
 });
 
 test('the emwin byteblaster row shows its docker status and start is hidden while it runs', function () {
@@ -228,7 +280,7 @@ test('the emwin row shows the last product received from the heartbeat', functio
     Http::fake(['docker-socket-proxy:2375/*' => Http::response(['State' => ['Status' => 'running']], 200)]);
     PipelineHeartbeat::record('emwin');
 
-    livewire(PipelineControl::class)->assertSee('Last product')->assertDontSee('Last product: never');
+    expect(substr_count(livewire(PipelineControl::class)->html(), 'Last product: never'))->toBe(1);
 });
 
 test('the emwin row shows never when no product has been received', function () {

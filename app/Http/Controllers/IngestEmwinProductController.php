@@ -19,9 +19,12 @@ class IngestEmwinProductController extends Controller
 
     public function __invoke(Request $request): Response
     {
-        $validated = $request->validate(['path' => ['required', 'string']]);
+        $validated = $request->validate([
+            'path' => ['required', 'string'],
+            'feed' => ['nullable', 'string', 'in:byteblaster,http'],
+        ]);
 
-        PipelineHeartbeat::record('emwin');
+        PipelineHeartbeat::record(($validated['feed'] ?? 'byteblaster') === 'http' ? 'emwin_http' : 'emwin');
 
         $root = realpath((string) config('services.pipeline.emwin_products_path'));
         $absolutePath = $root !== false ? realpath($root.DIRECTORY_SEPARATOR.$validated['path']) : false;

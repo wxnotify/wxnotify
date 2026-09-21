@@ -26,6 +26,8 @@ class PipelineControl extends Page
 
     private const EMWIN_CONTAINER = 'wxnotify-emwin';
 
+    private const EMWIN_HTTP_CONTAINER = 'wxnotify-emwin-http';
+
     /**
      * @var array<string, string>
      */
@@ -98,6 +100,26 @@ class PipelineControl extends Page
         return PipelineHeartbeat::lastReceivedAt('emwin')?->diffForHumans();
     }
 
+    public function emwinHttpStatus(): string
+    {
+        return $this->statusOf(self::EMWIN_HTTP_CONTAINER);
+    }
+
+    public function emwinHttpStatusColor(): string
+    {
+        return $this->colorFor($this->emwinHttpStatus());
+    }
+
+    public function emwinHttpStatusLabel(): string
+    {
+        return $this->labelFor($this->emwinHttpStatus());
+    }
+
+    public function emwinHttpLastProductAt(): ?string
+    {
+        return PipelineHeartbeat::lastReceivedAt('emwin_http')?->diffForHumans();
+    }
+
     public function startAction(): Action
     {
         return Action::make('start')
@@ -156,6 +178,36 @@ class PipelineControl extends Page
             ->requiresConfirmation()
             ->modalDescription('This briefly drops the live EMWIN Byteblaster feed connection.')
             ->action(fn () => $this->runDockerAction('EMWIN', self::EMWIN_CONTAINER, 'restart', fn () => app(DockerEngineClient::class)->restart(self::EMWIN_CONTAINER)));
+    }
+
+    public function startEmwinHttpAction(): Action
+    {
+        return Action::make('startEmwinHttp')
+            ->label('Start')
+            ->color('success')
+            ->visible(fn (): bool => $this->emwinHttpStatus() !== 'running')
+            ->action(fn () => $this->runDockerAction('EMWIN HTTP', self::EMWIN_HTTP_CONTAINER, 'start', fn () => app(DockerEngineClient::class)->start(self::EMWIN_HTTP_CONTAINER)));
+    }
+
+    public function stopEmwinHttpAction(): Action
+    {
+        return Action::make('stopEmwinHttp')
+            ->label('Stop')
+            ->color('danger')
+            ->requiresConfirmation()
+            ->modalDescription('This stops the EMWIN HTTP backup downloader until it is started again.')
+            ->visible(fn (): bool => $this->emwinHttpStatus() === 'running')
+            ->action(fn () => $this->runDockerAction('EMWIN HTTP', self::EMWIN_HTTP_CONTAINER, 'stop', fn () => app(DockerEngineClient::class)->stop(self::EMWIN_HTTP_CONTAINER)));
+    }
+
+    public function restartEmwinHttpAction(): Action
+    {
+        return Action::make('restartEmwinHttp')
+            ->label('Restart')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalDescription('This briefly interrupts the EMWIN HTTP backup downloader.')
+            ->action(fn () => $this->runDockerAction('EMWIN HTTP', self::EMWIN_HTTP_CONTAINER, 'restart', fn () => app(DockerEngineClient::class)->restart(self::EMWIN_HTTP_CONTAINER)));
     }
 
     private function runDockerAction(string $label, string $container, string $verb, callable $callback): void

@@ -70,7 +70,7 @@ class ResetToFactoryDefaults extends Page implements HasForms
                             ->helperText('Deletes every ingested product (test-generated included), clears active WWA tracking and the delivery log. Archived text already stored in B2/S3 is left in place.')
                             ->live(),
                         Checkbox::make('pipeline_stopped')
-                            ->label('I have stopped the pipeline services (Downloader, Alert Engine, GLM, Threshold evaluator, Traccar poller)')
+                            ->label('I have stopped the pipeline services (Downloader, EMWIN HTTP, Alert Engine, GLM, Threshold evaluator, Traccar poller)')
                             ->accepted()
                             ->visible(fn (Get $get): bool => (bool) $get('pipeline') && ! app(PipelineStack::class)->canStop()),
                         Toggle::make('catalogs')
