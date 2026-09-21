@@ -85,3 +85,66 @@ test('stop throws when the docker daemon returns an error', function () {
 
     (new DockerEngineClient)->stop('wxnotify-nwws');
 })->throws(RequestException::class);
+
+function dockerLogFrame(int $stream, string $payload): string
+{
+    return pack('CxxxN', $stream, strlen($payload)).$payload;
+}
+
+test('state reports the docker health status when a healthcheck exists', function () {
+    Http::fake(['*/containers/c1/json' => Http::response(['State' => ['Status' => 'running', 'Health' => ['Status' => 'unhealthy']]])]);
+
+    expect(app(DockerEngineClient::class)->state('c1'))->toBe(['status' => 'running', 'health' => 'unhealthy']);
+});
+
+test('state has a null health when the container defines no healthcheck', function () {
+    Http::fake(['*/containers/c1/json' => Http::response(['State' => ['Status' => 'exited']])]);
+
+    expect(app(DockerEngineClient::class)->state('c1'))->toBe(['status' => 'exited', 'health' => null]);
+});
+
+test('state reports not_found for a missing container and status still works', function () {
+    Http::fake(['*/containers/c1/json' => Http::response([], 404)]);
+
+    expect(app(DockerEngineClient::class)->state('c1'))->toBe(['status' => 'not_found', 'health' => null])
+        ->and(app(DockerEngineClient::class)->status('c1'))->toBe('not_found');
+});
+
+test('logs demultiplexes the docker stream frames into lines', function () {
+    $body = dockerLogFrame(1, "first line\nsecond line\n").dockerLogFrame(2, "error line\n");
+    Http::fake(['*/containers/c1/logs*' => Http::response($body)]);
+
+    expect(app(DockerEngineClient::class)->logs('c1'))->toBe(['first line', 'second line', 'error line']);
+});
+
+test('logs accepts a raw stream from a container running a tty', function () {
+    Http::fake(['*/containers/c1/logs*' => Http::response("alpha\nbeta\n")]);
+
+    expect(app(DockerEngineClient::class)->logs('c1'))->toBe(['alpha', 'beta']);
+});
+
+test('logs strips ansi sequences and control characters and truncates long lines', function () {
+    $long = str_repeat('x', 600);
+    $body = dockerLogFrame(1, "\e[31mred\e[0m\x07bell\n{$long}\n");
+    Http::fake(['*/containers/c1/logs*' => Http::response($body)]);
+
+    $lines = app(DockerEngineClient::class)->logs('c1');
+
+    expect($lines[0])->toBe('redbell')
+        ->and(mb_strlen($lines[1]))->toBe(501)
+        ->and($lines[1])->toEndWith('…');
+});
+
+test('logs keeps only the last requested lines', function () {
+    $body = dockerLogFrame(1, implode("\n", range(1, 10))."\n");
+    Http::fake(['*/containers/c1/logs*' => Http::response($body)]);
+
+    expect(app(DockerEngineClient::class)->logs('c1', 3))->toBe(['8', '9', '10']);
+});
+
+test('logs returns an empty list for a missing container and throws on other errors', function () {
+    Http::fake(['*/containers/gone/logs*' => Http::response('', 404), '*/containers/bad/logs*' => Http::response('', 500)]);
+
+    expect(app(DockerEngineClient::class)->logs('gone'))->toBe([]);
+    expect(fn () => app(DockerEngineClient::class)->logs('bad'))->toThrow(RequestException::class);
+});
