@@ -2,13 +2,17 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Enums\Secret;
 use App\Settings\FeatureFlagsSettings;
 use App\Settings\GeneralSettings;
 use App\Settings\IntegrationSettings;
+use App\Settings\SecretSettings;
 use App\Settings\TierThresholdSettings;
 use App\Support\ApplyEmailSettings;
+use App\Support\Secrets;
 use BackedEnum;
 use Closure;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -126,6 +130,7 @@ class AppSettings extends Page implements HasForms
                                 ]),
                         ]),
                         $this->integrationsTab(),
+                        $this->secretsTab(),
                     ]),
             ]);
     }
@@ -146,9 +151,88 @@ class AppSettings extends Page implements HasForms
                 $settings->fill(Arr::only($data, array_keys($settings->toArray())));
                 $settings->save();
             }
+
+            $this->saveSecrets($data);
         });
 
+        foreach (Secret::cases() as $secret) {
+            $this->data[$secret->settingsProperty()] = null;
+            $this->data["clear_{$secret->settingsProperty()}"] = false;
+        }
+
         Notification::make()->success()->title('Settings saved')->send();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function saveSecrets(array $data): void
+    {
+        if (auth()->user()?->is_owner !== true) {
+            return;
+        }
+
+        $changes = [];
+
+        foreach (Secret::cases() as $secret) {
+            $property = $secret->settingsProperty();
+
+            if (! empty($data["clear_{$property}"])) {
+                $changes[$property] = null;
+            } elseif (filled($data[$property] ?? null)) {
+                $changes[$property] = trim((string) $data[$property]);
+            }
+        }
+
+        if ($changes === []) {
+            return;
+        }
+
+        $settings = app(SecretSettings::class);
+        $settings->fill($changes);
+        $settings->save();
+    }
+
+    private function secretsTab(): Tab
+    {
+        $fields = [];
+
+        foreach (Secret::cases() as $secret) {
+            $property = $secret->settingsProperty();
+
+            $field = $secret === Secret::FirebaseServiceAccount
+                ? Textarea::make($property)->rows(4)->rules([fn (): Closure => $this->serviceAccountRule()])
+                : TextInput::make($property)->password()->autocomplete('new-password');
+
+            $fields[] = $field
+                ->label($secret->label())
+                ->helperText(Secrets::isStored($secret)
+                    ? 'Set. Enter a new value to replace it.'
+                    : 'Not set. Falls back to the .env value if one is configured.');
+            $fields[] = Checkbox::make("clear_{$property}")
+                ->label('Remove stored value')
+                ->dehydrated()
+                ->visible(fn (): bool => Secrets::isStored($secret));
+        }
+
+        return Tab::make('Secrets')
+            ->visible(fn (): bool => auth()->user()?->is_owner === true)
+            ->schema([
+                Section::make('Credentials')
+                    ->description('These credentials are stored encrypted and are never shown again after saving. Leave a field blank to keep its current value.')
+                    ->schema($fields),
+            ]);
+    }
+
+    private function serviceAccountRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            $decoded = is_string($value) ? json_decode($value, true) : null;
+
+            if (! is_array($decoded) || blank($decoded['client_email'] ?? null) || blank($decoded['private_key'] ?? null)) {
+                $fail('Enter the service-account JSON, including client_email and private_key.');
+            }
+        };
     }
 
     private function count(string $name, string $label, int $min, int $max): TextInput
