@@ -10,6 +10,10 @@ use Throwable;
  * Reads WxNotify's own production credentials: the value stored (encrypted)
  * in App settings wins, the .env-backed config is the fallback. Never throws;
  * if the settings cannot be read the .env value is used.
+ *
+ * A decryption failure (for example a wrong or rotated APP_KEY) is treated
+ * like "cannot be read": isStored() is false and get() falls back to the .env
+ * value, with no signal. Never log the exception message or any value.
  */
 class Secrets
 {
@@ -23,7 +27,7 @@ class Secrets
 
         $fallback = config($secret->configKey());
 
-        return filled($fallback) ? $fallback : null;
+        return is_string($fallback) && filled($fallback) ? $fallback : null;
     }
 
     public static function isStored(Secret $secret): bool

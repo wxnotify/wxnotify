@@ -101,3 +101,9 @@ test('the resolver falls back to config and never throws when the settings rows 
     expect(Secrets::get(Secret::StripeSecretKey))->toBe('env-value')
         ->and(Secrets::isStored(Secret::StripeSecretKey))->toBeFalse();
 });
+
+test('a non-string config fallback yields null', function () {
+    config(['services.stripe.secret' => ['not', 'a string']]);
+
+    expect(Secrets::get(Secret::StripeSecretKey))->toBeNull();
+});

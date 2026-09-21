@@ -137,27 +137,29 @@ class AppSettings extends Page implements HasForms
 
     public function save(): void
     {
-        $data = $this->form->getState();
+        try {
+            $data = $this->form->getState();
 
-        foreach (self::NULLABLE_STRINGS as $key) {
-            if (array_key_exists($key, $data)) {
-                $data[$key] = filled($data[$key]) ? $data[$key] : null;
-            }
-        }
-
-        DB::transaction(function () use ($data): void {
-            foreach ([GeneralSettings::class, TierThresholdSettings::class, FeatureFlagsSettings::class, IntegrationSettings::class] as $class) {
-                $settings = app($class);
-                $settings->fill(Arr::only($data, array_keys($settings->toArray())));
-                $settings->save();
+            foreach (self::NULLABLE_STRINGS as $key) {
+                if (array_key_exists($key, $data)) {
+                    $data[$key] = filled($data[$key]) ? $data[$key] : null;
+                }
             }
 
-            $this->saveSecrets($data);
-        });
+            DB::transaction(function () use ($data): void {
+                foreach ([GeneralSettings::class, TierThresholdSettings::class, FeatureFlagsSettings::class, IntegrationSettings::class] as $class) {
+                    $settings = app($class);
+                    $settings->fill(Arr::only($data, array_keys($settings->toArray())));
+                    $settings->save();
+                }
 
-        foreach (Secret::cases() as $secret) {
-            $this->data[$secret->settingsProperty()] = null;
-            $this->data["clear_{$secret->settingsProperty()}"] = false;
+                $this->saveSecrets($data);
+            });
+        } finally {
+            foreach (Secret::cases() as $secret) {
+                $this->data[$secret->settingsProperty()] = null;
+                $this->data["clear_{$secret->settingsProperty()}"] = false;
+            }
         }
 
         Notification::make()->success()->title('Settings saved')->send();
@@ -201,12 +203,12 @@ class AppSettings extends Page implements HasForms
             $property = $secret->settingsProperty();
 
             $field = $secret === Secret::FirebaseServiceAccount
-                ? Textarea::make($property)->rows(4)->rules([fn (): Closure => $this->serviceAccountRule()])
+                ? Textarea::make($property)->rows(4)->autocomplete('off')->rules([fn (): Closure => $this->serviceAccountRule()])
                 : TextInput::make($property)->password()->autocomplete('new-password');
 
             $fields[] = $field
                 ->label($secret->label())
-                ->helperText(Secrets::isStored($secret)
+                ->helperText(fn (): string => Secrets::isStored($secret)
                     ? 'Set. Enter a new value to replace it.'
                     : 'Not set. Falls back to the .env value if one is configured.');
             $fields[] = Checkbox::make("clear_{$property}")
