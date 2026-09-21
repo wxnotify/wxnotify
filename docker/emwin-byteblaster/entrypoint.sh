@@ -34,6 +34,7 @@ DAEMON_PID=""
 trap '[ -n "$DAEMON_PID" ] && kill "$DAEMON_PID" 2>/dev/null; exit 0' TERM INT
 
 while true; do
+    rm -f /var/run/npemwin/npemwind.pid
     runuser -u noaaport -- /usr/local/sbin/npemwind -F &
     DAEMON_PID=$!
     wait "$DAEMON_PID"

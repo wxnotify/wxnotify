@@ -9,7 +9,7 @@ RUN apt-get update \
         tcl tcllib libdb5.3 libwrap0 gnuplot-nox \
     && rm -rf /var/lib/apt/lists/*
 
-COPY docker/emwin/packages/ /tmp/packages/
+COPY docker/emwin-byteblaster/packages/ /tmp/packages/
 RUN cd /tmp/packages \
     && grep "npemwin_${NPEMWIN_VERSION}_${TARGETARCH}.deb" SHA256SUMS | sha256sum -c - \
     && apt-get update \
@@ -20,11 +20,11 @@ RUN id noaaport >/dev/null 2>&1 || (groupadd -r noaaport && useradd -r -g noaapo
 RUN mkdir -p /var/npemwin/files/delivered /usr/local/etc/npemwin/site \
     && chown noaaport:noaaport /var/npemwin/files/delivered
 
-COPY docker/emwin/site/ /usr/local/etc/npemwin/site/
-COPY docker/emwin/servers.conf.fallback /usr/local/etc/npemwin/servers.conf
+COPY docker/emwin-byteblaster/site/ /usr/local/etc/npemwin/site/
+COPY docker/emwin-byteblaster/servers.conf.fallback /usr/local/etc/npemwin/servers.conf
 
-COPY docker/emwin/rsyslog.conf /etc/rsyslog-emwin.conf
-COPY docker/emwin/entrypoint.sh docker/emwin/pan-notify.sh docker/emwin/refresh-servers.sh docker/emwin/healthcheck.sh /usr/local/bin/
+COPY docker/emwin-byteblaster/rsyslog.conf /etc/rsyslog-emwin.conf
+COPY docker/emwin-byteblaster/entrypoint.sh docker/emwin-byteblaster/pan-notify.sh docker/emwin-byteblaster/refresh-servers.sh docker/emwin-byteblaster/healthcheck.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/*.sh && ln -s /usr/local/bin/pan-notify.sh /pan-notify.sh
 
 EXPOSE 8016

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Process;
 function emwinShRefresh(array $env): ProcessResult
 {
     return Process::path(base_path())->env($env + ['PATH' => '/usr/bin:/bin'])
-        ->run(['sh', 'docker/emwin/refresh-servers.sh']);
+        ->run(['sh', 'docker/emwin-byteblaster/refresh-servers.sh']);
 }
 
 beforeEach(function () {
@@ -24,7 +24,7 @@ beforeEach(function () {
 afterEach(fn () => File::deleteDirectory($this->dir));
 
 test('the script is valid POSIX sh', function () {
-    expect(Process::path(base_path())->run(['sh', '-n', 'docker/emwin/refresh-servers.sh'])->successful())->toBeTrue();
+    expect(Process::path(base_path())->run(['sh', '-n', 'docker/emwin-byteblaster/refresh-servers.sh'])->successful())->toBeTrue();
 });
 
 test('it writes IP<TAB>port lines, drops bad rows and duplicates, and reports changed (10)', function () {

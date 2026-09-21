@@ -18,7 +18,7 @@ beforeEach(function () {
 
 test('the start action is visible and the stop action is hidden when nwws is not running', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
     ]);
 
@@ -29,7 +29,7 @@ test('the start action is visible and the stop action is hidden when nwws is not
 
 test('the stop action is visible and the start action is hidden when nwws is running', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
     ]);
 
@@ -40,7 +40,7 @@ test('the stop action is visible and the start action is hidden when nwws is run
 
 test('calling the start action starts the nwws container and notifies success', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/start' => Http::response('', 204),
     ]);
@@ -55,7 +55,7 @@ test('calling the start action starts the nwws container and notifies success', 
 
 test('calling the restart action restarts the nwws container and notifies success', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/restart' => Http::response('', 204),
     ]);
@@ -70,7 +70,7 @@ test('calling the restart action restarts the nwws container and notifies succes
 
 test('a failed docker call shows a failure notification instead of erroring', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/start' => Http::response([], 500),
     ]);
@@ -82,7 +82,7 @@ test('a failed docker call shows a failure notification instead of erroring', fu
 
 test('calling the stop action stops the nwws container and notifies success', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/stop' => Http::response('', 204),
     ]);
@@ -97,7 +97,7 @@ test('calling the stop action stops the nwws container and notifies success', fu
 
 test('a failed stop shows a failure notification instead of erroring', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/stop' => Http::response([], 500),
     ]);
@@ -109,7 +109,7 @@ test('a failed stop shows a failure notification instead of erroring', function 
 
 test('the page degrades gracefully when the docker status check fails', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => []], 200),
     ]);
 
@@ -122,7 +122,7 @@ test('the page degrades gracefully when the docker status check fails', function
 
 test('the status shown after a successful action reflects the new state, not a stale cached read', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::sequence()
             ->push(['State' => ['Status' => 'running']], 200)
             ->push(['State' => ['Status' => 'exited']], 200),
@@ -138,7 +138,7 @@ test('the status shown after a successful action reflects the new state, not a s
 
 test('the hidden action is genuinely absent from the rendered page, not just disabled', function () {
     Http::fake([
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
     ]);
 
@@ -150,7 +150,7 @@ test('the hidden action is genuinely absent from the rendered page, not just dis
 test('the emwin http backup row shows its docker status and start is hidden while it runs', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'exited']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'exited']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/json' => Http::response(['State' => ['Status' => 'running']], 200),
     ]);
 
@@ -165,7 +165,7 @@ test('the emwin http backup row shows its docker status and start is hidden whil
 test('the emwin http start action is visible and stop hidden when it is not running', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/json' => Http::response(['State' => ['Status' => 'exited']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/start' => Http::response('', 204),
     ]);
@@ -182,7 +182,7 @@ test('the emwin http start action is visible and stop hidden when it is not runn
 test('the emwin http stop and restart actions call the emwin http container and notify', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/json' => Http::response(['State' => ['Status' => 'running']], 200),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/stop' => Http::response('', 204),
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-http/restart' => Http::response('', 204),
@@ -199,7 +199,7 @@ test('the emwin http stop and restart actions call the emwin http container and 
 test('the emwin byteblaster row shows its docker status and start is hidden while it runs', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'exited']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
     ]);
 
     livewire(PipelineControl::class)
@@ -212,24 +212,24 @@ test('the emwin byteblaster row shows its docker status and start is hidden whil
 test('the emwin stop and restart actions call the emwin container and notify', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/stop' => Http::response('', 204),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/restart' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/stop' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/restart' => Http::response('', 204),
     ]);
 
     livewire(PipelineControl::class)
         ->callAction('stopEmwin')->assertNotified('EMWIN stop succeeded')
         ->callAction('restartEmwin')->assertNotified('EMWIN restart succeeded');
 
-    Http::assertSent(fn ($r) => $r->method() === 'POST' && str_contains($r->url(), '/containers/wxnotify-emwin/stop'));
-    Http::assertSent(fn ($r) => $r->method() === 'POST' && str_contains($r->url(), '/containers/wxnotify-emwin/restart'));
+    Http::assertSent(fn ($r) => $r->method() === 'POST' && str_contains($r->url(), '/containers/wxnotify-emwin-byteblaster/stop'));
+    Http::assertSent(fn ($r) => $r->method() === 'POST' && str_contains($r->url(), '/containers/wxnotify-emwin-byteblaster/restart'));
 });
 
 test('the emwin start action starts the emwin container when it is stopped', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'exited']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/start' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'exited']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/start' => Http::response('', 204),
     ]);
 
     livewire(PipelineControl::class)
@@ -241,8 +241,8 @@ test('the emwin start action starts the emwin container when it is stopped', fun
 test('a failed emwin docker call notifies a failure instead of erroring', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/stop' => Http::response([], 500),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response(['State' => ['Status' => 'running']], 200),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/stop' => Http::response([], 500),
     ]);
 
     livewire(PipelineControl::class)->callAction('stopEmwin')->assertNotified('Failed to stop EMWIN');
@@ -251,10 +251,10 @@ test('a failed emwin docker call notifies a failure instead of erroring', functi
 test('the emwin status after an action is not a stale cached read', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::sequence()
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::sequence()
             ->push(['State' => ['Status' => 'running']], 200)
             ->push(['State' => ['Status' => 'exited']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/stop' => Http::response('', 204),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/stop' => Http::response('', 204),
     ]);
 
     livewire(PipelineControl::class)
@@ -274,7 +274,7 @@ test('the emwin row shows never when no product has been received', function () 
 test('a missing emwin container degrades to Not found without breaking the nwws row', function () {
     Http::fake([
         'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response(['State' => ['Status' => 'running']], 200),
-        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin/json' => Http::response([], 404),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-emwin-byteblaster/json' => Http::response([], 404),
     ]);
 
     livewire(PipelineControl::class)->assertSuccessful()->assertSee('Not found')->assertActionVisible('stop');

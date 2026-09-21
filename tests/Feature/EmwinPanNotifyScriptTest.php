@@ -25,7 +25,7 @@ function emwinShRun(object $t, string $file, array $extraEnv = []): ProcessResul
         'EMWIN_WEBHOOK_URL' => 'http://laravel.test/api/pipeline/emwin-products',
         'PIPELINE_WEBHOOK_TOKEN' => 'secret-token',
         'EMWIN_HEARTBEAT_FILE' => $t->dir.'/heartbeat',
-    ])->run(['sh', 'docker/emwin/pan-notify.sh', $file]);
+    ])->run(['sh', 'docker/emwin-byteblaster/pan-notify.sh', $file]);
 }
 
 function emwinShPosts(object $t): array
@@ -60,7 +60,7 @@ beforeEach(function () {
 afterEach(fn () => File::deleteDirectory($this->dir));
 
 test('the script is valid POSIX sh', function () {
-    expect(Process::path(base_path())->run(['sh', '-n', 'docker/emwin/pan-notify.sh'])->successful())->toBeTrue();
+    expect(Process::path(base_path())->run(['sh', '-n', 'docker/emwin-byteblaster/pan-notify.sh'])->successful())->toBeTrue();
 });
 
 test('a zip with one text member is unzipped to a unique delivered file and posted once with the bearer token', function () {

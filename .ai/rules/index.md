@@ -6,7 +6,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Support/Delivery/** | .ai/rules/delivery.md |
 | docker/emwin-http/** | .ai/rules/emwin-http.md |
-| docker/emwin/** | .ai/rules/emwin.md |
+| docker/emwin-byteblaster/** | .ai/rules/emwin-byteblaster.md |
 | tests/Feature/** | .ai/rules/feature.md |
 | app/Filament/** | .ai/rules/filament.md |
 | app/Models/**, app/Models/Product.php, app/Models/ActiveWwa.php | .ai/rules/models.md |

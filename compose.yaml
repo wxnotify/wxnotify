@@ -84,11 +84,11 @@ services:
         restart: unless-stopped
         depends_on:
             - laravel.test
-    emwin:
+    emwin-byteblaster:
         build:
             context: .
-            dockerfile: docker/emwin/Dockerfile
-        container_name: wxnotify-emwin
+            dockerfile: docker/emwin-byteblaster/Dockerfile
+        container_name: wxnotify-emwin-byteblaster
         environment:
             PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
             EMWIN_WEBHOOK_URL: 'http://laravel.test/api/pipeline/emwin-products'

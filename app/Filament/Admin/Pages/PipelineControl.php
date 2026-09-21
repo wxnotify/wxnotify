@@ -24,7 +24,7 @@ class PipelineControl extends Page
 
     private const NWWS_CONTAINER = 'wxnotify-nwws';
 
-    private const EMWIN_CONTAINER = 'wxnotify-emwin';
+    private const EMWIN_CONTAINER = 'wxnotify-emwin-byteblaster';
 
     private const EMWIN_HTTP_CONTAINER = 'wxnotify-emwin-http';
 
