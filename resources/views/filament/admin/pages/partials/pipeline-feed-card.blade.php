@@ -16,7 +16,7 @@
                     <x-filament::badge :color="$card['health']->color">{{ $card['health']->label }}</x-filament::badge>
                 </div>
                 <p style="font-size:0.75rem;opacity:0.7;margin:0.125rem 0 0;">{{ $feed->role() }}</p>
-                <p style="font-size:0.875rem;opacity:0.7;margin:0.5rem 0 0;">Last product: <span style="font-weight:600;opacity:1;">{{ $card['lastProduct'] ?? 'never' }}</span></p>
+                <p style="font-size:0.875rem;opacity:0.7;margin:0.5rem 0 0;">Last product: <span style="font-size:1.25rem;font-weight:600;opacity:1;">{{ $card['lastProduct'] ?? 'never' }}</span></p>
             </div>
         </div>
         <div style="display:flex;align-items:center;gap:0.5rem;">

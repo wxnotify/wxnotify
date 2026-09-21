@@ -3,6 +3,7 @@
 namespace App\Actions\Pipeline;
 
 use App\Models\PipelineDelivery;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -19,7 +20,9 @@ class RecordPipelineDelivery
                 'received_at' => now(),
             ]);
         } catch (Throwable $e) {
-            Log::warning('Failed to record a pipeline delivery', ['feed' => $feed, 'error' => $e->getMessage()]);
+            if (Cache::add('pipeline.delivery-record-warning', true, 300)) {
+                Log::warning('Failed to record a pipeline delivery', ['feed' => $feed, 'error' => $e->getMessage()]);
+            }
         }
     }
 }

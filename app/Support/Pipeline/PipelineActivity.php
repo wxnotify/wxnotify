@@ -116,7 +116,7 @@ class PipelineActivity
                 continue;
             }
 
-            $byFeed = $group->groupBy('feed')->map(fn (Collection $group) => $group->min('received_at'));
+            $byFeed = $group->groupBy('feed')->map(fn (Collection $rows) => $rows->min('received_at'));
             $cells = [];
 
             foreach ($feeds as $feed) {

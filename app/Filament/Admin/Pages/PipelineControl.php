@@ -35,6 +35,11 @@ class PipelineControl extends Page
      */
     private array $stateCache = [];
 
+    /**
+     * @var array<string, FeedHealth>
+     */
+    private array $healthCache = [];
+
     private ?PipelineActivity $activity = null;
 
     /**
@@ -73,6 +78,11 @@ class PipelineControl extends Page
     }
 
     private function healthFor(PipelineFeed $feed): FeedHealth
+    {
+        return $this->healthCache[$feed->container()] ??= $this->resolveHealth($feed);
+    }
+
+    private function resolveHealth(PipelineFeed $feed): FeedHealth
     {
         $state = $this->stateOf($feed->container());
 
@@ -249,6 +259,9 @@ class PipelineControl extends Page
                 $feed = PipelineFeed::tryFrom((string) ($arguments['feed'] ?? ''));
 
                 if ($feed !== null) {
+                    // Drop any entry left by an earlier open, then warm the cache once here.
+                    // Removing the forget serves stale logs; removing the warm-up makes every
+                    // 10s poll re-render re-fetch the logs from Docker.
                     Cache::forget($this->logsCacheKey($feed));
                     $this->logsFor($feed);
                 }
@@ -264,6 +277,7 @@ class PipelineControl extends Page
 
                 return view('filament.admin.pages.partials.pipeline-logs', [
                     'lines' => $lines ?? [],
+                    'notDeployed' => $this->stateOf($feed->container())['status'] === 'not_found',
                     'error' => $lines === null ? 'Could not read the container logs.' : null,
                 ]);
             });
@@ -283,7 +297,7 @@ class PipelineControl extends Page
      */
     private function logsFor(PipelineFeed $feed): ?array
     {
-        $entry = Cache::remember($this->logsCacheKey($feed), now()->addMinutes(10), function () use ($feed): array {
+        $entry = Cache::remember($this->logsCacheKey($feed), now()->addMinutes(2), function () use ($feed): array {
             try {
                 return ['lines' => app(DockerEngineClient::class)->logs($feed->container())];
             } catch (Throwable) {
@@ -303,7 +317,7 @@ class PipelineControl extends Page
             // per-request status cache from before this call ran (Filament
             // re-checks visibility as part of authorizing the action) — the
             // subsequent re-render needs a fresh read, not that stale value.
-            unset($this->stateCache[$container]);
+            unset($this->stateCache[$container], $this->healthCache[$container]);
 
             Notification::make()
                 ->title("{$label} {$verb} succeeded")

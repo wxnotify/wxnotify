@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('outcome');
             $table->timestamp('received_at');
             $table->index(['feed', 'received_at']);
+            $table->index('received_at');
         });
     }
 

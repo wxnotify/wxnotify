@@ -142,6 +142,14 @@ test('logs keeps only the last requested lines', function () {
     expect(app(DockerEngineClient::class)->logs('c1', 3))->toBe(['8', '9', '10']);
 });
 
+test('logs clamps a non-positive tail to a single line instead of returning everything', function () {
+    $body = dockerLogFrame(1, implode("\n", range(1, 10))."\n");
+    Http::fake(['*/containers/c1/logs*' => Http::response($body)]);
+
+    expect(app(DockerEngineClient::class)->logs('c1', 0))->toBe(['10']);
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'tail=1'));
+});
+
 test('logs returns an empty list for a missing container and throws on other errors', function () {
     Http::fake(['*/containers/gone/logs*' => Http::response('', 404), '*/containers/bad/logs*' => Http::response('', 500)]);
 

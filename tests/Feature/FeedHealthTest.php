@@ -92,11 +92,11 @@ test('a backup whose container is not found is noted as not deployed', function 
 test('a stale feed makes the summary amber and names the feed', function () {
     $summary = PipelineSummary::evaluate(healthMap('healthy', 'healthy', 'stale'));
 
-    expect($summary->color)->toBe('warning')->and($summary->headline)->toBe('Needs attention: EMWIN HTTP backup (Stale)');
+    expect($summary->color)->toBe('warning')->and($summary->headline)->toBe('Needs attention (1): EMWIN HTTP backup (Stale)');
 });
 
 test('an unhealthy feed or a stopped primary makes the summary red', function () {
     expect(PipelineSummary::evaluate(healthMap('unhealthy', 'healthy', 'healthy'))->color)->toBe('danger')
         ->and(PipelineSummary::evaluate(healthMap('healthy', 'stopped', 'healthy'))->color)->toBe('danger')
-        ->and(PipelineSummary::evaluate(healthMap('healthy', 'stopped', 'healthy'))->headline)->toBe('Needs attention: EMWIN Byteblaster (Stopped)');
+        ->and(PipelineSummary::evaluate(healthMap('healthy', 'stopped', 'healthy'))->headline)->toBe('Needs attention (1): EMWIN Byteblaster (Stopped)');
 });

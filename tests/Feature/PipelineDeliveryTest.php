@@ -3,6 +3,7 @@
 use App\Actions\Pipeline\RecordPipelineDelivery;
 use App\Models\PipelineDelivery;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 test('it records a delivery with the file basename only', function () {
@@ -35,6 +36,17 @@ test('a recording failure is swallowed and logged, never thrown', function () {
     Log::shouldHaveReceived('warning')->once();
 });
 
+test('repeated recording failures log only one warning per throttle window', function () {
+    Log::spy();
+    Cache::forget('pipeline.delivery-record-warning');
+    PipelineDelivery::creating(fn () => throw new RuntimeException('boom'));
+
+    app(RecordPipelineDelivery::class)('nwws', 'k', 'a.txt', true);
+    app(RecordPipelineDelivery::class)('nwws', 'k2', 'b.txt', true);
+
+    Log::shouldHaveReceived('warning')->once();
+});
+
 test('the prune command deletes deliveries older than the retention and keeps newer ones', function () {
     config(['wxnotify.pipeline.delivery_retention_hours' => 48]);
     $old = PipelineDelivery::factory()->create(['received_at' => now()->subHours(49)]);
@@ -47,10 +59,9 @@ test('the prune command deletes deliveries older than the retention and keeps ne
 });
 
 test('the prune command is scheduled hourly', function () {
-    $output = Artisan::output();
     Artisan::call('schedule:list');
     $output = Artisan::output();
 
-    expect($output)->toContain('pipeline:prune-deliveries')
-        ->and($output)->toContain('0    * * * *');
+    expect($output)
+        ->and($output)->toMatch('/0\s+\*\s+\*\s+\*\s+\*\s+.*pipeline:prune-deliveries/');
 });

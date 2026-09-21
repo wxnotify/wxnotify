@@ -44,7 +44,7 @@ final class PipelineSummary
         }
 
         $headline = match (true) {
-            $attention !== [] => 'Needs attention: '.implode(', ', $attention),
+            $attention !== [] => 'Needs attention ('.count($attention).'): '.implode(', ', $attention),
             $notes !== [] => 'All running feeds healthy',
             default => 'All feeds healthy',
         };

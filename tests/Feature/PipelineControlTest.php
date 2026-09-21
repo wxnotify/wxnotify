@@ -362,7 +362,7 @@ test('a running feed with no product yet is stale and the banner asks for attent
     PipelineHeartbeat::record('nwws');
     PipelineHeartbeat::record('emwin');
 
-    $component = livewire(PipelineControl::class)->assertSee('Stale')->assertSee('Needs attention: EMWIN HTTP backup (Stale)');
+    $component = livewire(PipelineControl::class)->assertSee('Stale')->assertSee('Needs attention (1): EMWIN HTTP backup (Stale)');
 
     expect($component->instance()->summary()->color)->toBe('warning');
 });
@@ -437,7 +437,7 @@ test('each card shows its own last product even when the banner names the feeds 
     Cache::forget('pipeline.heartbeat.emwin');
     PipelineHeartbeat::record('emwin_http');
 
-    $html = livewire(PipelineControl::class)->assertSee('Needs attention: NWWS (Stale), EMWIN Byteblaster (Stale)')->html();
+    $html = livewire(PipelineControl::class)->assertSee('Needs attention (2): NWWS (Stale), EMWIN Byteblaster (Stale)')->html();
 
     expect(pipelineLastProduct($html, 'NWWS'))->toBe('never')
         ->and(pipelineLastProduct($html, 'EMWIN Byteblaster'))->toBe('never')
@@ -486,4 +486,24 @@ test('an open logs slide-over does not refetch the logs on a refresh or poll', f
         ->assertMountedActionModalSee('connected');
 
     expect(Http::recorded(fn ($request) => str_contains($request->url(), '/logs')))->toHaveCount(1);
+});
+
+test('the logs slide-over says the container is not deployed when docker cannot find it', function () {
+    fakeDockerRunning([
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/json' => Http::response('', 404),
+        'docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/logs*' => Http::response('', 404),
+    ]);
+
+    livewire(PipelineControl::class)
+        ->mountAction('logs', ['feed' => 'nwws'])
+        ->assertMountedActionModalSee('Container not deployed.')
+        ->assertMountedActionModalDontSee('No log output.');
+});
+
+test('the logs slide-over says no output for a deployed container with empty logs', function () {
+    fakeDockerRunning(['docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/logs*' => Http::response('')]);
+
+    livewire(PipelineControl::class)
+        ->mountAction('logs', ['feed' => 'nwws'])
+        ->assertMountedActionModalSee('No log output.');
 });

@@ -79,6 +79,8 @@ class DockerEngineClient
      */
     public function logs(string $container, int $tail = 200): array
     {
+        $tail = max(1, $tail);
+
         $response = $this->request('get', "/containers/{$container}/logs?stdout=1&stderr=1&tail={$tail}");
 
         if ($response->status() === 404) {
