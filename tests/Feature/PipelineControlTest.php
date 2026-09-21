@@ -443,3 +443,35 @@ test('each card shows its own last product even when the banner names the feeds 
         ->and(pipelineLastProduct($html, 'EMWIN Byteblaster'))->toBe('never')
         ->and(pipelineLastProduct($html, 'EMWIN HTTP backup'))->not->toBe('never')->not->toBeNull();
 });
+
+test('the logs action shows the sanitized container log lines for a feed', function () {
+    fakeDockerRunning(['docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/logs*' => Http::response("connected\n<script>alert(1)</script>\n")]);
+
+    livewire(PipelineControl::class)
+        ->mountAction('logs', ['feed' => 'nwws'])
+        ->assertMountedActionModalSee('connected')
+        ->assertMountedActionModalSeeHtml('&lt;script&gt;alert(1)&lt;/script&gt;')
+        ->assertMountedActionModalDontSeeHtml('<script>alert(1)</script>');
+});
+
+test('the logs action refuses an unknown feed and never calls docker', function () {
+    fakeDockerRunning();
+
+    livewire(PipelineControl::class)->mountAction('logs', ['feed' => 'not-a-feed'])->assertMountedActionModalSee('Unknown feed.');
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), '/logs'));
+});
+
+test('a docker log failure shows a message instead of crashing the page', function () {
+    fakeDockerRunning(['docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/logs*' => Http::response('', 500)]);
+
+    livewire(PipelineControl::class)->mountAction('logs', ['feed' => 'nwws'])->assertMountedActionModalSee('Could not read the container logs');
+});
+
+test('logs are only fetched when the action is opened, never on a normal render', function () {
+    fakeDockerRunning();
+
+    livewire(PipelineControl::class)->assertSuccessful();
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), '/logs'));
+});

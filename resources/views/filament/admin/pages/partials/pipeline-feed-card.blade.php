@@ -23,6 +23,7 @@
             @if ($actions['start']->isVisible()) {{ $actions['start'] }} @endif
             @if ($actions['stop']->isVisible()) {{ $actions['stop'] }} @endif
             {{ $actions['restart'] }}
+            <x-filament::button color="gray" size="sm" wire:click="mountAction('logs', { feed: '{{ $feed->value }}' })">Logs</x-filament::button>
         </div>
     </div>
 

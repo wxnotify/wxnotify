@@ -10,3 +10,6 @@ The page's canAccess() requires users.is_owner (no environment gate; intentional
 
 ## Owner-only pages inherit their safety from User::canBeImpersonated()
 The Secrets tab on AppSettings and ResetToFactoryDefaults both gate on `auth()->user()->is_owner`. Impersonation swaps auth()->user(), so these gates are only safe because `User::canBeImpersonated()` returns `! $this->is_staff` (owners are always staff and can never be impersonated). Relaxing that to allow impersonating staff would silently hand non-owner staff both surfaces. If it ever changes, re-check every is_owner gate. Also: never pre-fill a secret into Filament form state; the value would be serialized to the browser in the Livewire snapshot.
+
+## Pipeline Control logs and deliveries
+Container logs are untrusted text: DockerEngineClient::logs strips ANSI/control characters and caps lines; the view renders escaped text, and logs are fetched only when the slide-over opens, never on the 10s poll. pipeline_deliveries is best-effort telemetry (RecordPipelineDelivery never throws, PipelineActivity degrades to empty without the table) and is deliberately not in WipePipelineData — it holds no subscriber data and is pruned after 48 hours. Feed stale thresholds live in config wxnotify.pipeline.stale_minutes.

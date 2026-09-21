@@ -13,6 +13,7 @@ use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -228,6 +229,34 @@ class PipelineControl extends Page
             ->requiresConfirmation()
             ->modalDescription('This briefly interrupts the EMWIN HTTP backup downloader.')
             ->action(fn () => $this->runDockerAction('EMWIN HTTP', PipelineFeed::EmwinHttp->container(), 'restart', fn () => app(DockerEngineClient::class)->restart(PipelineFeed::EmwinHttp->container())));
+    }
+
+    public function logsAction(): Action
+    {
+        return Action::make('logs')
+            ->label('Logs')
+            ->color('gray')
+            ->slideOver()
+            ->modalHeading(function (array $arguments): string {
+                $feed = PipelineFeed::tryFrom((string) ($arguments['feed'] ?? ''));
+
+                return $feed === null ? 'Logs' : $feed->label().' logs';
+            })
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close')
+            ->modalContent(function (array $arguments): View {
+                $feed = PipelineFeed::tryFrom((string) ($arguments['feed'] ?? ''));
+
+                if ($feed === null) {
+                    return view('filament.admin.pages.partials.pipeline-logs', ['lines' => [], 'error' => 'Unknown feed.']);
+                }
+
+                try {
+                    return view('filament.admin.pages.partials.pipeline-logs', ['lines' => app(DockerEngineClient::class)->logs($feed->container()), 'error' => null]);
+                } catch (Throwable) {
+                    return view('filament.admin.pages.partials.pipeline-logs', ['lines' => [], 'error' => 'Could not read the container logs.']);
+                }
+            });
     }
 
     private function runDockerAction(string $label, string $container, string $verb, callable $callback): void
