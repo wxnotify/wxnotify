@@ -16,6 +16,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 use UnitEnum;
 
@@ -244,6 +245,14 @@ class PipelineControl extends Page
             })
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
+            ->mountUsing(function (array $arguments): void {
+                $feed = PipelineFeed::tryFrom((string) ($arguments['feed'] ?? ''));
+
+                if ($feed !== null) {
+                    Cache::forget($this->logsCacheKey($feed));
+                    $this->logsFor($feed);
+                }
+            })
             ->modalContent(function (array $arguments): View {
                 $feed = PipelineFeed::tryFrom((string) ($arguments['feed'] ?? ''));
 
@@ -251,12 +260,38 @@ class PipelineControl extends Page
                     return view('filament.admin.pages.partials.pipeline-logs', ['lines' => [], 'error' => 'Unknown feed.']);
                 }
 
-                try {
-                    return view('filament.admin.pages.partials.pipeline-logs', ['lines' => app(DockerEngineClient::class)->logs($feed->container()), 'error' => null]);
-                } catch (Throwable) {
-                    return view('filament.admin.pages.partials.pipeline-logs', ['lines' => [], 'error' => 'Could not read the container logs.']);
-                }
+                $lines = $this->logsFor($feed);
+
+                return view('filament.admin.pages.partials.pipeline-logs', [
+                    'lines' => $lines ?? [],
+                    'error' => $lines === null ? 'Could not read the container logs.' : null,
+                ]);
             });
+    }
+
+    private function logsCacheKey(PipelineFeed $feed): string
+    {
+        return 'pipeline.logs.'.$this->getId().'.'.$feed->value;
+    }
+
+    /**
+     * Fetched once when the slide-over mounts and held for its lifetime, so the
+     * 10s page poll re-renders the open modal without hitting Docker again.
+     * Null means the logs could not be read.
+     *
+     * @return array<int, string>|null
+     */
+    private function logsFor(PipelineFeed $feed): ?array
+    {
+        $entry = Cache::remember($this->logsCacheKey($feed), now()->addMinutes(10), function () use ($feed): array {
+            try {
+                return ['lines' => app(DockerEngineClient::class)->logs($feed->container())];
+            } catch (Throwable) {
+                return ['lines' => null];
+            }
+        });
+
+        return $entry['lines'];
     }
 
     private function runDockerAction(string $label, string $container, string $verb, callable $callback): void

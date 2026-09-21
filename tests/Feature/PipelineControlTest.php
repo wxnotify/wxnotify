@@ -471,7 +471,19 @@ test('a docker log failure shows a message instead of crashing the page', functi
 test('logs are only fetched when the action is opened, never on a normal render', function () {
     fakeDockerRunning();
 
-    livewire(PipelineControl::class)->assertSuccessful();
+    livewire(PipelineControl::class)->assertSuccessful()->assertSee('Logs');
 
     Http::assertNotSent(fn ($request) => str_contains($request->url(), '/logs'));
+});
+
+test('an open logs slide-over does not refetch the logs on a refresh or poll', function () {
+    fakeDockerRunning(['docker-socket-proxy:2375/v1.43/containers/wxnotify-nwws/logs*' => Http::response("connected\n")]);
+
+    livewire(PipelineControl::class)
+        ->mountAction('logs', ['feed' => 'nwws'])
+        ->call('$refresh')
+        ->call('$refresh')
+        ->assertMountedActionModalSee('connected');
+
+    expect(Http::recorded(fn ($request) => str_contains($request->url(), '/logs')))->toHaveCount(1);
 });
