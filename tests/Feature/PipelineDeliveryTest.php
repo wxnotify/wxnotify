@@ -2,20 +2,8 @@
 
 use App\Actions\Pipeline\RecordPipelineDelivery;
 use App\Models\PipelineDelivery;
-use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
-
-// Refresh the Schedule instance before each test to work around test isolation issues with Pest
-beforeEach(function () {
-    // Create a fresh schedule with the configured events
-    $schedule = new Schedule(app());
-    $schedule->command('shapefile:scan')->daily();
-    $schedule->command('alerts:dispatch-scheduled')->everyFifteenMinutes();
-    $schedule->command('traccar:poll-positions')->everyFiveMinutes()->withoutOverlapping();
-    $schedule->command('pipeline:prune-deliveries')->hourly();
-    app()->bind(Schedule::class, fn () => $schedule);
-});
 
 test('it records a delivery with the file basename only', function () {
     app(RecordPipelineDelivery::class)('emwin_http', 'wfus53 kbou 191622 torbou', 'http/../deep/dir/TORBOU_1.txt', true);
@@ -59,7 +47,10 @@ test('the prune command deletes deliveries older than the retention and keeps ne
 });
 
 test('the prune command is scheduled hourly', function () {
-    $events = collect(app(Schedule::class)->events());
+    $output = Artisan::output();
+    Artisan::call('schedule:list');
+    $output = Artisan::output();
 
-    expect($events->contains(fn ($event) => str_contains($event->command, 'pipeline:prune-deliveries')))->toBeTrue();
+    expect($output)->toContain('pipeline:prune-deliveries')
+        ->and($output)->toContain('0    * * * *');
 });
