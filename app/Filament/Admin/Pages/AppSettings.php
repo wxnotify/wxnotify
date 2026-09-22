@@ -49,6 +49,9 @@ class AppSettings extends Page implements HasForms
         'maintenance_message',
         'translation_endpoint',
         'short_urls_endpoint',
+        'heartbeat_nwws_url',
+        'heartbeat_emwin_url',
+        'heartbeat_emwin_http_url',
         'archival_provider',
         'archival_endpoint',
         'archival_bucket',
@@ -269,8 +272,12 @@ class AppSettings extends Page implements HasForms
                     $this->endpointField('short_urls_endpoint', 'Short URL endpoint', 'short_urls_enabled'),
                 ]),
             Section::make('Heartbeat')
+                ->description('Healthchecks ping URLs. A feed\'s URL is requested each time that feed delivers a product; leave a URL blank to skip that feed.')
                 ->schema([
                     Toggle::make('heartbeat_enabled')->label('Heartbeat enabled')->live(),
+                    $this->endpointField('heartbeat_nwws_url', 'NWWS ping URL', 'heartbeat_enabled', required: false),
+                    $this->endpointField('heartbeat_emwin_url', 'EMWIN Byteblaster ping URL', 'heartbeat_enabled', required: false),
+                    $this->endpointField('heartbeat_emwin_http_url', 'EMWIN HTTP ping URL', 'heartbeat_enabled', required: false),
                 ]),
             Section::make('Exception reporting')
                 ->schema([
@@ -330,13 +337,13 @@ class AppSettings extends Page implements HasForms
         ]);
     }
 
-    private function endpointField(string $name, string $label, string $toggle): TextInput
+    private function endpointField(string $name, string $label, string $toggle, bool $required = true): TextInput
     {
         return TextInput::make($name)
             ->label($label)
             ->maxLength(255)
             ->rules(['url:http,https'])
-            ->required(fn (Get $get): bool => (bool) $get($toggle))
+            ->required($required ? fn (Get $get): bool => (bool) $get($toggle) : false)
             ->visible(fn (Get $get): bool => (bool) $get($toggle));
     }
 }

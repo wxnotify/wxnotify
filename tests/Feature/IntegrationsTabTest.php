@@ -170,3 +170,70 @@ test('a saved integration change is written to the audit log', function () {
 
     expect($activity->properties['changes'])->toBe(['exception_reporting_enabled' => ['old' => false, 'new' => true]]);
 });
+
+test('the heartbeat ping url fields are hidden until heartbeat is enabled', function () {
+    livewire(AppSettings::class)
+        ->assertFormFieldHidden('heartbeat_nwws_url')
+        ->assertFormFieldHidden('heartbeat_emwin_url')
+        ->assertFormFieldHidden('heartbeat_emwin_http_url')
+        ->fillForm(['heartbeat_enabled' => true])
+        ->assertFormFieldVisible('heartbeat_nwws_url')
+        ->assertFormFieldVisible('heartbeat_emwin_url')
+        ->assertFormFieldVisible('heartbeat_emwin_http_url');
+});
+
+test('heartbeat urls are optional and saved per feed, with blank saved as null', function () {
+    livewire(AppSettings::class)
+        ->fillForm([
+            'heartbeat_enabled' => true,
+            'heartbeat_nwws_url' => 'https://hc.example.test/ping/aaaa',
+            'heartbeat_emwin_url' => '',
+            'heartbeat_emwin_http_url' => 'http://healthchecks.internal:8000/ping/cccc',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $settings = app(IntegrationSettings::class)->refresh();
+
+    expect($settings->heartbeat_enabled)->toBeTrue()
+        ->and($settings->heartbeat_nwws_url)->toBe('https://hc.example.test/ping/aaaa')
+        ->and($settings->heartbeat_emwin_url)->toBeNull()
+        ->and($settings->heartbeat_emwin_http_url)->toBe('http://healthchecks.internal:8000/ping/cccc');
+});
+
+test('heartbeat can be enabled with no urls at all', function () {
+    livewire(AppSettings::class)
+        ->fillForm(['heartbeat_enabled' => true, 'heartbeat_nwws_url' => null, 'heartbeat_emwin_url' => null, 'heartbeat_emwin_http_url' => null])
+        ->call('save')
+        ->assertHasNoFormErrors();
+});
+
+test('only http and https heartbeat urls are accepted', function (string $field, string $value) {
+    livewire(AppSettings::class)
+        ->fillForm(['heartbeat_enabled' => true, $field => $value])
+        ->call('save')
+        ->assertHasFormErrors([$field]);
+})->with([
+    'nwws ftp' => ['heartbeat_nwws_url', 'ftp://hc.example.test/ping/x'],
+    'emwin not a url' => ['heartbeat_emwin_url', 'not a url'],
+    'http backup javascript' => ['heartbeat_emwin_http_url', 'javascript:alert(1)'],
+]);
+
+test('turning heartbeat off keeps the stored ping urls', function () {
+    $settings = app(IntegrationSettings::class);
+    $settings->heartbeat_enabled = true;
+    $settings->heartbeat_nwws_url = 'https://hc.example.test/ping/aaaa';
+    $settings->heartbeat_emwin_http_url = 'https://hc.example.test/ping/cccc';
+    $settings->save();
+
+    livewire(AppSettings::class)
+        ->fillForm(['heartbeat_enabled' => false])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $settings = app(IntegrationSettings::class)->refresh();
+
+    expect($settings->heartbeat_enabled)->toBeFalse()
+        ->and($settings->heartbeat_nwws_url)->toBe('https://hc.example.test/ping/aaaa')
+        ->and($settings->heartbeat_emwin_http_url)->toBe('https://hc.example.test/ping/cccc');
+});
