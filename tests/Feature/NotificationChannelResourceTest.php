@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Support\Delivery\WebhookUrlGuard;
 use Filament\Actions\Testing\TestAction;
 use GuzzleHttp\Psr7\Response;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 
 use function Pest\Livewire\livewire;
 
@@ -94,6 +96,52 @@ test('the verify action is visible for an unverified channel', function () {
 
     livewire(ListNotificationChannels::class)
         ->assertActionVisible(TestAction::make('verify')->table($channel));
+});
+
+test('the send test action is hidden for an unverified channel', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->unverified()->create();
+
+    livewire(ListNotificationChannels::class)
+        ->assertActionHidden(TestAction::make('sendTest')->table($channel));
+});
+
+test('the send test action is visible for a verified channel', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create();
+
+    livewire(ListNotificationChannels::class)
+        ->assertActionVisible(TestAction::make('sendTest')->table($channel));
+});
+
+test('sending a test notification calls apprise with the channel url and notifies success', function () {
+    Http::fake(['*' => Http::response(status: 200)]);
+    $channel = NotificationChannel::factory()->for($this->user)->create(['apprise_url' => 'discord://123456789/token/']);
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('sendTest')->table($channel))
+        ->assertNotified();
+
+    Http::assertSent(fn ($request) => $request['urls'] === 'discord://123456789/token/'
+        && str_contains($request['body'], $channel->label));
+});
+
+test('a failed test send notifies failure without changing the channel', function () {
+    Http::fake(['*' => Http::response(status: 500)]);
+    $channel = NotificationChannel::factory()->for($this->user)->create();
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('sendTest')->table($channel))
+        ->assertNotified();
+
+    expect($channel->fresh()->isVerified())->toBeTrue();
+});
+
+test('an unreachable apprise api notifies failure instead of throwing', function () {
+    Http::fake(fn () => throw new ConnectionException('Could not connect to Apprise'));
+    $channel = NotificationChannel::factory()->for($this->user)->create();
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('sendTest')->table($channel))
+        ->assertNotified();
 });
 
 test('editing a channel changes its label', function () {

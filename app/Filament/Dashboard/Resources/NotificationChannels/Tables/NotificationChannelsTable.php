@@ -3,6 +3,7 @@
 namespace App\Filament\Dashboard\Resources\NotificationChannels\Tables;
 
 use App\Actions\Channels\DispatchChannelConfirmationCode;
+use App\Actions\Channels\SendTestNotification;
 use App\Actions\Channels\VerifyChannelConfirmationCode;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
@@ -83,6 +84,19 @@ class NotificationChannelsTable
                         Notification::make()
                             ->title('Confirmation code resent')
                             ->success()
+                            ->send();
+                    }),
+                Action::make('sendTest')
+                    ->label('Send Test')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->visible(fn (NotificationChannel $record): bool => $record->isVerified())
+                    ->action(function (NotificationChannel $record): void {
+                        $sent = app(SendTestNotification::class)($record);
+
+                        Notification::make()
+                            ->title($sent ? 'Test notification sent' : 'Couldn\'t send the test notification')
+                            ->body($sent ? null : 'Check the channel is still reachable and try again.')
+                            ->status($sent ? 'success' : 'danger')
                             ->send();
                     }),
                 EditAction::make()
