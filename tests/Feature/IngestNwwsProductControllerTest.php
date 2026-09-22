@@ -2,10 +2,13 @@
 
 use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
+use App\Jobs\SendHeartbeatPing;
 use App\Models\IngestedProduct;
 use App\Models\PipelineDelivery;
 use App\Models\Product;
+use App\Settings\IntegrationSettings;
 use App\Support\Pipeline\PipelineHeartbeat;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -348,4 +351,35 @@ test('an ingested nwws product records a delivery for the nwws feed', function (
         ->feed->toBe('nwws')
         ->file_name->toBe('kkci_ftus21-tafkord.221432_12345.txt')
         ->outcome->toBe('ingested');
+});
+
+function enableNwwsHeartbeat(): void
+{
+    $settings = app(IntegrationSettings::class);
+    $settings->heartbeat_enabled = true;
+    $settings->heartbeat_nwws_url = 'https://hc.example.test/ping/nwws';
+    $settings->save();
+}
+
+test('an nwws delivery queues a ping for the nwws feed', function () {
+    Bus::fake();
+    enableNwwsHeartbeat();
+    File::put($this->productsRoot.'/kkci/kkci_ftus21-tafkord.221432_12345.txt', "FTUS21 KKCI 221432\nTAFORD\nsample");
+
+    $this->postJson('/api/pipeline/nwws-products', ['path' => 'kkci/kkci_ftus21-tafkord.221432_12345.txt'], ['Authorization' => 'Bearer test-webhook-token'])->assertNoContent();
+
+    Bus::assertDispatchedTimes(SendHeartbeatPing::class, 1);
+    Bus::assertDispatched(SendHeartbeatPing::class, fn (SendHeartbeatPing $job) => $job->feed === 'nwws');
+});
+
+test('an nwws delivery queues no ping when heartbeat is off or the path is rejected', function () {
+    Bus::fake();
+    File::put($this->productsRoot.'/kkci/kkci_ftus21-tafkord.221432_12345.txt', "FTUS21 KKCI 221432\nTAFORD\nsample");
+
+    $this->postJson('/api/pipeline/nwws-products', ['path' => 'kkci/kkci_ftus21-tafkord.221432_12345.txt'], ['Authorization' => 'Bearer test-webhook-token'])->assertNoContent();
+
+    enableNwwsHeartbeat();
+    $this->postJson('/api/pipeline/nwws-products', ['path' => 'kkci/missing.txt'], ['Authorization' => 'Bearer test-webhook-token'])->assertNotFound();
+
+    Bus::assertNothingDispatched();
 });

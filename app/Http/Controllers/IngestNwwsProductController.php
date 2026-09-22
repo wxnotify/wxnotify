@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Pipeline\DispatchHeartbeatPing;
 use App\Actions\Pipeline\ExtractWmoHeaderIdentity;
 use App\Actions\Pipeline\IngestOncePerWmoHeader;
 use App\Actions\Pipeline\IngestProductText;
@@ -19,6 +20,7 @@ class IngestNwwsProductController extends Controller
         private readonly ExtractWmoHeaderIdentity $extractWmoHeaderIdentity,
         private readonly IngestOncePerWmoHeader $ingestOncePerWmoHeader,
         private readonly RecordPipelineDelivery $recordPipelineDelivery,
+        private readonly DispatchHeartbeatPing $dispatchHeartbeatPing,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -54,6 +56,7 @@ class IngestNwwsProductController extends Controller
         $ingested = ($this->ingestOncePerWmoHeader)($key, fn () => ($this->ingestProductText)($text, $validated['path'], $parsed, $isCap, ['source' => 'nwws', 'wmo_header_key' => $key]));
 
         ($this->recordPipelineDelivery)('nwws', $key, $validated['path'], $ingested);
+        ($this->dispatchHeartbeatPing)('nwws');
 
         return response()->noContent();
     }

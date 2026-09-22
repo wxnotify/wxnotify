@@ -1,8 +1,12 @@
 <?php
 
+use App\Jobs\SendHeartbeatPing;
 use App\Models\IngestedProduct;
 use App\Models\PipelineDelivery;
+use App\Settings\IntegrationSettings;
 use App\Support\Pipeline\PipelineHeartbeat;
+use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -190,4 +194,69 @@ test('a rejected path records no delivery', function () {
     emwinApiPost($this, 'missing.txt')->assertNotFound();
 
     expect(PipelineDelivery::count())->toBe(0);
+});
+
+function enableHeartbeatUrls(): void
+{
+    $settings = app(IntegrationSettings::class);
+    $settings->heartbeat_enabled = true;
+    $settings->heartbeat_nwws_url = 'https://hc.example.test/ping/nwws';
+    $settings->heartbeat_emwin_url = 'https://hc.example.test/ping/emwin';
+    $settings->heartbeat_emwin_http_url = 'https://hc.example.test/ping/http';
+    $settings->save();
+}
+
+test('a byteblaster delivery queues a ping for the emwin feed only', function () {
+    Bus::fake();
+    enableHeartbeatUrls();
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();
+
+    Bus::assertDispatchedTimes(SendHeartbeatPing::class, 1);
+    Bus::assertDispatched(SendHeartbeatPing::class, fn (SendHeartbeatPing $job) => $job->feed === 'emwin');
+});
+
+test('an http delivery queues a ping for the emwin_http feed, even when it is a duplicate', function () {
+    Bus::fake();
+    enableHeartbeatUrls();
+    IngestedProduct::factory()->create(['file_path' => 'x/y.txt', 'wmo_header_key' => 'wfus53 kbou 191622 torbou']);
+    File::put($this->emwinRoot.'/delivered/kbou/dup.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/dup.txt', 'http')->assertNoContent();
+
+    Bus::assertDispatched(SendHeartbeatPing::class, fn (SendHeartbeatPing $job) => $job->feed === 'emwin_http');
+    expect(IngestedProduct::count())->toBe(1);
+});
+
+test('no ping is queued when heartbeat is off, the feed url is blank, or the path is rejected', function () {
+    Bus::fake();
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();
+    Bus::assertNothingDispatched();
+
+    enableHeartbeatUrls();
+    $settings = app(IntegrationSettings::class);
+    $settings->heartbeat_emwin_url = null;
+    $settings->save();
+    emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();
+    Bus::assertNothingDispatched();
+
+    $settings->heartbeat_emwin_url = 'https://hc.example.test/ping/emwin';
+    $settings->save();
+    emwinApiPost($this, 'missing.txt')->assertNotFound();
+    Bus::assertNothingDispatched();
+});
+
+test('a queueing failure never fails the ingest request', function () {
+    enableHeartbeatUrls();
+    $dispatcher = Mockery::mock(Dispatcher::class);
+    $dispatcher->shouldReceive('dispatch')->once()->andThrow(new RuntimeException('queue down'));
+    $this->instance(Dispatcher::class, $dispatcher);
+    File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
+
+    emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();
+
+    expect(IngestedProduct::count())->toBe(1);
 });
