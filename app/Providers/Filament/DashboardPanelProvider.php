@@ -10,6 +10,7 @@ use App\Http\Middleware\RedirectAdmins;
 use App\Models\User;
 use App\Support\MaintenanceModeGuard;
 use Awcodes\Gravatar\GravatarPlugin;
+use CerealKiller97\FilamentBugReports\BugReportsPlugin;
 use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
@@ -137,6 +138,8 @@ class DashboardPanelProvider extends PanelProvider
                 ServiceDeskUserPlugin::make()
                     ->knowledgeBase(false)
                     ->serviceCatalog(false),
+                BugReportsPlugin::make()
+                    ->authorizeManagementUsing(fn (User $user): bool => $user->is_staff),
             ])
             ->renderHook(
                 PanelsRenderHook::BODY_END,

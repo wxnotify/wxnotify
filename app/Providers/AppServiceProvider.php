@@ -18,6 +18,16 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Support\CauserResolver;
+use Spatie\Health\Facades\Health;
+use Spatie\Health\Checks\Checks\DebugModeCheck;
+use Spatie\Health\Checks\Checks\EnvironmentCheck;
+use Spatie\Health\Checks\Checks\OptimizedAppCheck;
+use Spatie\Health\Checks\Checks\ScheduleCheck;
+use Spatie\Health\Checks\Checks\UsedDiskSpaceCheck;
+use Spatie\Health\Checks\Checks\DatabaseCheck;
+use Spatie\Health\Checks\Checks\CacheCheck;
+use Spatie\Health\Checks\Checks\PingCheck;
+use Spatie\Health\Checks\Checks\DatabaseConnectionCountCheck;
 use STS\FilamentImpersonate\ImpersonateManager;
 
 class AppServiceProvider extends ServiceProvider
@@ -59,5 +69,18 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('command-center:access', fn ($user) => $user->is_staff);
         Gate::define('command-center:manage-commands', fn ($user) => $user->is_staff);
         Gate::define('command-center:prune-history', fn ($user) => $user->is_staff);
+
+        Health::checks([
+            OptimizedAppCheck::new(),
+            DebugModeCheck::new(),
+            EnvironmentCheck::new(),
+            ScheduleCheck::new(),
+            UsedDiskSpaceCheck::new(),
+            DatabaseCheck::new(),
+            CacheCheck::new(),
+            PingCheck::new()->url('https://wxnotify.com')
+                ->name('Ping wxnotify.com'),
+            DatabaseConnectionCountCheck::new(),
+        ]);
     }
 }

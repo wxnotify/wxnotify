@@ -4,7 +4,10 @@ namespace App\Providers\Filament;
 
 use App\Filament\Admin\Widgets\AdminStatsOverview;
 use App\Filament\Admin\Widgets\AlertRulesByCategoryChart;
+use App\Models\User;
 use Bityukov\CommandCenter\Filament\CommandCenterPlugin;
+use CerealKiller97\FilamentBugReports\BugReportsPlugin;
+use EightCedars\FilamentInactivityGuard\FilamentInactivityGuardPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -22,6 +25,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use JeffersonGoncalves\Filament\CookieConsent\CookieConsentPlugin;
 use JeffersonGoncalves\FilamentServiceDesk\ServiceDeskAdminPlugin;
+use ShuvroRoy\FilamentSpatieLaravelHealth\FilamentSpatieLaravelHealthPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -50,6 +54,14 @@ class AdminPanelProvider extends PanelProvider
                 CommandCenterPlugin::make(),
                 ServiceDeskAdminPlugin::make(),
                 CookieConsentPlugin::make(),
+                FilamentInactivityGuardPlugin::make(),
+                BugReportsPlugin::make()
+                    ->authorizeManagementUsing(fn (User $user): bool => $user->is_staff),
+                FilamentSpatieLaravelHealthPlugin::make()
+                    ->navigationGroup('System')
+                    ->navigationSort(10)
+                    ->navigationIcon('heroicon-o-cpu-chip')
+                    ->navigationLabel('Application Health'),
             ])
             ->middleware([
                 EncryptCookies::class,
