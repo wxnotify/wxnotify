@@ -1,8 +1,11 @@
 <?php
 
 use App\Enums\Integration;
+use App\Enums\PipelineFeed;
 use App\Settings\IntegrationSettings;
 use App\Support\Integrations;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 function setIntegrationSetting(string $property, mixed $value): void
 {
@@ -28,7 +31,7 @@ test('endpoints, provider and mail overrides default to null', function () {
 
     expect($settings->translation_endpoint)->toBeNull()
         ->and($settings->short_urls_endpoint)->toBeNull()
-        ->and($settings->heartbeat_endpoint)->toBeNull()
+        ->and($settings->heartbeat_nwws_url)->toBeNull()->and($settings->heartbeat_emwin_url)->toBeNull()->and($settings->heartbeat_emwin_http_url)->toBeNull()
         ->and($settings->archival_provider)->toBeNull()
         ->and($settings->archival_endpoint)->toBeNull()
         ->and($settings->archival_bucket)->toBeNull()
@@ -52,19 +55,18 @@ test('each integration maps to its expected properties', function (Integration $
 })->with([
     'translation' => [Integration::Translation, 'translation_enabled', 'translation_endpoint'],
     'short urls' => [Integration::ShortUrls, 'short_urls_enabled', 'short_urls_endpoint'],
-    'heartbeat' => [Integration::Heartbeat, 'heartbeat_enabled', 'heartbeat_endpoint'],
+    'heartbeat' => [Integration::Heartbeat, 'heartbeat_enabled', null],
     'exception reporting' => [Integration::ExceptionReporting, 'exception_reporting_enabled', null],
     'archival' => [Integration::Archival, 'archival_enabled', 'archival_endpoint'],
     'status page' => [Integration::StatusPage, 'status_page_enabled', 'status_page_url'],
     'email relay' => [Integration::EmailRelay, 'email_relay_enabled', null],
 ]);
 
-test('endpoint() returns the stored short urls and heartbeat endpoints', function () {
+test('endpoint() returns the stored short urls endpoint', function () {
     setIntegrationSetting('short_urls_endpoint', 'https://s.example.test');
-    setIntegrationSetting('heartbeat_endpoint', 'https://hb.example.test');
 
     expect(Integrations::endpoint(Integration::ShortUrls))->toBe('https://s.example.test')
-        ->and(Integrations::endpoint(Integration::Heartbeat))->toBe('https://hb.example.test');
+        ->and(Integrations::endpoint(Integration::Heartbeat))->toBeNull();
 });
 
 test('endpoint() returns the stored endpoint, and null when blank or not applicable', function () {
@@ -91,4 +93,40 @@ test('every integration maps to real properties on the settings class', function
             expect($properties)->toContain($integration->endpointProperty());
         }
     }
+});
+
+test('each feed maps to its own heartbeat url property', function () {
+    expect(PipelineFeed::Nwws->heartbeatUrlProperty())->toBe('heartbeat_nwws_url')
+        ->and(PipelineFeed::Emwin->heartbeatUrlProperty())->toBe('heartbeat_emwin_url')
+        ->and(PipelineFeed::EmwinHttp->heartbeatUrlProperty())->toBe('heartbeat_emwin_http_url');
+});
+
+test('heartbeatUrl returns each feed url only while heartbeat is enabled', function () {
+    setIntegrationSetting('heartbeat_nwws_url', 'https://hc.example.test/ping/nwws');
+    setIntegrationSetting('heartbeat_emwin_url', 'https://hc.example.test/ping/emwin');
+    setIntegrationSetting('heartbeat_emwin_http_url', 'https://hc.example.test/ping/http');
+
+    expect(Integrations::heartbeatUrl(PipelineFeed::Nwws))->toBeNull();
+
+    setIntegrationSetting('heartbeat_enabled', true);
+
+    expect(Integrations::heartbeatUrl(PipelineFeed::Nwws))->toBe('https://hc.example.test/ping/nwws')
+        ->and(Integrations::heartbeatUrl(PipelineFeed::Emwin))->toBe('https://hc.example.test/ping/emwin')
+        ->and(Integrations::heartbeatUrl(PipelineFeed::EmwinHttp))->toBe('https://hc.example.test/ping/http');
+});
+
+test('heartbeatUrl is null for a blank url', function () {
+    setIntegrationSetting('heartbeat_enabled', true);
+    setIntegrationSetting('heartbeat_emwin_url', '');
+
+    expect(Integrations::heartbeatUrl(PipelineFeed::Emwin))->toBeNull()
+        ->and(Integrations::heartbeatUrl(PipelineFeed::Nwws))->toBeNull();
+});
+
+test('heartbeatUrl fails open when the integration settings cannot be read', function () {
+    DB::table('settings')->where('group', 'integrations')->delete();
+    Cache::flush();
+    app()->forgetInstance(IntegrationSettings::class);
+
+    expect(Integrations::heartbeatUrl(PipelineFeed::Nwws))->toBeNull();
 });

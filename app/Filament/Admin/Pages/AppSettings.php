@@ -49,7 +49,6 @@ class AppSettings extends Page implements HasForms
         'maintenance_message',
         'translation_endpoint',
         'short_urls_endpoint',
-        'heartbeat_endpoint',
         'archival_provider',
         'archival_endpoint',
         'archival_bucket',
@@ -272,7 +271,6 @@ class AppSettings extends Page implements HasForms
             Section::make('Heartbeat')
                 ->schema([
                     Toggle::make('heartbeat_enabled')->label('Heartbeat enabled')->live(),
-                    $this->endpointField('heartbeat_endpoint', 'Heartbeat endpoint', 'heartbeat_enabled'),
                 ]),
             Section::make('Exception reporting')
                 ->schema([

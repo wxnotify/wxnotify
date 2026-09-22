@@ -16,7 +16,11 @@ class IntegrationSettings extends Settings
 
     public bool $heartbeat_enabled;
 
-    public ?string $heartbeat_endpoint;
+    public ?string $heartbeat_nwws_url;
+
+    public ?string $heartbeat_emwin_url;
+
+    public ?string $heartbeat_emwin_http_url;
 
     public bool $exception_reporting_enabled;
 

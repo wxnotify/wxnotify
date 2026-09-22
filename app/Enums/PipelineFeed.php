@@ -51,6 +51,15 @@ enum PipelineFeed: string
         };
     }
 
+    public function heartbeatUrlProperty(): string
+    {
+        return match ($this) {
+            self::Nwws => 'heartbeat_nwws_url',
+            self::Emwin => 'heartbeat_emwin_url',
+            self::EmwinHttp => 'heartbeat_emwin_http_url',
+        };
+    }
+
     public function staleMinutes(): int
     {
         return (int) config("wxnotify.pipeline.stale_minutes.{$this->value}");

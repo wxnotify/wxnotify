@@ -60,7 +60,6 @@ test('an enabled integration requires its endpoint', function (string $toggle, s
 })->with([
     'translation' => ['translation_enabled', 'translation_endpoint'],
     'short urls' => ['short_urls_enabled', 'short_urls_endpoint'],
-    'heartbeat' => ['heartbeat_enabled', 'heartbeat_endpoint'],
     'status page' => ['status_page_enabled', 'status_page_url'],
     'archival endpoint' => ['archival_enabled', 'archival_endpoint'],
     'archival bucket' => ['archival_enabled', 'archival_bucket'],

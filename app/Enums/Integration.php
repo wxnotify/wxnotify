@@ -28,10 +28,9 @@ enum Integration: string
         return match ($this) {
             self::Translation => 'translation_endpoint',
             self::ShortUrls => 'short_urls_endpoint',
-            self::Heartbeat => 'heartbeat_endpoint',
             self::Archival => 'archival_endpoint',
             self::StatusPage => 'status_page_url',
-            self::ExceptionReporting, self::EmailRelay => null,
+            self::ExceptionReporting, self::EmailRelay, self::Heartbeat => null,
         };
     }
 }

@@ -3,7 +3,9 @@
 namespace App\Support;
 
 use App\Enums\Integration;
+use App\Enums\PipelineFeed;
 use App\Settings\IntegrationSettings;
+use Throwable;
 
 /**
  * Runtime switches and non-secret endpoints for third-party integrations.
@@ -28,5 +30,22 @@ class Integrations
         $value = app(IntegrationSettings::class)->{$property};
 
         return filled($value) ? $value : null;
+    }
+
+    public static function heartbeatUrl(PipelineFeed $feed): ?string
+    {
+        try {
+            $settings = app(IntegrationSettings::class);
+
+            if (! $settings->heartbeat_enabled) {
+                return null;
+            }
+
+            $value = $settings->{$feed->heartbeatUrlProperty()};
+
+            return filled($value) ? $value : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 }
