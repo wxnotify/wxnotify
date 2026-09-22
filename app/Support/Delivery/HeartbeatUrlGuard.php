@@ -37,10 +37,19 @@ class HeartbeatUrlGuard
 
         $host = strtolower(trim($parts['host'], '[]'));
 
+        if (str_contains($host, '%')) {
+            return 'The URL host must not contain a zone identifier.';
+        }
+
+        if ($this->isObfuscatedNumericHost($host)) {
+            return 'The URL host must be a name or a standard IP address, not a numeric shorthand.';
+        }
+
         if (in_array($host, self::BLOCKED_HOSTS, true)) {
             return 'That host is a cloud metadata service.';
         }
 
+        // Our lookup and Guzzle's own are separate resolutions (DNS-rebinding gap accepted: staff-set URL, GET only, no response body used, no redirects).
         foreach ($this->addressesFor($host) as $address) {
             if ($this->isBlockedAddress($address)) {
                 return 'That address is a link-local or cloud metadata address.';
@@ -63,15 +72,25 @@ class HeartbeatUrlGuard
             return ($this->resolver)($host);
         }
 
-        $addresses = gethostbynamel($host) ?: [];
+        try {
+            $addresses = @gethostbynamel($host) ?: [];
 
-        foreach (dns_get_record($host, DNS_AAAA) ?: [] as $record) {
-            if (isset($record['ipv6'])) {
-                $addresses[] = $record['ipv6'];
+            foreach (@dns_get_record($host, DNS_AAAA) ?: [] as $record) {
+                if (isset($record['ipv6'])) {
+                    $addresses[] = $record['ipv6'];
+                }
             }
-        }
 
-        return $addresses;
+            return $addresses;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function isObfuscatedNumericHost(string $host): bool
+    {
+        return filter_var($host, FILTER_VALIDATE_IP) === false
+            && preg_match('/^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+))*$/i', $host) === 1;
     }
 
     private function isBlockedAddress(string $address): bool

@@ -32,13 +32,13 @@ class SendHeartbeatPing implements ShouldQueue
             return;
         }
 
-        if ($guard->violation($url) !== null) {
-            $this->warnOnce();
-
-            return;
-        }
-
         try {
+            if ($guard->violation($url) !== null) {
+                $this->warnOnce();
+
+                return;
+            }
+
             $response = $this->pendingRequest()->get($url);
 
             if (! $response->successful()) {
