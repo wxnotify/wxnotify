@@ -21,7 +21,16 @@ class SendHeartbeatPing implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public readonly string $feed) {}
+    public int $timeout = 15;
+
+    public function __construct(public readonly string $feed)
+    {
+        // Queueable's $queue property has no type, so it can't be redeclared with
+        // one here (PHP treats that as an incompatible trait composition) — set
+        // it via the trait's own setter instead, to isolate ping traffic onto its
+        // own worker away from the shared default queue.
+        $this->onQueue('heartbeat');
+    }
 
     public function handle(HeartbeatUrlGuard $guard): void
     {

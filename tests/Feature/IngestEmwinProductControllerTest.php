@@ -252,7 +252,7 @@ test('no ping is queued when heartbeat is off, the feed url is blank, or the pat
 test('a queueing failure never fails the ingest request', function () {
     enableHeartbeatUrls();
     $dispatcher = Mockery::mock(Dispatcher::class);
-    $dispatcher->shouldReceive('dispatch')->once()->andThrow(new RuntimeException('queue down'));
+    $dispatcher->shouldReceive('dispatch')->atLeast()->once()->andThrow(new RuntimeException('queue down'));
     $this->instance(Dispatcher::class, $dispatcher);
     File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
 

@@ -68,12 +68,30 @@ test('the guard refuses link-local and cloud metadata targets', function (string
     'octal dotted ipv4' => 'http://0251.0376.0251.0376/',
     'ipv6 zone id' => 'http://[fe80::1%25eth0]/ping',
     'ipv6 link-local febf' => 'http://[febf::1]/ping',
+    'nat64' => 'http://[64:ff9b::a9fe:a9fe]/ping',
+    '6to4' => 'http://[2002:a9fe:a9fe::]/ping',
+    'ipv4-translated hex form' => 'http://[::ffff:0:7f00:1]/ping',
+    'trailing dot host' => 'http://169.254.169.254./',
 ]);
 
 test('the guard refuses a host name that resolves to a metadata address', function () {
     $guard = new HeartbeatUrlGuard(fn (string $host): array => ['169.254.169.254']);
 
     expect($guard->violation('https://looks-harmless.example.test/ping'))->not->toBeNull();
+});
+
+test('the guard resolves each host at most once within the cache window', function () {
+    $calls = 0;
+    $guard = new HeartbeatUrlGuard(function (string $host) use (&$calls): array {
+        $calls++;
+
+        return ['10.0.0.5'];
+    });
+
+    $guard->violation('http://healthchecks.internal:8000/ping/abc');
+    $guard->violation('http://healthchecks.internal:8000/ping/abc');
+
+    expect($calls)->toBe(1);
 });
 
 // --- job ---
@@ -162,6 +180,13 @@ test('the job builds its request with redirects disabled and a short timeout', f
         ->and($options['timeout'])->toBe(5);
 });
 
+test('the job runs on its own queue with a job-level timeout backstop', function () {
+    $job = new SendHeartbeatPing('nwws');
+
+    expect($job->queue)->toBe('heartbeat')
+        ->and($job->timeout)->toBe(15);
+});
+
 // --- dispatch action ---
 
 test('the dispatch action queues the job only when the feed has a url and heartbeat is on', function () {
@@ -194,6 +219,29 @@ test('the dispatch action never throws when queueing fails', function () {
     $dispatcher = Mockery::mock(Dispatcher::class);
     $dispatcher->shouldReceive('dispatch')->once()->andThrow(new RuntimeException('queue down'));
     $this->instance(Dispatcher::class, $dispatcher);
+
+    expect(fn () => (app(DispatchHeartbeatPing::class))('nwws'))->not->toThrow(Throwable::class);
+});
+
+test('the dispatch action logs only the feed, throttled, when queueing fails', function () {
+    heartbeatSetup();
+    Log::spy();
+    $dispatcher = Mockery::mock(Dispatcher::class);
+    $dispatcher->shouldReceive('dispatch')->twice()->andThrow(new RuntimeException('queue down'));
+    $this->instance(Dispatcher::class, $dispatcher);
+
+    (app(DispatchHeartbeatPing::class))('nwws');
+    (app(DispatchHeartbeatPing::class))('nwws');
+
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message, array $context = []) => $context === ['feed' => 'nwws']);
+});
+
+test('the dispatch action still returns normally when the failure-warning log itself throws', function () {
+    heartbeatSetup();
+    $dispatcher = Mockery::mock(Dispatcher::class);
+    $dispatcher->shouldReceive('dispatch')->once()->andThrow(new RuntimeException('queue down'));
+    $this->instance(Dispatcher::class, $dispatcher);
+    Log::shouldReceive('warning')->andThrow(new RuntimeException('log down'));
 
     expect(fn () => (app(DispatchHeartbeatPing::class))('nwws'))->not->toThrow(Throwable::class);
 });
