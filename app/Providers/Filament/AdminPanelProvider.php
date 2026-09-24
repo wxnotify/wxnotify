@@ -24,6 +24,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use JeffersonGoncalves\Filament\CookieConsent\CookieConsentPlugin;
+use JeffersonGoncalves\Filament\OneTimeOperations\OneTimeOperationsPlugin;
 use JeffersonGoncalves\FilamentServiceDesk\ServiceDeskAdminPlugin;
 use ShuvroRoy\FilamentSpatieLaravelHealth\FilamentSpatieLaravelHealthPlugin;
 
@@ -62,6 +63,7 @@ class AdminPanelProvider extends PanelProvider
                     ->navigationSort(10)
                     ->navigationIcon('heroicon-o-cpu-chip')
                     ->navigationLabel('Application Health'),
+                OneTimeOperationsPlugin::make(),
             ])
             ->middleware([
                 EncryptCookies::class,
