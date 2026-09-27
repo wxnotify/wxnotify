@@ -46,6 +46,11 @@ class NotificationChannelFactory extends Factory
         ]]);
     }
 
+    public function email(string $to = 'subscriber@example.com'): static
+    {
+        return $this->state(fn () => ['channel_type' => 'email', 'apprise_url' => null, 'config' => ['to' => $to]]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

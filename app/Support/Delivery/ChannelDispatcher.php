@@ -6,6 +6,7 @@ use App\Enums\ChannelTransport;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\Delivery\Transports\AppriseTransport;
+use App\Support\Delivery\Transports\MailTransport;
 use App\Support\Delivery\Transports\Transport;
 use App\Support\Delivery\Transports\WebhookTransport;
 use App\Support\Delivery\Transports\WebPushTransport;
@@ -34,6 +35,7 @@ class ChannelDispatcher
             ChannelTransport::Apprise => app(AppriseTransport::class),
             ChannelTransport::Webhook => app(WebhookTransport::class),
             ChannelTransport::WebPush => app(WebPushTransport::class),
+            ChannelTransport::Mail => app(MailTransport::class),
         };
     }
 }
