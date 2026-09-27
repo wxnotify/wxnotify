@@ -1,6 +1,8 @@
 ---
 paths:
   - 'app/Actions/Pipeline/**'
+  - 'app/Actions/Weather/MatchWeatherAlertRules.php'
+  - 'app/Observers/IngestedProductObserver.php'
 ---
 
 # Pipeline

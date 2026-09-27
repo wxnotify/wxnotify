@@ -120,7 +120,7 @@ test('a replay refuses to run in production', function () {
     app()->instance('env', 'production');
 
     expect(ReplayIngestedProduct::allowed())->toBeFalse()
-        ->and(fn () => app(ReplayIngestedProduct::class)($original))->toThrow(RuntimeException::class)
+        ->and(fn () => app(ReplayIngestedProduct::class)($original))->toThrow(RuntimeException::class, 'disabled in production')
         ->and(IngestedProduct::count())->toBe(1);
 });
 
@@ -131,6 +131,6 @@ test('replaying is allowed outside production', function () {
 test('a product whose text cannot be re-ingested throws instead of returning nothing', function () {
     $original = IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create(['format' => 'cap', 'text' => 'this is not a cap document']));
 
-    expect(fn () => app(ReplayIngestedProduct::class)($original))->toThrow(RuntimeException::class)
+    expect(fn () => app(ReplayIngestedProduct::class)($original))->toThrow(RuntimeException::class, 'could not be re-ingested')
         ->and(IngestedProduct::count())->toBe(1);
 });

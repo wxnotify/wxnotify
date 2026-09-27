@@ -152,7 +152,7 @@ test('the replay row action creates a test copy and notifies', function () {
     expect(IngestedProduct::where('replay_of_id', $product->id)->where('is_test', true)->count())->toBe(1);
 });
 
-test('the replay actions are hidden in production and a forged call does nothing', function () {
+test('the replay actions are hidden in production and Filament refuses a forged call', function () {
     $product = IngestedProduct::factory()->create();
     app()->instance('env', 'production');
 
@@ -164,7 +164,8 @@ test('the replay actions are hidden in production and a forged call does nothing
 
     livewire(ListIngestedProducts::class)
         ->call('mountAction', 'replay', [], ['table' => true, 'recordKey' => (string) $product->id])
-        ->call('callMountedAction');
+        ->call('callMountedAction')
+        ->assertNotNotified();
 
     expect(IngestedProduct::whereNotNull('replay_of_id')->count())->toBe(0);
 });
