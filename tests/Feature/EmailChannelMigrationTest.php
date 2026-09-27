@@ -2,6 +2,7 @@
 
 use App\Models\NotificationChannel;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
 
 function emailMigrationUnderTest(): Migration
 {
@@ -36,7 +37,7 @@ test('other channel types and unparsable email rows are left untouched', functio
         ->and($unparsable->fresh()->config)->toBeNull();
 });
 
-test('running the migration twice does not change an already migrated channel', function () {
+test('the migration leaves an already migrated channel unchanged', function () {
     $channel = NotificationChannel::factory()->email('subscriber@example.com')->create();
 
     emailMigrationUnderTest()->up();
@@ -59,4 +60,31 @@ test('rolling back rebuilds a working mailto url from the address and the mail c
     expect($channel->fresh()->apprise_url)->toBe('mailto://mailpit:1025/?to=subscriber%40example.com&from=alerts%40wxnotify.test&mode=insecure')
         ->and($channel->fresh()->config)->toBeNull()
         ->and($discord->fresh()->apprise_url)->toBe('discord://1/abc/');
+});
+
+test('a plus address survives the migration and the rollback', function () {
+    config([
+        'mail.mailers.smtp.host' => 'mailpit', 'mail.mailers.smtp.port' => 1025,
+        'mail.mailers.smtp.username' => null, 'mail.mailers.smtp.password' => null,
+        'mail.mailers.smtp.encryption' => null, 'mail.from.address' => 'alerts@wxnotify.test',
+    ]);
+    $url = 'mailto://mailpit:1025/?to=a%2Bb%40example.com&from=alerts%40wxnotify.test&mode=insecure';
+    $channel = NotificationChannel::factory()->create(['channel_type' => 'email', 'apprise_url' => $url]);
+
+    emailMigrationUnderTest()->up();
+    expect($channel->fresh()->config)->toBe(['to' => 'a+b@example.com']);
+
+    emailMigrationUnderTest()->down();
+    expect($channel->fresh()->apprise_url)->toBe($url);
+});
+
+test('an undecryptable row is skipped while other rows still migrate', function () {
+    $garbage = NotificationChannel::factory()->create(['channel_type' => 'email', 'apprise_url' => 'mailto://x/?to=a%40example.com']);
+    DB::table('notification_channels')->where('id', $garbage->id)->update(['apprise_url' => 'not-a-valid-ciphertext']);
+    $good = NotificationChannel::factory()->create(['channel_type' => 'email', 'apprise_url' => 'mailto://mailpit:1025/?to=ok%40example.com&mode=insecure']);
+
+    emailMigrationUnderTest()->up();
+
+    expect($good->fresh()->config)->toBe(['to' => 'ok@example.com'])
+        ->and(DB::table('notification_channels')->where('id', $garbage->id)->value('apprise_url'))->toBe('not-a-valid-ciphertext');
 });

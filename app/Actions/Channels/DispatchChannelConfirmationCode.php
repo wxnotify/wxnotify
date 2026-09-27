@@ -9,8 +9,10 @@ use Illuminate\Http\Client\ConnectionException;
 class DispatchChannelConfirmationCode
 {
     /**
-     * Returns false both when Apprise reports the message wasn't delivered
-     * and when the Apprise API itself is unreachable. The two are kept
+     * Sends the code through ChannelDispatcher: Apprise for most channel
+     * types, Laravel Mail for Email. Returns false both when the message
+     * wasn't delivered and, for Apprise-backed channels, when the Apprise API
+     * itself is unreachable. The two are kept
      * distinguishable only via the log: AppriseApiClient::notify() isn't
      * changed to swallow ConnectionException itself, since
      * DeliverWeatherAlert/SendActivityAlert share it and rely on that

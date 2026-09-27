@@ -15,11 +15,14 @@ return new class extends Migration
             ->where('channel_type', 'email')
             ->whereNotNull('apprise_url')
             ->whereNull('config')
-            ->orderBy('id')
-            ->each(function (object $row) use (&$skipped): void {
-                $url = Crypt::decryptString($row->apprise_url);
-                parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
-                $to = $query['to'] ?? null;
+            ->eachById(function (object $row) use (&$skipped): void {
+                try {
+                    $url = Crypt::decryptString($row->apprise_url);
+                    parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+                    $to = $query['to'] ?? null;
+                } catch (Throwable) {
+                    $to = null;
+                }
 
                 if (! is_string($to) || $to === '') {
                     $skipped[] = $row->id;
@@ -56,10 +59,13 @@ return new class extends Migration
             ->where('channel_type', 'email')
             ->whereNull('apprise_url')
             ->whereNotNull('config')
-            ->orderBy('id')
-            ->each(function (object $row) use ($host, $port, $auth, $from, $mode): void {
-                $config = json_decode(Crypt::decryptString($row->config), true);
-                $to = is_array($config) ? ($config['to'] ?? null) : null;
+            ->eachById(function (object $row) use ($host, $port, $auth, $from, $mode): void {
+                try {
+                    $config = json_decode(Crypt::decryptString($row->config), true);
+                    $to = is_array($config) ? ($config['to'] ?? null) : null;
+                } catch (Throwable) {
+                    $to = null;
+                }
 
                 if (! is_string($to) || $to === '') {
                     return;

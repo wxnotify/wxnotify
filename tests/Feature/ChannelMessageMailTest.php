@@ -38,3 +38,18 @@ test('the plain text alternative carries the app name and the body without html'
         ->assertSeeInText("TORNADO WARNING\n<b>literal</b> & more\n\n\n\nEND")
         ->assertDontSeeInText('<pre');
 });
+
+test('an EMWIN-shaped body is normalised to single-spaced text without control bytes', function () {
+    $mailable = new ChannelMessageMail('Title', "\x01\r\r\n123\r\r\nWFUS53 KDMX 011200\r\r\nTORWDMX\r\r\n\r\r\nBULLETIN\r\r\n\x03");
+
+    $html = $mailable->render();
+    $text = view('mail.channel-message-text', ['messageBody' => $mailable->messageBody])->render();
+
+    expect($html)->toContain("WFUS53 KDMX 011200\nTORWDMX\n\nBULLETIN")
+        ->and($html)->not->toContain("\r")
+        ->and($html)->not->toContain("\x01")
+        ->and($html)->not->toContain("\x03")
+        ->and($text)->toContain("WFUS53 KDMX 011200\nTORWDMX\n\nBULLETIN")
+        ->and($text)->not->toContain("\r")
+        ->and($text)->not->toContain("\x01");
+});

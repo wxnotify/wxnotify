@@ -8,10 +8,16 @@ use Illuminate\Mail\Mailables\Envelope;
 
 class ChannelMessageMail extends Mailable
 {
+    public readonly string $messageBody;
+
     public function __construct(
         public readonly ?string $messageTitle,
-        public readonly string $messageBody,
-    ) {}
+        string $messageBody,
+    ) {
+        $messageBody = str_replace(["\r\r\n", "\r\n", "\r"], "\n", $messageBody);
+
+        $this->messageBody = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $messageBody) ?? $messageBody;
+    }
 
     public function envelope(): Envelope
     {

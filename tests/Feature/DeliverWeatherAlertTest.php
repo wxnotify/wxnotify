@@ -315,7 +315,8 @@ test('an email channel alert is mailed with the product text and writes a succes
 
     (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
-    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->hasTo('subscriber@example.com'));
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->hasTo('subscriber@example.com')
+        && str_contains($mail->messageBody, 'Tornado Warning issued for...'));
     Http::assertNothingSent();
     expect(DeliveryLog::sole()->status)->toBe('success');
 });

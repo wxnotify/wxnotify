@@ -314,7 +314,7 @@ class AppSettings extends Page implements HasForms
                 ->schema([
                     Toggle::make('email_relay_enabled')
                         ->label('Email relay enabled')
-                        ->helperText('Turning this off in production stops password resets and email verification.')
+                        ->helperText('Turning this off in production stops password resets, email verification and subscriber Email-channel alerts.')
                         ->live(),
                     Select::make('email_mailer')
                         ->label('Mailer')
