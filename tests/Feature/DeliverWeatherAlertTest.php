@@ -2,6 +2,7 @@
 
 use App\Enums\Tier;
 use App\Jobs\DeliverWeatherAlert;
+use App\Mail\ChannelMessageMail;
 use App\Models\AlertRule;
 use App\Models\AlertTemplate;
 use App\Models\DeliveryLog;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 test('it delivers via apprise and writes a success DeliveryLog row', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
@@ -302,4 +304,18 @@ test('a text-sourced product still uses its raw text as the message body, unaffe
     (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['body'] === 'Tornado Warning issued for the area.');
+});
+
+test('an email channel alert is mailed with the product text and writes a success DeliveryLog row', function () {
+    Mail::fake();
+    Http::fake();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->email('subscriber@example.com')->create();
+    $product = IngestedProduct::factory()->create(['text' => 'Tornado Warning issued for...']);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->hasTo('subscriber@example.com'));
+    Http::assertNothingSent();
+    expect(DeliveryLog::sole()->status)->toBe('success');
 });

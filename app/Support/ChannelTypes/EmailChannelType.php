@@ -2,14 +2,12 @@
 
 namespace App\Support\ChannelTypes;
 
-use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
+use App\Enums\ChannelTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Filament\Forms\Components\TextInput;
 
 class EmailChannelType implements ChannelType
 {
-    use UsesAppriseTransport;
-
     public function slug(): string
     {
         return 'email';
@@ -36,25 +34,28 @@ class EmailChannelType implements ChannelType
         ];
     }
 
-    public function buildAppriseUrl(array $data): string
+    public function transport(): ChannelTransport
     {
-        $host = config('mail.mailers.smtp.host', 'localhost');
-        $port = config('mail.mailers.smtp.port', 587);
-        $username = config('mail.mailers.smtp.username');
-        $password = config('mail.mailers.smtp.password');
-        $from = config('services.apprise.from_email');
+        return ChannelTransport::Mail;
+    }
 
-        $mode = match (config('mail.mailers.smtp.encryption')) {
-            'tls', 'starttls' => 'starttls',
-            'ssl' => 'ssl',
-            default => 'insecure',
-        };
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{config: array{to: string}}
+     */
+    public function buildDestination(array $data): array
+    {
+        return ['config' => ['to' => (string) $data['to']]];
+    }
 
-        $auth = $username ? rawurlencode($username).':'.rawurlencode((string) $password).'@' : '';
+    public function supportsInlineCreate(): bool
+    {
+        return true;
+    }
 
-        return "mailto://{$auth}{$host}:{$port}/?to=".rawurlencode($data['to'])
-            .'&from='.rawurlencode($from)
-            ."&mode={$mode}";
+    public function isAvailable(): bool
+    {
+        return true;
     }
 
     public function countsTowardFreeSlot(): bool

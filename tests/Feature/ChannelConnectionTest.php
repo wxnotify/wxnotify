@@ -2,12 +2,14 @@
 
 use App\Enums\Tier;
 use App\Filament\Dashboard\Pages\ConnectChannel;
+use App\Mail\ChannelMessageMail;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\Delivery\WebhookUrlGuard;
 use Filament\Forms\Components\TextInput;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 
 use function Pest\Livewire\livewire;
 
@@ -415,4 +417,25 @@ test('the web push wizard rejects an invalid subscription without creating a cha
 
     $component->assertNotified('That browser subscription is not valid.');
     expect(NotificationChannel::count())->toBe(0);
+});
+
+test('completing the wizard for email stores the address in config and mails the confirmation code', function () {
+    Mail::fake();
+    Http::fake();
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'email']);
+    goToConnectChannelStep($component, 0);
+    $component->assertWizardCurrentStep(2)->fillForm(['to' => 'subscriber@example.com']);
+    goToConnectChannelStep($component, 1);
+    $component->assertWizardCurrentStep(3);
+
+    $channel = NotificationChannel::where('user_id', $this->user->id)->sole();
+
+    expect($channel->channel_type)->toBe('email')
+        ->and($channel->config)->toBe(['to' => 'subscriber@example.com'])
+        ->and($channel->apprise_url)->toBeNull()
+        ->and($channel->confirmation_code)->not->toBeNull();
+
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->hasTo('subscriber@example.com') && str_contains($mail->messageBody, $channel->confirmation_code));
+    Http::assertNothingSent();
 });

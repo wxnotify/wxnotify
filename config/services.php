@@ -43,7 +43,6 @@ return [
 
     'apprise' => [
         'base_url' => env('APPRISE_API_URL', 'http://apprise:8000'),
-        'from_email' => env('APPRISE_FROM_EMAIL', 'alerts@wxnotify.test'),
     ],
 
     'chatwoot' => [

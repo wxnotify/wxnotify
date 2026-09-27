@@ -14,19 +14,14 @@ use App\Support\ChannelTypes\TeamsChannelType;
 use App\Support\ChannelTypes\TelegramChannelType;
 use Illuminate\Support\Facades\Validator;
 
-test('email builds a mailto url from mail config', function () {
-    config([
-        'mail.mailers.smtp.host' => 'mailpit',
-        'mail.mailers.smtp.port' => 1025,
-        'mail.mailers.smtp.username' => null,
-        'mail.mailers.smtp.password' => null,
-        'mail.mailers.smtp.encryption' => null,
-        'services.apprise.from_email' => 'alerts@wxnotify.test',
-    ]);
+test('email keeps its address in config and sends through the mail transport', function () {
+    $type = new EmailChannelType;
 
-    $url = (new EmailChannelType)->buildAppriseUrl(['to' => 'subscriber@example.com']);
-
-    expect($url)->toBe('mailto://mailpit:1025/?to=subscriber%40example.com&from=alerts%40wxnotify.test&mode=insecure');
+    expect($type->transport())->toBe(ChannelTransport::Mail)
+        ->and($type->buildDestination(['to' => 'subscriber@example.com']))->toBe(['config' => ['to' => 'subscriber@example.com']])
+        ->and($type->supportsInlineCreate())->toBeTrue()
+        ->and($type->isAvailable())->toBeTrue()
+        ->and($type->countsTowardFreeSlot())->toBeFalse();
 });
 
 test('discord extracts the webhook id and token from a pasted url', function () {
@@ -162,7 +157,7 @@ test('every registered channel type implements the transport contract', function
         'msteams' => ['webhook_url' => 'https://prod-00.westus.logic.azure.com:443/workflows/'.str_repeat('a', 32).'/triggers/manual/paths/invoke?sig=abc_DEF-123'],
     ];
 
-    foreach (['email', 'ntfy', 'discord', 'slack', 'telegram', 'pushover', 'msteams'] as $slug) {
+    foreach (['ntfy', 'discord', 'slack', 'telegram', 'pushover', 'msteams'] as $slug) {
         $type = app(ChannelTypeRegistry::class)->find($slug);
 
         expect($type->transport())->toBe(ChannelTransport::Apprise)
