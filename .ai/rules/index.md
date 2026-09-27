@@ -5,10 +5,11 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Support/Delivery/** | .ai/rules/delivery.md |
-| docker/emwin-http/** | .ai/rules/emwin-http.md |
 | docker/emwin-byteblaster/** | .ai/rules/emwin-byteblaster.md |
+| docker/emwin-http/** | .ai/rules/emwin-http.md |
 | tests/Feature/** | .ai/rules/feature.md |
 | app/Filament/** | .ai/rules/filament.md |
+| app/Jobs/DeliverWeatherAlert.php, app/Jobs/DeliverScheduledAlert.php | .ai/rules/jobs.md |
 | app/Models/**, app/Models/Product.php, app/Models/ActiveWwa.php | .ai/rules/models.md |
 | app/Filament/Admin/Pages/** | .ai/rules/pages.md |
 | app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php | .ai/rules/pipeline.md |

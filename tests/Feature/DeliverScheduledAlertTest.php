@@ -2,6 +2,7 @@
 
 use App\Enums\Tier;
 use App\Jobs\DeliverScheduledAlert;
+use App\Mail\ChannelMessageMail;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
@@ -9,6 +10,7 @@ use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 test('it delivers via apprise and writes a success DeliveryLog row', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
@@ -106,6 +108,21 @@ test('message_body_style Brief truncates the passed-in body to 280 characters', 
         ->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => strlen($request['body']) <= 280);
+});
+
+test('message_body_style Brief does not truncate an email alert either', function () {
+    Mail::fake();
+    Http::fake();
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['message_body_style' => 'brief']);
+    $channel = NotificationChannel::factory()->for($rule->user)->email('subscriber@example.com')->create();
+    $longBody = str_repeat('Sunny with a high of 88 degrees. ', 30);
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', $longBody))
+        ->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->messageBody === $longBody);
+    Http::assertNothingSent();
 });
 
 test('message_body_style Full (or null) preserves the passed-in body unchanged', function () {

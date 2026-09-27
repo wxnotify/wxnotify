@@ -306,6 +306,41 @@ test('a text-sourced product still uses its raw text as the message body, unaffe
     Http::assertSent(fn ($request) => $request['body'] === 'Tornado Warning issued for the area.');
 });
 
+test('a long multi-line email alert is sent in full, with its line breaks intact and no truncation', function () {
+    Mail::fake();
+    Http::fake();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->email('subscriber@example.com')->create();
+    $lines = array_fill(0, 60, 'This is one line of a long area forecast discussion that keeps going.');
+    $longText = implode("\n", $lines);
+    $product = IngestedProduct::factory()->create(['text' => $longText]);
+    expect(strlen($longText))->toBeGreaterThan(1500);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->hasTo('subscriber@example.com')
+        && $mail->messageBody === $longText
+        && substr_count($mail->messageBody, "\n") === 59
+        && ! str_ends_with($mail->messageBody, '...'));
+});
+
+test('message_body_style Brief does not truncate an email alert either', function () {
+    Mail::fake();
+    Http::fake();
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'message_body_style' => 'brief',
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->email('subscriber@example.com')->create();
+    $longText = str_repeat('Tornado Warning issued for the area. ', 60);
+    $product = IngestedProduct::factory()->create(['text' => $longText]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->messageBody === $longText);
+});
+
 test('an email channel alert is mailed with the product text and writes a success DeliveryLog row', function () {
     Mail::fake();
     Http::fake();

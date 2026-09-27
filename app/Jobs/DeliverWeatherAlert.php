@@ -4,11 +4,13 @@ namespace App\Jobs;
 
 use App\Actions\Weather\ComposeTemplatedAlertBody;
 use App\Actions\Weather\RenderAlertSubject;
+use App\Enums\ChannelTransport;
 use App\Enums\MessageBodyStyle;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,12 +40,17 @@ use Illuminate\Support\Str;
  *
  * Body composition: a rule with an attached weather_alerts-category
  * AlertTemplate that App\Actions\Weather\ComposeTemplatedAlertBody manages
- * to compose into something non-null takes priority, always capped at 1500
- * characters. Otherwise the raw product text is used (a CAP product's
- * description, falling back to its text), capped at 280 or 1500 characters
- * per the rule's existing message_body_style — the templated body bypasses
- * that Brief cap entirely, since section selection is what controls length
- * in that case.
+ * to compose into something non-null takes priority. Otherwise the raw
+ * product text is used (a CAP product's description, falling back to its
+ * text). For every channel except email the result is capped at 280 or
+ * 1500 characters per the rule's existing message_body_style via
+ * Str::limit — the templated body bypasses that Brief cap entirely, since
+ * section selection is what controls length in that case. An email
+ * channel (the only one with no practical length limit) always gets the
+ * body in full and unmodified, regardless of message_body_style:
+ * Str::limit's word-preserving mode collapses every line break to a
+ * space, which is fine for a short chat message but destroys a formatted
+ * product in an inbox.
  */
 class DeliverWeatherAlert implements ShouldQueue
 {
@@ -97,9 +104,15 @@ class DeliverWeatherAlert implements ShouldQueue
 
         $templatedBody = app(ComposeTemplatedAlertBody::class)($rule, $product);
         $bodySource = $templatedBody ?? ($product->format === 'cap' ? ($product->description ?? $product->text) : $product->text);
-        $maxLength = $templatedBody === null && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500;
 
-        $result = $dispatcher->send($channel, Str::limit($bodySource, $maxLength, preserveWords: true), app(RenderAlertSubject::class)($rule, $product->product), [
+        // Str::limit's word-preserving mode collapses every line break to a space (it exists for
+        // single-line excerpts), so it must never touch a body bound for a real inbox. Email has
+        // no length constraint that would justify running it in the first place.
+        $isEmailChannel = app(ChannelTypeRegistry::class)->find($channel->channel_type)?->transport() === ChannelTransport::Mail;
+        $maxLength = $templatedBody === null && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500;
+        $body = $isEmailChannel ? $bodySource : Str::limit($bodySource, $maxLength, preserveWords: true);
+
+        $result = $dispatcher->send($channel, $body, app(RenderAlertSubject::class)($rule, $product->product), [
             'type' => 'alert',
             'rule' => $rule->name,
             'product' => $product->product?->name,

@@ -3,10 +3,12 @@
 namespace App\Jobs;
 
 use App\Actions\Weather\RenderAlertSubject;
+use App\Enums\ChannelTransport;
 use App\Enums\MessageBodyStyle;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -73,7 +75,10 @@ class DeliverScheduledAlert implements ShouldQueue
         }
 
         $title = app(RenderAlertSubject::class)($rule);
-        $body = $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief
+        // Str::limit's word-preserving mode collapses line breaks to spaces, so it must never
+        // touch a body bound for a real inbox — see DeliverWeatherAlert for the same rule.
+        $isEmailChannel = app(ChannelTypeRegistry::class)->find($channel->channel_type)?->transport() === ChannelTransport::Mail;
+        $body = (! $isEmailChannel && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief)
             ? Str::limit($this->body, 280, preserveWords: true)
             : $this->body;
 
