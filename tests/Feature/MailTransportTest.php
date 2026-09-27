@@ -20,6 +20,24 @@ test('it sends one branded message to the channel address and reports delivered'
         && $mail->messageBody === "body\ntext");
 });
 
+test('a url in the meta is passed through to the mailable as its view link', function () {
+    Mail::fake();
+    $channel = NotificationChannel::factory()->email('subscriber@example.com')->create();
+
+    app(MailTransport::class)->send($channel, 'body', 'title', ['url' => 'https://wxnotify.test/products/kbou-afd-271728']);
+
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->viewUrl === 'https://wxnotify.test/products/kbou-afd-271728');
+});
+
+test('no url in the meta means no link on the mailable', function () {
+    Mail::fake();
+    $channel = NotificationChannel::factory()->email('subscriber@example.com')->create();
+
+    app(MailTransport::class)->send($channel, 'body', 'title');
+
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->viewUrl === null);
+});
+
 test('a channel without an address fails with a fixed message and sends nothing', function () {
     Mail::fake();
     $channel = NotificationChannel::factory()->email()->create(['config' => []]);

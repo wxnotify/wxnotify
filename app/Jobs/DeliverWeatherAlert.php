@@ -116,6 +116,7 @@ class DeliverWeatherAlert implements ShouldQueue
             'type' => 'alert',
             'rule' => $rule->name,
             'product' => $product->product?->name,
+            'url' => $product->viewUrl(),
         ]);
 
         DeliveryLog::create([

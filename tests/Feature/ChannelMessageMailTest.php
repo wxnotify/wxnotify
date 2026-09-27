@@ -53,3 +53,24 @@ test('an EMWIN-shaped body is normalised to single-spaced text without control b
         ->and($text)->not->toContain("\r")
         ->and($text)->not->toContain("\x01");
 });
+
+test('a view url renders as a link below the body, and is absent when there is none', function () {
+    $withLink = (new ChannelMessageMail('Title', 'body', 'https://wxnotify.test/products/kbou-afd-271728'))->render();
+    $withoutLink = (new ChannelMessageMail('Title', 'body'))->render();
+
+    expect($withLink)->toContain('href="https://wxnotify.test/products/kbou-afd-271728"')
+        ->and($withoutLink)->not->toContain('href="https://wxnotify.test');
+});
+
+test('the view url cannot break out of the href attribute or inject a script tag, and appears in the plain text alternative too', function () {
+    $mailable = new ChannelMessageMail('Title', 'body', 'https://wxnotify.test/p?x="><script>alert(1)</script>');
+
+    $html = $mailable->render();
+    $mailable->assertSeeInText('https://wxnotify.test/p?x=');
+
+    preg_match('/href="(https:\/\/wxnotify\.test[^"]*)"/', $html, $matches);
+
+    expect($html)->not->toContain('<script>alert(1)</script>')
+        ->and($matches)->toHaveCount(2)
+        ->and($matches[1])->not->toContain('>');
+});

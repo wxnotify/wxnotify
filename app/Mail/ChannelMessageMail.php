@@ -13,6 +13,7 @@ class ChannelMessageMail extends Mailable
     public function __construct(
         public readonly ?string $messageTitle,
         string $messageBody,
+        public readonly ?string $viewUrl = null,
     ) {
         $messageBody = str_replace(["\r\r\n", "\r\n", "\r"], "\n", $messageBody);
 

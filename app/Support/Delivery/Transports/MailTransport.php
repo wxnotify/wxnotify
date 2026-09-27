@@ -32,7 +32,7 @@ class MailTransport implements Transport
         }
 
         try {
-            Mail::to($to)->send(new ChannelMessageMail($title, $body));
+            Mail::to($to)->send(new ChannelMessageMail($title, $body, $meta['url'] ?? null));
         } catch (Throwable $e) {
             logger()->warning('Email channel send failed', ['notification_channel_id' => $channel->id, 'exception' => $e::class]);
 

@@ -341,6 +341,18 @@ test('message_body_style Brief does not truncate an email alert either', functio
     Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->messageBody === $longText);
 });
 
+test('an email alert includes the product\'s view url as a link', function () {
+    Mail::fake();
+    Http::fake();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->email('subscriber@example.com')->create();
+    $product = IngestedProduct::factory()->create(['text' => 'Tornado Warning issued for...', 'view_slug' => 'kbou-torbou-271622']);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->viewUrl === $product->viewUrl());
+});
+
 test('an email channel alert is mailed with the product text and writes a success DeliveryLog row', function () {
     Mail::fake();
     Http::fake();
