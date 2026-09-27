@@ -25,6 +25,19 @@ log() {
 src=$1
 [ -f "$src" ] || exit 0
 
+# EMWIN text ends its lines with CR CR LF, which reads as a blank line after every line. Rewrites
+# $1 in place so every line ends in a single LF, before the file is posted. Files without a CR are
+# left alone. A failure is logged and the product is still delivered.
+normalize_line_endings() {
+    nl_file=$1
+    nl_cr=$(printf '\r')
+    grep -q "$nl_cr" "$nl_file" 2>/dev/null || return 0
+    if ! sed -i 's/\r*$//' "$nl_file" 2>/dev/null; then
+        log err "could not normalize the line endings of ${nl_file#"$ROOT"/}; delivering it as received"
+    fi
+    return 0
+}
+
 # Delivers one already-placed file: $1 = absolute path under $ROOT.
 deliver() {
     file=$1
@@ -32,6 +45,7 @@ deliver() {
     case $rel in
         *[!A-Za-z0-9._/-]*) log err "refusing to deliver $rel: unsafe characters in the file name"; return 1 ;;
     esac
+    normalize_line_endings "$file"
     if err=$(curl -sS -f --max-time 10 -X POST "$WEBHOOK_URL" \
         -H "Authorization: Bearer ${PIPELINE_WEBHOOK_TOKEN:-}" \
         -H "Content-Type: application/json" \

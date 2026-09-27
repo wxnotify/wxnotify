@@ -201,3 +201,92 @@ test('file names with unsafe characters are refused rather than put into JSON', 
 
     expect(emwinShPosts($this))->toBe([]);
 });
+
+/**
+ * Replaces the fake curl with one that snapshots the product file at the moment of the POST,
+ * so a test can prove what the pipeline would have read, not just what is on disk afterwards.
+ */
+function emwinShSnapshotCurl(object $t): void
+{
+    File::put($t->bin.'/curl', "#!/bin/sh\ncp \"\$SNAPSHOT_SRC\" \"\$SNAPSHOT_DEST\"\nprintf '%s\\n' \"\$@\" >> \"".$t->dir."/curl.log\"\nexit 0\n");
+    chmod($t->bin.'/curl', 0755);
+}
+
+test('doubled CR CR LF line endings are reduced to single line breaks before the product is posted', function () {
+    $file = $this->root.'/txt/kbox/torbox.abc.txt';
+    File::put($file, "WFUS53 KBOU 191622\r\r\nTORBOU\r\r\n\r\r\nBULLETIN\r\r\nTornado Warning\r\r\n");
+    emwinShSnapshotCurl($this);
+
+    emwinShRun($this, $file, ['SNAPSHOT_SRC' => $file, 'SNAPSHOT_DEST' => $this->dir.'/snapshot.txt']);
+
+    $expected = "WFUS53 KBOU 191622\nTORBOU\n\nBULLETIN\nTornado Warning\n";
+    expect(emwinShPosts($this))->toBe(['txt/kbox/torbox.abc.txt'])
+        ->and(File::get($this->dir.'/snapshot.txt'))->toBe($expected)
+        ->and(File::get($file))->toBe($expected);
+});
+
+test('plain CR LF line endings become single line breaks too', function () {
+    $file = $this->root.'/txt/kbox/crlf.txt';
+    File::put($file, "LINE ONE\r\nLINE TWO\r\n");
+
+    emwinShRun($this, $file);
+
+    expect(File::get($file))->toBe("LINE ONE\nLINE TWO\n");
+});
+
+test('only line-ending carriage returns are removed, everything else is left as it was', function () {
+    $file = $this->root.'/txt/kbox/mixed.txt';
+    File::put($file, "\x01A\rB\r\r\n  indented   spaces\t tab\r\r\n\r\r\n\r\r\nlast line without a break\x03");
+
+    emwinShRun($this, $file);
+
+    expect(File::get($file))->toBe("\x01A\rB\n  indented   spaces\t tab\n\n\nlast line without a break\x03");
+});
+
+test('a product with no carriage returns is not rewritten', function () {
+    $file = $this->root.'/txt/kbox/clean.txt';
+    File::put($file, "already\nclean\n");
+    touch($file, 1_000_000_000);
+    clearstatcache();
+
+    emwinShRun($this, $file);
+
+    clearstatcache();
+    expect(File::get($file))->toBe("already\nclean\n")
+        ->and(filemtime($file))->toBe(1_000_000_000)
+        ->and(emwinShPosts($this))->toBe(['txt/kbox/clean.txt']);
+});
+
+test('a text member extracted from a zip is normalized in its delivered copy', function () {
+    emwinShMakeZip($this->root.'/zip/kbox/AFDBOX.ZIP', ['AFDBOX.TXT' => "FXUS61 KBOX 191622\r\r\nAFDBOX\r\r\n\r\r\nDiscussion text\r\r\n"]);
+
+    emwinShRun($this, $this->root.'/zip/kbox/AFDBOX.ZIP');
+
+    $posts = emwinShPosts($this);
+    expect($posts)->toHaveCount(1)
+        ->and(File::get($this->root.'/'.$posts[0]))->toBe("FXUS61 KBOX 191622\nAFDBOX\n\nDiscussion text\n");
+});
+
+test('if normalizing fails the failure is logged and the product is still delivered', function () {
+    $file = $this->root.'/txt/kbox/stuck.txt';
+    File::put($file, "A\r\r\nB\r\r\n");
+    File::put($this->bin.'/sed', "#!/bin/sh\nexit 1\n");
+    chmod($this->bin.'/sed', 0755);
+
+    $result = emwinShRun($this, $file);
+
+    expect($result->exitCode())->toBe(0)
+        ->and(emwinShPosts($this))->toBe(['txt/kbox/stuck.txt'])
+        ->and(File::get($this->dir.'/logger.log'))->toContain('could not normalize the line endings of txt/kbox/stuck.txt')
+        ->and(File::get($file))->toBe("A\r\r\nB\r\r\n");
+});
+
+test('a file with an unsafe name is refused before it is touched', function () {
+    $file = $this->root.'/txt/kbox/we"ird.txt';
+    File::put($file, "A\r\r\nB\r\r\n");
+
+    emwinShRun($this, $file);
+
+    expect(emwinShPosts($this))->toBe([])
+        ->and(File::get($file))->toBe("A\r\r\nB\r\r\n");
+});
