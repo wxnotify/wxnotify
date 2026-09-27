@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Pipeline\ReplayIngestedProduct;
+use App\Filament\Admin\Resources\IngestedProducts\IngestedProductResource;
 use App\Filament\Admin\Resources\IngestedProducts\Pages\ListIngestedProducts;
 use App\Filament\Admin\Resources\IngestedProducts\Pages\ViewIngestedProduct;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
@@ -10,6 +11,7 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 
 use function Pest\Livewire\livewire;
 
@@ -219,4 +221,96 @@ test('a replay copy links back to its original on the view page and an ordinary 
 
     livewire(ViewIngestedProduct::class, ['record' => $original->id])
         ->assertDontSee('Replay of');
+});
+
+function paneProduct(array $overrides = []): IngestedProduct
+{
+    return IngestedProduct::factory()->create([
+        'cccc' => 'kbou', 'ttaaii' => 'wfus53', 'awipsid' => 'torbou', 'wmo_ddhhmm' => '191622', 'source' => 'nwws',
+        'text' => "WFUS53 KBOU 191622\nTORBOU\nTornado Warning for Boulder County",
+        ...$overrides,
+    ]);
+}
+
+test('the content pane shows a placeholder until a product is selected', function () {
+    paneProduct();
+
+    livewire(ListIngestedProducts::class)
+        ->assertSet('selectedProductId', null)
+        ->assertSee('Select a product below to view its contents');
+});
+
+test('clicking a row shows that product text and details in the pane', function () {
+    $product = paneProduct();
+    $other = paneProduct(['awipsid' => 'svrbou', 'text' => "WUUS53 KBOU 191700\nSVRBOU\nSevere Thunderstorm Warning"]);
+
+    livewire(ListIngestedProducts::class)
+        ->callAction(TestAction::make('select')->table($product))
+        ->assertSet('selectedProductId', $product->id)
+        ->assertDontSee('Select a product below to view its contents')
+        ->assertSee('Tornado Warning for Boulder County')
+        ->assertSee('KBOU')
+        ->assertSee('WFUS53')
+        ->assertSee('TORBOU')
+        ->assertDontSee('Severe Thunderstorm Warning')
+        ->callAction(TestAction::make('select')->table($other))
+        ->assertSee('Severe Thunderstorm Warning')
+        ->assertDontSee('Tornado Warning for Boulder County');
+});
+
+test('the selected product is preselected from the product query parameter', function () {
+    $product = paneProduct();
+
+    Livewire::withQueryParams(['product' => $product->id])
+        ->test(ListIngestedProducts::class)
+        ->assertSee('Tornado Warning for Boulder County');
+});
+
+test('an unknown or malformed product query parameter falls back to the placeholder', function (mixed $value) {
+    paneProduct();
+
+    Livewire::withQueryParams(['product' => $value])
+        ->test(ListIngestedProducts::class)
+        ->assertSee('Select a product below to view its contents');
+})->with(['unknown id' => 999999, 'not a number' => 'abc', 'injection' => '1 OR 1=1']);
+
+test('product text is escaped in the pane', function () {
+    $product = paneProduct(['text' => "Line one\n<script>alert(1)</script> & more"]);
+
+    livewire(ListIngestedProducts::class)
+        ->callAction(TestAction::make('select')->table($product))
+        ->assertSeeHtml('&lt;script&gt;alert(1)&lt;/script&gt; &amp; more')
+        ->assertDontSeeHtml('<script>alert(1)</script>');
+});
+
+test('the pane links to the full page and to the original of a replay copy', function () {
+    $original = paneProduct();
+    $copy = IngestedProduct::withoutEvents(fn () => paneProduct(['is_test' => true, 'replay_of_id' => $original->id]));
+
+    livewire(ListIngestedProducts::class)
+        ->callAction(TestAction::make('select')->table($copy))
+        ->assertSee('Open full page')
+        ->assertSeeHtml(IngestedProductResource::getUrl('view', ['record' => $copy]))
+        ->assertSee('Replay of')
+        ->assertSeeHtml(IngestedProductResource::getUrl('view', ['record' => $original]));
+});
+
+test('the selected product stays in the pane when the table is filtered', function () {
+    $real = paneProduct();
+    paneProduct(['is_test' => true, 'awipsid' => 'svrbou']);
+
+    livewire(ListIngestedProducts::class)
+        ->callAction(TestAction::make('select')->table($real))
+        ->filterTable('is_test', true)
+        ->assertCanNotSeeTableRecords([$real])
+        ->assertSee('Tornado Warning for Boulder County');
+});
+
+test('rows no longer have a view button and replay is still there', function () {
+    $product = paneProduct();
+
+    livewire(ListIngestedProducts::class)
+        ->assertTableActionDoesNotExist('view')
+        ->assertActionExists(TestAction::make('replay')->table($product))
+        ->assertActionExists(TestAction::make('select')->table($product));
 });

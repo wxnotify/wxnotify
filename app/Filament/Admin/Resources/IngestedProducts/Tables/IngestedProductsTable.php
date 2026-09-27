@@ -3,12 +3,12 @@
 namespace App\Filament\Admin\Resources\IngestedProducts\Tables;
 
 use App\Actions\Pipeline\ReplayIngestedProduct;
+use App\Filament\Admin\Resources\IngestedProducts\Pages\ListIngestedProducts;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\IngestedProduct;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
@@ -85,8 +85,16 @@ class IngestedProductsTable
                         ->when($data['from'] ?? null, fn (Builder $q, $date) => $q->whereDate('received_at', '>=', $date))
                         ->when($data['until'] ?? null, fn (Builder $q, $date) => $q->whereDate('received_at', '<=', $date))),
             ])
+            ->recordUrl(null)
+            ->recordAction('select')
+            ->recordClasses(fn (IngestedProduct $record, ListIngestedProducts $livewire): ?string => (string) $livewire->selectedProductId === (string) $record->getKey()
+                ? 'ingested-product-row-selected'
+                : null)
             ->recordActions([
-                ViewAction::make(),
+                Action::make('select')
+                    ->label('Show in pane')
+                    ->extraAttributes(['style' => 'display: none;'])
+                    ->action(fn (IngestedProduct $record, ListIngestedProducts $livewire) => $livewire->selectProduct($record->getKey())),
                 Action::make('replay')
                     ->label('Replay')
                     ->icon('heroicon-o-arrow-path')
