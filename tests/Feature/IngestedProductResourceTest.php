@@ -1,11 +1,13 @@
 <?php
 
+use App\Actions\Pipeline\ReplayIngestedProduct;
 use App\Filament\Admin\Resources\IngestedProducts\Pages\ListIngestedProducts;
 use App\Filament\Admin\Resources\IngestedProducts\Pages\ViewIngestedProduct;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\IngestedProduct;
 use App\Models\TestProductScenario;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 
@@ -133,4 +135,87 @@ test('the scenario link shows the scenario name, falling back to "Scenario #id" 
         ->assertSee("Scenario #{$unnamed->id}");
     livewire(ViewIngestedProduct::class, ['record' => $namedProduct->id])->assertSee('Squall line demo');
     livewire(ViewIngestedProduct::class, ['record' => $unnamedProduct->id])->assertSee("Scenario #{$unnamed->id}");
+});
+
+function replayCopyIds(): array
+{
+    return IngestedProduct::whereNotNull('replay_of_id')->orderBy('id')->pluck('replay_of_id')->all();
+}
+
+test('the replay row action creates a test copy and notifies', function () {
+    $product = IngestedProduct::factory()->create(['cccc' => 'ktwc']);
+
+    livewire(ListIngestedProducts::class)
+        ->callAction(TestAction::make('replay')->table($product))
+        ->assertNotified('Replayed 1 product to test accounts');
+
+    expect(IngestedProduct::where('replay_of_id', $product->id)->where('is_test', true)->count())->toBe(1);
+});
+
+test('the replay actions are hidden in production and a forged call does nothing', function () {
+    $product = IngestedProduct::factory()->create();
+    app()->instance('env', 'production');
+
+    livewire(ListIngestedProducts::class)
+        ->assertActionHidden(TestAction::make('replay')->table($product))
+        ->assertActionHidden(TestAction::make('replay')->table()->bulk());
+
+    expect(ReplayIngestedProduct::allowed())->toBeFalse();
+
+    livewire(ListIngestedProducts::class)
+        ->call('mountAction', 'replay', [], ['table' => true, 'recordKey' => (string) $product->id])
+        ->call('callMountedAction');
+
+    expect(IngestedProduct::whereNotNull('replay_of_id')->count())->toBe(0);
+});
+
+test('the bulk replay action replays the selected products oldest first', function () {
+    $newest = IngestedProduct::factory()->create(['received_at' => now()->subHour()]);
+    $oldest = IngestedProduct::factory()->create(['received_at' => now()->subDays(3)]);
+    $middle = IngestedProduct::factory()->create(['received_at' => now()->subDay()]);
+    $untouched = IngestedProduct::factory()->create();
+
+    livewire(ListIngestedProducts::class)
+        ->selectTableRecords([$newest->id, $oldest->id, $middle->id])
+        ->callAction(TestAction::make('replay')->table()->bulk())
+        ->assertNotified('Replayed 3 products to test accounts');
+
+    expect(replayCopyIds())->toBe([$oldest->id, $middle->id, $newest->id])
+        ->and(IngestedProduct::where('replay_of_id', $untouched->id)->exists())->toBeFalse();
+});
+
+test('the bulk replay action refuses more than 25 products and replays nothing', function () {
+    $products = IngestedProduct::factory()->count(26)->create();
+
+    livewire(ListIngestedProducts::class)
+        ->selectTableRecords($products->pluck('id')->all())
+        ->callAction(TestAction::make('replay')->table()->bulk())
+        ->assertNotified('Select 25 or fewer products to replay');
+
+    expect(IngestedProduct::whereNotNull('replay_of_id')->count())->toBe(0);
+});
+
+test('one product that cannot be replayed does not stop the rest', function () {
+    $first = IngestedProduct::factory()->create(['received_at' => now()->subDays(2)]);
+    $broken = IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create(['format' => 'cap', 'text' => 'not a cap document', 'received_at' => now()->subDay()]));
+    $last = IngestedProduct::factory()->create(['received_at' => now()->subHour()]);
+
+    livewire(ListIngestedProducts::class)
+        ->selectTableRecords([$first->id, $broken->id, $last->id])
+        ->callAction(TestAction::make('replay')->table()->bulk())
+        ->assertNotified('Replayed 2 products; 1 could not be replayed');
+
+    expect(replayCopyIds())->toBe([$first->id, $last->id]);
+});
+
+test('a replay copy links back to its original on the view page and an ordinary product does not', function () {
+    $original = IngestedProduct::factory()->create();
+    $copy = IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create(['is_test' => true, 'replay_of_id' => $original->id]));
+
+    livewire(ViewIngestedProduct::class, ['record' => $copy->id])
+        ->assertSee('Replay of')
+        ->assertSee("Product #{$original->id}");
+
+    livewire(ViewIngestedProduct::class, ['record' => $original->id])
+        ->assertDontSee('Replay of');
 });

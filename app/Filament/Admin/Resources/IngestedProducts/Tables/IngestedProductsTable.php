@@ -2,19 +2,31 @@
 
 namespace App\Filament\Admin\Resources\IngestedProducts\Tables;
 
+use App\Actions\Pipeline\ReplayIngestedProduct;
 use App\Filament\Admin\Resources\TestProductScenarios\TestProductScenarioResource;
 use App\Models\IngestedProduct;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Throwable;
 
 class IngestedProductsTable
 {
+    private const REPLAY_LIMIT = 25;
+
+    private const REPLAY_WARNING = 'This re-sends the product through the alert system as a test copy. Only test accounts receive it, and it creates duplicate alerts.';
+
     public static function configure(Table $table): Table
     {
         return $table
@@ -75,6 +87,67 @@ class IngestedProductsTable
             ])
             ->recordActions([
                 ViewAction::make(),
+                Action::make('replay')
+                    ->label('Replay')
+                    ->icon('heroicon-o-arrow-path')
+                    ->visible(fn (): bool => ReplayIngestedProduct::allowed())
+                    ->requiresConfirmation()
+                    ->modalHeading('Replay this product?')
+                    ->modalDescription(self::REPLAY_WARNING)
+                    ->action(fn (IngestedProduct $record) => self::replay(collect([$record]))),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('replay')
+                        ->label('Replay')
+                        ->icon('heroicon-o-arrow-path')
+                        ->visible(fn (): bool => ReplayIngestedProduct::allowed())
+                        ->requiresConfirmation()
+                        ->modalHeading('Replay the selected products?')
+                        ->modalDescription(self::REPLAY_WARNING)
+                        ->deselectRecordsAfterCompletion()
+                        ->action(fn (Collection $records) => self::replay($records)),
+                ]),
             ]);
+    }
+
+    /**
+     * @param  Collection<int, IngestedProduct>  $records
+     */
+    private static function replay(Collection $records): void
+    {
+        if ($records->count() > self::REPLAY_LIMIT) {
+            Notification::make()
+                ->title('Select '.self::REPLAY_LIMIT.' or fewer products to replay')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $replayed = 0;
+        $failed = 0;
+
+        foreach ($records->sortBy([['received_at', 'asc'], ['id', 'asc']]) as $product) {
+            try {
+                app(ReplayIngestedProduct::class)($product);
+                $replayed++;
+            } catch (Throwable $e) {
+                $failed++;
+                report($e);
+            }
+        }
+
+        $products = Str::plural('product', $replayed);
+
+        $notification = Notification::make();
+
+        if ($failed === 0) {
+            $notification->title("Replayed {$replayed} {$products} to test accounts")->success();
+        } else {
+            $notification->title("Replayed {$replayed} {$products}; {$failed} could not be replayed")->warning();
+        }
+
+        $notification->send();
     }
 }
