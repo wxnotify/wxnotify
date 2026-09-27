@@ -25,14 +25,17 @@ type Poster interface {
 }
 
 type Deps struct {
-	Fetcher    Fetcher
-	Poster     Poster // nil in image mode: files are written but nothing is posted
-	Store      *state.Store
-	Limits     unzip.Limits
-	StorageDir string
-	RelPrefix  string // "http" for text; the posted path is RelPrefix + "/" + name
-	TempDir    string
-	Log        *slog.Logger
+	Fetcher Fetcher
+	Poster  Poster // nil in image mode: files are written but nothing is posted
+	Store   *state.Store
+	Limits  unzip.Limits
+	// NormalizeLineEndings rewrites text members to single LF line endings as they are extracted; set
+	// for the text zip, never for images.
+	NormalizeLineEndings bool
+	StorageDir           string
+	RelPrefix            string // "http" for text; the posted path is RelPrefix + "/" + name
+	TempDir              string
+	Log                  *slog.Logger
 }
 
 // RunCycle performs one conditional download and processes the new products. It returns nil
@@ -57,9 +60,13 @@ func RunCycle(ctx context.Context, d Deps) error {
 		return nil
 	}
 
+	var extractOpts []unzip.Option
+	if d.NormalizeLineEndings {
+		extractOpts = append(extractOpts, unzip.NormalizeLineEndings())
+	}
 	written, skipped, err := unzip.Extract(tmp.Name(), d.StorageDir, d.Limits, func(name string) bool {
 		return !d.Store.Seen(name)
-	})
+	}, extractOpts...)
 	if err != nil {
 		return fmt.Errorf("unzip: %w", err)
 	}

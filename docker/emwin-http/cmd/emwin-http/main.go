@@ -104,14 +104,15 @@ func main() {
 		}
 
 		deps := runner.Deps{
-			Fetcher:    &fetch.Fetcher{Client: client, URL: cfg.URLFor(j.Zip), MaxBytes: env.MaxZipBytes},
-			Poster:     p,
-			Store:      store,
-			Limits:     limits,
-			StorageDir: j.StorageDir,
-			RelPrefix:  j.RelPrefix,
-			TempDir:    os.TempDir(),
-			Log:        log.With("zip", j.Zip),
+			Fetcher:              &fetch.Fetcher{Client: client, URL: cfg.URLFor(j.Zip), MaxBytes: env.MaxZipBytes},
+			Poster:               p,
+			Store:                store,
+			Limits:               limits,
+			NormalizeLineEndings: j.Text,
+			StorageDir:           j.StorageDir,
+			RelPrefix:            j.RelPrefix,
+			TempDir:              os.TempDir(),
+			Log:                  log.With("zip", j.Zip),
 		}
 
 		wg.Add(1)
@@ -147,6 +148,7 @@ type jobSpec struct {
 	StorageDir string
 	RelPrefix  string // empty when nothing is posted
 	Posts      bool
+	Text       bool   // a text zip: its members get single LF line endings
 	Name       string // health marker name
 }
 
@@ -155,7 +157,7 @@ func buildJobs(cfg config.Config, env config.Env) []jobSpec {
 	var jobs []jobSpec
 	if cfg.DownloadText {
 		cad, _ := cadence.ForZip(cfg.TextZip)
-		jobs = append(jobs, jobSpec{Zip: cfg.TextZip, Name: cfg.TextZip, Cadence: cad, StorageDir: cfg.StorageDir, RelPrefix: cfg.RelPrefix(), Posts: true})
+		jobs = append(jobs, jobSpec{Zip: cfg.TextZip, Name: cfg.TextZip, Cadence: cad, StorageDir: cfg.StorageDir, RelPrefix: cfg.RelPrefix(), Posts: true, Text: true})
 	}
 	if cfg.DownloadImages {
 		cad, _ := cadence.ForZip(cfg.ImageZip)

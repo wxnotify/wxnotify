@@ -15,7 +15,7 @@ func TestBuildJobsTextOnlyByDefault(t *testing.T) {
 		t.Fatalf("jobs = %+v", jobs)
 	}
 	j := jobs[0]
-	if j.Zip != "txtmin02.zip" || j.Cadence != 2*time.Minute || j.StorageDir != "/emwin-products/http" || j.RelPrefix != "http" || !j.Posts || j.Name != "txtmin02.zip" {
+	if j.Zip != "txtmin02.zip" || j.Cadence != 2*time.Minute || j.StorageDir != "/emwin-products/http" || j.RelPrefix != "http" || !j.Posts || !j.Text || j.Name != "txtmin02.zip" {
 		t.Fatalf("text job = %+v", j)
 	}
 }
@@ -28,7 +28,7 @@ func TestBuildJobsAddsAnImageJobThatDoesNotPost(t *testing.T) {
 		t.Fatalf("jobs = %+v", jobs)
 	}
 	img := jobs[1]
-	if img.Zip != "imgmin15.zip" || img.Cadence != 15*time.Minute || img.StorageDir != "/emwin-products/http-images" || img.RelPrefix != "" || img.Posts {
+	if img.Zip != "imgmin15.zip" || img.Cadence != 15*time.Minute || img.StorageDir != "/emwin-products/http-images" || img.RelPrefix != "" || img.Posts || img.Text {
 		t.Fatalf("image job = %+v", img)
 	}
 }

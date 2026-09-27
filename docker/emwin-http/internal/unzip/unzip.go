@@ -3,6 +3,7 @@ package unzip
 
 import (
 	"archive/zip"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -23,11 +24,39 @@ type Limits struct {
 
 var unsafeChars = regexp.MustCompile(`[^A-Za-z0-9._-]`)
 
+// crRunBeforeLF matches the carriage returns that precede a line feed. EMWIN text ends its lines
+// with CR CR LF, which reads as a blank line after every line.
+var crRunBeforeLF = regexp.MustCompile("\r+\n")
+
+// Option adjusts how Extract writes members.
+type Option func(*options)
+
+type options struct {
+	normalizeLineEndings bool
+}
+
+// NormalizeLineEndings makes Extract rewrite every member's line endings to a single LF before
+// the member is written, so a consumer never sees the doubled line breaks. Lone carriage returns
+// in the middle of a line are kept. Only for text zips: never use it for images or other binary
+// members.
+func NormalizeLineEndings() Option {
+	return func(o *options) { o.normalizeLineEndings = true }
+}
+
+func normalizeLineEndings(b []byte) []byte {
+	return bytes.TrimRight(crRunBeforeLF.ReplaceAll(b, []byte("\n")), "\r")
+}
+
 // Extract writes the wanted, safe members of the zip into destDir (flat). want receives the
 // sanitised name. Members with path separators or "..", directories, and empty or dotfile
 // names are skipped and reported. Limits are checked over every member before anything is
 // written and enforced again while copying; on any error nothing from this call remains.
-func Extract(zipPath, destDir string, limits Limits, want func(name string) bool) (written, skipped []string, err error) {
+func Extract(zipPath, destDir string, limits Limits, want func(name string) bool, opts ...Option) (written, skipped []string, err error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	r, err := zip.OpenReader(zipPath)
 	// Members with unsafe names make OpenReader return the reader together with
 	// zip.ErrInsecurePath; we skip those members ourselves, so carry on.
@@ -79,7 +108,7 @@ func Extract(zipPath, destDir string, limits Limits, want func(name string) bool
 		}
 
 		final := filepath.Join(destDir, name)
-		if err := copyMember(f, final, limits.MaxMemberBytes); err != nil {
+		if err := copyMember(f, final, limits.MaxMemberBytes, o.normalizeLineEndings); err != nil {
 			cleanup()
 			return nil, nil, err
 		}
@@ -104,7 +133,7 @@ func safeName(f *zip.File) (string, bool) {
 	return name, true
 }
 
-func copyMember(f *zip.File, final string, maxBytes int64) error {
+func copyMember(f *zip.File, final string, maxBytes int64, normalize bool) error {
 	in, err := f.Open()
 	if err != nil {
 		return fmt.Errorf("open member %q: %w", f.Name, err)
@@ -117,7 +146,13 @@ func copyMember(f *zip.File, final string, maxBytes int64) error {
 	}
 	tmpName := tmp.Name()
 
-	n, copyErr := io.Copy(tmp, io.LimitReader(in, maxBytes+1))
+	var n int64
+	var copyErr error
+	if normalize {
+		n, copyErr = writeNormalized(tmp, in, maxBytes)
+	} else {
+		n, copyErr = io.Copy(tmp, io.LimitReader(in, maxBytes+1))
+	}
 	closeErr := tmp.Close()
 
 	switch {
@@ -141,4 +176,19 @@ func copyMember(f *zip.File, final string, maxBytes int64) error {
 		return err
 	}
 	return nil
+}
+
+// writeNormalized reads the whole member (bounded by maxBytes+1), and writes it with normalised
+// line endings unless it breached the limit. It returns the raw size read, so the caller's limit
+// check is judged on the bytes the zip really held, not the shrunken text.
+func writeNormalized(w io.Writer, r io.Reader, maxBytes int64) (int64, error) {
+	data, err := io.ReadAll(io.LimitReader(r, maxBytes+1))
+	if err != nil {
+		return int64(len(data)), err
+	}
+	if int64(len(data)) > maxBytes {
+		return int64(len(data)), nil
+	}
+	_, err = w.Write(normalizeLineEndings(data))
+	return int64(len(data)), err
 }

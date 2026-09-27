@@ -215,3 +215,57 @@ func TestExtractSkipsDirectoryAndSymlinkMembers(t *testing.T) {
 		t.Fatalf("written=%v skipped=%v err=%v", written, skipped, err)
 	}
 }
+
+func TestExtractNormalizesLineEndingsWhenAsked(t *testing.T) {
+	zipPath := makeZip(t, map[string]string{
+		"a.txt": "L1\r\r\nL2\r\r\n\r\r\nL3\r\n",
+		"b.txt": "x\r\ry\r\r\nend\r",
+	})
+	dest := t.TempDir()
+
+	if _, _, err := Extract(zipPath, dest, generous, all, NormalizeLineEndings()); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, want := range map[string]string{
+		"a.txt": "L1\nL2\n\nL3\n",
+		"b.txt": "x\r\ry\nend",
+	} {
+		got, err := os.ReadFile(filepath.Join(dest, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != want {
+			t.Errorf("%s = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestExtractLeavesBytesAloneWithoutTheOption(t *testing.T) {
+	body := "L1\r\r\nL2\r\r\n\x00\x01binary\r\r\n"
+	dest := t.TempDir()
+
+	if _, _, err := Extract(makeZip(t, map[string]string{"a.png": body}), dest, generous, all); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := os.ReadFile(filepath.Join(dest, "a.png"))
+	if string(got) != body {
+		t.Fatalf("content changed without the option: %q", got)
+	}
+}
+
+func TestExtractLimitsApplyToTheRawSizeWhenNormalizing(t *testing.T) {
+	// 24 raw bytes shrink to 12 once normalized, but the limit is judged on what the zip declares.
+	raw := strings.Repeat("ab\r\r\n", 4) + "abcd"
+	dest := t.TempDir()
+
+	_, _, err := Extract(makeZip(t, map[string]string{"a.txt": raw}), dest, Limits{MaxMemberBytes: 15, MaxTotalBytes: 1 << 20, MaxMembers: 10}, all, NormalizeLineEndings())
+
+	if !errors.Is(err, ErrLimit) {
+		t.Fatalf("err = %v, want ErrLimit", err)
+	}
+	if got := listDir(t, dest); len(got) != 0 {
+		t.Fatalf("files left behind: %v", got)
+	}
+}

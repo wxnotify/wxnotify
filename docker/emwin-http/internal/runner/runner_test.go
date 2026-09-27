@@ -323,3 +323,53 @@ func TestLoopDoesNotSleepOrLogFailureOnShutdown(t *testing.T) {
 		t.Fatalf("shutdown logged as failure: %s", buf.String())
 	}
 }
+
+func zipWithBodies(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	for n, body := range files {
+		f, _ := w.Create(n)
+		io.WriteString(f, body)
+	}
+	w.Close()
+	return buf.Bytes()
+}
+
+func TestTextModeNormalizesLineEndingsBeforeTheFileIsWrittenAndPosted(t *testing.T) {
+	f := &fakeFetcher{zipBytes: zipWithBodies(t, map[string]string{"A.TXT": "WFUS53 KBOU 191622\r\r\nTORBOU\r\r\n\r\r\nBULLETIN\r\r\n"})}
+	p := &fakePoster{}
+	d, _ := newDeps(t, f, p)
+	d.NormalizeLineEndings = true
+
+	if err := RunCycle(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(d.StorageDir, "A.TXT"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "WFUS53 KBOU 191622\nTORBOU\n\nBULLETIN\n" {
+		t.Fatalf("stored = %q", got)
+	}
+	if len(p.posted) != 1 || p.posted[0] != "http/A.TXT" {
+		t.Fatalf("posted = %v", p.posted)
+	}
+}
+
+func TestImageModeNeverRewritesFileContents(t *testing.T) {
+	body := "\x89PNG\r\n\x1a\n\r\r\nraw"
+	f := &fakeFetcher{zipBytes: zipWithBodies(t, map[string]string{"IMG1.PNG": body})}
+	d, _ := newDeps(t, f, nil)
+	d.RelPrefix = ""
+
+	if err := RunCycle(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := os.ReadFile(filepath.Join(d.StorageDir, "IMG1.PNG"))
+	if string(got) != body {
+		t.Fatalf("image bytes changed: %q", got)
+	}
+}
