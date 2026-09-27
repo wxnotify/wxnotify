@@ -57,7 +57,7 @@ class AdminPanelProvider extends PanelProvider
                 CookieConsentPlugin::make(),
                 FilamentInactivityGuardPlugin::make(),
                 BugReportsPlugin::make()
-                    ->authorizeManagementUsing(fn (User $user): bool => $user->is_staff),
+                    ->authorizeManagementUsing(fn (User $user): bool => (bool) $user->is_staff),
                 FilamentSpatieLaravelHealthPlugin::make()
                     ->navigationGroup('System')
                     ->navigationSort(10)

@@ -5,6 +5,7 @@ use App\Settings\IntegrationSettings;
 use App\Support\ApplyEmailSettings;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Spatie\Health\Health;
 
 function setEmailSettings(array $values): void
 {
@@ -108,7 +109,10 @@ test('the app applies the email settings when it boots', function () {
     setEmailSettings(['email_mailer' => 'smtp']);
 
     // Re-running the provider's boot is enough to prove the wiring; re-registering its
-    // observers and listeners for the rest of this one test is harmless.
+    // observers and listeners for the rest of this one test is harmless. Spatie Health
+    // appends checks and rejects duplicate names, so the checks boot already registered
+    // are cleared first.
+    app(Health::class)->clearChecks();
     $this->app->getProvider(AppServiceProvider::class)->boot();
 
     expect(config('mail.default'))->toBe('smtp');

@@ -139,7 +139,7 @@ class DashboardPanelProvider extends PanelProvider
                     ->knowledgeBase(false)
                     ->serviceCatalog(false),
                 BugReportsPlugin::make()
-                    ->authorizeManagementUsing(fn (User $user): bool => $user->is_staff),
+                    ->authorizeManagementUsing(fn (User $user): bool => (bool) $user->is_staff),
             ])
             ->renderHook(
                 PanelsRenderHook::BODY_END,
