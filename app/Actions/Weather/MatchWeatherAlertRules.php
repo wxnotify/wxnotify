@@ -29,11 +29,28 @@ class MatchWeatherAlertRules
 {
     private const PRODUCT_MATCHED_CATEGORIES = [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc];
 
+    /**
+     * The catalog code for the one product Forecast Discussion rules mean: the office's Area
+     * Forecast Discussion. Subscribers only ever pick a WFO for this category (there is no
+     * product step in the wizard) precisely because it always means this single product --
+     * matching on WFO alone, with no product check at all, would instead match every product
+     * type that office issues.
+     */
+    private const FORECAST_DISCUSSION_PRODUCT_CODE = 'AFD';
+
     public function __invoke(IngestedProduct $product): void
     {
-        $categories = [AlertCategory::ForecastDiscussion];
+        $categories = [];
         if ($product->product_id !== null) {
             array_push($categories, ...self::PRODUCT_MATCHED_CATEGORIES);
+
+            if ($product->product?->code === self::FORECAST_DISCUSSION_PRODUCT_CODE) {
+                $categories[] = AlertCategory::ForecastDiscussion;
+            }
+        }
+
+        if ($categories === []) {
+            return;
         }
 
         try {

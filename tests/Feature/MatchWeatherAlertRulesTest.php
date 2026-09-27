@@ -91,17 +91,32 @@ test('a Wfo-mode rule for a different office never matches', function () {
     Queue::assertNotPushed(DeliverWeatherAlert::class);
 });
 
-test('a forecast discussion rule matches by wfo alone, with no product filter', function () {
+test('a forecast discussion rule matches the office\'s AFD, with no product picker needed', function () {
     Queue::fake();
+    $afd = Product::where('code', 'AFD')->sole();
     $rule = AlertRule::factory()->create([
         'category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'OKX', 'location_id' => null,
     ]);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
-    $ingested = createIngestedProductWithoutMatching(['product_id' => null, 'cccc' => 'KOKX']);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $afd->id, 'cccc' => 'KOKX']);
 
     (new MatchWeatherAlertRules)($ingested);
 
     Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a forecast discussion rule never matches a different product type from the same office', function () {
+    Queue::fake();
+    $rule = AlertRule::factory()->create([
+        'category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'BOU', 'location_id' => null,
+    ]);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    // A TAF from the same office never resolves a product_id (not a catalog crosswalk entry an AlertRule can target).
+    $taf = createIngestedProductWithoutMatching(['product_id' => null, 'awipsid' => 'tafbjc', 'cccc' => 'KBOU']);
+
+    (new MatchWeatherAlertRules)($taf);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
 });
 
 test('an inactive rule never matches', function () {
@@ -511,7 +526,8 @@ test('an is_test product only matches AlertRules belonging to a user flagged is_
     $testRule = AlertRule::factory()->for($testUser)->create(['category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'TWC', 'location_id' => null]);
     $testRule->notificationChannels()->attach($testChannel);
 
-    $ingestedProduct = createIngestedProductWithoutMatching(['cccc' => 'ktwc', 'is_test' => true]);
+    $afd = Product::where('code', 'AFD')->sole();
+    $ingestedProduct = createIngestedProductWithoutMatching(['product_id' => $afd->id, 'cccc' => 'ktwc', 'is_test' => true]);
 
     (new MatchWeatherAlertRules)($ingestedProduct);
 
@@ -526,7 +542,8 @@ test('a real (non-test) product matches every active subscriber as before, regar
     $rule = AlertRule::factory()->for($realUser)->create(['category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'TWC', 'location_id' => null]);
     $rule->notificationChannels()->attach($channel);
 
-    $ingestedProduct = createIngestedProductWithoutMatching(['cccc' => 'ktwc', 'is_test' => false]);
+    $afd = Product::where('code', 'AFD')->sole();
+    $ingestedProduct = createIngestedProductWithoutMatching(['product_id' => $afd->id, 'cccc' => 'ktwc', 'is_test' => false]);
 
     (new MatchWeatherAlertRules)($ingestedProduct);
 
