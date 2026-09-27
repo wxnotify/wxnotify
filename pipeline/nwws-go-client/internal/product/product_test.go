@@ -156,3 +156,32 @@ func TestProduct_SanitizesCCCC(t *testing.T) {
 		t.Errorf("Filename() = %q, contains unsafe path traversal characters from the raw CCCC", filename)
 	}
 }
+
+func TestNormalizeNewlines(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"doubled line endings collapse", "\n\n295\n\nSRUS53 KGID 270240\n\nHMLGID\n\n", "\n295\nSRUS53 KGID 270240\nHMLGID\n"},
+		{"a real blank line (doubled twice) survives as one", "a\n\n\n\nb", "a\n\nb"},
+		{"single newlines are left alone", "a\nb\nc", "a\nb\nc"},
+		{"odd run never merges lines", "a\n\n\nb", "a\n\nb"},
+		{"no newlines", "abc", "abc"},
+		{"empty", "", ""},
+	}
+	for _, c := range cases {
+		if got := normalizeNewlines(c.in); got != c.want {
+			t.Errorf("%s: normalizeNewlines(%q) = %q, want %q", c.name, c.in, got, c.want)
+		}
+	}
+}
+
+func TestParseMessage_CollapsesDoubledNewlines(t *testing.T) {
+	// NWS text products use \r\r\n line endings, which XML line-ending
+	// normalization turns into \n\n.
+	xmlStr := "<message><x xmlns=\"nwws-oi\" cccc=\"KGID\" ttaaii=\"SRUS53\" awipsid=\"HMLGID\" issue=\"2026-09-27T02:40:00Z\" id=\"1\">\n\n309\n\nSRUS53 KGID 270240\n\nHMLGID\n\n</x></message>"
+	p, err := ParseMessage(unmarshalMessage(t, xmlStr))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if want := "\n309\nSRUS53 KGID 270240\nHMLGID\n"; p.Text != want {
+		t.Errorf("Text = %q, want %q", p.Text, want)
+	}
+}

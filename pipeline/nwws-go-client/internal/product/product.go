@@ -80,8 +80,24 @@ func ParseMessage(msg stanza.Message) (Product, error) {
 		AWIPSID: ext.AWIPSID,
 		Issue:   issue.UTC(),
 		ID:      ext.ID,
-		Text:    ext.Text,
+		Text:    normalizeNewlines(ext.Text),
 	}, nil
+}
+
+var newlineRun = regexp.MustCompile(`\n+`)
+
+// normalizeNewlines undoes the line-ending doubling in NWS text products.
+// They terminate lines with \r\r\n, which XML line-ending normalization
+// (applied when the stanza is parsed) turns into \n\n, so every line of the
+// product arrives followed by an extra blank line. Each run of n newlines
+// becomes ceil(n/2): a doubled line ending collapses to one, a genuine blank
+// line (doubled twice, \n\n\n\n) survives as one, and a lone \n is never
+// dropped, which matters because CAP products carry an XML body that is
+// already single-spaced under a doubled WMO header.
+func normalizeNewlines(s string) string {
+	return newlineRun.ReplaceAllStringFunc(s, func(run string) string {
+		return strings.Repeat("\n", (len(run)+1)/2)
+	})
 }
 
 var idSanitizer = regexp.MustCompile(`[^A-Za-z0-9._-]`)
