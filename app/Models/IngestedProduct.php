@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -20,7 +21,7 @@ use Throwable;
     'headline', 'description', 'instruction', 'event_motion_description',
     'awips_identifier', 'wmo_identifier',
     'hazard', 'hazard_source', 'impact', 'locations_impacted', 'call_to_action',
-    'is_test', 'test_product_scenario_id',
+    'is_test', 'test_product_scenario_id', 'replay_of_id',
 ])]
 class IngestedProduct extends Model
 {
@@ -58,6 +59,16 @@ class IngestedProduct extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function replayOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replay_of_id');
+    }
+
+    public function replays(): HasMany
+    {
+        return $this->hasMany(self::class, 'replay_of_id');
     }
 
     public function scenario(): BelongsTo
