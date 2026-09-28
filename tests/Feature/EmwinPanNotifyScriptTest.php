@@ -22,7 +22,7 @@ function emwinShRun(object $t, string $file, array $extraEnv = []): ProcessResul
     return Process::path(base_path())->env($extraEnv + [
         'PATH' => $t->bin.':/usr/bin:/bin',
         'EMWIN_FILES_ROOT' => $t->root,
-        'EMWIN_WEBHOOK_URL' => 'http://laravel.test/api/pipeline/emwin-products',
+        'EMWIN_WEBHOOK_URL' => 'http://pipeline-api:8080/api/pipeline/emwin-products',
         'PIPELINE_WEBHOOK_TOKEN' => 'secret-token',
         'EMWIN_HEARTBEAT_FILE' => $t->dir.'/heartbeat',
     ])->run(['sh', 'docker/emwin-byteblaster/pan-notify.sh', $file]);

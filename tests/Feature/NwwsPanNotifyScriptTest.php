@@ -46,21 +46,21 @@ test('the script is valid POSIX sh', function () {
     expect(Process::path(base_path())->run(['sh', '-n', 'docker/nwws/pan-notify.sh'])->successful())->toBeTrue();
 });
 
-test('posts to the default laravel.test URL when NWWS_WEBHOOK_URL is unset', function () {
+test('posts to the default pipeline-api URL when NWWS_WEBHOOK_URL is unset', function () {
     $result = nwwsShRun($this, '/products/kbou/kbou_wfus53-torbou.191622_1.txt');
 
     expect($result->exitCode())->toBe(0)
         ->and(File::get($this->dir.'/curl.log'))
-        ->toContain('http://laravel.test/api/pipeline/nwws-products')
+        ->toContain('http://pipeline-api:8080/api/pipeline/nwws-products')
         ->toContain('Authorization: Bearer secret-token');
 });
 
 test('posts to NWWS_WEBHOOK_URL when set, stripping the /products/ prefix', function () {
     $result = nwwsShRun($this, '/products/kbou/kbou_wfus53-torbou.191622_1.txt', [
-        'NWWS_WEBHOOK_URL' => 'http://pipeline-api/api/pipeline/nwws-products',
+        'NWWS_WEBHOOK_URL' => 'http://pipeline-api.example.test/api/pipeline/nwws-products',
     ]);
 
     expect($result->exitCode())->toBe(0)
-        ->and(File::get($this->dir.'/curl.log'))->toContain('http://pipeline-api/api/pipeline/nwws-products')
+        ->and(File::get($this->dir.'/curl.log'))->toContain('http://pipeline-api.example.test/api/pipeline/nwws-products')
         ->and(nwwsShPosts($this))->toBe(['kbou/kbou_wfus53-torbou.191622_1.txt']);
 });

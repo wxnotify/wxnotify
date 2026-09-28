@@ -7,27 +7,38 @@ services:
     # just the dashboard (server-a) -- proving the alert engine (pipeline-api's
     # ingestion + matching, plus the queue/queue-heartbeat delivery workers,
     # all server-c) runs independently of it. server-a alone still needs
-    # server-b (laravel.test depends_on pgsql/redis) and server-c always needs
+    # server-b (front-end depends_on pgsql/redis) and server-c always needs
     # server-a reachable in a real deployment (its webhook target), so this is
     # a way to trim the pipeline out of a dashboard-only dev session, not true
     # single-server isolation -- see the "server-a" chat discussion.
-    laravel.test:
+    #
+    # front-end and pipeline-api both build docker/8.4's `web-development`
+    # target (fpm-nginx: real PHP-FPM + nginx, not artisan serve) and share
+    # one image tag so Compose builds it once; queue/queue-heartbeat build the
+    # separate `worker-development` target (cli: no nginx, no Node -- see
+    # docker/8.4/Dockerfile's own comments for why each role gets its own
+    # stage, and why AUTORUN_* stays off in this dev file). USER_ID/GROUP_ID
+    # build args replace Sail's runtime WWWUSER: serversideup's images match
+    # the container's www-data uid/gid to the host at BUILD time only
+    # (docker-php-serversideup-set-id) -- PUID/PGID env vars don't exist in
+    # these images.
+    front-end:
         build:
-            context: './docker/8.5'
+            context: './docker/8.4'
             dockerfile: Dockerfile
+            target: web-development
             args:
-                WWWGROUP: '${WWWGROUP}'
-        image: 'sail-8.5/app'
+                USER_ID: '${USER_ID:-1000}'
+                GROUP_ID: '${GROUP_ID:-1000}'
+        image: 'wxnotify-php/web:local'
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
-            - '${APP_PORT:-80}:80'
+            - '${APP_PORT:-80}:8080'
             - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
         environment:
-            WWWUSER: '${WWWUSER}'
-            LARAVEL_SAIL: 1
-            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
-            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+            XDEBUG_MODE: '${XDEBUG_MODE:-off}'
+            XDEBUG_CONFIG: '${XDEBUG_CONFIG:-client_host=host.docker.internal}'
             IGNITION_LOCAL_SITES_PATH: '${PWD}'
             PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
         volumes:
@@ -46,27 +57,28 @@ services:
             - server-a
     # The Alert Engine's ingestion entry point: serves only the /api/pipeline/*
     # webhook routes the feed clients below post to. Same image/codebase as
-    # laravel.test (no separate build), but its own process -- this is what
+    # front-end (no separate build), but its own process -- this is what
     # lets ingestion, matching, and queued delivery keep running with the
-    # dashboard (server-a) stopped entirely. `artisan serve` is a dev-only
-    # stand-in for a real route-restricted web server; see the chat design
-    # discussion on Tier 2 for why that's fine for now.
+    # dashboard (server-a) stopped entirely. Restricting nginx to just those
+    # routes (now that this is real nginx, not the artisan-serve stopgap the
+    # Sail image ran) is a deliberate follow-up, not done in this pass -- see
+    # the chat discussion on why that needed its own verification.
     pipeline-api:
         build:
-            context: './docker/8.5'
+            context: './docker/8.4'
             dockerfile: Dockerfile
+            target: web-development
             args:
-                WWWGROUP: '${WWWGROUP}'
-        image: 'sail-8.5/app'
+                USER_ID: '${USER_ID:-1000}'
+                GROUP_ID: '${GROUP_ID:-1000}'
+        image: 'wxnotify-php/web:local'
         container_name: wxnotify-pipeline-api
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         environment:
-            WWWUSER: '${WWWUSER}'
-            LARAVEL_SAIL: 1
             PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
         ports:
-            - '${PIPELINE_API_PORT:-8027}:80'
+            - '${PIPELINE_API_PORT:-8027}:8080'
         volumes:
             - '.:/var/www/html'
             - 'nwws-products:/products'
@@ -77,22 +89,20 @@ services:
             - pgsql
             - redis
             - mailpit
-        command: 'php artisan serve --host=0.0.0.0 --port=80'
         restart: unless-stopped
         profiles:
             - server-c
     queue:
         build:
-            context: './docker/8.5'
+            context: './docker/8.4'
             dockerfile: Dockerfile
+            target: worker-development
             args:
-                WWWGROUP: '${WWWGROUP}'
-        image: 'sail-8.5/app'
+                USER_ID: '${USER_ID:-1000}'
+                GROUP_ID: '${GROUP_ID:-1000}'
+        image: 'wxnotify-php/worker:local'
         extra_hosts:
             - 'host.docker.internal:host-gateway'
-        environment:
-            WWWUSER: '${WWWUSER}'
-            LARAVEL_SAIL: 1
         volumes:
             - '.:/var/www/html'
         networks:
@@ -101,22 +111,27 @@ services:
             - pgsql
             - redis
         command: 'php artisan queue:listen --tries=1'
+        stop_signal: SIGTERM
+        healthcheck:
+            test:
+                - CMD
+                - healthcheck-queue
+            start_period: 10s
         restart: unless-stopped
         profiles:
             - server-c
     queue-heartbeat:
         build:
-            context: './docker/8.5'
+            context: './docker/8.4'
             dockerfile: Dockerfile
+            target: worker-development
             args:
-                WWWGROUP: '${WWWGROUP}'
-        image: 'sail-8.5/app'
+                USER_ID: '${USER_ID:-1000}'
+                GROUP_ID: '${GROUP_ID:-1000}'
+        image: 'wxnotify-php/worker:local'
         container_name: wxnotify-queue-heartbeat
         extra_hosts:
             - 'host.docker.internal:host-gateway'
-        environment:
-            WWWUSER: '${WWWUSER}'
-            LARAVEL_SAIL: 1
         volumes:
             - '.:/var/www/html'
         networks:
@@ -125,6 +140,12 @@ services:
             - pgsql
             - redis
         command: 'php artisan queue:work --queue=heartbeat --tries=1'
+        stop_signal: SIGTERM
+        healthcheck:
+            test:
+                - CMD
+                - healthcheck-queue
+            start_period: 10s
         restart: unless-stopped
         profiles:
             - server-c
@@ -139,7 +160,7 @@ services:
             NWWS_ARCHIVEDIR: /products
             NWWS_PAN_RUN: /pan-notify.sh
             NWWS_RETRY: 'true'
-            NWWS_WEBHOOK_URL: 'http://pipeline-api/api/pipeline/nwws-products'
+            NWWS_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/nwws-products'
             PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
         volumes:
             - 'nwws-products:/products'
@@ -156,7 +177,7 @@ services:
             dockerfile: docker/glm-decoder/Dockerfile
         container_name: wxnotify-glm-decoder
         environment:
-            GLM_WEBHOOK_URL: 'http://pipeline-api/api/pipeline/glm-flashes'
+            GLM_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/glm-flashes'
             PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
         volumes:
             - 'glm-state:/state'
@@ -174,7 +195,7 @@ services:
         container_name: wxnotify-emwin-byteblaster
         environment:
             PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
-            EMWIN_WEBHOOK_URL: 'http://pipeline-api/api/pipeline/emwin-products'
+            EMWIN_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/emwin-products'
             EMWIN_SERVERS_REFRESH_HOURS: '${EMWIN_SERVERS_REFRESH_HOURS:-6}'
             EMWIN_MAX_UNZIP_BYTES: '${EMWIN_MAX_UNZIP_BYTES:-5242880}'
             EMWIN_RETENTION_DAYS: '${EMWIN_RETENTION_DAYS:-7}'
@@ -196,7 +217,7 @@ services:
         container_name: wxnotify-emwin-http
         environment:
             PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
-            EMWIN_WEBHOOK_URL: 'http://pipeline-api/api/pipeline/emwin-products'
+            EMWIN_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/emwin-products'
             EMWIN_HTTP_STATE_DIR: /state
             EMWIN_RETENTION_DAYS: '${EMWIN_RETENTION_DAYS:-7}'
         volumes:
@@ -258,7 +279,7 @@ services:
             POSTGRES_PASSWORD: '${DB_PASSWORD:-secret}'
         volumes:
             - 'sail-pgsql:/var/lib/postgresql'
-            - './vendor/laravel/sail/database/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql'
+            - './docker/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql'
         networks:
             - sail
         healthcheck:
@@ -312,7 +333,7 @@ services:
     #             - local
     #         retries: 3
     #         timeout: 5s
-    # No profile: both laravel.test (server-a) and pipeline-api (server-c)
+    # No profile: both front-end (server-a) and pipeline-api (server-c)
     # depend_on this directly, so it stays always-on regardless of which
     # profiles are active, rather than forcing "support" to be enabled
     # whenever either of those is.

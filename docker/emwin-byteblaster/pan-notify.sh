@@ -6,7 +6,7 @@
 set -u
 
 ROOT="${EMWIN_FILES_ROOT:-/var/npemwin/files}"
-WEBHOOK_URL="${EMWIN_WEBHOOK_URL:-http://laravel.test/api/pipeline/emwin-products}"
+WEBHOOK_URL="${EMWIN_WEBHOOK_URL:-http://pipeline-api:8080/api/pipeline/emwin-products}"
 MAX_BYTES="${EMWIN_MAX_UNZIP_BYTES:-5242880}"
 MAX_MEMBERS="${EMWIN_MAX_UNZIP_MEMBERS:-50}"
 HEARTBEAT="${EMWIN_HEARTBEAT_FILE:-/tmp/emwin-last-product}"

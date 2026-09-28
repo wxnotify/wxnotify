@@ -9,7 +9,7 @@ use RuntimeException;
 /**
  * Talks to the local Docker Engine API through a docker-socket-proxy
  * sidecar (see compose.yaml) that mounts the real socket itself and
- * exposes a restricted HTTP API — laravel.test never touches the raw
+ * exposes a restricted HTTP API — front-end never touches the raw
  * socket directly. Controls the fixed, known pipeline containers. Not a
  * general-purpose Docker client.
  */
