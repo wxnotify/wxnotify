@@ -234,26 +234,92 @@ test('no ping is queued when heartbeat is off, the feed url is blank, or the pat
     File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
 
     emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();
-    Bus::assertNothingDispatched();
+    // Not assertNothingDispatched(): a successful ingest now legitimately
+    // dispatches ProcessIngestedProduct too (see IngestNwwsProductControllerTest's
+    // equivalent) -- this test is specifically about the heartbeat ping never firing.
+    Bus::assertNotDispatched(SendHeartbeatPing::class);
 
     enableHeartbeatUrls();
     $settings = app(IntegrationSettings::class);
     $settings->heartbeat_emwin_url = null;
     $settings->save();
     emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();
-    Bus::assertNothingDispatched();
+    Bus::assertNotDispatched(SendHeartbeatPing::class);
 
     $settings->heartbeat_emwin_url = 'https://hc.example.test/ping/emwin';
     $settings->save();
     emwinApiPost($this, 'missing.txt')->assertNotFound();
-    Bus::assertNothingDispatched();
+    Bus::assertNotDispatched(SendHeartbeatPing::class);
 });
 
 test('a queueing failure never fails the ingest request', function () {
+    // Scoped to SendHeartbeatPing specifically, not every dispatch: since
+    // ProcessIngestedProduct started being dispatched from the same request
+    // (see IngestedProductObserver), a queueing failure there SHOULD fail the
+    // ingest request -- accepting the file without successfully queueing its
+    // processing would mark it seen and drop its matching forever, exactly
+    // the silent-drop-while-green scenario .ai/rules/emwin-http.md warns
+    // against. Only the heartbeat ping's own best-effort dispatch (see
+    // DispatchHeartbeatPing) is guaranteed never to fail ingestion.
     enableHeartbeatUrls();
-    $dispatcher = Mockery::mock(Dispatcher::class);
-    $dispatcher->shouldReceive('dispatch')->atLeast()->once()->andThrow(new RuntimeException('queue down'));
-    $this->instance(Dispatcher::class, $dispatcher);
+    // A decorator, not a full Mockery interface mock: Dispatcher has other
+    // methods (getCommandHandler, etc.) the framework calls internally while
+    // dispatching a real queued job, which a strict interface mock would
+    // reject as unexpected calls. Delegating everything except dispatch()
+    // keeps ProcessIngestedProduct's real dispatch working normally.
+    $this->instance(Dispatcher::class, new class(app(Dispatcher::class)) implements Dispatcher
+    {
+        public function __construct(private readonly Dispatcher $real) {}
+
+        public function dispatch($command)
+        {
+            if ($command instanceof SendHeartbeatPing) {
+                throw new RuntimeException('queue down');
+            }
+
+            return $this->real->dispatch($command);
+        }
+
+        public function dispatchSync($command, $handler = null)
+        {
+            return $this->real->dispatchSync($command, $handler);
+        }
+
+        public function dispatchNow($command, $handler = null)
+        {
+            return $this->real->dispatchNow($command, $handler);
+        }
+
+        public function dispatchAfterResponse($command, $handler = null)
+        {
+            return $this->real->dispatchAfterResponse($command, $handler);
+        }
+
+        public function chain($jobs = null)
+        {
+            return $this->real->chain($jobs);
+        }
+
+        public function hasCommandHandler($command)
+        {
+            return $this->real->hasCommandHandler($command);
+        }
+
+        public function getCommandHandler($command)
+        {
+            return $this->real->getCommandHandler($command);
+        }
+
+        public function pipeThrough(array $pipes)
+        {
+            return $this->real->pipeThrough($pipes);
+        }
+
+        public function map(array $map)
+        {
+            return $this->real->map($map);
+        }
+    });
     File::put($this->emwinRoot.'/delivered/kbou/a.txt', emwinApiWarning());
 
     emwinApiPost($this, 'delivered/kbou/a.txt')->assertNoContent();

@@ -64,7 +64,10 @@ function e2eDispatchedRuleIds(): array
 }
 
 test('a generated warning-family product matches the fixture test account and dispatches a real notification, never a real subscriber', function () {
-    Queue::fake();
+    // Only DeliverWeatherAlert is faked (captured for the assertions below) --
+    // ProcessIngestedProduct itself must still run for real, on the sync queue
+    // connection tests use, or matching would never happen at all.
+    Queue::fake([DeliverWeatherAlert::class]);
 
     $product = Product::where('code', 'SV.W')->sole();
     $testRule = e2eCreateRuleFor(true, $product, ['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'PAH']);
@@ -81,7 +84,7 @@ test('a generated warning-family product matches the fixture test account and di
 });
 
 test('a generated SPC mesoscale discussion parses its concatenated polygon and dispatches only to the fixture account', function () {
-    Queue::fake();
+    Queue::fake([DeliverWeatherAlert::class]);
 
     $product = Product::where('code', 'SPC.MD')->sole();
     $testRule = e2eCreateRuleFor(true, $product, ['category' => 'spc_wpc', 'matching_mode' => 'nationwide']);
@@ -115,7 +118,7 @@ test('a generated SPC mesoscale discussion parses its concatenated polygon and d
 });
 
 test('a generated plain-text AFD dispatches to the fixture account forecast-discussion rule, never a real subscriber', function () {
-    Queue::fake();
+    Queue::fake([DeliverWeatherAlert::class]);
 
     $product = Product::where('code', 'AFD')->sole();
     $testRule = e2eCreateRuleFor(true, null, ['category' => 'forecast_discussion', 'wfo' => 'PIH']);
@@ -134,7 +137,7 @@ test('a generated plain-text AFD dispatches to the fixture account forecast-disc
 });
 
 test('a continuing CAN scenario updates the same active_wwas row instead of creating a second one', function () {
-    Queue::fake();
+    Queue::fake([DeliverWeatherAlert::class]);
 
     $product = Product::where('code', 'SV.W')->sole();
     $first = TestProductScenario::factory()->for($product)->create(['input' => e2eWarningInput()]);
@@ -158,7 +161,7 @@ test('a continuing CAN scenario updates the same active_wwas row instead of crea
 });
 
 test('a real, non-test ingestion still reaches real subscribers and is not restricted to the fixture account', function () {
-    Queue::fake();
+    Queue::fake([DeliverWeatherAlert::class]);
 
     $product = Product::where('code', 'SV.W')->sole();
     $testRule = e2eCreateRuleFor(true, $product, ['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'PAH']);
@@ -180,7 +183,7 @@ test('a real, non-test ingestion still reaches real subscribers and is not restr
 });
 
 test('a synthetic product with no flagged fixture account dispatches nothing to anyone', function () {
-    Queue::fake();
+    Queue::fake([DeliverWeatherAlert::class]);
 
     $product = Product::where('code', 'SV.W')->sole();
     e2eCreateRuleFor(false, $product, ['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'PAH']);

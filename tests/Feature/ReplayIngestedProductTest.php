@@ -73,7 +73,10 @@ test('the copy never carries the original wmo header key so intake dedup only se
 });
 
 test('a replayed non-vtec product is delivered only to test account rules', function () {
-    Queue::fake();
+    // Only DeliverWeatherAlert is faked -- ProcessIngestedProduct itself must
+    // still run for real, on the sync queue connection tests use, or a replay
+    // would never actually reach MatchWeatherAlertRules.
+    Queue::fake([DeliverWeatherAlert::class]);
     $realRule = replayRule(User::factory()->create(['is_test_account' => false]), ['category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'TWC', 'location_id' => null]);
     $testRule = replayRule(User::factory()->create(['is_test_account' => true]), ['category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'TWC', 'location_id' => null]);
 
@@ -84,7 +87,10 @@ test('a replayed non-vtec product is delivered only to test account rules', func
 });
 
 test('a replayed vtec product is delivered only to test account rules and never writes active_wwas', function () {
-    Queue::fake();
+    // Only DeliverWeatherAlert is faked -- ProcessIngestedProduct itself must
+    // still run for real, on the sync queue connection tests use, or a replay
+    // would never actually reach MatchWeatherAlertRules.
+    Queue::fake([DeliverWeatherAlert::class]);
     $tornado = Product::where('code', 'TO.W')->sole();
     $realRule = replayRule(User::factory()->create(['is_test_account' => false]), ['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
     $realRule->products()->attach($tornado);

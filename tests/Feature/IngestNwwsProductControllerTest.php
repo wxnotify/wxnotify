@@ -2,6 +2,7 @@
 
 use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
+use App\Jobs\ProcessIngestedProduct;
 use App\Jobs\SendHeartbeatPing;
 use App\Models\IngestedProduct;
 use App\Models\PipelineDelivery;
@@ -219,6 +220,23 @@ test('a newly ingested product dispatches MatchWeatherAlertRules exactly once', 
     $spy->shouldHaveReceived('__invoke')->once();
 });
 
+test('a newly ingested product dispatches ProcessIngestedProduct onto the queue, not inline', function () {
+    Bus::fake();
+
+    File::ensureDirectoryExists($this->productsRoot.'/okx');
+    File::put($this->productsRoot.'/okx/okx_fxus61-afdokx.061800_1.txt', "AREA FORECAST DISCUSSION\n");
+
+    $this->postJson(
+        '/api/pipeline/nwws-products',
+        ['path' => 'okx/okx_fxus61-afdokx.061800_1.txt'],
+        ['Authorization' => 'Bearer test-webhook-token'],
+    )->assertNoContent();
+
+    $product = IngestedProduct::sole();
+
+    Bus::assertDispatched(ProcessIngestedProduct::class, fn (ProcessIngestedProduct $job) => $job->ingestedProductId === $product->id);
+});
+
 test('ingesting a CAP product runs the CAP extractor and persists its fields', function () {
     // FF.W is part of the real catalog seeded by the products table
     // migration (see ExtractProductMetadataTest) — no need to create it.
@@ -381,5 +399,8 @@ test('an nwws delivery queues no ping when heartbeat is off or the path is rejec
     enableNwwsHeartbeat();
     $this->postJson('/api/pipeline/nwws-products', ['path' => 'kkci/missing.txt'], ['Authorization' => 'Bearer test-webhook-token'])->assertNotFound();
 
-    Bus::assertNothingDispatched();
+    // Not assertNothingDispatched(): the first request still legitimately
+    // dispatches ProcessIngestedProduct (see the dedicated test above) --
+    // this test is specifically about the heartbeat ping never firing.
+    Bus::assertNotDispatched(SendHeartbeatPing::class);
 });

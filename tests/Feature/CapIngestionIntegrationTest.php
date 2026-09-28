@@ -37,7 +37,11 @@ afterEach(function () {
 });
 
 test('a real text-NEW, paired CAP, and text-continuation sequence produces one active_wwas row and correctly matches Polygon-mode subscribers on the continuation using the persisted polygon', function () {
-    Queue::fake();
+    // Only DeliverWeatherAlert is faked (captured for the assertion below) --
+    // ProcessIngestedProduct itself must still run for real, on the sync
+    // queue connection tests use, or none of SyncActiveWwa/MatchWeatherAlertRules
+    // below would actually execute.
+    Queue::fake([DeliverWeatherAlert::class]);
 
     // FF.W is part of the real catalog seeded by the products table
     // migration (see ExtractProductMetadataTest) -- no need to create it.
