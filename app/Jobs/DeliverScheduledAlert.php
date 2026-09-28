@@ -68,6 +68,7 @@ class DeliverScheduledAlert implements ShouldQueue
                 'channel_type' => $channel->channel_type,
                 'status' => 'skipped',
                 'error_detail' => 'The rule was deactivated after this delivery was dispatched.',
+                'subject' => $rule->displayName(),
                 'dispatched_at' => now(),
             ]);
 
@@ -87,6 +88,9 @@ class DeliverScheduledAlert implements ShouldQueue
             'rule' => $rule->name,
         ]);
 
+        // ingested_product_id stays null (the column's default): Threshold
+        // Alerts and Daily Weather Summary have no IngestedProduct behind
+        // them at all, per this job's own docblock.
         DeliveryLog::create([
             'alert_rule_id' => $rule->id,
             'notification_channel_id' => $channel->id,
@@ -94,6 +98,7 @@ class DeliverScheduledAlert implements ShouldQueue
             'channel_type' => $channel->channel_type,
             'status' => $result->success ? 'success' : 'failure',
             'error_detail' => $result->error,
+            'subject' => $title,
             'dispatched_at' => now(),
         ]);
     }

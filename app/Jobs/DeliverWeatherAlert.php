@@ -97,7 +97,7 @@ class DeliverWeatherAlert implements ShouldQueue
         }
 
         if (! $rule->is_active) {
-            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.');
+            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $product->product));
 
             return;
         }
@@ -112,7 +112,9 @@ class DeliverWeatherAlert implements ShouldQueue
         $maxLength = $templatedBody === null && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500;
         $body = $isEmailChannel ? $bodySource : Str::limit($bodySource, $maxLength, preserveWords: true);
 
-        $result = $dispatcher->send($channel, $body, app(RenderAlertSubject::class)($rule, $product->product), [
+        $subject = app(RenderAlertSubject::class)($rule, $product->product);
+
+        $result = $dispatcher->send($channel, $body, $subject, [
             'type' => 'alert',
             'rule' => $rule->name,
             'product' => $product->product?->name,
@@ -126,11 +128,19 @@ class DeliverWeatherAlert implements ShouldQueue
             'channel_type' => $channel->channel_type,
             'status' => $result->success ? 'success' : 'failure',
             'error_detail' => $result->error,
+            'subject' => $subject,
+            'ingested_product_id' => $product->id,
             'dispatched_at' => now(),
         ]);
     }
 
-    private function logSkipped(AlertRule $rule, NotificationChannel $channel, string $reason): void
+    /**
+     * $product/$subject are only available from the "rule deactivated" skip
+     * path (reached after $product is resolved) — the "rule/channel/product
+     * gone" paths have nothing to render a subject from, so both stay null
+     * there, and ingested_product_id (nullable) is simply omitted.
+     */
+    private function logSkipped(AlertRule $rule, NotificationChannel $channel, string $reason, ?IngestedProduct $product = null, ?string $subject = null): void
     {
         DeliveryLog::create([
             'alert_rule_id' => $rule->id,
@@ -139,6 +149,8 @@ class DeliverWeatherAlert implements ShouldQueue
             'channel_type' => $channel->channel_type,
             'status' => 'skipped',
             'error_detail' => $reason,
+            'subject' => $subject,
+            'ingested_product_id' => $product?->id,
             'dispatched_at' => now(),
         ]);
     }

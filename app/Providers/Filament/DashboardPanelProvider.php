@@ -6,6 +6,7 @@ use App\Actions\Support\GenerateChatwootIdentityHash;
 use App\Filament\Dashboard\Pages\Auth\EditProfile;
 use App\Filament\Dashboard\Pages\Auth\Register;
 use App\Filament\Dashboard\Widgets\AnnouncementsWidget;
+use App\Filament\Dashboard\Widgets\RecentAlertsWidget;
 use App\Http\Middleware\RedirectAdmins;
 use App\Models\User;
 use App\Support\MaintenanceModeGuard;
@@ -74,6 +75,7 @@ class DashboardPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Dashboard/Widgets'), for: 'App\Filament\Dashboard\Widgets')
             ->widgets([
                 AnnouncementsWidget::class,
+                RecentAlertsWidget::class,
                 // AccountWidget::class,
                 // FilamentInfoWidget::class,
             ])

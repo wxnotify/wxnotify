@@ -31,7 +31,9 @@ test('it delivers via apprise and writes a success DeliveryLog row', function ()
         ->and($log->error_detail)->toBeNull()
         ->and($log->alert_rule_id)->toBe($rule->id)
         ->and($log->notification_channel_id)->toBe($channel->id)
-        ->and($log->channel_type)->toBe($channel->channel_type);
+        ->and($log->channel_type)->toBe($channel->channel_type)
+        ->and($log->subject)->toBe($rule->displayName())
+        ->and($log->ingested_product_id)->toBe($product->id);
 });
 
 test('a non-delivery from apprise writes a failure DeliveryLog row instead of throwing', function () {
@@ -91,7 +93,10 @@ test('a missing product sends nothing but writes a skipped DeliveryLog row', fun
         ->and($log->error_detail)->not->toBeNull()
         ->and($log->alert_rule_id)->toBe($rule->id)
         ->and($log->notification_channel_id)->toBe($channel->id)
-        ->and($log->channel_type)->toBe($channel->channel_type);
+        ->and($log->channel_type)->toBe($channel->channel_type)
+        // No product was ever resolved on this path, so there's nothing to render a subject from.
+        ->and($log->subject)->toBeNull()
+        ->and($log->ingested_product_id)->toBeNull();
 });
 
 test('a deactivated rule sends nothing but writes a skipped DeliveryLog row', function () {
@@ -108,7 +113,10 @@ test('a deactivated rule sends nothing but writes a skipped DeliveryLog row', fu
         ->and($log->error_detail)->not->toBeNull()
         ->and($log->alert_rule_id)->toBe($rule->id)
         ->and($log->notification_channel_id)->toBe($channel->id)
-        ->and($log->channel_type)->toBe($channel->channel_type);
+        ->and($log->channel_type)->toBe($channel->channel_type)
+        // This path is reached after the product IS resolved, so both are available.
+        ->and($log->subject)->toBe($rule->displayName())
+        ->and($log->ingested_product_id)->toBe($product->id);
 });
 
 test('a custom subject template is used as the Apprise title instead of displayName()', function () {

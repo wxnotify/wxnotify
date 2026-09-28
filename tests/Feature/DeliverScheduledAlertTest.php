@@ -28,7 +28,11 @@ test('it delivers via apprise and writes a success DeliveryLog row', function ()
         ->and($log->error_detail)->toBeNull()
         ->and($log->alert_rule_id)->toBe($rule->id)
         ->and($log->notification_channel_id)->toBe($channel->id)
-        ->and($log->channel_type)->toBe($channel->channel_type);
+        ->and($log->channel_type)->toBe($channel->channel_type)
+        // Not "Daily summary" (the ignored passed-in title) -- see the
+        // "ignored default title" tests below for why displayName() wins.
+        ->and($log->subject)->toBe($rule->displayName())
+        ->and($log->ingested_product_id)->toBeNull();
 });
 
 test('a non-delivery from apprise writes a failure DeliveryLog row instead of throwing', function () {
@@ -54,7 +58,9 @@ test('a deactivated rule is skipped and logged rather than delivered', function 
 
     Http::assertNothingSent();
     $log = DeliveryLog::sole();
-    expect($log->status)->toBe('skipped');
+    expect($log->status)->toBe('skipped')
+        ->and($log->subject)->toBe($rule->displayName())
+        ->and($log->ingested_product_id)->toBeNull();
 });
 
 test('a missing rule sends nothing and logs a warning', function () {

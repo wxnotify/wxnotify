@@ -23,6 +23,7 @@ class DeliveryLogFactory extends Factory
             'channel_type' => 'discord',
             'status' => 'success',
             'error_detail' => null,
+            'subject' => fake()->sentence(4),
             'dispatched_at' => now(),
         ];
     }
