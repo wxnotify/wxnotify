@@ -25,7 +25,7 @@ class AlertTemplatesTable
                     ->formatStateUsing(fn (AlertCategory $state): string => $state->label()),
                 TextColumn::make('sections')
                     ->label('Sections')
-                    ->formatStateUsing(fn (AlertTemplate $record): string => $record->sections === null || $record->sections === []
+                    ->state(fn (AlertTemplate $record): string => $record->sections === null || $record->sections === []
                         ? '—'
                         : count($record->sections).' selected'),
                 TextColumn::make('created_at')

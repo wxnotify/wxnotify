@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AlertTemplateSection;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertTemplates\AlertTemplateResource;
 use App\Filament\Dashboard\Resources\AlertTemplates\Pages\CreateAlertTemplate;
@@ -73,6 +74,25 @@ test('the list only shows the current subscriber\'s own templates', function () 
     livewire(ListAlertTemplates::class)
         ->assertCanSeeTableRecords([$mine])
         ->assertCanNotSeeTableRecords([$someoneElses]);
+});
+
+test('the Sections column shows the count once, not once per selected section', function () {
+    // Regression test: the Sections column's ->state() closure returns a
+    // single "N selected" string. The old ->formatStateUsing() approach
+    // left the underlying state as the raw `sections` array, which
+    // Filament's TextColumn renders as one comma-separated value per
+    // array item -- reformatting (and duplicating) the count text once
+    // for every selected section instead of showing it once.
+    AlertTemplate::factory()->for($this->user)->create([
+        'category' => 'weather_alerts',
+        'sections' => array_column(AlertTemplateSection::cases(), 'value'),
+    ]);
+
+    $html = livewire(ListAlertTemplates::class)
+        ->assertSee('7 selected')
+        ->html();
+
+    expect(substr_count($html, '7 selected'))->toBe(1);
 });
 
 test('the list page explains what it\'s for', function () {
