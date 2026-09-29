@@ -40,6 +40,11 @@ test('a subscriber only sees their own alert rules', function () {
         ->assertCanNotSeeTableRecords([$someoneElses]);
 });
 
+test('the list page explains what it\'s for', function () {
+    livewire(ListAlertRules::class)
+        ->assertSee("Alerts you've set up to be notified about");
+});
+
 test('creating a threshold alert persists the rule and its channel', function () {
     livewire(CreateAlertRule::class)
         ->fillForm([

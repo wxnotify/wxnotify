@@ -14,6 +14,13 @@ use function Pest\Laravel\assertDatabaseHas;
 use function Pest\Laravel\assertDatabaseMissing;
 use function Pest\Livewire\livewire;
 
+test('the list page explains what it\'s for', function () {
+    $this->actingAs(User::factory()->create(['tier_override' => Tier::Plus]));
+
+    livewire(ListTraccarServers::class)
+        ->assertSee('Your own Traccar server connections');
+});
+
 test('a Plus subscriber can create a Traccar server that polls successfully', function () {
     $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $this->actingAs($user);

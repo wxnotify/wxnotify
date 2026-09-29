@@ -75,6 +75,11 @@ test('the list only shows the current subscriber\'s own templates', function () 
         ->assertCanNotSeeTableRecords([$someoneElses]);
 });
 
+test('the list page explains what it\'s for', function () {
+    livewire(ListAlertTemplates::class)
+        ->assertSee('Reusable message templates');
+});
+
 test('a Free-tier subscriber cannot access the resource at all', function () {
     $this->actingAs(User::factory()->create(['tier_override' => Tier::Free]));
 

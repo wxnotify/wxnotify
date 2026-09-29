@@ -2,12 +2,15 @@
 
 namespace App\Filament\Dashboard\Resources\TraccarServers\Pages;
 
+use App\Filament\Dashboard\Resources\Concerns\DescribesListPage;
 use App\Filament\Dashboard\Resources\TraccarServers\TraccarServerResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListTraccarServers extends ListRecords
 {
+    use DescribesListPage;
+
     protected static string $resource = TraccarServerResource::class;
 
     protected function getHeaderActions(): array
@@ -19,5 +22,10 @@ class ListTraccarServers extends ListRecords
                     ? null
                     : 'You\'ve reached your plan\'s Traccar server limit — upgrade to add more.'),
         ];
+    }
+
+    protected function pageDescription(): string
+    {
+        return 'Your own Traccar server connections, used to track a mobile location — a vehicle, for example — in real time, so an alert can follow it wherever it goes.';
     }
 }

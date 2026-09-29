@@ -27,6 +27,11 @@ test('a subscriber only sees their own locations', function () {
         ->assertCanNotSeeTableRecords([$someoneElses]);
 });
 
+test('the list page explains what it\'s for', function () {
+    livewire(ListLocations::class)
+        ->assertSee('Places you want alerts and forecasts tied to');
+});
+
 test('creating a location attaches it to the authenticated user', function () {
     livewire(CreateLocation::class)
         ->fillForm([

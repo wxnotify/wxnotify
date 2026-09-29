@@ -21,6 +21,11 @@ beforeEach(function () {
     chanFakePauser();
 });
 
+test('the list page explains what it\'s for', function () {
+    livewire(ListNotificationChannels::class)
+        ->assertSee('Where your alerts actually get delivered');
+});
+
 /**
  * The flat option fields the webhook edit form submits, so each test only has to
  * name what it is actually changing.
