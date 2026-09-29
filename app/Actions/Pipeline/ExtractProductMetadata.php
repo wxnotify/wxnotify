@@ -45,6 +45,7 @@ class ExtractProductMetadata
      */
     private const AWIPS_EXACT_CROSSWALK = [
         'swody1' => 'SPC.OUTLOOK',
+        'ptsdy1' => 'SPC.OUTLOOK',
         'swody2' => 'DY2',
         'swody3' => 'DY3',
         'swod48' => 'D48',
@@ -65,19 +66,37 @@ class ExtractProductMetadata
     private const CONVECTIVE_OUTLOOK_CODE = 'SPC.OUTLOOK';
 
     /**
-     * @return array{product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>, risk_levels: ?array<int, string>, vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int, vtec_action: ?string, vtec_begin: ?Carbon, vtec_end: ?Carbon, hazard: ?string, hazard_source: ?string, impact: ?string, locations_impacted: ?string, call_to_action: ?string}
+     * PTSDY1 ("Day 1 Convective Outlook Areal Outline") resolves to the same
+     * SPC.OUTLOOK catalog product as its paired narrative SWODY1 bulletin
+     * (so a subscriber only ever picks "SPC Convective Outlook" once), but
+     * is a structurally distinct product carrying the real per-risk-level
+     * polygon data SWODY1's prose never does — see extractCategoricalRiskAreas().
+     * App\Actions\Pipeline\BackfillOutlookRiskAreas is what actually merges
+     * the two bulletins into one matchable event rather than two.
+     */
+    private const CATEGORICAL_AREAL_AWIPS_ID = 'ptsdy1';
+
+    /**
+     * @return array{product_id: ?int, ugc_codes: ?array<int, string>, polygon: ?array<int, array{lat: float, lon: float}>, risk_levels: ?array<int, string>, risk_level_polygons: ?array<string, array<int, array{lat: float, lon: float}>>, vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int, vtec_action: ?string, vtec_begin: ?Carbon, vtec_end: ?Carbon, hazard: ?string, hazard_source: ?string, impact: ?string, locations_impacted: ?string, call_to_action: ?string}
      */
     public function __invoke(string $text, ?string $awipsid): array
     {
         [$productId, $code] = $this->resolveProduct($text, $awipsid);
         $vtec = (new ParseVtecString)($text);
         $narrative = (new ParseNarrativeSections)($text);
+        $isCategoricalAreal = $awipsid !== null && strtolower($awipsid) === self::CATEGORICAL_AREAL_AWIPS_ID;
+        $riskAreas = $isCategoricalAreal ? $this->extractCategoricalRiskAreas($text) : null;
 
         return [
             'product_id' => $productId,
             'ugc_codes' => $this->parseUgcCodes($text),
-            'polygon' => $this->parsePolygon($text),
-            'risk_levels' => $code === self::CONVECTIVE_OUTLOOK_CODE ? $this->extractConvectiveOutlookRiskLevels($text) : null,
+            'polygon' => $isCategoricalAreal ? null : $this->parsePolygon($text),
+            'risk_levels' => match (true) {
+                $isCategoricalAreal => array_keys($riskAreas),
+                $code === self::CONVECTIVE_OUTLOOK_CODE => $this->extractConvectiveOutlookRiskLevels($text),
+                default => null,
+            },
+            'risk_level_polygons' => $riskAreas,
             'vtec_office' => $vtec['office'] ?? null,
             'vtec_phenomenon' => $vtec['phenomenon'] ?? null,
             'vtec_significance' => $vtec['significance'] ?? null,
@@ -160,6 +179,50 @@ class ExtractProductMetadata
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * PTSDY1's "CATEGORICAL OUTLOOK POINTS DAY 1" section lists one
+     * combined-token coordinate ring per named risk level (MDT/ENH/SLGT/
+     * MRGL/HIGH), each starting on its own labeled line and continuing
+     * (indented, unlabeled) until the next labeled line, a blank line, or
+     * the section's closing "&&" -- confirmed against a real captured
+     * bulletin (2024-04-27 1257Z; see decodeCombinedToken()'s docblock for
+     * the coordinate format itself, verified against this same bulletin).
+     * TSTM (general thunderstorm, below Marginal) and SIGN (a "significant
+     * severe" probability overlay, not a risk level) both appear in this
+     * section too but neither is one of the named categories
+     * Product::risk_level_options tracks, so neither is collected.
+     *
+     * @return array<string, array<int, array{lat: float, lon: float}>>
+     */
+    private function extractCategoricalRiskAreas(string $text): array
+    {
+        $labels = ['MDT' => 'Moderate', 'ENH' => 'Enhanced', 'SLGT' => 'Slight', 'MRGL' => 'Marginal', 'HIGH' => 'High'];
+        $areas = [];
+        $currentLevel = null;
+
+        foreach (preg_split('/\r\n|\r|\n/', $text) as $line) {
+            $trimmed = trim($line);
+
+            if (preg_match('/^(MDT|ENH|SLGT|MRGL|HIGH)\b(.*)$/', $trimmed, $matches)) {
+                $currentLevel = $labels[$matches[1]];
+                $areas[$currentLevel] ??= [];
+                $trimmed = trim($matches[2]);
+            } elseif (preg_match('/^(TSTM|SIGN)\b/', $trimmed) || $trimmed === '' || $trimmed === '&&') {
+                $currentLevel = null;
+
+                continue;
+            } elseif ($currentLevel === null || ! preg_match('/^\d/', $trimmed)) {
+                continue;
+            }
+
+            if ($currentLevel !== null && preg_match_all('/\d{8}/', $trimmed, $matches)) {
+                array_push($areas[$currentLevel], ...array_map(self::decodeCombinedToken(...), $matches[0]));
+            }
+        }
+
+        return array_filter($areas, fn (array $points): bool => count($points) >= 3);
     }
 
     /**
@@ -272,28 +335,41 @@ class ExtractProductMetadata
 
     /**
      * Decodes one combined lat/lon token: the first 4 digits are latitude
-     * (decimal after 2, as usual), the rest is longitude. A 4-digit
-     * remainder always represents a longitude >= 100 degrees with its
-     * leading "1" digit dropped -- confirmed against this repo's own real
-     * SPC MCD fixture (database/product_examples/SWO.txt: token "33311429"
-     * only decodes to a real Arizona/Nevada/California-border coordinate,
-     * matching that MD's own "AREAS AFFECTED...CENTRAL/SOUTHERN AZ...FAR
-     * ERN CA...FAR SRN NV" text, if the longitude half is read as "114.29"
-     * rather than "14.29"). Built from a single real confirmed example --
-     * if a real MD/MPD example is ever found using a different convention,
-     * this needs revisiting, not guessed at further.
+     * (decimal after 2, as usual); the remaining 4 digits are longitude,
+     * ALWAYS read directly (decimal after 2) -- never with a leading "1"
+     * blindly prepended. That prior rule was reverse-engineered from a
+     * single fixture (database/product_examples/SWO.txt's real Arizona MD,
+     * token "33311429") where the true longitude genuinely is >= 100
+     * degrees (114.29), and prepending "1" happened to fix that one case.
+     * It silently breaks for a longitude < 100 -- confirmed against a real
+     * PTSDY1 (SPC Day 1 Outlook Areal Outline) bulletin's own categorical
+     * risk-area coordinates: token "32959919" decodes correctly, directly,
+     * to (32.95, -99.19) -- almost exactly between Abilene and Wichita
+     * Falls, TX, matching that same bulletin's own "...TO THE RIGHT OF A
+     * LINE FROM 45 NE ABI 65 WSW SPS..." text -- while prepending "1"
+     * produces an impossible -199.19.
+     *
+     * The actual rule: decode the 4-digit remainder directly; if that
+     * yields a magnitude under 60 (no real CONUS longitude is ever that
+     * small -- Maine, the easternmost point, is ~67), the source must have
+     * dropped a leading "1" digit from a true value >= 100, so restore it.
+     * A genuine < 100 value (the common case east of the Rockies -- the
+     * Great Plains/Midwest/South are almost entirely in the 90s) and a
+     * genuine >= 100 value transmitted this way (114.29 minus its dropped
+     * leading digit lands at 14.29) can never collide in that gap; both
+     * real fixtures above decode correctly, ring-wide, against this rule.
      *
      * @return array{lat: float, lon: float}
      */
     private static function decodeCombinedToken(string $token): array
     {
         $lat = substr($token, 0, 4);
-        $lonDigits = substr($token, 4);
-        $lon = strlen($lonDigits) === 4 ? '1'.$lonDigits : $lonDigits;
+        $lonDirect = self::decodeCoordinatePart(substr($token, 4));
+        $lon = $lonDirect < 60 ? self::decodeCoordinatePart('1'.substr($token, 4)) : $lonDirect;
 
         return [
             'lat' => self::decodeCoordinatePart($lat),
-            'lon' => -self::decodeCoordinatePart($lon),
+            'lon' => -$lon,
         ];
     }
 

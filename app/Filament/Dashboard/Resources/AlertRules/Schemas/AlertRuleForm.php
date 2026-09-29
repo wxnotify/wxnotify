@@ -289,7 +289,7 @@ class AlertRuleForm
             ...self::productSections(Product::query()
                 ->whereIn('family', ['warning', 'watch', 'advisory', 'statement', 'informational', 'administrative', 'aviation'])
                 ->where('status', 'active')),
-            ...self::matchingModeFields(),
+            ...self::matchingModeFields(AlertCategory::WeatherAlerts),
         ];
     }
 
@@ -315,12 +315,24 @@ class AlertRuleForm
                     ->mapWithKeys(fn (string $level): array => [$level => $level])
                     ->all())
                 ->helperText('Leave all unchecked to receive every risk level for the products above.')
-                ->visible(fn (Get $get): bool => Product::query()
-                    ->whereIn('id', self::selectedProductIds($get))
-                    ->whereNotNull('risk_level_options')
-                    ->exists()),
-            ...self::matchingModeFields(),
+                ->visible(fn (Get $get): bool => self::hasRiskLevelProducts($get)),
+            ...self::matchingModeFields(AlertCategory::SpcWpc),
         ];
+    }
+
+    /**
+     * Shared by the risk_levels CheckboxList's own visibility above and
+     * matchingModeFields()'s SPC/WPC option set below, so both stay in
+     * lockstep: a rule only ever sees the RiskArea matching mode when it
+     * would also see the risk-level checkboxes that mode's threshold reads
+     * from.
+     */
+    protected static function hasRiskLevelProducts(Get $get): bool
+    {
+        return Product::query()
+            ->whereIn('id', self::selectedProductIds($get))
+            ->whereNotNull('risk_level_options')
+            ->exists();
     }
 
     /**
@@ -406,19 +418,42 @@ class AlertRuleForm
     }
 
     /**
+     * Weather Alerts gets all 5 modes, unchanged. SPC/WPC never offers
+     * Location/WFO/County-Zone at all -- SPC/WPC always issues from the
+     * same two offices nationwide, so they're meaningless there -- and
+     * swaps Polygon for RiskArea (or keeps Polygon) depending on whether
+     * the products selected in the step above actually carry categorical
+     * risk levels (see hasRiskLevelProducts()): RiskArea's threshold reads
+     * risk_levels, which only exists for those products, while a plain
+     * event-type SPC/WPC product (Mesoscale Discussion, WPC MPD) has a
+     * real single polygon of its own that Polygon mode already matches
+     * correctly. Known minor gap: switching which products are selected
+     * within the SAME spc_wpc rule, after matching_mode is already set,
+     * can leave a no-longer-offered mode selected with nothing shown
+     * checked -- narrow enough (it needs a product-set change, not just a
+     * category change, which existing dynamic-step patterns already don't
+     * carry state across) not to chase further here.
+     *
      * @return array<Component>
      */
-    protected static function matchingModeFields(): array
+    protected static function matchingModeFields(AlertCategory $category): array
     {
+        $allowedModes = fn (Get $get): array => match ($category) {
+            AlertCategory::SpcWpc => self::hasRiskLevelProducts($get)
+                ? [MatchingMode::Nationwide, MatchingMode::RiskArea]
+                : [MatchingMode::Nationwide, MatchingMode::Polygon],
+            default => MatchingMode::cases(),
+        };
+
         return [
             Radio::make('matching_mode')
                 ->label('Matching mode')
-                ->options(collect(MatchingMode::cases())->mapWithKeys(fn (MatchingMode $m) => [$m->value => $m->label()]))
-                ->descriptions(collect(MatchingMode::cases())->mapWithKeys(fn (MatchingMode $m) => [$m->value => $m->helperText()]))
+                ->options(fn (Get $get): array => collect($allowedModes($get))->mapWithKeys(fn (MatchingMode $m) => [$m->value => $m->label()])->all())
+                ->descriptions(fn (Get $get): array => collect($allowedModes($get))->mapWithKeys(fn (MatchingMode $m) => [$m->value => $m->helperText()])->all())
                 ->required()
                 ->live(),
             self::locationSelect()
-                ->visible(fn (Get $get): bool => in_array($get('matching_mode'), [MatchingMode::Location->value, MatchingMode::Polygon->value], true)),
+                ->visible(fn (Get $get): bool => in_array($get('matching_mode'), [MatchingMode::Location->value, MatchingMode::Polygon->value, MatchingMode::RiskArea->value], true)),
             self::wfoField()
                 ->visible(fn (Get $get): bool => $get('matching_mode') === MatchingMode::Wfo->value),
             self::countyZoneStateField()

@@ -123,6 +123,21 @@ class MatchWeatherAlertRules
 
         $rule->notificationChannels->each(function (NotificationChannel $channel) use ($rule, $product, $suppressed): void {
             try {
+                // A backfilled SPC Convective Outlook row (see
+                // App\Actions\Pipeline\BackfillOutlookRiskAreas) gets
+                // re-matched once PTSDY1 enriches it with real risk-level
+                // geometry -- every other product is only ever matched
+                // once, so this is a no-op query there. Guards against a
+                // rematch re-delivering (or re-logging a repeat "suppressed"
+                // row for) a rule/channel/product combination that already
+                // got a real DeliveryLog row on an earlier pass.
+                if (DeliveryLog::where('alert_rule_id', $rule->id)
+                    ->where('notification_channel_id', $channel->id)
+                    ->where('ingested_product_id', $product->id)
+                    ->exists()) {
+                    return;
+                }
+
                 if ($suppressed) {
                     DeliveryLog::create([
                         'alert_rule_id' => $rule->id,
@@ -130,6 +145,8 @@ class MatchWeatherAlertRules
                         'user_id' => $rule->user_id,
                         'channel_type' => $channel->channel_type,
                         'status' => 'suppressed',
+                        'subject' => app(RenderAlertSubject::class)($rule, $product->product),
+                        'ingested_product_id' => $product->id,
                         'dispatched_at' => now(),
                     ]);
 
@@ -160,6 +177,7 @@ class MatchWeatherAlertRules
             MatchingMode::Location => $this->matchesLocationZones($rule, $product),
             MatchingMode::CountyZone => $this->matchesCountyZone($rule, $product),
             MatchingMode::Polygon => $this->matchesPolygon($rule, $product) ?? $this->matchesLocationZones($rule, $product),
+            MatchingMode::RiskArea => $this->matchesRiskArea($rule, $product) ?? $this->matchesLocationZones($rule, $product),
             null => false,
         };
     }
@@ -257,6 +275,63 @@ class MatchWeatherAlertRules
         );
 
         return $this->resultIsTrue($result);
+    }
+
+    /**
+     * "At or above" a threshold, not "exactly the checked level(s)": the
+     * threshold is the LOWEST-ranked level among the rule's own risk_levels
+     * selection (rank = position in Product::risk_level_options, already
+     * ordered low-to-high in the seed data) -- checking "Moderate" also
+     * matches a High-risk area, mirroring how these outlooks are actually
+     * read. An empty/null risk_levels means "every level" (rank 0), matching
+     * matchesRiskLevel()'s own "leave unchecked for every risk level" text.
+     *
+     * Returns null (not false) -- same contract as matchesPolygon() -- when
+     * the triggering product carries no risk_level_polygons at all: every
+     * SPC/WPC product except the Convective Outlook's own PTSDY1-enriched
+     * row (see App\Actions\Pipeline\BackfillOutlookRiskAreas) has none, so
+     * this falls back to matchesPolygon() itself in that case -- which
+     * inherits its own fallback to matchesLocationZones() -- rather than
+     * silently never matching a rule that mixes a risk-area product with a
+     * plain event-type one.
+     */
+    private function matchesRiskArea(AlertRule $rule, IngestedProduct $product): ?bool
+    {
+        if ($product->risk_level_polygons === null || $product->risk_level_polygons === []) {
+            return $this->matchesPolygon($rule, $product);
+        }
+
+        if ($rule->location === null || ! $rule->location->hasFix()) {
+            return null;
+        }
+
+        $order = $product->product?->risk_level_options ?? [];
+        $selectedRanks = collect($rule->risk_levels ?? [])
+            ->map(fn (string $level): int|false => array_search($level, $order, true))
+            ->filter(fn (int|false $rank): bool => $rank !== false);
+        $thresholdRank = $selectedRanks->isEmpty() ? 0 : $selectedRanks->min();
+
+        $lng = (float) $rule->location->lng;
+        $lat = (float) $rule->location->lat;
+
+        foreach ($product->risk_level_polygons as $level => $points) {
+            $rank = array_search($level, $order, true);
+
+            if ($rank === false || $rank < $thresholdRank || count($points) < 3) {
+                continue;
+            }
+
+            $result = DB::selectOne(
+                'SELECT ST_Contains(ST_SetSRID(ST_GeomFromText(?), 4269), ST_SetSRID(ST_MakePoint(?, ?), 4269)) AS contains',
+                [$this->polygonToWkt($points), $lng, $lat],
+            );
+
+            if ($this->resultIsTrue($result)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

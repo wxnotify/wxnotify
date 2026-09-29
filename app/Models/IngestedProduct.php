@@ -14,7 +14,7 @@ use Throwable;
 
 #[Fillable([
     'cccc', 'ttaaii', 'awipsid', 'nwws_id', 'wmo_ddhhmm', 'text', 'file_path', 'source', 'wmo_header_key', 'received_at',
-    'product_id', 'ugc_codes', 'polygon', 'risk_levels',
+    'product_id', 'ugc_codes', 'polygon', 'risk_levels', 'risk_level_polygons',
     'vtec_office', 'vtec_phenomenon', 'vtec_significance', 'vtec_event_number', 'vtec_year',
     'vtec_action', 'vtec_begin', 'vtec_end',
     'format', 'msg_type', 'event', 'severity', 'urgency', 'certainty',
@@ -35,6 +35,7 @@ class IngestedProduct extends Model
             'ugc_codes' => 'array',
             'polygon' => 'array',
             'risk_levels' => 'array',
+            'risk_level_polygons' => 'array',
             'vtec_begin' => 'datetime',
             'vtec_end' => 'datetime',
             'is_test' => 'boolean',

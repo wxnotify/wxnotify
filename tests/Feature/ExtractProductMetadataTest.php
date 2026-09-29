@@ -191,6 +191,27 @@ test('a concatenated 8-digit LAT...LON token (SPC MD/WPC MPD format) decodes cor
     ]);
 });
 
+test('a concatenated 8-digit token whose longitude is under 100 decodes directly, without the old +100 bug', function () {
+    // Real coordinates from a live PTSDY1 (SPC Day 1 Outlook Areal Outline)
+    // bulletin's MDT categorical risk area, 2024-04-27 1257Z -- the same
+    // bulletin's own text reads "...TO THE RIGHT OF A LINE FROM 45 NE ABI
+    // 65 WSW SPS..." (Abilene/Wichita Falls, TX), and the first point here
+    // decodes to (32.95, -99.19), almost exactly between them. Blindly
+    // adding 100 (the previous rule) would have produced an impossible
+    // -199.19 longitude.
+    $text = "LAT...LON 32959919 33449944 34229940 35029916 35889865\n";
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['polygon'])->toBe([
+        ['lat' => 32.95, 'lon' => -99.19],
+        ['lat' => 33.44, 'lon' => -99.44],
+        ['lat' => 34.22, 'lon' => -99.4],
+        ['lat' => 35.02, 'lon' => -99.16],
+        ['lat' => 35.88, 'lon' => -98.65],
+    ]);
+});
+
 test('a product with no LAT...LON line resolves no polygon', function () {
     $metadata = (new ExtractProductMetadata)("AREA FORECAST DISCUSSION\nNo polygon here.", null);
 
@@ -250,6 +271,28 @@ test('a Day 1 Convective Outlook with no risk statement extracts an empty (not n
     $metadata = (new ExtractProductMetadata)($text, 'swody1');
 
     expect($metadata['risk_levels'])->toBe([]);
+});
+
+test('PTSDY1 resolves to the same SPC.OUTLOOK product as SWODY1, and populates risk_level_polygons instead of risk_levels-by-text', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $text = file_get_contents(base_path('database/product_examples/PTSDY1.txt'));
+
+    $metadata = (new ExtractProductMetadata)($text, 'ptsdy1');
+
+    expect($metadata['product_id'])->toBe($outlook->id)
+        ->and($metadata['polygon'])->toBeNull()
+        ->and($metadata['risk_levels'])->toBe(['Moderate', 'Enhanced', 'Slight', 'Marginal'])
+        ->and($metadata['risk_level_polygons'])->toHaveKeys(['Moderate', 'Enhanced', 'Slight', 'Marginal'])
+        ->and($metadata['risk_level_polygons'])->not->toHaveKey('High')
+        // TSTM and SIGN are real labels in this section but neither is a
+        // named risk level Product::risk_level_options tracks.
+        ->not->toHaveKey('TSTM')
+        ->and($metadata['risk_level_polygons']['Moderate'][0])
+        // Real coordinates from this bulletin's own MDT area, confirmed
+        // against its "...TO THE RIGHT OF A LINE FROM 45 NE ABI 65 WSW
+        // SPS..." text (Abilene/Wichita Falls, TX) -- see
+        // decodeCombinedToken()'s docblock.
+        ->toBe(['lat' => 32.95, 'lon' => -99.19]);
 });
 
 test('a product other than the Day 1 Convective Outlook never attempts risk-level extraction', function () {

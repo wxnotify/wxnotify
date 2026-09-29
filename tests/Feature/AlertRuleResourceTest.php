@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\MatchingMode;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
@@ -194,6 +195,28 @@ test('creating an spc wpc rule persists the chosen risk levels', function () {
 
     expect($rule->risk_levels)->toBe(['Enhanced', 'Moderate', 'High'])
         ->and($rule->products->pluck('id')->all())->toBe([$outlook->id]);
+});
+
+test('an spc wpc rule for the Convective Outlook can use RiskArea matching mode against a saved location', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $location = Location::factory()->for($this->user)->create();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'spc_wpc',
+            'product_ids' => [$outlook->category->value => [$outlook->id]],
+            'risk_levels' => ['Moderate'],
+            'matching_mode' => 'risk_area',
+            'location_id' => $location->id,
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($rule->matching_mode)->toBe(MatchingMode::RiskArea)
+        ->and($rule->location_id)->toBe($location->id);
 });
 
 test('creating a lightning alert rejects a radius below the enforced minimum', function () {

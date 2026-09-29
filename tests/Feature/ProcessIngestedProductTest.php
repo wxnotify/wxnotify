@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Pipeline\BackfillOutlookRiskAreas;
 use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
 use App\Jobs\ProcessIngestedProduct;
@@ -44,5 +45,22 @@ test('a replay product is matched even when it carries a vtec_office, and never 
     (new ProcessIngestedProduct($replay->id))->handle();
 
     $matchSpy->shouldHaveReceived('__invoke')->once();
+    $syncSpy->shouldNotHaveReceived('__invoke');
+});
+
+test('a PTSDY1 product is routed to BackfillOutlookRiskAreas, not matched or synced directly', function () {
+    $backfillSpy = Mockery::spy(BackfillOutlookRiskAreas::class);
+    app()->instance(BackfillOutlookRiskAreas::class, $backfillSpy);
+    $matchSpy = Mockery::spy(MatchWeatherAlertRules::class);
+    app()->instance(MatchWeatherAlertRules::class, $matchSpy);
+    $syncSpy = Mockery::spy(SyncActiveWwa::class);
+    app()->instance(SyncActiveWwa::class, $syncSpy);
+
+    $product = IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create(['awipsid' => 'ptsdy1']));
+
+    (new ProcessIngestedProduct($product->id))->handle();
+
+    $backfillSpy->shouldHaveReceived('__invoke')->once();
+    $matchSpy->shouldNotHaveReceived('__invoke');
     $syncSpy->shouldNotHaveReceived('__invoke');
 });

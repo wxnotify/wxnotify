@@ -9,6 +9,7 @@ enum MatchingMode: string
     case Wfo = 'wfo';
     case CountyZone = 'county_zone';
     case Polygon = 'polygon';
+    case RiskArea = 'risk_area';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum MatchingMode: string
             self::Wfo => 'By issuing office (WFO)',
             self::CountyZone => 'By county/zone (UGC)',
             self::Polygon => 'By product polygon',
+            self::RiskArea => 'By risk area at my location',
         };
     }
 
@@ -29,6 +31,7 @@ enum MatchingMode: string
             self::Wfo => 'Follow everything a specific NWS office issues, independent of your own location.',
             self::CountyZone => 'Classic zone-based matching against NWS county/forecast-zone (UGC) codes.',
             self::Polygon => 'Point-in-polygon matching against the warning\'s actual geometry, for the highest precision available.',
+            self::RiskArea => 'Fires when your saved location falls inside the area for the risk level(s) you selected above, or anything more severe. Falls back to point-in-polygon matching for products with no categorical risk levels.',
         };
     }
 }

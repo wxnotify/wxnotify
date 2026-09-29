@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Pipeline\BackfillOutlookRiskAreas;
 use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
 use App\Models\IngestedProduct;
@@ -24,11 +25,14 @@ use Illuminate\Queue\SerializesModels;
  * reasoning: a product deleted between dispatch and processing is a no-op, not a
  * failed job.
  *
- * Branching mirrors IngestedProductObserver::created() exactly, since it replaces
- * that method's body verbatim — see .ai/rules/pipeline.md for why this order
- * matters: a replay copy must always go to MatchWeatherAlertRules and never to
- * SyncActiveWwa (replays never write active_wwas), checked before the general
- * vtec_office branch.
+ * Branching originally mirrored IngestedProductObserver::created() exactly (it
+ * replaced that method's body verbatim, which now just dispatches this job) and
+ * has since grown its own cases — see .ai/rules/pipeline.md for why the replay
+ * check still comes first: a replay copy must always go to MatchWeatherAlertRules
+ * and never to SyncActiveWwa (replays never write active_wwas). The ptsdy1 check
+ * comes next, before the general vtec_office branch, since PTSDY1 is neither a
+ * replay nor VTEC-tagged but still needs to skip both of those paths — see
+ * App\Actions\Pipeline\BackfillOutlookRiskAreas.
  */
 class ProcessIngestedProduct implements ShouldQueue
 {
@@ -53,6 +57,15 @@ class ProcessIngestedProduct implements ShouldQueue
         if ($product->replay_of_id !== null) {
             // A replay only exercises alert delivery, so it must not write active_wwas.
             app(MatchWeatherAlertRules::class)($product);
+
+            return;
+        }
+
+        if ($product->awipsid === 'ptsdy1') {
+            // The SPC Day 1 Outlook Areal Outline: merges into its paired
+            // SWODY1 event rather than independently matching -- see
+            // BackfillOutlookRiskAreas's own docblock for why.
+            app(BackfillOutlookRiskAreas::class)($product);
 
             return;
         }

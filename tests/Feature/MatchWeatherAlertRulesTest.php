@@ -239,7 +239,30 @@ test('a matched rule within its quiet hours window is suppressed and logged, not
     $log = DeliveryLog::sole();
     expect($log->status)->toBe('suppressed')
         ->and($log->alert_rule_id)->toBe($rule->id)
-        ->and($log->notification_channel_id)->toBe($channel->id);
+        ->and($log->notification_channel_id)->toBe($channel->id)
+        ->and($log->subject)->toBe($rule->displayName())
+        ->and($log->ingested_product_id)->toBe($ingested->id);
+});
+
+test('a rule that already has a DeliveryLog row for this exact product is never re-dispatched or re-logged (the PTSDY1-backfill rematch guard)', function () {
+    Queue::fake();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $rule->notificationChannels()->attach($channel);
+    $product = Product::where('code', 'TO.W')->sole();
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id]);
+    DeliveryLog::factory()->create([
+        'alert_rule_id' => $rule->id,
+        'notification_channel_id' => $channel->id,
+        'ingested_product_id' => $ingested->id,
+        'user_id' => $rule->user_id,
+        'channel_type' => $channel->channel_type,
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+    expect(DeliveryLog::count())->toBe(1);
 });
 
 test('a nationwide rule with quiet hours set always delivers, since it has no location to resolve a timezone from', function () {
@@ -366,6 +389,101 @@ test('a Polygon-mode rule falls back to Location-style zone matching when the pr
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'polygon' => null, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a RiskArea-mode rule matches a location inside a HIGHER risk level than the one selected', function () {
+    Queue::fake();
+    // Real seeded catalog product, with risk_level_options already ordered
+    // low-to-high: ["Marginal","Slight","Enhanced","Moderate","High"].
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $location = Location::factory()->create(['lat' => 34.5, 'lng' => -95.5]); // inside Moderate below
+    $rule = AlertRule::factory()->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'location_id' => $location->id,
+        'risk_levels' => ['Slight'],
+    ]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $outlook->id,
+        'risk_level_polygons' => [
+            'Slight' => [['lat' => 30, 'lon' => -100], ['lat' => 30, 'lon' => -90], ['lat' => 40, 'lon' => -90], ['lat' => 40, 'lon' => -100]],
+            'Moderate' => [['lat' => 33, 'lon' => -97], ['lat' => 33, 'lon' => -94], ['lat' => 36, 'lon' => -94], ['lat' => 36, 'lon' => -97]],
+        ],
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a RiskArea-mode rule does not match a location inside a LOWER risk level than the one selected', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $location = Location::factory()->create(['lat' => 31, 'lng' => -99]); // inside Slight only, not Moderate
+    $rule = AlertRule::factory()->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'location_id' => $location->id,
+        'risk_levels' => ['Moderate'],
+    ]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $outlook->id,
+        'risk_level_polygons' => [
+            'Slight' => [['lat' => 30, 'lon' => -100], ['lat' => 30, 'lon' => -90], ['lat' => 40, 'lon' => -90], ['lat' => 40, 'lon' => -100]],
+            'Moderate' => [['lat' => 33, 'lon' => -97], ['lat' => 33, 'lon' => -94], ['lat' => 36, 'lon' => -94], ['lat' => 36, 'lon' => -97]],
+        ],
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('a RiskArea-mode rule with no risk_levels selected matches inside any risk level\'s area', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $location = Location::factory()->create(['lat' => 31, 'lng' => -99]); // inside Slight only
+    $rule = AlertRule::factory()->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'location_id' => $location->id,
+        'risk_levels' => null,
+    ]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $outlook->id,
+        'risk_level_polygons' => [
+            'Slight' => [['lat' => 30, 'lon' => -100], ['lat' => 30, 'lon' => -90], ['lat' => 40, 'lon' => -90], ['lat' => 40, 'lon' => -100]],
+            'Moderate' => [['lat' => 33, 'lon' => -97], ['lat' => 33, 'lon' => -94], ['lat' => 36, 'lon' => -94], ['lat' => 36, 'lon' => -97]],
+        ],
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a RiskArea-mode rule falls back to plain polygon matching when the product has no risk_level_polygons', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $location = Location::factory()->create(['lat' => 40.5, 'lng' => -74.0]);
+    $rule = AlertRule::factory()->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'location_id' => $location->id,
+    ]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    // e.g. an SPC Mesoscale Discussion sharing this rule -- no risk levels at all.
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $outlook->id,
+        'risk_level_polygons' => null,
+        'polygon' => [
+            ['lat' => 40.0, 'lon' => -74.5], ['lat' => 41.0, 'lon' => -74.5],
+            ['lat' => 41.0, 'lon' => -73.5], ['lat' => 40.0, 'lon' => -73.5],
+        ],
+    ]);
 
     (new MatchWeatherAlertRules)($ingested);
 
