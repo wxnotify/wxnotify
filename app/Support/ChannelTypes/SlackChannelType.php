@@ -2,13 +2,15 @@
 
 namespace App\Support\ChannelTypes;
 
+use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Filament\Forms\Components\TextInput;
 
 class SlackChannelType implements ChannelType
 {
-    use UsesAppriseTransport;
+    use MasksDestinationSecrets, UsesAppriseTransport;
 
     public function slug(): string
     {
@@ -47,5 +49,14 @@ class SlackChannelType implements ChannelType
     public function countsTowardFreeSlot(): bool
     {
         return true;
+    }
+
+    public function displaySummary(NotificationChannel $record): string
+    {
+        if (! preg_match('#^slack://([\w-]+)/([\w-]+)/([\w-]+)/?$#', (string) $record->apprise_url, $matches)) {
+            return '—';
+        }
+
+        return self::maskLast4($matches[3]);
     }
 }

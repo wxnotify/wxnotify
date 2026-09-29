@@ -26,6 +26,28 @@ test('the list page explains what it\'s for', function () {
         ->assertSee('Where your alerts actually get delivered');
 });
 
+test('the Destination column tells apart two channels of the same type', function () {
+    // Regression: the table previously showed only Label/Type/Verified, so
+    // two Email channels with different labels were indistinguishable --
+    // there was no way to tell which address either one actually used.
+    NotificationChannel::factory()->for($this->user)->email('first@example.com')->create();
+    NotificationChannel::factory()->for($this->user)->email('second@example.com')->create();
+
+    livewire(ListNotificationChannels::class)
+        ->assertSee('first@example.com')
+        ->assertSee('second@example.com');
+});
+
+test('the Destination column never renders a webhook\'s signing secret', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->webhook('https://hooks.example.com/wx', 'super-secret-value')->create();
+
+    livewire(ListNotificationChannels::class)
+        ->assertSee('hooks.example.com')
+        ->assertDontSee('super-secret-value');
+
+    expect($channel->config['secret'])->toBe('super-secret-value');
+});
+
 /**
  * The flat option fields the webhook edit form submits, so each test only has to
  * name what it is actually changing.

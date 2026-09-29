@@ -12,6 +12,8 @@ use App\Support\ChannelTypes\PushoverChannelType;
 use App\Support\ChannelTypes\SlackChannelType;
 use App\Support\ChannelTypes\TeamsChannelType;
 use App\Support\ChannelTypes\TelegramChannelType;
+use App\Support\ChannelTypes\WebhookChannelType;
+use App\Support\ChannelTypes\WebPushChannelType;
 use Illuminate\Support\Facades\Validator;
 
 test('email keeps its address in config and sends through the mail transport', function () {
@@ -188,6 +190,85 @@ test('pushover only sends the emergency retry interval and expiry for emergency 
         ->toBe($base.'?priority=2&interval=60&expire=7200')
         ->and($type->buildAppriseUrl($pushoverBase + ['priority' => '1', 'retry_interval' => 60, 'expire' => 7200]))
         ->toBe($base.'?priority=1');
+});
+
+test('email\'s destination summary shows the full address -- it is not a secret', function () {
+    $record = NotificationChannel::factory()->email('subscriber@example.com')->make();
+
+    expect((new EmailChannelType)->displaySummary($record))->toBe('subscriber@example.com');
+});
+
+test('telegram\'s destination summary shows the chat id in full but never the bot token', function () {
+    $record = NotificationChannel::factory()->make(['apprise_url' => 'tgram://123%3AABC-token/-100123456']);
+
+    expect((new TelegramChannelType)->displaySummary($record))
+        ->toBe('Chat -100123456')
+        ->not->toContain('ABC-token');
+});
+
+test('discord\'s destination summary masks the webhook token to its last 4 characters', function () {
+    $record = NotificationChannel::factory()->make(['apprise_url' => 'discord://123456789/abcDEF-token_123/']);
+
+    expect((new DiscordChannelType)->displaySummary($record))
+        ->toBe('••••_123')
+        ->not->toContain('abcDEF');
+});
+
+test('slack\'s destination summary masks the final token to its last 4 characters', function () {
+    $record = NotificationChannel::factory()->make(['apprise_url' => 'slack://T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXWXYZ/']);
+
+    expect((new SlackChannelType)->displaySummary($record))
+        ->toBe('••••WXYZ')
+        ->not->toContain('T00000000');
+});
+
+test('teams\'s destination summary masks the signature to its last 4 characters', function () {
+    $record = NotificationChannel::factory()->make(['apprise_url' => 'workflows://prod-12.westus.logic.azure.com/0123456789abcdef0123456789abcdef/SIGNATUREabc-_123']);
+
+    expect((new TeamsChannelType)->displaySummary($record))
+        ->toBe('••••_123')
+        ->not->toContain('SIGNATURE');
+});
+
+test('pushover\'s destination summary masks the user key to its last 4 characters and never the api token', function () {
+    $record = NotificationChannel::factory()->make(['apprise_url' => 'pover://abcdefghijklmnopqrstuvwxyz1234@zyxwvutsrqponmlkjihgfedcba4321']);
+
+    expect((new PushoverChannelType)->displaySummary($record))
+        ->toBe('••••1234')
+        ->not->toContain('zyxwvutsrqponmlkjihgfedcba4321');
+});
+
+test('ntfy\'s destination summary masks the topic since it is functionally a shared secret', function () {
+    $public = NotificationChannel::factory()->make(['apprise_url' => 'ntfy://wxnotify-a1b2c3']);
+    $selfHosted = NotificationChannel::factory()->make(['apprise_url' => 'ntfys://ntfy.example.com/wxnotify-a1b2c3']);
+
+    expect((new NtfyChannelType)->displaySummary($public))->toBe('••••b2c3')
+        ->and((new NtfyChannelType)->displaySummary($selfHosted))->toBe('ntfy.example.com ••••b2c3');
+});
+
+test('webhook\'s destination summary shows only the host, never the path or the signing secret', function () {
+    $record = NotificationChannel::factory()->webhook('https://hooks.example.com/wx/secret-path?token=abc', 's3cret')->make();
+
+    expect((new WebhookChannelType)->displaySummary($record))
+        ->toBe('hooks.example.com')
+        ->not->toContain('secret-path')
+        ->not->toContain('token')
+        ->not->toContain('s3cret');
+});
+
+test('web push\'s destination summary shows only the push service host, never the auth keys', function () {
+    $record = NotificationChannel::factory()->webPush()->make();
+
+    expect((new WebPushChannelType)->displaySummary($record))
+        ->toBe('fcm.googleapis.com')
+        ->not->toContain(str_repeat('B', 87))
+        ->not->toContain(str_repeat('a', 22));
+});
+
+test('the registry resolves displaySummary through find() for every registered type', function () {
+    $record = NotificationChannel::factory()->email()->make();
+
+    expect(app(ChannelTypeRegistry::class)->find('email')?->displaySummary($record))->toBe('subscriber@example.com');
 });
 
 test('pushover validates device names, priority, sound and emergency bounds', function () {

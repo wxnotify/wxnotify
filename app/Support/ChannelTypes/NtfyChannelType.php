@@ -2,13 +2,15 @@
 
 namespace App\Support\ChannelTypes;
 
+use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Filament\Forms\Components\TextInput;
 
 class NtfyChannelType implements ChannelType
 {
-    use UsesAppriseTransport;
+    use MasksDestinationSecrets, UsesAppriseTransport;
 
     public function slug(): string
     {
@@ -58,5 +60,21 @@ class NtfyChannelType implements ChannelType
     public function countsTowardFreeSlot(): bool
     {
         return true;
+    }
+
+    /**
+     * The topic is masked, not shown in full: per its own helper text above,
+     * knowing it is enough to subscribe, so it functions as a shared secret.
+     */
+    public function displaySummary(NotificationChannel $record): string
+    {
+        if (! preg_match('#^ntfys?://(?:([^/]+)/)?([\w-]+)$#', (string) $record->apprise_url, $matches)) {
+            return '—';
+        }
+
+        $host = $matches[1] ?? '';
+        $masked = self::maskLast4($matches[2]);
+
+        return $host === '' ? $masked : "{$host} {$masked}";
     }
 }

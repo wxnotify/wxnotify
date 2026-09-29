@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes;
 
 use App\Enums\ChannelTransport;
+use App\Models\NotificationChannel;
 use App\Rules\SafeWebhookHeaders;
 use App\Rules\SafeWebhookProxyUrl;
 use App\Rules\SafeWebhookUrl;
@@ -329,5 +330,16 @@ class WebhookChannelType implements ChannelType
     public function isAvailable(): bool
     {
         return true;
+    }
+
+    /**
+     * The host only -- never the full URL (path/query may carry a token)
+     * and never config['secret'].
+     */
+    public function displaySummary(NotificationChannel $record): string
+    {
+        $host = parse_url((string) ($record->config['url'] ?? ''), PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? $host : '—';
     }
 }

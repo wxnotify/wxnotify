@@ -2,6 +2,8 @@
 
 namespace App\Support\ChannelTypes;
 
+use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Closure;
@@ -9,7 +11,7 @@ use Filament\Forms\Components\TextInput;
 
 class TeamsChannelType implements ChannelType
 {
-    use UsesAppriseTransport;
+    use MasksDestinationSecrets, UsesAppriseTransport;
 
     public function slug(): string
     {
@@ -87,5 +89,14 @@ class TeamsChannelType implements ChannelType
     public function countsTowardFreeSlot(): bool
     {
         return true;
+    }
+
+    public function displaySummary(NotificationChannel $record): string
+    {
+        if (! preg_match('#^workflows://[^/]+/[0-9a-f]{32}/(.+)$#i', (string) $record->apprise_url, $matches)) {
+            return '—';
+        }
+
+        return self::maskLast4($matches[1]);
     }
 }

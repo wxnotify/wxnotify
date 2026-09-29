@@ -32,6 +32,9 @@ class NotificationChannelsTable
                     ->label('Type')
                     ->formatStateUsing(fn (string $state): string => app(ChannelTypeRegistry::class)->find($state)?->label() ?? $state)
                     ->badge(),
+                TextColumn::make('destination')
+                    ->label('Destination')
+                    ->state(fn (NotificationChannel $record): string => app(ChannelTypeRegistry::class)->find($record->channel_type)?->displaySummary($record) ?? '—'),
                 IconColumn::make('verified_at')
                     ->label('Verified')
                     ->boolean()

@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes;
 
 use App\Enums\ChannelTransport;
+use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Filament\Forms\Components\TextInput;
 
@@ -61,5 +62,10 @@ class EmailChannelType implements ChannelType
     public function countsTowardFreeSlot(): bool
     {
         return false;
+    }
+
+    public function displaySummary(NotificationChannel $record): string
+    {
+        return $record->config['to'] ?? '—';
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes;
 
 use App\Enums\ChannelTransport;
+use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use App\Support\Delivery\WebhookUrlGuard;
 use Filament\Forms\Components\Hidden;
@@ -97,6 +98,17 @@ class WebPushChannelType implements ChannelType
     public function isAvailable(): bool
     {
         return filled(config('webpush.vapid.public_key')) && filled(config('webpush.vapid.private_key'));
+    }
+
+    /**
+     * The browser-managed subscription has no subscriber-meaningful identity
+     * beyond the push service it's registered with (never public_key/auth_token).
+     */
+    public function displaySummary(NotificationChannel $record): string
+    {
+        $host = parse_url((string) ($record->config['endpoint'] ?? ''), PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? $host : '—';
     }
 
     private static function describeBrowser(string $userAgent): string

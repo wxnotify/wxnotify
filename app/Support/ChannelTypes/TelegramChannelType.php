@@ -2,6 +2,7 @@
 
 namespace App\Support\ChannelTypes;
 
+use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Filament\Forms\Components\TextInput;
@@ -47,5 +48,18 @@ class TelegramChannelType implements ChannelType
     public function countsTowardFreeSlot(): bool
     {
         return true;
+    }
+
+    /**
+     * The chat ID isn't secret (the bot token is what actually grants send
+     * access), so it's shown in full rather than masked.
+     */
+    public function displaySummary(NotificationChannel $record): string
+    {
+        if (! preg_match('#^tgram://.+/([^/]+)$#', (string) $record->apprise_url, $matches)) {
+            return '—';
+        }
+
+        return 'Chat '.rawurldecode($matches[1]);
     }
 }

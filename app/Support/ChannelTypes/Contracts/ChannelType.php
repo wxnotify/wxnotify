@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes\Contracts;
 
 use App\Enums\ChannelTransport;
+use App\Models\NotificationChannel;
 use Filament\Schemas\Components\Component;
 
 interface ChannelType
@@ -57,4 +58,13 @@ interface ChannelType
      * for the no-cost catalog).
      */
     public function countsTowardFreeSlot(): bool;
+
+    /**
+     * A short, at-a-glance identifier for this channel's destination, safe to
+     * show in the subscriber-facing table — e.g. the email address, or a
+     * masked fragment of a secret the channel type never surfaces in full.
+     * Must never return a value that alone grants delivery access (a full
+     * webhook URL, bot token, API key, etc.).
+     */
+    public function displaySummary(NotificationChannel $record): string;
 }
