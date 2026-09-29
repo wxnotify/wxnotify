@@ -17,9 +17,18 @@ class ScanShapefileLayers extends Command
     public function handle(ScanShapefileLayer $scan, ImportShapefileVersion $import): int
     {
         $staged = 0;
+        // -v (every Artisan command's built-in verbosity flag, not a custom
+        // option) is what turns this on -- no reason to invent a separate
+        // --verbose flag for something Symfony Console already gives every
+        // command for free.
+        $verbose = $this->getOutput()->isVerbose();
 
         foreach (ShapefileLayer::all() as $layer) {
-            $version = $scan($layer);
+            if ($verbose) {
+                $this->line("Scanning {$layer->name}...");
+            }
+
+            $version = $scan($layer, $verbose ? fn (string $message) => $this->line("  {$message}") : null);
 
             if ($version === null) {
                 continue;

@@ -22,6 +22,24 @@ test('it scans every seeded layer and reports how many staged a new version', fu
     Http::assertSentCount(9);
 });
 
+test('-v narrates each layer being scanned and why nothing was staged, unlike the default quiet run', function () {
+    $layer = ShapefileLayer::factory()->create([
+        'key' => 'public_zones',
+        'name' => 'Public Zones',
+        'source_url' => 'https://www.weather.gov/gis/PublicZones',
+    ]);
+    Http::fake(['www.weather.gov/gis/PublicZones' => Http::response('<table><tbody></tbody></table>')]);
+
+    $this->artisan('shapefile:scan', ['-v' => true])
+        ->assertSuccessful()
+        ->expectsOutputToContain("Scanning {$layer->name}...")
+        ->expectsOutputToContain('No matching version group found on the page for this layer');
+
+    $this->artisan('shapefile:scan')
+        ->assertSuccessful()
+        ->doesntExpectOutputToContain("Scanning {$layer->name}...");
+});
+
 function buildScanCommandFixtureZip(string $basename): string
 {
     $dir = storage_path('app/test-fixtures/'.$basename);
