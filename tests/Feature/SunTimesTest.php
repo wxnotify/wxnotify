@@ -1,0 +1,41 @@
+<?php
+
+use App\Models\Location;
+use App\Support\SunTimes;
+use Illuminate\Support\Carbon;
+
+afterEach(function () {
+    Carbon::setTestNow();
+});
+
+test('it returns today\'s sunrise and sunset in the location\'s timezone', function () {
+    Carbon::setTestNow('2026-10-02 15:00:00'); // 09:00 America/Denver
+    $location = Location::factory()->create(['lat' => 40.0031694, 'lng' => -104.997011, 'timezone' => 'America/Denver']);
+
+    $sun = SunTimes::forLocation($location);
+
+    expect(Carbon::parse($sun['sunrise'])->format('Y-m-d H:i'))->toBe('2026-10-02 06:57')
+        ->and(Carbon::parse($sun['sunset'])->format('Y-m-d H:i'))->toBe('2026-10-02 18:40')
+        ->and($sun['sunrise'])->toEndWith('-06:00');
+});
+
+test('a timezone east of UTC still gets its own local date, not the previous day\'s', function () {
+    Carbon::setTestNow('2026-10-02 15:00:00'); // 2026-10-03 04:00 Pacific/Auckland
+    $location = Location::factory()->create(['lat' => -36.85, 'lng' => 174.76, 'timezone' => 'Pacific/Auckland']);
+
+    $sun = SunTimes::forLocation($location);
+
+    expect(Carbon::parse($sun['sunrise'])->format('Y-m-d'))->toBe('2026-10-03')
+        ->and(Carbon::parse($sun['sunset'])->format('Y-m-d'))->toBe('2026-10-03');
+});
+
+test('polar day, where the sun never sets, returns null', function () {
+    Carbon::setTestNow('2026-06-21 12:00:00');
+    $location = Location::factory()->create(['lat' => 80.0, 'lng' => 0.0, 'timezone' => 'UTC']);
+
+    expect(SunTimes::forLocation($location))->toBeNull();
+});
+
+test('a location with no fix returns null', function () {
+    expect(SunTimes::forLocation(Location::factory()->mobile()->create()))->toBeNull();
+});
