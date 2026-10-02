@@ -755,3 +755,27 @@ test('a subscriber cannot attach another subscriber\'s location via location_ids
 
     expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
 });
+
+test('saving changes to an alert returns the subscriber to the alerts list', function () {
+    $rule = AlertRule::factory()->for($this->user)->for($this->location)->create(['threshold_value' => 32]);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->fillForm(['threshold_value' => 28])
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertRedirect(AlertRuleResource::getUrl('index'));
+
+    expect($rule->fresh()->threshold_value)->toBe('28.0');
+});
+
+test('a save that fails validation stays on the edit page', function () {
+    $rule = AlertRule::factory()->for($this->user)->for($this->location)->create();
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->fillForm(['channel_ids' => []])
+        ->call('save')
+        ->assertHasFormErrors(['channel_ids'])
+        ->assertNoRedirect();
+});
