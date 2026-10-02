@@ -4,6 +4,7 @@ namespace App\Support\Delivery\Transports;
 
 use App\Enums\Integration;
 use App\Mail\ChannelMessageMail;
+use App\Mail\DailySummaryMail;
 use App\Models\NotificationChannel;
 use App\Support\Delivery\DeliveryResult;
 use App\Support\Integrations;
@@ -32,7 +33,11 @@ class MailTransport implements Transport
         }
 
         try {
-            Mail::to($to)->send(new ChannelMessageMail($title, $body, $meta['url'] ?? null));
+            $summary = $meta['daily_summary'] ?? null;
+
+            Mail::to($to)->send(is_array($summary)
+                ? new DailySummaryMail($title, $summary, $body, $meta['daily_summary_radar'] ?? null)
+                : new ChannelMessageMail($title, $body, $meta['url'] ?? null));
         } catch (Throwable $e) {
             logger()->warning('Email channel send failed', ['notification_channel_id' => $channel->id, 'exception' => $e::class]);
 

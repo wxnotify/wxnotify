@@ -359,3 +359,30 @@ function nwsFakeEverything(array $overrides = []): void
         'radar.weather.gov/*' => Http::response("GIF89a\x01\x00\x01\x00\x00\x00\x00;", 200, ['Content-Type' => 'image/gif']),
     ], $overrides));
 }
+
+/**
+ * A representative BuildDailySummaryReport array. Overrides replace top-level keys.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function presenterReport(array $overrides = []): array
+{
+    return array_replace([
+        'location' => 'Home',
+        'timezone' => 'America/Denver',
+        'sun' => ['sunrise' => '2026-10-02T06:57:34-06:00', 'sunset' => '2026-10-02T18:40:53-06:00'],
+        'alerts' => [['event' => 'Wind Advisory', 'headline' => 'Wind Advisory issued', 'expires' => '2026-10-02T15:00:00-06:00', 'family' => 'advisory']],
+        'current' => [
+            'station' => ['id' => 'KEIK', 'name' => 'Erie Municipal Airport', 'lat' => 40.01169, 'lng' => -105.05033, 'elevation_ft' => 5085.0],
+            'observed_at' => '2026-10-02T08:35:00-06:00', 'description' => 'Clear',
+            'icon' => ['period' => 'day', 'code' => 'skc'],
+            'temperature_f' => 53.6, 'feels_like_f' => 50.0, 'humidity_pct' => 76.5,
+            'wind' => ['direction' => 'NE', 'speed_mph' => 10.0, 'gust_mph' => 20.0],
+            'barometer_inhg' => 30.2712, 'dewpoint_f' => 46.4, 'visibility_mi' => 10.0,
+        ],
+        'radar_site' => 'KFTG',
+        'hourly' => [['time' => '2026-10-02T09:00:00-06:00', 'icon' => ['period' => 'day', 'code' => 'few'], 'temperature' => 54, 'unit' => 'F', 'precip_chance' => 10, 'wind' => '5 mph NW', 'summary' => 'Sunny']],
+        'periods' => [['name' => 'Today', 'date' => '2026-10-02T09:00:00-06:00', 'summary' => 'Sunny', 'label' => 'High', 'temperature' => 79, 'unit' => 'F', 'icon' => ['period' => 'day', 'code' => 'few']]],
+    ], $overrides);
+}

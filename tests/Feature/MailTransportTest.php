@@ -1,6 +1,7 @@
 <?php
 
 use App\Mail\ChannelMessageMail;
+use App\Mail\DailySummaryMail;
 use App\Models\NotificationChannel;
 use App\Settings\IntegrationSettings;
 use App\Support\Delivery\Transports\MailTransport;
@@ -103,4 +104,32 @@ test('a send failure logs only the channel id and exception class', function () 
             && ! str_contains(json_encode($context), 'secret-recipient')
             && ! str_contains(json_encode($context), 'smtp.internal');
     })->once();
+});
+
+test('a daily_summary payload in the meta sends the rich daily summary mail, with the radar', function () {
+    Mail::fake();
+    $channel = NotificationChannel::factory()->email('subscriber@example.com')->create();
+    $radar = ['bytes' => "GIF89a\x01\x00\x01\x00\x00\x00\x00;", 'mime' => 'image/gif'];
+
+    $result = app(MailTransport::class)->send($channel, 'Brief text', 'Daily summary for Home', [
+        'daily_summary' => presenterReport(),
+        'daily_summary_radar' => $radar,
+    ]);
+
+    expect($result->success)->toBeTrue();
+    Mail::assertSent(DailySummaryMail::class, fn (DailySummaryMail $mail) => $mail->hasTo('subscriber@example.com')
+        && $mail->messageTitle === 'Daily summary for Home'
+        && $mail->briefText === 'Brief text'
+        && $mail->radar === $radar);
+    Mail::assertNotSent(ChannelMessageMail::class);
+});
+
+test('without a daily_summary payload the plain channel message is still sent', function () {
+    Mail::fake();
+    $channel = NotificationChannel::factory()->email('subscriber@example.com')->create();
+
+    app(MailTransport::class)->send($channel, 'Brief text', 'Title', ['daily_summary_radar' => null]);
+
+    Mail::assertSent(ChannelMessageMail::class);
+    Mail::assertNotSent(DailySummaryMail::class);
 });
