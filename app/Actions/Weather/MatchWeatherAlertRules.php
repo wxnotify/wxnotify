@@ -187,8 +187,9 @@ class MatchWeatherAlertRules
     }
 
     /**
-     * "Any attached location matches -> the rule fires": the first location
-     * (in attachment order) whose check succeeds wins and is the one
+     * "Any attached location matches -> the rule fires": the first location,
+     * ordered by location id (AlertRule::locations()'s explicit orderBy),
+     * not attachment order, whose check succeeds wins and is the one
      * downstream code (quiet hours, {location} subject rendering) treats as
      * "the" match for this delivery. A rule with zero attached locations
      * never matches in these three modes -- there is nothing to check.

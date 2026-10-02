@@ -83,7 +83,7 @@ class AlertRule extends Model
 
     public function locations(): BelongsToMany
     {
-        return $this->belongsToMany(Location::class);
+        return $this->belongsToMany(Location::class)->orderBy('locations.id');
     }
 
     public function products(): BelongsToMany

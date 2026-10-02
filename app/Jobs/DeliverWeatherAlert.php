@@ -98,7 +98,15 @@ class DeliverWeatherAlert implements ShouldQueue
             return;
         }
 
-        $location = $this->locationId !== null ? Location::find($this->locationId) : null;
+        // A job serialized onto the queue by code predating $locationId (via
+        // Illuminate\Queue\SerializesModels' native unserialize(), which
+        // bypasses the constructor entirely) has this typed property left
+        // uninitialized, not null. The `??` null-coalesce uses isset()
+        // semantics, which is false for an uninitialized typed property
+        // instead of throwing, so the property is read exactly once here
+        // and never dereferenced again while potentially uninitialized.
+        $locationId = $this->locationId ?? null;
+        $location = $locationId !== null ? Location::find($locationId) : null;
 
         if (! $rule->is_active) {
             $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $product->product, $location));

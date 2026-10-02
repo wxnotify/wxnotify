@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Weather\MatchWeatherAlertRules;
+use App\Enums\Tier;
 use App\Jobs\DeliverWeatherAlert;
 use App\Models\ActiveWwa;
 use App\Models\AlertRule;
@@ -697,7 +698,7 @@ test('a Location-mode rule with two attached locations fires when only the secon
 
     (new MatchWeatherAlertRules)($ingested);
 
-    Queue::assertPushed(DeliverWeatherAlert::class);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->locationId === $overlaps->id);
 });
 
 test('a Location-mode rule with zero attached locations never matches', function () {
@@ -743,9 +744,17 @@ test('a RiskArea-mode rule\'s quiet hours now suppress correctly -- previously s
     // real location and a real timezone.
     Queue::fake();
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
-    $location = Location::factory()->create(['timezone' => 'America/New_York', 'lat' => 34.5, 'lng' => -95.5]);
-    $rule = AlertRule::factory()->create([
+    $location = Location::factory()->create(['label' => 'Moore OK', 'timezone' => 'America/New_York', 'lat' => 34.5, 'lng' => -95.5]);
+    // A Plus-tier user and a custom template are required here so the
+    // suppressed DeliveryLog's subject actually depends on $matchedLocation
+    // -- displayName() (the default for spc_wpc, and what a Free-tier
+    // user's custom template is ignored in favor of) renders product names,
+    // not the location, and would prove nothing about location-threading
+    // through this path.
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->for($plusUser)->create([
         'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'risk_levels' => ['Slight'],
+        'custom_subject_template' => 'Alert for {location}',
         'quiet_hours_start' => now('America/New_York')->subHour()->format('H:i:s'),
         'quiet_hours_end' => now('America/New_York')->addHour()->format('H:i:s'),
     ]);
@@ -763,5 +772,6 @@ test('a RiskArea-mode rule\'s quiet hours now suppress correctly -- previously s
     (new MatchWeatherAlertRules)($ingested);
 
     Queue::assertNotPushed(DeliverWeatherAlert::class);
-    expect(DeliveryLog::sole()->status)->toBe('suppressed');
+    expect(DeliveryLog::sole()->status)->toBe('suppressed')
+        ->and(DeliveryLog::sole()->subject)->toBe('Alert for Moore OK');
 });

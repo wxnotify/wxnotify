@@ -408,3 +408,33 @@ test('omitting the job\'s locationId renders the subject exactly as it did befor
 
     expect(DeliveryLog::sole()->subject)->toBe($rule->displayName());
 });
+
+test('a job queued before locationId existed unserializes without it and still delivers, instead of crashing on an uninitialized typed property', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create(['apprise_url' => 'discord://token/id']);
+    $product = IngestedProduct::factory()->create();
+
+    // Reproduces a DeliverWeatherAlert job that was serialized onto the
+    // queue by the OLD code (before this feature's deploy), whose payload
+    // has no locationId key at all. Illuminate\Queue\SerializesModels'
+    // native unserialize() bypasses the constructor entirely, so such a job
+    // would come back with the typed `?int $locationId` property left
+    // genuinely uninitialized, not null. newInstanceWithoutConstructor()
+    // plus setting only the three pre-existing properties via Reflection
+    // reproduces that exact state without ever touching $locationId.
+    $reflection = new ReflectionClass(DeliverWeatherAlert::class);
+    $job = $reflection->newInstanceWithoutConstructor();
+    foreach (['ruleId' => $rule->id, 'channelId' => $channel->id, 'ingestedProductId' => $product->id] as $property => $value) {
+        $reflectionProperty = $reflection->getProperty($property);
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue($job, $value);
+    }
+
+    $job->handle(app(ChannelDispatcher::class));
+
+    $log = DeliveryLog::sole();
+    expect($log->status)->toBe('success')
+        ->and($log->subject)->toBe($rule->displayName());
+});
