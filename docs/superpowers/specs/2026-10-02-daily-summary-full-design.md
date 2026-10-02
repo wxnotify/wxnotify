@@ -18,7 +18,7 @@ A Daily Weather Summary rule whose stored `message_body_style` is `full` deliver
 - **Alerts in Effect = everything in effect at the location**, read from our own `active_wwas` table (the same live data the alert rules match against — no extra API call), independent of the subscriber's own alert rules. Warnings, watches, advisories and statements all appear.
 - **Sunrise/sunset are computed locally** with PHP's `date_sun_info()` from the location's lat/lng (NWS publishes neither); no network call and nothing to fail.
 - **Section order**: header (location, station, sunrise/sunset) → Alerts in Effect → Current Conditions → Radar → Next 12 Hours → 7-Day Forecast. Alerts come first because they are the time-critical item.
-- **Every optional section degrades independently.** Alerts, Current Conditions, Radar, Hourly and Sun times each build inside their own guard; a failure omits just that section (logged with fixed strings only). Only the 7-day forecast being unavailable suppresses the Full send, as today.
+- **Every optional section degrades independently.** Alerts, Current Conditions, Radar, Hourly and Sun times each build inside their own guard; a failure omits just that section (logged with fixed strings only) — except Alerts in Effect, whose failure renders the notice "Alert information is unavailable right now." instead of being omitted, because silence there would read as an all-clear. Only the 7-day forecast being unavailable suppresses the Full send, as today.
 - **Imperial units**, matching Threshold Alerts. **Period labels** are NWS's own period names ("Today", "Tonight", "Overnight", "Saturday"…) plus the date from the period's `startTime`.
 
 ## Verified against the live NWS API (2026-10-02)
@@ -88,7 +88,7 @@ Reuse `GetSevenDayForecast` unchanged. For each of its periods the Full view nee
 - **In effect**: `status = 'Active'` and (`expires` is null or in the future). `is_test = false`, or any `is_test` when `$includeTest` is true (the rule owner is a test account, mirroring `MatchWeatherAlertRules`' test routing).
 - **Covers the location**: when the row has a `polygon`, `ST_Contains(polygon, point)` decides (the polygon is the authoritative extent for warnings, as in `MatchWeatherAlertRules::matchesActiveWwaPolygon`); when it has none, the row's `ugc_codes` must intersect the location's `forecast_zone_ugc` / `county_ugc`. Zones are resolved lazily through the existing `ResolveLocationZones` action the matcher uses; a location with no fix returns `[]`. SRID 4269, same as the rest of the pipeline.
 - **Each entry**: `event` (the product name, e.g. "Tornado Warning"), `headline`, `expires` (ISO string in the location's timezone), `family`. **Order**: family severity (warning, watch, advisory, statement, then anything else), then soonest `expires`.
-- No cap beyond the data itself; an empty array renders "No active alerts."
+- No cap beyond the data itself; an empty array renders "No active alerts."; the action's *failure* is reported by the report builder as `null` (not `[]`) and renders "Alert information is unavailable right now."
 
 ### `App\Actions\Weather\GetRadarSnapshot` (new)
 
@@ -102,7 +102,7 @@ Reuse `GetSevenDayForecast` unchanged. For each of its periods the Full view nee
 [
     'location' => 'Home',                          // Location::label
     'sun' => <SunTimes array>|null,
-    'alerts' => <GetActiveAlertsForLocation array>,       // [] renders "No active alerts"
+    'alerts' => <GetActiveAlertsForLocation array>|null,  // [] renders "No active alerts"; null (lookup failed) renders "Alert information is unavailable right now."
     'current' => <GetCurrentConditions array>|null,
     'radar_site' => 'KFTG'|null,                          // the site code only -- the image is fetched at send time, never queued
     'hourly' => <GetHourlyForecast array>|null,
@@ -110,7 +110,7 @@ Reuse `GetSevenDayForecast` unchanged. For each of its periods the Full view nee
 ]
 ```
 
-Returns `null` when the periods array is empty (forecast unavailable). Every other section is built inside its own `try`/`catch (Throwable)` and becomes `null` (or `[]` for alerts) on failure, with a fixed-string warning log. `BuildDailySummaryMessage` (Brief) is not modified. The alert lookup needs the rule owner's `is_test_account`, so the builder takes the rule (or that flag) as a second argument.
+Returns `null` when the periods array is empty (forecast unavailable). Every other section is built inside its own `try`/`catch (Throwable)` and becomes `null` on failure (including alerts — see Decisions), with a fixed-string warning log. `BuildDailySummaryMessage` (Brief) is not modified. The alert lookup needs the rule owner's `is_test_account`, so the builder takes the rule (or that flag) as a second argument.
 
 Dates/times inside the report are stored as plain strings/ISO timestamps, not Carbon/closures, so the payload survives queue serialization and carries no models.
 
@@ -149,7 +149,7 @@ Gains a nullable trailing constructor parameter `?array $report = null`. Handlin
 A Markdown mailable (so it inherits the shared theme/header logo, per `.ai/rules/delivery.md`), with:
 
 - **Header**: location label; "Reporting station: {name} ({id}) — {lat}, {lng} — elev. {ft} ft" (omitted when there is no current-conditions data); "Sunrise {time} · Sunset {time}" (omitted when `sun` is null).
-- **Alerts in Effect**: one row per alert — event name, headline, "until {expires}" in the location's timezone; "No active alerts." when the array is empty. Always present in a Full email (an empty state is information, unlike a missing data source).
+- **Alerts in Effect**: one row per alert — event name, headline, "until {expires}" in the location's timezone; "No active alerts." when the array is empty. Always present in a Full email: an empty state ("No active alerts.") is information, and a failed lookup shows "Alert information is unavailable right now." rather than disappearing.
 - **Current Conditions** (omitted entirely when `current` is null): icon + description, temperature, feels like, humidity, wind (direction, speed, and "gusting {n} mph" only when a gust exists), barometer (inHg), dewpoint, visibility (mi), "Last updated {observed_at}" in the location's timezone.
 - **Radar** (omitted when no image was fetched): the embedded image (`$message->embedData(...)`, rendered as a `cid:` `<img>`) with alt text "Radar near {location} from {site}" and a "Radar as of {send time}" caption.
 - **Next 12 Hours** (omitted when `hourly` is null): one row per hour — time, icon, temperature, "{n}%" precip chance (or `—`), wind, short summary.
