@@ -4,6 +4,8 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Pages;
 
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
+use App\Support\AlertRuleFormUnits;
+use App\Support\Units;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
 use Filament\Schemas\Components\Wizard\Step;
@@ -26,7 +28,7 @@ class CreateAlertRule extends CreateRecord
     {
         $data['user_id'] = auth()->id();
 
-        return $data;
+        return AlertRuleFormUnits::toStorage($data, Units::for(auth()->user()));
     }
 
     protected function getRedirectUrl(): string

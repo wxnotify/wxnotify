@@ -6,6 +6,8 @@ use App\Enums\AlertCategory;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
 use App\Models\Product;
+use App\Support\AlertRuleFormUnits;
+use App\Support\Units;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\EditRecord\Concerns\HasWizard;
@@ -59,7 +61,7 @@ class EditAlertRule extends EditRecord
             ? explode(',', $data['county_zone_codes'])
             : [];
 
-        return $data;
+        return AlertRuleFormUnits::toDisplay($data, Units::for(auth()->user()));
     }
 
     /**
@@ -86,7 +88,7 @@ class EditAlertRule extends EditRecord
             $data['alert_template_id'] = null;
         }
 
-        return $data;
+        return AlertRuleFormUnits::toStorage($data, Units::for(auth()->user()), $this->record);
     }
 
     protected function afterSave(): void

@@ -18,6 +18,7 @@ use App\Models\Product;
 use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\ChannelType;
+use App\Support\Units;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
@@ -466,7 +467,7 @@ class AlertRuleForm
             TextInput::make('threshold_value')
                 ->numeric()
                 ->required()
-                ->suffix(fn (Get $get): ?string => ThresholdVariable::tryFrom($get('variable'))?->unit()),
+                ->suffix(fn (Get $get): ?string => ThresholdVariable::tryFrom($get('variable'))?->unit(Units::for(auth()->user())->system)),
             Select::make('timeframe')
                 ->options(collect(ThresholdTimeframe::cases())->mapWithKeys(fn (ThresholdTimeframe $t) => [$t->value => $t->label()]))
                 ->required(),
@@ -499,13 +500,13 @@ class AlertRuleForm
         return [
             self::locationSelect(),
             TextInput::make('radius_miles')
-                ->label('Alert radius (miles)')
+                ->label(fn (): string => 'Alert radius ('.Units::for(auth()->user())->distanceUnitName().')')
                 ->numeric()
-                ->minValue(fn (): int => app(TierThresholdSettings::class)->lightning_min_radius_miles)
-                ->maxValue(50)
+                ->minValue(fn (): int => Units::for(auth()->user())->minDistanceDisplay(app(TierThresholdSettings::class)->lightning_min_radius_miles))
+                ->maxValue(fn (): int => Units::for(auth()->user())->maxDistanceDisplay(50))
                 ->default(15)
                 ->required()
-                ->helperText(fn (): string => 'Minimum '.app(TierThresholdSettings::class)->lightning_min_radius_miles.' miles — tighter radii outrun what satellite lightning detection can reliably pinpoint.'),
+                ->helperText(fn (): string => 'Minimum '.Units::for(auth()->user())->minDistanceDisplay(app(TierThresholdSettings::class)->lightning_min_radius_miles).' '.Units::for(auth()->user())->distanceUnitName().' — tighter radii outrun what satellite lightning detection can reliably pinpoint.'),
         ];
     }
 
