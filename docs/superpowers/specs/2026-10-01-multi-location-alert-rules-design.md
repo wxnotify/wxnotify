@@ -51,6 +51,8 @@ New small DTO, `App\Support\Geography\GeographyMatch` — `app/Support/Geography
 
 `isWithinQuietHours(AlertRule $rule, ?Location $matchedLocation)`: reads `$matchedLocation?->timezone` instead of `$rule->location?->timezone`. Null → never suppress, unchanged fallback.
 
+**Incidental bug fix, surfaced by this refactor**: today's `isWithinQuietHours()` gates on `in_array($rule->matching_mode, [Location, Polygon, CountyZone])` before even checking for a timezone — `RiskArea` is missing from that list, so a RiskArea-mode rule's quiet hours silently never apply today, even though it has a real location with a real timezone (CountyZone's presence in that list is a harmless no-op, since CountyZone rules never have a location at all). The new `?Location $matchedLocation` parameter already encodes exactly which modes have a location worth checking, making the mode allow-list redundant — it's dropped entirely, which both simplifies the function and fixes the RiskArea gap as a direct consequence. Called out explicitly (not silently): gets its own test asserting a RiskArea-mode rule's quiet hours now suppress correctly.
+
 ## Delivery and rendering
 
 `DeliverWeatherAlert::__construct` gains a nullable `?int $locationId = null` (its only real call site is `MatchWeatherAlertRules::dispatchOrSuppress()`, confirmed by grep — `DeliverWeatherAlert::dispatch($rule->id, $channel->id, $product->id, $match->location?->id)`).
