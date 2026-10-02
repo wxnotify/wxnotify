@@ -120,6 +120,36 @@ services:
         restart: unless-stopped
         profiles:
             - server-c
+    # Nothing else runs `artisan schedule:run`, so every schedule() entry in
+    # bootstrap/app.php (alerts:dispatch-scheduled -- Daily Summary and
+    # Threshold deliveries -- plus shapefile:scan, traccar:poll-positions,
+    # pipeline:prune-deliveries, bug-reports:sync) would never fire without
+    # this. schedule:work is the long-running equivalent of a per-minute cron
+    # entry, which a worker-development container has no cron daemon for.
+    scheduler:
+        build:
+            context: './docker/8.4'
+            dockerfile: Dockerfile
+            target: worker-development
+            args:
+                USER_ID: '${USER_ID:-1000}'
+                GROUP_ID: '${GROUP_ID:-1000}'
+        image: 'wxnotify-php/worker:local'
+        container_name: wxnotify-scheduler
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - pgsql
+            - redis
+        command: 'php artisan schedule:work'
+        stop_signal: SIGTERM
+        restart: unless-stopped
+        profiles:
+            - server-c
     queue-heartbeat:
         build:
             context: './docker/8.4'
