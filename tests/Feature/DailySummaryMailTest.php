@@ -26,7 +26,7 @@ test('the html renders every section in order under the branded header', functio
     expect($html)->toContain('src="https://alerts.example.test/images/logo.png"')
         ->and($html)->toContain('Home')
         ->and($html)->toContain('Reporting station: Erie Municipal Airport (KEIK) — 40.0117, -105.0503 — elev. 5,085 ft')
-        ->and($html)->toContain('Sunrise 6:57 AM · Sunset 6:40 PM')
+        ->and($html)->toContain('Sunrise')->toContain('6:57 AM')->toContain('Sunset')->toContain('6:40 PM')
         ->and($html)->toContain('Wind Advisory')
         ->and($html)->toContain('until Fri 3:00 PM')
         ->and($html)->toContain('Feels like')
@@ -126,7 +126,7 @@ test('the plain text alternative carries the content without html and without th
 
     $mail->assertSeeInText('WxNotify Test')
         ->assertSeeInText('ALERTS IN EFFECT')
-        ->assertSeeInText('Today (Fri, Oct 2): Sunny — High 79°F')
+        ->assertSeeInText('Today (Fri, Oct 2): Sunny, with a high near 79. East southeast wind 2 to 6 mph. — High 79°F')
         ->assertDontSeeInText('<table');
 });
 
@@ -146,4 +146,31 @@ test('no radar means no embedded attachment', function () {
     $email = Mail::mailer()->getSymfonyTransport()->messages()->first()->getOriginalMessage();
 
     expect($email->getAttachments())->toHaveCount(0);
+});
+
+test('the sun times are a prominent header line with sunrise and sunset icons, above the station line', function () {
+    $html = (new DailySummaryMail('Title', presenterReport(), 'brief'))->render();
+
+    expect($html)->toContain('🌅')
+        ->and($html)->toContain('🌇')
+        ->and(strpos($html, '🌅'))->toBeLessThan(strpos($html, 'Reporting station'))
+        ->and(strpos($html, 'Home'))->toBeLessThan(strpos($html, '🌅'));
+
+    $visible = html_entity_decode(strip_tags($html));
+    expect(str_replace("\u{a0}", ' ', $visible))->toContain('Sunrise 6:57 AM')->toContain('Sunset 6:40 PM');
+});
+
+test('there is no sun line or sun icon without sun data', function () {
+    $html = (new DailySummaryMail('Title', presenterReport(['sun' => null]), 'brief'))->render();
+
+    expect($html)->not->toContain('🌅')->not->toContain('Sunrise');
+});
+
+test('the 7-day rows show the detailed forecast text, while the icon alt text stays short', function () {
+    $html = (new DailySummaryMail('Title', presenterReport(), 'brief'))->render();
+
+    // alt="Sunny" appears twice: the one hourly row and the one 7-day row; the long text is never used as alt.
+    expect($html)->toContain('East southeast wind 2 to 6 mph.')
+        ->and(substr_count($html, 'alt="Sunny"'))->toBe(2)
+        ->and($html)->not->toContain('alt="Sunny, with a high');
 });

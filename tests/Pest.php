@@ -323,9 +323,9 @@ function nwsObservation(array $overrides = []): array
 function nwsForecastPeriods(): array
 {
     return [
-        ['name' => 'Today', 'startTime' => '2026-10-02T09:00:00-06:00', 'isDaytime' => true, 'temperature' => 79, 'temperatureUnit' => 'F', 'shortForecast' => 'Sunny', 'icon' => 'https://api.weather.gov/icons/land/day/few?size=medium'],
-        ['name' => 'Tonight', 'startTime' => '2026-10-02T18:00:00-06:00', 'isDaytime' => false, 'temperature' => 50, 'temperatureUnit' => 'F', 'shortForecast' => 'Mostly Clear', 'icon' => 'https://api.weather.gov/icons/land/night/few?size=medium'],
-        ['name' => 'Saturday', 'startTime' => '2026-10-03T06:00:00-06:00', 'isDaytime' => true, 'temperature' => 84, 'temperatureUnit' => 'F', 'shortForecast' => 'Sunny', 'icon' => 'https://api.weather.gov/icons/land/day/few?size=medium'],
+        ['name' => 'Today', 'startTime' => '2026-10-02T09:00:00-06:00', 'isDaytime' => true, 'temperature' => 79, 'temperatureUnit' => 'F', 'shortForecast' => 'Sunny', 'detailedForecast' => 'Sunny, with a high near 79. East southeast wind 2 to 6 mph.', 'icon' => 'https://api.weather.gov/icons/land/day/few?size=medium'],
+        ['name' => 'Tonight', 'startTime' => '2026-10-02T18:00:00-06:00', 'isDaytime' => false, 'temperature' => 50, 'temperatureUnit' => 'F', 'shortForecast' => 'Mostly Clear', 'detailedForecast' => 'Mostly clear, with a low around 50. South southwest wind around 7 mph.', 'icon' => 'https://api.weather.gov/icons/land/night/few?size=medium'],
+        ['name' => 'Saturday', 'startTime' => '2026-10-03T06:00:00-06:00', 'isDaytime' => true, 'temperature' => 84, 'temperatureUnit' => 'F', 'shortForecast' => 'Sunny', 'detailedForecast' => 'Sunny. High near 84, with temperatures falling to around 81 in the afternoon.', 'icon' => 'https://api.weather.gov/icons/land/day/few?size=medium'],
     ];
 }
 
@@ -383,6 +383,6 @@ function presenterReport(array $overrides = []): array
         ],
         'radar_site' => 'KFTG',
         'hourly' => [['time' => '2026-10-02T09:00:00-06:00', 'icon' => ['period' => 'day', 'code' => 'few'], 'temperature' => 54, 'unit' => 'F', 'precip_chance' => 10, 'wind' => '5 mph NW', 'summary' => 'Sunny']],
-        'periods' => [['name' => 'Today', 'date' => '2026-10-02T09:00:00-06:00', 'summary' => 'Sunny', 'label' => 'High', 'temperature' => 79, 'unit' => 'F', 'icon' => ['period' => 'day', 'code' => 'few']]],
+        'periods' => [['name' => 'Today', 'date' => '2026-10-02T09:00:00-06:00', 'summary' => 'Sunny, with a high near 79. East southeast wind 2 to 6 mph.', 'short' => 'Sunny', 'label' => 'High', 'temperature' => 79, 'unit' => 'F', 'icon' => ['period' => 'day', 'code' => 'few']]],
     ], $overrides);
 }

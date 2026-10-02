@@ -49,7 +49,7 @@ test('periods are labelled High for daytime and Low for nighttime with icon code
     $periods = (new BuildDailySummaryReport)($this->location)['periods'];
 
     expect($periods[0])->toBe([
-        'name' => 'Today', 'date' => '2026-10-02T09:00:00-06:00', 'summary' => 'Sunny', 'label' => 'High',
+        'name' => 'Today', 'date' => '2026-10-02T09:00:00-06:00', 'summary' => 'Sunny, with a high near 79. East southeast wind 2 to 6 mph.', 'short' => 'Sunny', 'label' => 'High',
         'temperature' => 79, 'unit' => 'F', 'icon' => ['period' => 'day', 'code' => 'few'],
     ])->and($periods[1]['label'])->toBe('Low')
         ->and($periods[1]['icon'])->toBe(['period' => 'night', 'code' => 'few']);
@@ -148,4 +148,18 @@ test('a connection failure fetching the seven-day forecast returns null and logs
         'Daily summary forecast section failed',
         ['exception' => ConnectionException::class],
     );
+});
+
+test('a period with no detailed forecast falls back to its short forecast for the summary text', function () {
+    $periods = nwsForecastPeriods();
+    $periods[0]['detailedForecast'] = '  ';
+    unset($periods[1]['detailedForecast']);
+    nwsFakeEverything(['api.weather.gov/gridpoints/BOU/64,73/forecast' => Http::response(['properties' => ['periods' => $periods]])]);
+
+    $report = (new BuildDailySummaryReport)($this->location);
+
+    expect($report['periods'][0]['summary'])->toBe('Sunny')
+        ->and($report['periods'][0]['short'])->toBe('Sunny')
+        ->and($report['periods'][1]['summary'])->toBe('Mostly Clear')
+        ->and($report['periods'][2]['summary'])->toBe('Sunny. High near 84, with temperatures falling to around 81 in the afternoon.');
 });

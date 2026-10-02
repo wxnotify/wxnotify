@@ -1,10 +1,10 @@
 <div style="font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; color: #1f2937;">
 <h2 style="margin: 0 0 4px; font-size: 20px;">{{ $s['location'] }}</h2>
+@if ($s['sun'] !== null)
+<p style="margin: 0 0 6px; font-size: 15px; color: #1f2937;">🌅 <strong>Sunrise</strong> {{ $s['sun']['sunrise'] }} &nbsp;·&nbsp; 🌇 <strong>Sunset</strong> {{ $s['sun']['sunset'] }}</p>
+@endif
 @if ($s['station_line'] !== null)
 <p style="margin: 0; font-size: 13px; color: #6b7280;">{{ $s['station_line'] }}</p>
-@endif
-@if ($s['sun_line'] !== null)
-<p style="margin: 2px 0 0; font-size: 13px; color: #6b7280;">{{ $s['sun_line'] }}</p>
 @endif
 
 <h3 style="margin: 20px 0 6px; font-size: 16px;">Alerts in Effect</h3>
@@ -54,7 +54,7 @@
 <h3 style="margin: 20px 0 6px; font-size: 16px;">7-Day Forecast</h3>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; border-collapse: collapse;">
 @foreach ($s['periods'] as $period)
-<tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 6px 10px 6px 0; vertical-align: top;"><img src="{{ $period['icon_url'] }}" alt="{{ $period['summary'] }}" width="40" height="40" style="display: block;"></td><td style="padding: 6px 10px 6px 0; vertical-align: top;"><strong>{{ $period['name'] }}</strong>@if ($period['date'] !== null)<br><span style="color: #6b7280; font-size: 12px;">{{ $period['date'] }}</span>@endif</td><td style="padding: 6px 10px 6px 0; vertical-align: top;">{{ $period['summary'] }}</td><td style="padding: 6px 0; vertical-align: top; white-space: nowrap; font-weight: 600;">{{ $period['temp'] }}</td></tr>
+<tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 6px 10px 6px 0; vertical-align: top;"><img src="{{ $period['icon_url'] }}" alt="{{ $period['alt'] }}" width="40" height="40" style="display: block;"></td><td style="padding: 6px 10px 6px 0; vertical-align: top;"><strong>{{ $period['name'] }}</strong>@if ($period['date'] !== null)<br><span style="color: #6b7280; font-size: 12px;">{{ $period['date'] }}</span>@endif</td><td style="padding: 6px 10px 6px 0; vertical-align: top;">{{ $period['summary'] }}</td><td style="padding: 6px 0; vertical-align: top; white-space: nowrap; font-weight: 600;">{{ $period['temp'] }}</td></tr>
 @endforeach
 </table>
 </div>

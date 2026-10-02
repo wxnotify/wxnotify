@@ -57,7 +57,10 @@ class BuildDailySummaryReport
         return array_values(array_map(fn (array $period): array => [
             'name' => (string) ($period['name'] ?? ''),
             'date' => isset($period['startTime']) ? Carbon::parse($period['startTime'])->setTimezone($timezone)->toIso8601String() : null,
-            'summary' => (string) ($period['shortForecast'] ?? ''),
+            // NWS's detailedForecast is the one-to-two sentence description; shortForecast ("Sunny") is
+            // kept as `short` for icon alt text and is the fallback when no detail is published.
+            'summary' => filled(trim((string) ($period['detailedForecast'] ?? ''))) ? trim((string) $period['detailedForecast']) : (string) ($period['shortForecast'] ?? ''),
+            'short' => (string) ($period['shortForecast'] ?? ''),
             'label' => ($period['isDaytime'] ?? true) ? 'High' : 'Low',
             'temperature' => $period['temperature'] ?? null,
             'unit' => (string) ($period['temperatureUnit'] ?? 'F'),

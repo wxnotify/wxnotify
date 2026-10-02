@@ -28,6 +28,7 @@ class DailySummaryPresenter
             'location' => (string) ($report['location'] ?? ''),
             'station_line' => $current !== null ? self::stationLine($current['station']) : null,
             'sun_line' => self::sunLine($report['sun'] ?? null),
+            'sun' => self::sunTimes($report['sun'] ?? null),
             'alerts' => isset($report['alerts']) ? array_map(fn (array $alert): array => [
                 'event' => (string) $alert['event'],
                 'headline' => $alert['headline'] ?? null,
@@ -49,6 +50,8 @@ class DailySummaryPresenter
                 'name' => (string) $period['name'],
                 'date' => isset($period['date']) ? Carbon::parse($period['date'])->format('D, M j') : null,
                 'summary' => (string) $period['summary'],
+                // Reports queued before `short` existed fall back to the summary for the alt text.
+                'alt' => (string) ($period['short'] ?? $period['summary']),
                 'temp' => $period['label'].' '.self::temperature($period['temperature'], $period['unit']),
             ], $report['periods'] ?? []),
         ];
@@ -61,7 +64,7 @@ class DailySummaryPresenter
     {
         $lines = [$view['location']];
 
-        foreach (['station_line', 'sun_line'] as $key) {
+        foreach (['sun_line', 'station_line'] as $key) {
             if ($view[$key] !== null) {
                 $lines[] = $view[$key];
             }
@@ -139,6 +142,18 @@ class DailySummaryPresenter
         }
 
         return $line;
+    }
+
+    /**
+     * @param  array{sunrise: string, sunset: string}|null  $sun
+     * @return array{sunrise: string, sunset: string}|null
+     */
+    private static function sunTimes(?array $sun): ?array
+    {
+        return $sun === null ? null : [
+            'sunrise' => Carbon::parse($sun['sunrise'])->format('g:i A'),
+            'sunset' => Carbon::parse($sun['sunset'])->format('g:i A'),
+        ];
     }
 
     /**

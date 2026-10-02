@@ -82,7 +82,7 @@ test('hourly and 7-day rows are formatted, with a missing precip chance shown as
     expect($view['hourly'][0])->toBe(['time' => '9 AM', 'icon_url' => 'https://alerts.example.test/images/weather/day/few.png', 'temp' => '54°F', 'precip' => '10%', 'wind' => '5 mph NW', 'summary' => 'Sunny'])
         ->and($view['hourly'][1]['precip'])->toBe('—')
         ->and($view['hourly'][1]['wind'])->toBe('—')
-        ->and($view['periods'][0])->toBe(['icon_url' => 'https://alerts.example.test/images/weather/day/few.png', 'name' => 'Today', 'date' => 'Fri, Oct 2', 'summary' => 'Sunny', 'temp' => 'High 79°F']);
+        ->and($view['periods'][0])->toBe(['icon_url' => 'https://alerts.example.test/images/weather/day/few.png', 'name' => 'Today', 'date' => 'Fri, Oct 2', 'summary' => 'Sunny, with a high near 79. East southeast wind 2 to 6 mph.', 'alt' => 'Sunny', 'temp' => 'High 79°F']);
 });
 
 test('radar alt and caption exist only when the report has a radar site', function () {
@@ -115,7 +115,7 @@ test('the plain text rendering carries every section and omits the radar line wh
         ->and($text)->toContain('NEXT 12 HOURS')
         ->and($text)->toContain('9 AM — 54°F — 10% — 5 mph NW — Sunny')
         ->and($text)->toContain('7-DAY FORECAST')
-        ->and($text)->toContain('Today (Fri, Oct 2): Sunny — High 79°F')
+        ->and($text)->toContain('Today (Fri, Oct 2): Sunny, with a high near 79. East southeast wind 2 to 6 mph. — High 79°F')
         ->and($text)->not->toContain('Radar');
 
     Carbon::setTestNow();
@@ -155,7 +155,7 @@ test('a forecast period with no date is named alone, with no empty parentheses o
     $html = view('mail.partials.daily-summary', ['s' => $view, 'hasRadar' => false])->render();
 
     expect($view['periods'][0]['date'])->toBeNull()
-        ->and($text)->toContain('Today: Sunny — High 79°F')
+        ->and($text)->toContain('Today: Sunny, with a high near 79. East southeast wind 2 to 6 mph. — High 79°F')
         ->and($text)->not->toContain('()')
         ->and($html)->not->toContain('<span style="color: #6b7280; font-size: 12px;"></span>')
         ->and($html)->toContain('<strong>Today</strong>');
@@ -173,4 +173,28 @@ test('a blank current conditions description leaves no empty heading, no blank t
         ->and($text)->toContain("CURRENT CONDITIONS\nTemperature: 54°F")
         ->and($html)->not->toContain('font-weight: 600;"></div>')
         ->and($html)->toContain('alt="Current conditions"');
+});
+
+test('a report queued before the short forecast key existed still renders, using the summary as the icon alt text', function () {
+    $report = presenterReport();
+    unset($report['periods'][0]['short']);
+
+    $period = DailySummaryPresenter::present($report)['periods'][0];
+
+    expect($period['alt'])->toBe($period['summary']);
+});
+
+test('the sun times are exposed separately for the header, and absent without sun data', function () {
+    $with = DailySummaryPresenter::present(presenterReport());
+    $without = DailySummaryPresenter::present(presenterReport(['sun' => null]));
+
+    expect($with['sun'])->toBe(['sunrise' => '6:57 AM', 'sunset' => '6:40 PM'])
+        ->and($without['sun'])->toBeNull();
+});
+
+test('the plain text puts the sun line right after the location, before the station line', function () {
+    $text = DailySummaryPresenter::text(DailySummaryPresenter::present(presenterReport()), hasRadar: false);
+
+    expect(strpos($text, 'Sunrise 6:57 AM'))->toBeLessThan(strpos($text, 'Reporting station'))
+        ->and(strpos($text, 'Home'))->toBeLessThan(strpos($text, 'Sunrise'));
 });

@@ -17,7 +17,7 @@ A Daily Weather Summary rule whose stored `message_body_style` is `full` deliver
 - **Hourly forecast = the next 12 hours, one row per hour.**
 - **Alerts in Effect = everything in effect at the location**, read from our own `active_wwas` table (the same live data the alert rules match against — no extra API call), independent of the subscriber's own alert rules. Warnings, watches, advisories and statements all appear.
 - **Sunrise/sunset are computed locally** with PHP's `date_sun_info()` from the location's lat/lng (NWS publishes neither); no network call and nothing to fail.
-- **Section order**: header (location, station, sunrise/sunset) → Alerts in Effect → Current Conditions → Radar → Next 12 Hours → 7-Day Forecast. Alerts come first because they are the time-critical item.
+- **Section order**: header (location, then a prominent sunrise/sunset line with 🌅/🌇 icons, then the small station line) → Alerts in Effect → Current Conditions → Radar → Next 12 Hours → 7-Day Forecast. Alerts come first because they are the time-critical item.
 - **Every optional section degrades independently.** Alerts, Current Conditions, Radar, Hourly and Sun times each build inside their own guard; a failure omits just that section (logged with fixed strings only) — except Alerts in Effect, whose failure renders the notice "Alert information is unavailable right now." instead of being omitted, because silence there would read as an all-clear. Only the 7-day forecast being unavailable suppresses the Full send, as today.
 - **Imperial units**, matching Threshold Alerts. **Period labels** are NWS's own period names ("Today", "Tonight", "Overnight", "Saturday"…) plus the date from the period's `startTime`.
 
@@ -71,7 +71,7 @@ Normalized shape (a plain, queue-serializable array; numbers are rounded for dis
 
 ### Forecast periods
 
-Reuse `GetSevenDayForecast` unchanged. For each of its periods the Full view needs: `name`, date (`startTime` formatted `D, M j`), `shortForecast`, `temperature`/`temperatureUnit` (labelled "High" when `isDaytime`, "Low" otherwise), and the icon code parsed from `icon`. Brief continues to read only the first day and first night period.
+Reuse `GetSevenDayForecast` unchanged. For each of its periods the Full view needs: `name`, date (`startTime` formatted `D, M j`), `detailedForecast` (NWS's one-to-two sentence description; falls back to `shortForecast` when blank) as the row text, `shortForecast` kept as `short` for icon alt text, `temperature`/`temperatureUnit` (labelled "High" when `isDaytime`, "Low" otherwise), and the icon code parsed from `icon`. Brief continues to read only the first day and first night period.
 
 ### `App\Actions\Weather\GetHourlyForecast` (new)
 
@@ -106,7 +106,7 @@ Reuse `GetSevenDayForecast` unchanged. For each of its periods the Full view nee
     'current' => <GetCurrentConditions array>|null,
     'radar_site' => 'KFTG'|null,                          // the site code only -- the image is fetched at send time, never queued
     'hourly' => <GetHourlyForecast array>|null,
-    'periods' => [ ['name' =>, 'date' =>, 'summary' =>, 'label' => 'High'|'Low', 'temperature' =>, 'unit' =>, 'icon' => ['period' =>, 'code' =>]], … ],
+    'periods' => [ ['name' =>, 'date' =>, 'summary' => /* detailedForecast ?: shortForecast */, 'short' => /* shortForecast, icon alt text */, 'label' => 'High'|'Low', 'temperature' =>, 'unit' =>, 'icon' => ['period' =>, 'code' =>]], … ],
 ]
 ```
 
@@ -148,12 +148,12 @@ Gains a nullable trailing constructor parameter `?array $report = null`. Handlin
 
 A Markdown mailable (so it inherits the shared theme/header logo, per `.ai/rules/delivery.md`), with:
 
-- **Header**: location label; "Reporting station: {name} ({id}) — {lat}, {lng} — elev. {ft} ft" (omitted when there is no current-conditions data); "Sunrise {time} · Sunset {time}" (omitted when `sun` is null).
+- **Header**: location label; a prominent line directly under it — "🌅 **Sunrise** {time} · 🌇 **Sunset** {time}" at 15px in the normal text color (omitted when `sun` is null; emoji because NWS publishes no sun icons, they need no assets and render in every mail client; the plain-text version has the same line without emoji); then the small gray line "Reporting station: {name} ({id}) — {lat}, {lng} — elev. {ft} ft" (omitted when there is no current-conditions data). (The sun line was originally a small gray line below the station line and was easy to miss.)
 - **Alerts in Effect**: one row per alert — event name, headline, "until {expires}" in the location's timezone; "No active alerts." when the array is empty. Always present in a Full email: an empty state ("No active alerts.") is information, and a failed lookup shows "Alert information is unavailable right now." rather than disappearing.
 - **Current Conditions** (omitted entirely when `current` is null): icon + description, temperature, feels like, humidity, wind (direction, speed, and "gusting {n} mph" only when a gust exists), barometer (inHg), dewpoint, visibility (mi), "Last updated {observed_at}" in the location's timezone.
 - **Radar** (omitted when no image was fetched): the embedded image (`$message->embedData(...)`, rendered as a `cid:` `<img>`) with alt text "Radar near {location} from {site}" and a "Radar as of {send time}" caption.
 - **Next 12 Hours** (omitted when `hourly` is null): one row per hour — time, icon, temperature, "{n}%" precip chance (or `—`), wind, short summary.
-- **7-Day Forecast**: one row per period — icon, "{name} · {date}", short summary, "High|Low {temp}°{unit}".
+- **7-Day Forecast**: one row per period — icon (alt text = the short forecast), "{name} · {date}", the detailed forecast text (1–2 sentences, e.g. "Sunny. High near 84, with temperatures falling to around 81 in the afternoon. South southeast wind 2 to 9 mph, with gusts as high as 20 mph."), "High|Low {temp}°{unit}". A report queued before the `short` key existed falls back to the summary for the alt text.
 - A plain-text alternative view carrying the same content line-by-line, minus the radar image (the existing mail already ships a text alternative; this one must too).
 
 All dynamic values are Blade-escaped (`{{ }}`), never `{!! !!}`; the station name, description and summaries come from an external API.
