@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use Database\Seeders\ProductCatalogSeeder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -222,6 +223,23 @@ test('an spc wpc rule for the Convective Outlook can use RiskArea matching mode 
 
     expect($rule->matching_mode)->toBe(MatchingMode::RiskArea)
         ->and($rule->location_id)->toBe($location->id);
+});
+
+test('RiskArea is not offered as a matching mode for weather_alerts -- it only applies to spc_wpc', function () {
+    // Regression: matchingModeFields()'s default branch (every non-spc_wpc
+    // category) used to return MatchingMode::cases() unfiltered, which
+    // started including RiskArea the moment that case was added for SPC/WPC
+    // -- "By risk area at my location" leaked into Weather Alerts' picker
+    // even though its threshold logic (risk_levels) only exists on the
+    // spc_wpc branch.
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'weather_alerts'])
+        ->assertFormFieldExists('matching_mode', function (Radio $field): bool {
+            $optionValues = array_keys($field->getOptions());
+
+            return ! in_array(MatchingMode::RiskArea->value, $optionValues, true)
+                && in_array(MatchingMode::Polygon->value, $optionValues, true);
+        });
 });
 
 test('creating a lightning alert rejects a radius below the enforced minimum', function () {

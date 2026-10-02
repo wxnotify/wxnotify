@@ -442,7 +442,13 @@ class AlertRuleForm
             AlertCategory::SpcWpc => self::hasRiskLevelProducts($get)
                 ? [MatchingMode::Nationwide, MatchingMode::RiskArea]
                 : [MatchingMode::Nationwide, MatchingMode::Polygon],
-            default => MatchingMode::cases(),
+            // RiskArea's threshold reads risk_levels, which only Weather
+            // Alerts' sibling spc_wpc branch above ever populates -- every
+            // other mode is fair game here.
+            default => array_values(array_filter(
+                MatchingMode::cases(),
+                fn (MatchingMode $m): bool => $m !== MatchingMode::RiskArea,
+            )),
         };
 
         return [
