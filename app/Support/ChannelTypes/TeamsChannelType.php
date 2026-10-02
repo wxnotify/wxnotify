@@ -86,6 +86,11 @@ class TeamsChannelType implements ChannelType
         return "workflows://{$parsed['host']}/{$parsed['workflow']}/{$parsed['signature']}";
     }
 
+    public function supportsRichContent(): bool
+    {
+        return false;
+    }
+
     public function countsTowardFreeSlot(): bool
     {
         return true;

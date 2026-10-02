@@ -57,6 +57,11 @@ class NtfyChannelType implements ChannelType
         return "ntfy://{$topic}";
     }
 
+    public function supportsRichContent(): bool
+    {
+        return false;
+    }
+
     public function countsTowardFreeSlot(): bool
     {
         return true;

@@ -5,6 +5,7 @@ use App\Enums\Tier;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\Contracts\ChannelType;
 use App\Support\ChannelTypes\DiscordChannelType;
 use App\Support\ChannelTypes\EmailChannelType;
 use App\Support\ChannelTypes\NtfyChannelType;
@@ -290,4 +291,14 @@ test('pushover validates device names, priority, sound and emergency bounds', fu
         ->and(array_keys($fields['sound']->getOptions()))->toHaveCount(23)
         ->and($fields['retry_interval']->getDefaultState())->toBe(900)
         ->and($fields['expire']->getDefaultState())->toBe(3600);
+});
+
+test('only the email channel type supports rich content', function () {
+    $rich = app(ChannelTypeRegistry::class)->all()
+        ->filter(fn (ChannelType $type): bool => $type->supportsRichContent())
+        ->map(fn (ChannelType $type): string => $type->slug())
+        ->values()
+        ->all();
+
+    expect($rich)->toBe(['email']);
 });

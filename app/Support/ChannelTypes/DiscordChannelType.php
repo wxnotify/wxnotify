@@ -46,6 +46,11 @@ class DiscordChannelType implements ChannelType
         return "discord://{$matches[1]}/{$matches[2]}/";
     }
 
+    public function supportsRichContent(): bool
+    {
+        return false;
+    }
+
     public function countsTowardFreeSlot(): bool
     {
         return true;

@@ -46,6 +46,11 @@ class SlackChannelType implements ChannelType
         return "slack://{$matches[1]}/{$matches[2]}/{$matches[3]}/";
     }
 
+    public function supportsRichContent(): bool
+    {
+        return false;
+    }
+
     public function countsTowardFreeSlot(): bool
     {
         return true;

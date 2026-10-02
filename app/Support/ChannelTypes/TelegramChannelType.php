@@ -45,6 +45,11 @@ class TelegramChannelType implements ChannelType
         return 'tgram://'.rawurlencode($data['bot_token']).'/'.rawurlencode($data['chat_id']);
     }
 
+    public function supportsRichContent(): bool
+    {
+        return false;
+    }
+
     public function countsTowardFreeSlot(): bool
     {
         return true;

@@ -59,6 +59,11 @@ class EmailChannelType implements ChannelType
         return true;
     }
 
+    public function supportsRichContent(): bool
+    {
+        return true;
+    }
+
     public function countsTowardFreeSlot(): bool
     {
         return false;

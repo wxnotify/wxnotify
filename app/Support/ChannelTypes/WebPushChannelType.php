@@ -100,6 +100,11 @@ class WebPushChannelType implements ChannelType
         return filled(config('webpush.vapid.public_key')) && filled(config('webpush.vapid.private_key'));
     }
 
+    public function supportsRichContent(): bool
+    {
+        return false;
+    }
+
     /**
      * The browser-managed subscription has no subscriber-meaningful identity
      * beyond the push service it's registered with (never public_key/auth_token).

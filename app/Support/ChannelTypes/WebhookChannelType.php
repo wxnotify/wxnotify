@@ -332,6 +332,11 @@ class WebhookChannelType implements ChannelType
         return true;
     }
 
+    public function supportsRichContent(): bool
+    {
+        return false;
+    }
+
     /**
      * The host only -- never the full URL (path/query may carry a token)
      * and never config['secret'].

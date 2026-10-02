@@ -51,6 +51,13 @@ interface ChannelType
     public function isAvailable(): bool;
 
     /**
+     * Whether this channel can render a rich (HTML, inline images) message.
+     * Only such channels receive the Daily Weather Summary's Full format;
+     * every other type receives the Brief text.
+     */
+    public function supportsRichContent(): bool;
+
+    /**
      * Whether this channel counts against Free's single no-cost-channel
      * slot. False for Email, which is unlimited at every tier, and for
      * BYO-key paid channels, which are locked to Free entirely (they

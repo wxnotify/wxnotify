@@ -173,6 +173,11 @@ class PushoverChannelType implements ChannelType
         return "pover://{$data['user_key']}@{$data['api_token']}{$devices}{$queryString}";
     }
 
+    public function supportsRichContent(): bool
+    {
+        return false;
+    }
+
     /**
      * @return array<int, string>
      */
