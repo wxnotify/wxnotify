@@ -47,7 +47,8 @@ test('a real text-NEW, paired CAP, and text-continuation sequence produces one a
     // migration (see ExtractProductMetadataTest) -- no need to create it.
     $product = Product::where('code', 'FF.W')->sole();
     $location = Location::factory()->create(['lat' => 32.55, 'lng' => -110.58]); // inside the real captured polygon
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
 

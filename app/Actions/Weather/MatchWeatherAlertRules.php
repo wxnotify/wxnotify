@@ -11,6 +11,8 @@ use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\NotificationChannel;
+use App\Support\Geography\GeographyMatch;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -74,8 +76,10 @@ class MatchWeatherAlertRules
         }
 
         $rules->each(function (AlertRule $rule) use ($product): void {
-            if ($this->matchesGeographySafely($rule, $product) && $this->matchesRiskLevel($rule, $product)) {
-                $this->dispatchOrSuppress($rule, $product);
+            $match = $this->matchesGeographySafely($rule, $product);
+
+            if ($match->matched && $this->matchesRiskLevel($rule, $product)) {
+                $this->dispatchOrSuppress($rule, $product, $match->location);
             }
         });
     }
@@ -102,10 +106,10 @@ class MatchWeatherAlertRules
      * instead. Either way, a failure here only rolls back this one rule's
      * work, not the batch.
      */
-    private function matchesGeographySafely(AlertRule $rule, IngestedProduct $product): bool
+    private function matchesGeographySafely(AlertRule $rule, IngestedProduct $product): GeographyMatch
     {
         try {
-            return DB::transaction(fn (): bool => $this->matchesGeography($rule, $product));
+            return DB::transaction(fn (): GeographyMatch => $this->matchesGeography($rule, $product));
         } catch (Throwable $e) {
             logger()->error('Failed to evaluate geography match for AlertRule', [
                 'rule_id' => $rule->id,
@@ -113,15 +117,15 @@ class MatchWeatherAlertRules
                 'exception' => $e->getMessage(),
             ]);
 
-            return false;
+            return GeographyMatch::notMatched();
         }
     }
 
-    private function dispatchOrSuppress(AlertRule $rule, IngestedProduct $product): void
+    private function dispatchOrSuppress(AlertRule $rule, IngestedProduct $product, ?Location $matchedLocation): void
     {
-        $suppressed = $this->isWithinQuietHours($rule);
+        $suppressed = $this->isWithinQuietHours($rule, $matchedLocation);
 
-        $rule->notificationChannels->each(function (NotificationChannel $channel) use ($rule, $product, $suppressed): void {
+        $rule->notificationChannels->each(function (NotificationChannel $channel) use ($rule, $product, $suppressed, $matchedLocation): void {
             try {
                 // A backfilled SPC Convective Outlook row (see
                 // App\Actions\Pipeline\BackfillOutlookRiskAreas) gets
@@ -145,7 +149,7 @@ class MatchWeatherAlertRules
                         'user_id' => $rule->user_id,
                         'channel_type' => $channel->channel_type,
                         'status' => 'suppressed',
-                        'subject' => app(RenderAlertSubject::class)($rule, $product->product),
+                        'subject' => app(RenderAlertSubject::class)($rule, $product->product, $matchedLocation),
                         'ingested_product_id' => $product->id,
                         'dispatched_at' => now(),
                     ]);
@@ -153,7 +157,7 @@ class MatchWeatherAlertRules
                     return;
                 }
 
-                DeliverWeatherAlert::dispatch($rule->id, $channel->id, $product->id);
+                DeliverWeatherAlert::dispatch($rule->id, $channel->id, $product->id, $matchedLocation?->id);
             } catch (Throwable $e) {
                 logger()->error('Failed to dispatch DeliverWeatherAlert', [
                     'rule_id' => $rule->id,
@@ -165,21 +169,39 @@ class MatchWeatherAlertRules
         });
     }
 
-    private function matchesGeography(AlertRule $rule, IngestedProduct $product): bool
+    private function matchesGeography(AlertRule $rule, IngestedProduct $product): GeographyMatch
     {
         if ($rule->category === AlertCategory::ForecastDiscussion) {
-            return $this->matchesWfo($rule->wfo, $product->cccc);
+            return $this->matchesWfo($rule->wfo, $product->cccc) ? GeographyMatch::matched() : GeographyMatch::notMatched();
         }
 
         return match ($rule->matching_mode) {
-            MatchingMode::Nationwide => true,
-            MatchingMode::Wfo => $this->matchesWfo($rule->wfo, $product->cccc),
-            MatchingMode::Location => $this->matchesLocationZones($rule, $product),
-            MatchingMode::CountyZone => $this->matchesCountyZone($rule, $product),
-            MatchingMode::Polygon => $this->matchesPolygon($rule, $product) ?? $this->matchesLocationZones($rule, $product),
-            MatchingMode::RiskArea => $this->matchesRiskArea($rule, $product) ?? $this->matchesLocationZones($rule, $product),
-            null => false,
+            MatchingMode::Nationwide => GeographyMatch::matched(),
+            MatchingMode::Wfo => $this->matchesWfo($rule->wfo, $product->cccc) ? GeographyMatch::matched() : GeographyMatch::notMatched(),
+            MatchingMode::CountyZone => $this->matchesCountyZone($rule, $product) ? GeographyMatch::matched() : GeographyMatch::notMatched(),
+            MatchingMode::Location => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesLocationZones($location, $product)),
+            MatchingMode::Polygon => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesPolygon($location, $product) ?? $this->matchesLocationZones($location, $product)),
+            MatchingMode::RiskArea => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesRiskArea($rule, $location, $product) ?? $this->matchesLocationZones($location, $product)),
+            null => GeographyMatch::notMatched(),
         };
+    }
+
+    /**
+     * "Any attached location matches -> the rule fires": the first location
+     * (in attachment order) whose check succeeds wins and is the one
+     * downstream code (quiet hours, {location} subject rendering) treats as
+     * "the" match for this delivery. A rule with zero attached locations
+     * never matches in these three modes -- there is nothing to check.
+     */
+    private function matchesAnyLocation(AlertRule $rule, Closure $matchesLocation): GeographyMatch
+    {
+        foreach ($rule->locations as $location) {
+            if ($matchesLocation($location)) {
+                return GeographyMatch::matched($location);
+            }
+        }
+
+        return GeographyMatch::notMatched();
     }
 
     /**
@@ -212,19 +234,21 @@ class MatchWeatherAlertRules
     }
 
     /**
-     * Returns null (not false) when the product has no polygon, so the
-     * caller can fall back to matchesLocationZones() — most VTEC products
-     * don't carry a polygon, and a subscriber in Polygon mode shouldn't be
-     * silently missed on a warning type that's UGC-only.
+     * Takes the specific `Location` being checked (one of the rule's
+     * possibly several attached locations), not the rule itself. Returns
+     * null (not false) when the product has no polygon, so the caller can
+     * fall back to matchesLocationZones() — most VTEC products don't carry a
+     * polygon, and a subscriber in Polygon mode shouldn't be silently missed
+     * on a warning type that's UGC-only.
      */
-    private function matchesPolygon(AlertRule $rule, IngestedProduct $product): ?bool
+    private function matchesPolygon(Location $location, IngestedProduct $product): ?bool
     {
-        if ($rule->location === null || ! $rule->location->hasFix()) {
+        if (! $location->hasFix()) {
             return null;
         }
 
-        $lng = (float) $rule->location->lng;
-        $lat = (float) $rule->location->lat;
+        $lng = (float) $location->lng;
+        $lat = (float) $location->lat;
 
         $activeWwaResult = $this->matchesActiveWwaPolygon($product, $lng, $lat);
         if ($activeWwaResult !== null) {
@@ -294,14 +318,17 @@ class MatchWeatherAlertRules
      * inherits its own fallback to matchesLocationZones() -- rather than
      * silently never matching a rule that mixes a risk-area product with a
      * plain event-type one.
+     *
+     * Takes the specific location being checked (one of the rule's possibly
+     * several attached locations) rather than reading $rule->location.
      */
-    private function matchesRiskArea(AlertRule $rule, IngestedProduct $product): ?bool
+    private function matchesRiskArea(AlertRule $rule, Location $location, IngestedProduct $product): ?bool
     {
         if ($product->risk_level_polygons === null || $product->risk_level_polygons === []) {
-            return $this->matchesPolygon($rule, $product);
+            return $this->matchesPolygon($location, $product);
         }
 
-        if ($rule->location === null || ! $rule->location->hasFix()) {
+        if (! $location->hasFix()) {
             return null;
         }
 
@@ -311,8 +338,8 @@ class MatchWeatherAlertRules
             ->filter(fn (int|false $rank): bool => $rank !== false);
         $thresholdRank = $selectedRanks->isEmpty() ? 0 : $selectedRanks->min();
 
-        $lng = (float) $rule->location->lng;
-        $lat = (float) $rule->location->lat;
+        $lng = (float) $location->lng;
+        $lat = (float) $location->lat;
 
         foreach ($product->risk_level_polygons as $level => $points) {
             $rank = array_search($level, $order, true);
@@ -362,13 +389,13 @@ class MatchWeatherAlertRules
         return 'POLYGON(('.$coords->join(', ').'))';
     }
 
-    private function matchesLocationZones(AlertRule $rule, IngestedProduct $product): bool
+    private function matchesLocationZones(Location $location, IngestedProduct $product): bool
     {
-        if ($rule->location === null || ! $rule->location->hasFix() || $product->ugc_codes === null) {
+        if (! $location->hasFix() || $product->ugc_codes === null) {
             return false;
         }
 
-        $location = $this->ensureZonesResolved($rule->location);
+        $location = $this->ensureZonesResolved($location);
         $zones = array_filter([$location->forecast_zone_ugc, $location->county_ugc]);
 
         return array_intersect($zones, $product->ugc_codes) !== [];
@@ -406,22 +433,25 @@ class MatchWeatherAlertRules
     }
 
     /**
-     * Nationwide/Wfo/ForecastDiscussion rules have no Location at all —
-     * "quiet hours" implicitly means "my nighttime", which has no
-     * well-defined answer without one. These always deliver regardless of
-     * any quiet_hours_start/end value on the row.
+     * Nationwide/Wfo/CountyZone/ForecastDiscussion rules, and a
+     * Location/Polygon/RiskArea rule with zero attached locations or none
+     * that matched, pass $matchedLocation = null -- "quiet hours" implicitly
+     * means "my nighttime", which has no well-defined answer without a
+     * specific location. These always deliver regardless of any
+     * quiet_hours_start/end value on the row.
+     *
+     * Uses the location that actually matched THIS delivery, not an
+     * arbitrary or aggregated location across every location the rule has
+     * attached -- see the design spec for why that's the only well-defined
+     * choice once a rule can have more than one.
      */
-    private function isWithinQuietHours(AlertRule $rule): bool
+    private function isWithinQuietHours(AlertRule $rule, ?Location $matchedLocation): bool
     {
         if ($rule->quiet_hours_start === null || $rule->quiet_hours_end === null) {
             return false;
         }
 
-        if (! in_array($rule->matching_mode, [MatchingMode::Location, MatchingMode::Polygon, MatchingMode::CountyZone], true)) {
-            return false;
-        }
-
-        $timezone = $rule->location?->timezone;
+        $timezone = $matchedLocation?->timezone;
         if ($timezone === null) {
             return false;
         }

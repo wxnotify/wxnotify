@@ -220,10 +220,11 @@ test('a matched rule within its quiet hours window is suppressed and logged, not
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->create(['timezone' => 'America/New_York']);
     $rule = AlertRule::factory()->create([
-        'category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => $location->id,
+        'category' => 'weather_alerts', 'matching_mode' => 'location',
         'quiet_hours_start' => now('America/New_York')->subHour()->format('H:i:s'),
         'quiet_hours_end' => now('America/New_York')->addHour()->format('H:i:s'),
     ]);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $rule->notificationChannels()->attach($channel);
@@ -285,7 +286,8 @@ test('a Location-mode rule matches when the location\'s resolved zone overlaps t
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
@@ -299,7 +301,8 @@ test('a Location-mode rule with no zone overlap never matches', function () {
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->create(['forecast_zone_ugc' => 'NYZ999']);
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
@@ -345,7 +348,8 @@ test('a Polygon-mode rule matches when the location falls inside the product\'s 
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->create(['lat' => 40.5, 'lng' => -74.0]);
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching([
@@ -365,7 +369,8 @@ test('a Polygon-mode rule does not match a location outside the product\'s parse
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->create(['lat' => 10.0, 'lng' => -10.0]);
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching([
@@ -385,7 +390,8 @@ test('a Polygon-mode rule falls back to Location-style zone matching when the pr
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'polygon' => null, 'ugc_codes' => ['NYZ072']]);
@@ -402,9 +408,10 @@ test('a RiskArea-mode rule matches a location inside a HIGHER risk level than th
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
     $location = Location::factory()->create(['lat' => 34.5, 'lng' => -95.5]); // inside Moderate below
     $rule = AlertRule::factory()->create([
-        'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'location_id' => $location->id,
+        'category' => 'spc_wpc', 'matching_mode' => 'risk_area',
         'risk_levels' => ['Slight'],
     ]);
+    $rule->locations()->attach($location);
     $rule->products()->attach($outlook);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching([
@@ -425,9 +432,10 @@ test('a RiskArea-mode rule does not match a location inside a LOWER risk level t
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
     $location = Location::factory()->create(['lat' => 31, 'lng' => -99]); // inside Slight only, not Moderate
     $rule = AlertRule::factory()->create([
-        'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'location_id' => $location->id,
+        'category' => 'spc_wpc', 'matching_mode' => 'risk_area',
         'risk_levels' => ['Moderate'],
     ]);
+    $rule->locations()->attach($location);
     $rule->products()->attach($outlook);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching([
@@ -448,9 +456,10 @@ test('a RiskArea-mode rule with no risk_levels selected matches inside any risk 
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
     $location = Location::factory()->create(['lat' => 31, 'lng' => -99]); // inside Slight only
     $rule = AlertRule::factory()->create([
-        'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'location_id' => $location->id,
+        'category' => 'spc_wpc', 'matching_mode' => 'risk_area',
         'risk_levels' => null,
     ]);
+    $rule->locations()->attach($location);
     $rule->products()->attach($outlook);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching([
@@ -471,8 +480,9 @@ test('a RiskArea-mode rule falls back to plain polygon matching when the product
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
     $location = Location::factory()->create(['lat' => 40.5, 'lng' => -74.0]);
     $rule = AlertRule::factory()->create([
-        'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'location_id' => $location->id,
+        'category' => 'spc_wpc', 'matching_mode' => 'risk_area',
     ]);
+    $rule->locations()->attach($location);
     $rule->products()->attach($outlook);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     // e.g. an SPC Mesoscale Discussion sharing this rule -- no risk levels at all.
@@ -494,7 +504,8 @@ test('a Location-mode rule against a fixless mobile location never matches', fun
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->mobile()->create();
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ069']]);
@@ -508,7 +519,8 @@ test('a Polygon-mode rule against a fixless mobile location falls back to Locati
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->mobile()->create();
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
     $ingested = createIngestedProductWithoutMatching([
@@ -532,7 +544,8 @@ test('an exception evaluating one rule\'s geography does not prevent a second, v
     $product = Product::where('code', 'TO.W')->sole();
 
     $badLocation = Location::factory()->create();
-    $throwingRule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $badLocation->id]);
+    $throwingRule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon']);
+    $throwingRule->locations()->attach($badLocation);
     $throwingRule->products()->attach($product);
     $throwingRule->notificationChannels()->attach(NotificationChannel::factory()->for($throwingRule->user)->create());
 
@@ -559,7 +572,8 @@ test('a Polygon-mode rule matches against active_wwas\'s persisted polygon when 
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->create(['lat' => 40.5, 'lng' => -74.0]);
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
 
@@ -587,7 +601,8 @@ test('a Polygon-mode rule does not match a location outside active_wwas\'s persi
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->create(['lat' => 10.0, 'lng' => -10.0]);
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
 
@@ -617,7 +632,8 @@ test('when active_wwas has no persisted polygon for this VTEC key, matching fall
     Queue::fake();
     $product = Product::where('code', 'TO.W')->sole();
     $location = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => $location->id]);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon']);
+    $rule->locations()->attach($location);
     $rule->products()->attach($product);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
 
