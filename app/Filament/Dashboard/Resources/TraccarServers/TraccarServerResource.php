@@ -8,6 +8,7 @@ use App\Filament\Dashboard\Resources\TraccarServers\Pages\EditTraccarServer;
 use App\Filament\Dashboard\Resources\TraccarServers\Pages\ListTraccarServers;
 use App\Filament\Dashboard\Resources\TraccarServers\Schemas\TraccarServerForm;
 use App\Filament\Dashboard\Resources\TraccarServers\Tables\TraccarServersTable;
+use App\Filament\Dashboard\Resources\TraccarServers\Widgets\TraccarDevicesMapWidget;
 use App\Models\TraccarServer;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -67,6 +68,16 @@ class TraccarServerResource extends Resource
             'index' => ListTraccarServers::route('/'),
             'create' => CreateTraccarServer::route('/create'),
             'edit' => EditTraccarServer::route('/{record}/edit'),
+        ];
+    }
+
+    /**
+     * @return array<class-string>
+     */
+    public static function getWidgets(): array
+    {
+        return [
+            TraccarDevicesMapWidget::class,
         ];
     }
 }

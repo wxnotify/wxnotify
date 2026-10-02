@@ -4,6 +4,7 @@ namespace App\Filament\Dashboard\Resources\TraccarServers\Pages;
 
 use App\Filament\Dashboard\Resources\Concerns\DescribesListPage;
 use App\Filament\Dashboard\Resources\TraccarServers\TraccarServerResource;
+use App\Filament\Dashboard\Resources\TraccarServers\Widgets\TraccarDevicesMapWidget;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
@@ -21,6 +22,13 @@ class ListTraccarServers extends ListRecords
                 ->tooltip(fn (): ?string => auth()->user()->canCreateTraccarServer()
                     ? null
                     : 'You\'ve reached your plan\'s Traccar server limit — upgrade to add more.'),
+        ];
+    }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            TraccarDevicesMapWidget::class,
         ];
     }
 
