@@ -9,7 +9,6 @@ enum AlertCategory: string
     case Threshold = 'threshold';
     case SpcWpc = 'spc_wpc';
     case Lightning = 'lightning';
-    case ForecastDiscussion = 'forecast_discussion';
 
     public function label(): string
     {
@@ -19,7 +18,6 @@ enum AlertCategory: string
             self::Threshold => 'Threshold Alerts',
             self::SpcWpc => 'SPC & WPC Alerts',
             self::Lightning => 'Lightning Alerts',
-            self::ForecastDiscussion => 'Forecast Discussions',
         };
     }
 
@@ -31,7 +29,6 @@ enum AlertCategory: string
             self::Threshold => 'Get notified when a forecast variable crosses a value you set.',
             self::SpcWpc => 'Convective outlooks, mesoscale discussions, and rainfall outlooks.',
             self::Lightning => 'Lightning detected near a saved location.',
-            self::ForecastDiscussion => "A specific NWS office's forecast discussion.",
         };
     }
 
@@ -43,7 +40,6 @@ enum AlertCategory: string
             self::Threshold => 'heroicon-o-adjustments-horizontal',
             self::SpcWpc => 'heroicon-o-map',
             self::Lightning => 'heroicon-o-bolt',
-            self::ForecastDiscussion => 'heroicon-o-document-text',
         };
     }
 }

@@ -117,12 +117,12 @@ test('a generated SPC mesoscale discussion parses its concatenated polygon and d
     Queue::assertNotPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job) => $job->ruleId === $realRule->id);
 });
 
-test('a generated plain-text AFD dispatches to the fixture account forecast-discussion rule, never a real subscriber', function () {
+test('a generated plain-text AFD dispatches to the fixture account WFO rule with AFD attached, never a real subscriber', function () {
     Queue::fake([DeliverWeatherAlert::class]);
 
     $product = Product::where('code', 'AFD')->sole();
-    $testRule = e2eCreateRuleFor(true, null, ['category' => 'forecast_discussion', 'wfo' => 'PIH']);
-    $realRule = e2eCreateRuleFor(false, null, ['category' => 'forecast_discussion', 'wfo' => 'PIH']);
+    $testRule = e2eCreateRuleFor(true, $product, ['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'PIH', 'location_id' => null]);
+    $realRule = e2eCreateRuleFor(false, $product, ['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'PIH', 'location_id' => null]);
 
     $scenario = TestProductScenario::factory()->for($product)->create([
         'input' => ['mode' => 'new', 'wfo' => 'PIH', 'ugc_codes' => [], 'body_text' => 'Clear skies expected.'],

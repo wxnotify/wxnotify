@@ -18,6 +18,7 @@ use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Jbuitt\FilamentToggleList\ToggleList;
 
 use function Pest\Livewire\livewire;
 
@@ -274,7 +275,7 @@ test('creating a lightning alert at the minimum radius succeeds', function () {
         ->and($rule->displayName())->toBe('Lightning within 10 mi of Home');
 });
 
-test('creating a forecast discussion rule picks a real office from the WFO picker', function () {
+test('creating a Weather Alerts rule for the Area Forecast Discussion picks a real office from the WFO picker', function () {
     DB::table('cwa_boundaries')->insert([
         'wfo' => 'OKX', 'cwa' => 'OKX', 'city' => 'Upton', 'st' => 'NY', 'citystate' => 'Upton NY',
         'lon' => -72.5, 'lat' => 40.9,
@@ -282,9 +283,13 @@ test('creating a forecast discussion rule picks a real office from the WFO picke
         'created_at' => now(), 'updated_at' => now(),
     ]);
 
+    $afd = Product::where('code', 'AFD')->sole();
+
     livewire(CreateAlertRule::class)
         ->fillForm([
-            'category' => 'forecast_discussion',
+            'category' => 'weather_alerts',
+            'product_ids' => [$afd->category->value => [$afd->id]],
+            'matching_mode' => 'wfo',
             'wfo' => 'OKX',
             'channel_ids' => [$this->channel->id],
         ])
@@ -293,7 +298,9 @@ test('creating a forecast discussion rule picks a real office from the WFO picke
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->wfo)->toBe('OKX');
+    expect($rule->wfo)->toBe('OKX')
+        ->and($rule->category->value)->toBe('weather_alerts')
+        ->and($rule->products->pluck('code')->all())->toBe(['AFD']);
 });
 
 test('the WFO picker rejects an office not in the real cwa_boundaries table', function () {
@@ -306,9 +313,13 @@ test('the WFO picker rejects an office not in the real cwa_boundaries table', fu
         'created_at' => now(), 'updated_at' => now(),
     ]);
 
+    $afd = Product::where('code', 'AFD')->sole();
+
     livewire(CreateAlertRule::class)
         ->fillForm([
-            'category' => 'forecast_discussion',
+            'category' => 'weather_alerts',
+            'product_ids' => [$afd->category->value => [$afd->id]],
+            'matching_mode' => 'wfo',
             'wfo' => 'ZZZ',
             'channel_ids' => [$this->channel->id],
         ])
@@ -548,17 +559,18 @@ test('editing a CountyZone rule preserves its stored codes without requiring the
     expect($rule->fresh()->county_zone_codes)->toBe('NYZ072,NYC061');
 });
 
-test('the forecast discussion wfo field defaults to the subscriber\'s most recent location\'s CWA', function () {
-    DB::table('cwa_boundaries')->insert([
-        'wfo' => 'OKX', 'cwa' => 'OKX', 'lon' => -72.5, 'lat' => 40.9,
-        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
-        'created_at' => now(), 'updated_at' => now(),
-    ]);
-    $this->location->update(['lat' => 40.5, 'lng' => -72.5]);
+test('the Area Forecast Discussion is offered under Weather Alerts, in the Other Forecasts group', function () {
+    $afd = Product::where('code', 'AFD')->sole();
 
     livewire(CreateAlertRule::class)
-        ->fillForm(['category' => 'forecast_discussion'])
-        ->assertFormSet(['wfo' => 'OKX']);
+        ->fillForm(['category' => 'weather_alerts'])
+        ->assertFormFieldExists("product_ids.{$afd->category->value}", fn (ToggleList $field): bool => array_key_exists($afd->id, $field->getOptions()));
+});
+
+test('Forecast Discussions is no longer a category in the wizard', function () {
+    livewire(CreateAlertRule::class)
+        ->assertFormFieldExists('category', fn (Radio $field): bool => ! array_key_exists('forecast_discussion', $field->getOptions())
+            && count($field->getOptions()) === 5);
 });
 
 test('a Free subscriber\'s wizard never shows the message customization fields', function () {

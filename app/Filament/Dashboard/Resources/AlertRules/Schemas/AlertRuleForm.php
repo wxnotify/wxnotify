@@ -74,7 +74,6 @@ class AlertRuleForm
                     ->live()
                     ->afterStateUpdated(function (Set $set, Get $get): void {
                         self::seedProductIdsDefaults($set, $get);
-                        self::seedForecastDiscussionWfoDefault($set, $get);
                         self::clearAlertTemplateIfCategoryUnsupported($set, $get);
                     }),
             ]);
@@ -107,23 +106,6 @@ class AlertRuleForm
     }
 
     /**
-     * `wfo` (forecastDiscussionFields()'s field) hits the exact same timing
-     * issue as product_ids above: it only enters the schema once `category`
-     * is picked, so a plain ->default() on the field itself never fires
-     * (confirmed via a control test: radius_miles's pre-existing
-     * ->default(15) in lightningFields() — same dynamic-step context —
-     * also never applies). Seeded here the same way instead, guarded on
-     * the field currently being blank so switching categories away and
-     * back, or typing over the suggestion, never clobbers a real value.
-     */
-    protected static function seedForecastDiscussionWfoDefault(Set $set, Get $get): void
-    {
-        if ($get('category') === AlertCategory::ForecastDiscussion->value && blank($get('wfo'))) {
-            $set('wfo', self::suggestedWfo());
-        }
-    }
-
-    /**
      * alert_template_id's own field is hidden (not just disabled) once the
      * category changes away from weather_alerts/spc_wpc, and a hidden
      * field is neither dehydrated nor validated by default -- so without
@@ -148,7 +130,6 @@ class AlertRuleForm
                 AlertCategory::Threshold => self::thresholdFields(),
                 AlertCategory::DailySummary => self::dailySummaryFields(),
                 AlertCategory::Lightning => self::lightningFields(),
-                AlertCategory::ForecastDiscussion => self::forecastDiscussionFields(),
                 null => [],
             });
     }
@@ -287,7 +268,7 @@ class AlertRuleForm
     {
         return [
             ...self::productSections(Product::query()
-                ->whereIn('family', ['warning', 'watch', 'advisory', 'statement', 'informational', 'administrative', 'aviation'])
+                ->whereIn('family', ['warning', 'watch', 'advisory', 'statement', 'informational', 'administrative', 'aviation', 'forecast_discussion'])
                 ->where('status', 'active')),
             ...self::matchingModeFields(AlertCategory::WeatherAlerts),
         ];
@@ -529,44 +510,6 @@ class AlertRuleForm
     }
 
     /**
-     * @return array<Component>
-     */
-    protected static function forecastDiscussionFields(): array
-    {
-        return [
-            // No ->default() here: this field only enters the schema once
-            // category is picked, so a bare default() never fires -- see
-            // seedForecastDiscussionWfoDefault(), which sets it eagerly
-            // from categoryStep()'s afterStateUpdated() hook instead.
-            self::wfoField()
-                ->helperText('Search by office code or by city/state if you\'re not sure which is yours.'),
-        ];
-    }
-
-    /**
-     * Suggests a WFO from the subscriber's most recently added Location via
-     * a real ST_Contains lookup against cwa_boundaries -- a convenience
-     * default only (the subscriber can still type over it), since this
-     * wizard step has no location picker of its own for ForecastDiscussion
-     * rules.
-     */
-    protected static function suggestedWfo(): ?string
-    {
-        $location = auth()->user()->locations()->latest()->first();
-
-        if ($location === null) {
-            return null;
-        }
-
-        $row = DB::selectOne(
-            'SELECT cwa FROM cwa_boundaries WHERE ST_Contains(boundary, ST_SetSRID(ST_MakePoint(?, ?), 4269)) LIMIT 1',
-            [(float) $location->lng, (float) $location->lat],
-        );
-
-        return $row?->cwa;
-    }
-
-    /**
      * Deliberately native (no ->searchable()/->relationship()): Select's
      * non-native mode renders a choices.js widget wired up via
      * $wire.$entangle(), which errors ("cannot be found on component") for
@@ -643,11 +586,9 @@ class AlertRuleForm
      * keyed on the natural `cwa` code (already the exact 3-letter identifier
      * this app compares against IngestedProduct.cccc elsewhere) and labeled
      * with the office's real city/state for a subscriber who doesn't have
-     * their local office's code memorized. Shared by both call sites (the
-     * Wfo matching-mode field and Forecast Discussion's office field) --
-     * this is the same field as locationSelect()'s note below now describes
-     * an exception for; see that docblock for why ->searchable() is safe
-     * here despite this file's documented dynamic-step entangle bug.
+     * their local office's code memorized. See locationSelect()'s note below
+     * for why ->searchable() is safe here despite this file's documented
+     * dynamic-step entangle bug.
      */
     protected static function wfoField(): Select
     {

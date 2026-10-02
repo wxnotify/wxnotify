@@ -77,8 +77,11 @@ test('a replayed non-vtec product is delivered only to test account rules', func
     // still run for real, on the sync queue connection tests use, or a replay
     // would never actually reach MatchWeatherAlertRules.
     Queue::fake([DeliverWeatherAlert::class]);
-    $realRule = replayRule(User::factory()->create(['is_test_account' => false]), ['category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'TWC', 'location_id' => null]);
-    $testRule = replayRule(User::factory()->create(['is_test_account' => true]), ['category' => 'forecast_discussion', 'matching_mode' => null, 'wfo' => 'TWC', 'location_id' => null]);
+    $afd = Product::where('code', 'AFD')->sole();
+    $realRule = replayRule(User::factory()->create(['is_test_account' => false]), ['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'TWC', 'location_id' => null]);
+    $realRule->products()->attach($afd);
+    $testRule = replayRule(User::factory()->create(['is_test_account' => true]), ['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'TWC', 'location_id' => null]);
+    $testRule->products()->attach($afd);
 
     $copy = app(ReplayIngestedProduct::class)(replayForecastDiscussion());
 

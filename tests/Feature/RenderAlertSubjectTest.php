@@ -114,8 +114,8 @@ test('{location} resolves to the rule\'s location label when present', function 
 test('{location} falls back to the WFO code when the rule has a WFO but no location', function () {
     $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
     $rule = AlertRule::factory()->for($plusUser)->create([
-        'category' => 'forecast_discussion',
-        'matching_mode' => null,
+        'category' => 'weather_alerts',
+        'matching_mode' => 'wfo',
         'location_id' => null,
         'wfo' => 'OKX',
         'custom_subject_template' => 'Discussion for {location}',

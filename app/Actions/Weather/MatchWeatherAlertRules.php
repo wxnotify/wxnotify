@@ -31,39 +31,17 @@ class MatchWeatherAlertRules
 {
     private const PRODUCT_MATCHED_CATEGORIES = [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc];
 
-    /**
-     * The catalog code for the one product Forecast Discussion rules mean: the office's Area
-     * Forecast Discussion. Subscribers only ever pick a WFO for this category (there is no
-     * product step in the wizard) precisely because it always means this single product --
-     * matching on WFO alone, with no product check at all, would instead match every product
-     * type that office issues.
-     */
-    private const FORECAST_DISCUSSION_PRODUCT_CODE = 'AFD';
-
     public function __invoke(IngestedProduct $product): void
     {
-        $categories = [];
-        if ($product->product_id !== null) {
-            array_push($categories, ...self::PRODUCT_MATCHED_CATEGORIES);
-
-            if ($product->product?->code === self::FORECAST_DISCUSSION_PRODUCT_CODE) {
-                $categories[] = AlertCategory::ForecastDiscussion;
-            }
-        }
-
-        if ($categories === []) {
+        if ($product->product_id === null) {
             return;
         }
 
         try {
             $rules = AlertRule::query()
                 ->where('is_active', true)
-                ->whereIn('category', $categories)
-                ->where(function (Builder $query) use ($product) {
-                    $query->where('category', AlertCategory::ForecastDiscussion)
-                        ->orWhere(fn (Builder $q) => $q->whereIn('category', self::PRODUCT_MATCHED_CATEGORIES)
-                            ->whereHas('products', fn (Builder $q) => $q->whereKey($product->product_id)));
-                })
+                ->whereIn('category', self::PRODUCT_MATCHED_CATEGORIES)
+                ->whereHas('products', fn (Builder $q) => $q->whereKey($product->product_id))
                 ->when($product->is_test, fn (Builder $query) => $query->whereHas('user', fn (Builder $q) => $q->where('is_test_account', true)))
                 ->get();
         } catch (Throwable $e) {
@@ -171,10 +149,6 @@ class MatchWeatherAlertRules
 
     private function matchesGeography(AlertRule $rule, IngestedProduct $product): GeographyMatch
     {
-        if ($rule->category === AlertCategory::ForecastDiscussion) {
-            return $this->matchesWfo($rule->wfo, $product->cccc) ? GeographyMatch::matched() : GeographyMatch::notMatched();
-        }
-
         return match ($rule->matching_mode) {
             MatchingMode::Nationwide => GeographyMatch::matched(),
             MatchingMode::Wfo => $this->matchesWfo($rule->wfo, $product->cccc) ? GeographyMatch::matched() : GeographyMatch::notMatched(),
@@ -434,7 +408,7 @@ class MatchWeatherAlertRules
     }
 
     /**
-     * Nationwide/Wfo/CountyZone/ForecastDiscussion rules, and a
+     * Nationwide/Wfo/CountyZone rules, and a
      * Location/Polygon/RiskArea rule with zero attached locations or none
      * that matched, pass $matchedLocation = null -- "quiet hours" implicitly
      * means "my nighttime", which has no well-defined answer without a

@@ -131,7 +131,6 @@ class AlertRule extends Model
             AlertCategory::DailySummary => "Daily summary for {$this->location?->label}",
             AlertCategory::Threshold => "{$this->variable?->label()} {$this->direction?->label()} {$this->threshold_value}{$this->variable?->unit()}",
             AlertCategory::Lightning => "Lightning within {$this->radius_miles} mi of {$this->location?->label}",
-            AlertCategory::ForecastDiscussion => "Forecast discussion — {$this->wfo}",
         };
     }
 }
