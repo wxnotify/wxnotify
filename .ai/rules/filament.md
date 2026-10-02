@@ -1,6 +1,7 @@
 ---
 paths:
   - 'app/Filament/**'
+  - 'resources/views/filament/**'
 ---
 
 # Filament
@@ -56,3 +57,6 @@ A read-only display field with a dotted state path (e.g. TextInput::make('config
 
 ## Dynamic Wizard-step entangle bug is about ->relationship()/AJAX, not ->multiple() itself
 The documented Filament dynamic-Wizard-step entangle bug (Select inside a `Step::schema(fn (Get $get) => ...)` closure) is triggered by `->relationship()` or other AJAX-entangled state -- NOT by `->multiple()`/`->searchable()` on their own. A plain `Select::make(...)->multiple()->options(fn () => [...])` (options resolved server-side, no relationship()) is safe in this exact context, already proven in two places: `AlertRuleForm::countyZoneField()` (browser-verified) and `locationsSelect()` (browser-verified + controller-verified via direct Livewire component state inspection, no desync). Don't avoid `->multiple()` in a dynamic Wizard step on this basis alone -- only avoid `->relationship()`/live AJAX-backed options there.
+
+## Resource widgets & Leaflet maps
+**Resource widgets & Leaflet maps.** A widget shown via a Resource page's `getHeaderWidgets()` must also be returned from `Resource::getWidgets()` (that is what registers its Livewire component). Load Leaflet only through `filament.partials.leaflet-loader` (`window.whenLeafletReady`); it shares Pinpoint's `pinpoint:leaflet:loaded` / `window.leafletLoading` / `#leaflet-css` protocol, so keep that interop. Put map logic in a global `window.*` init function called from `x-init` (an x-init expression does not reliably resolve `L`), put `wire:ignore` on the Alpine root, and tear down (clear timers, `map.remove()`) in Alpine `destroy()`. Fetch data with a `#[Renderless]` public method called via `await $wire.method()`, never during render. Render external strings only with DOM nodes / `textContent` (never `innerHTML` or bound popup HTML). A data method on a tier-gated resource's widget needs a matching `canView()` (enforced on every hydrate).

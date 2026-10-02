@@ -127,10 +127,11 @@
 
                         if (existing) {
                             existing.setLatLng([device.lat, device.lng]);
+                            existing.options.title = existing.options.alt = device.name;
                             existing.setIcon(icon);
                             existing.setPopupContent(popupContent(device));
                         } else {
-                            const marker = L.marker([device.lat, device.lng], { icon: icon })
+                            const marker = L.marker([device.lat, device.lng], { icon: icon, title: device.name, alt: device.name })
                                 .bindPopup(popupContent(device))
                                 .addTo(state.map);
                             state.markers.set(device.key, marker);
@@ -153,19 +154,19 @@
                 };
 
                 const refresh = async () => {
-                    let data;
-
                     try {
-                        data = await $wire.devices();
+                        const data = await $wire.devices();
+
+                        if (state.destroyed || ! state.map) { return; }
+
+                        if (! data || ! Array.isArray(data.devices)) {
+                            throw new Error('Unexpected map payload');
+                        }
+
+                        render(data);
                     } catch (error) {
                         if (! state.destroyed) { captionEl.textContent = "Couldn't refresh the map."; }
-
-                        return;
                     }
-
-                    if (state.destroyed || ! state.map) { return; }
-
-                    render(data);
                 };
 
                 window.whenLeafletReady(() => {
@@ -178,6 +179,8 @@
 
                     refresh();
                     state.timer = setInterval(refresh, REFRESH_MS);
+                }, () => {
+                    if (! state.destroyed) { captionEl.textContent = "Couldn't load the map."; }
                 });
             };
         </script>

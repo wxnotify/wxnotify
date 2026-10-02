@@ -4,6 +4,8 @@ use App\Actions\Traccar\GetTraccarDeviceMap;
 use App\Models\TraccarServer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -33,7 +35,7 @@ function fakeTraccar(string $host, array $devices, array $positions): array
     ];
 }
 
-function position(int $deviceId, float $lat = 39.74, float $lng = -104.99, ?string $serverTime = '2026-10-02T11:59:00Z'): array
+function traccarPosition(int $deviceId, float $lat = 39.74, float $lng = -104.99, ?string $serverTime = '2026-10-02T11:59:00Z'): array
 {
     return ['id' => $deviceId * 10, 'deviceId' => $deviceId, 'latitude' => $lat, 'longitude' => $lng, 'fixTime' => '2026-10-02T11:58:00Z', 'serverTime' => $serverTime];
 }
@@ -45,8 +47,8 @@ test('devices on several servers are joined to their positions, labelled by serv
         ...fakeTraccar('fleet.example.com', [
             ['id' => 1, 'name' => 'Truck 1', 'lastUpdate' => '2026-10-02T11:55:00Z'],
             ['id' => 2, 'name' => 'Truck 2', 'lastUpdate' => '2026-10-02T11:50:00Z'],
-        ], [position(1, 40.0, -105.0), position(2, 41.0, -106.0)]),
-        ...fakeTraccar('boat.example.com', [['id' => 7, 'name' => 'Dinghy', 'lastUpdate' => '2026-10-02T11:59:00Z']], [position(7, 25.7, -80.1)]),
+        ], [traccarPosition(1, 40.0, -105.0), traccarPosition(2, 41.0, -106.0)]),
+        ...fakeTraccar('boat.example.com', [['id' => 7, 'name' => 'Dinghy', 'lastUpdate' => '2026-10-02T11:59:00Z']], [traccarPosition(7, 25.7, -80.1)]),
     ]);
 
     $result = (new GetTraccarDeviceMap)([$fleet, $boat]);
@@ -65,7 +67,7 @@ test('a device is stale after exactly more than one hour without a check-in', fu
         ['id' => 1, 'name' => 'Exactly an hour', 'lastUpdate' => '2026-10-02T11:00:00Z'],
         ['id' => 2, 'name' => 'A second over', 'lastUpdate' => '2026-10-02T10:59:59Z'],
         ['id' => 3, 'name' => 'Recent', 'lastUpdate' => '2026-10-02T11:59:59Z'],
-    ], [position(1), position(2), position(3)]));
+    ], [traccarPosition(1), traccarPosition(2), traccarPosition(3)]));
 
     $stale = collect((new GetTraccarDeviceMap)([$server])['devices'])->pluck('stale', 'name')->all();
 
@@ -77,7 +79,7 @@ test('a missing lastUpdate falls back to the position serverTime, and no time at
     Http::fake(fakeTraccar('fleet.example.com', [
         ['id' => 1, 'name' => 'Fallback', 'lastUpdate' => null],
         ['id' => 2, 'name' => 'Nothing', 'lastUpdate' => null],
-    ], [position(1, serverTime: '2026-10-02T11:58:00Z'), position(2, serverTime: null)]));
+    ], [traccarPosition(1, serverTime: '2026-10-02T11:58:00Z'), traccarPosition(2, serverTime: null)]));
 
     $devices = collect((new GetTraccarDeviceMap)([$server])['devices'])->keyBy('name');
 
@@ -93,7 +95,7 @@ test('a device with no position is counted, and a disabled device is ignored', f
         ['id' => 1, 'name' => 'Placed', 'lastUpdate' => '2026-10-02T11:59:00Z'],
         ['id' => 2, 'name' => 'Never reported', 'lastUpdate' => null],
         ['id' => 3, 'name' => 'Disabled', 'disabled' => true, 'lastUpdate' => '2026-10-02T11:59:00Z'],
-    ], [position(1), position(3)]));
+    ], [traccarPosition(1), traccarPosition(3)]));
 
     $result = (new GetTraccarDeviceMap)([$server]);
 
@@ -108,28 +110,47 @@ test('one server failing never affects the others, and is named as unreachable',
     $badFakes = match ($scenario) {
         'a 500' => ['bad.example.com/api/devices' => Http::response([], 500), 'bad.example.com/api/positions' => Http::response([])],
         'a 401' => ['bad.example.com/api/devices' => Http::response(['error' => 'no'], 401), 'bad.example.com/api/positions' => Http::response([], 401)],
-        'a redirect' => ['bad.example.com/api/devices' => Http::response('', 302), 'bad.example.com/api/positions' => Http::response([])],
+        'a redirect' => ['bad.example.com/api/devices' => Http::response('', 302, ['Location' => 'https://elsewhere.example.com/x']), 'bad.example.com/api/positions' => Http::response([])],
         'a non-json body' => ['bad.example.com/api/devices' => Http::response('<html>hi</html>'), 'bad.example.com/api/positions' => Http::response([])],
         'non-numeric coordinates' => fakeTraccar('bad.example.com', [['id' => 1, 'name' => 'X']], [['deviceId' => 1, 'latitude' => 'north', 'longitude' => 'west']]),
         'a malformed device' => fakeTraccar('bad.example.com', ['not-a-device'], []),
+        'an array-typed name' => fakeTraccar('bad.example.com', [['id' => 1, 'name' => ['x']]], []),
+        'an array-typed id' => fakeTraccar('bad.example.com', [['id' => [1], 'name' => 'X']], []),
+        'a junk string id' => fakeTraccar('bad.example.com', [['id' => 'abc', 'name' => 'X']], []),
+        'an array-typed deviceId' => fakeTraccar('bad.example.com', [['id' => 1, 'name' => 'X']], [['deviceId' => [1], 'latitude' => 1, 'longitude' => 1]]),
+        'a latitude of 91' => fakeTraccar('bad.example.com', [['id' => 1, 'name' => 'X']], [['deviceId' => 1, 'latitude' => 91, 'longitude' => 0]]),
+        'a longitude of -181' => fakeTraccar('bad.example.com', [['id' => 1, 'name' => 'X']], [['deviceId' => 1, 'latitude' => 0, 'longitude' => -181]]),
+        'an infinite coordinate' => fakeTraccar('bad.example.com', [['id' => 1, 'name' => 'X']], [['deviceId' => 1, 'latitude' => '1e999', 'longitude' => 0]]),
+        'an infinite JSON number' => [
+            'bad.example.com/api/devices' => Http::response([['id' => 1, 'name' => 'X']]),
+            'bad.example.com/api/positions' => Http::response('[{"deviceId":1,"latitude":0,"longitude":1e999}]', 200, ['Content-Type' => 'application/json']),
+        ],
         'a connection failure' => ['bad.example.com/*' => fn () => throw new ConnectionException('Connection refused')],
     };
 
-    Http::fake([...fakeTraccar('good.example.com', [['id' => 1, 'name' => 'Fine', 'lastUpdate' => '2026-10-02T11:59:00Z']], [position(1)]), ...$badFakes]);
+    Http::fake([...fakeTraccar('good.example.com', [['id' => 1, 'name' => 'Fine', 'lastUpdate' => '2026-10-02T11:59:00Z']], [traccarPosition(1)]), ...$badFakes]);
 
     $result = (new GetTraccarDeviceMap)([$good, $bad]);
 
     expect(collect($result['devices'])->pluck('name')->all())->toBe(['Fine'])
-        ->and($result['unreachable'])->toBe(['Bad']);
-})->with(['a 500', 'a 401', 'a redirect', 'a non-json body', 'non-numeric coordinates', 'a malformed device', 'a connection failure']);
+        ->and($result['unreachable'])->toBe(['Bad'])
+        ->and(Cache::has("traccar-device-map:{$bad->id}:{$bad->updated_at->getTimestamp()}"))->toBeFalse();
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'elsewhere.example.com'));
+})->with([
+    'a 500', 'a 401', 'a redirect', 'a non-json body', 'non-numeric coordinates', 'a malformed device',
+    'an array-typed name', 'an array-typed id', 'a junk string id', 'an array-typed deviceId',
+    'a latitude of 91', 'a longitude of -181', 'an infinite coordinate', 'an infinite JSON number', 'a connection failure',
+]);
 
 test('requests carry the bearer token, and the token never appears in the result', function () {
     $server = mapServer('Fleet', 'fleet.example.com', 'super-secret-token');
-    Http::fake(fakeTraccar('fleet.example.com', [['id' => 1, 'name' => 'Truck', 'lastUpdate' => '2026-10-02T11:59:00Z']], [position(1)]));
+    Http::fake(fakeTraccar('fleet.example.com', [['id' => 1, 'name' => 'Truck', 'lastUpdate' => '2026-10-02T11:59:00Z']], [traccarPosition(1)]));
 
     $result = (new GetTraccarDeviceMap)([$server]);
 
-    Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer super-secret-token'));
+    Http::assertSentCount(2);
+    Http::assertNotSent(fn ($request) => ! $request->hasHeader('Authorization', 'Bearer super-secret-token'));
     expect(json_encode($result))->not->toContain('super-secret-token')->not->toContain('fleet.example.com');
 });
 
@@ -144,8 +165,8 @@ test('each server is cached for 60 seconds, and editing it busts only its own ca
     $fleet = mapServer('Fleet', 'fleet.example.com');
     $boat = mapServer('Boat', 'boat.example.com');
     Http::fake([
-        ...fakeTraccar('fleet.example.com', [['id' => 1, 'name' => 'Truck', 'lastUpdate' => '2026-10-02T11:59:00Z']], [position(1)]),
-        ...fakeTraccar('boat.example.com', [['id' => 7, 'name' => 'Dinghy', 'lastUpdate' => '2026-10-02T11:59:00Z']], [position(7)]),
+        ...fakeTraccar('fleet.example.com', [['id' => 1, 'name' => 'Truck', 'lastUpdate' => '2026-10-02T11:59:00Z']], [traccarPosition(1)]),
+        ...fakeTraccar('boat.example.com', [['id' => 7, 'name' => 'Dinghy', 'lastUpdate' => '2026-10-02T11:59:00Z']], [traccarPosition(7)]),
     ]);
 
     (new GetTraccarDeviceMap)([$fleet, $boat]);
@@ -170,7 +191,7 @@ test('a failed fetch is not cached, so the next call retries', function () {
         'fleet.example.com/api/devices' => Http::sequence()
             ->push([], 500)
             ->push([['id' => 1, 'name' => 'Truck', 'lastUpdate' => '2026-10-02T11:59:00Z']]),
-        'fleet.example.com/api/positions' => Http::response([position(1)]),
+        'fleet.example.com/api/positions' => Http::response([traccarPosition(1)]),
     ]);
 
     $first = (new GetTraccarDeviceMap)([$server]);
@@ -183,7 +204,7 @@ test('a failed fetch is not cached, so the next call retries', function () {
 
 test('staleness is recomputed on every call, even from cache', function () {
     $server = mapServer('Fleet', 'fleet.example.com');
-    Http::fake(fakeTraccar('fleet.example.com', [['id' => 1, 'name' => 'Truck', 'lastUpdate' => '2026-10-02T11:00:30Z']], [position(1)]));
+    Http::fake(fakeTraccar('fleet.example.com', [['id' => 1, 'name' => 'Truck', 'lastUpdate' => '2026-10-02T11:00:30Z']], [traccarPosition(1)]));
 
     // 12:00:00 -> the check-in is 59 m 30 s old: fresh.
     $fresh = (new GetTraccarDeviceMap)([$server])['devices'][0]['stale'];
@@ -211,4 +232,36 @@ test('failures log only fixed strings with the server id and status', function (
 
     Log::shouldHaveReceived('warning')->with('Traccar device map: server returned an error', ['traccar_server_id' => $failing->id, 'status' => 500])->once();
     Log::shouldHaveReceived('warning')->with('Traccar device map: server unreachable', ['traccar_server_id' => $unreachable->id])->once();
+});
+
+test('a server whose base_url cannot be parsed is unreachable, and never takes the others down', function () {
+    Log::spy();
+    $good = mapServer('Good', 'good.example.com');
+    $bad = mapServer('Bad', 'bad.example.com:80800');
+    Http::fake(fakeTraccar('good.example.com', [['id' => 1, 'name' => 'Fine', 'lastUpdate' => '2026-10-02T11:59:00Z']], [traccarPosition(1)]));
+
+    $result = (new GetTraccarDeviceMap)([$bad, $good]);
+
+    expect(collect($result['devices'])->pluck('name')->all())->toBe(['Fine'])
+        ->and($result['unreachable'])->toBe(['Bad'])
+        ->and(Cache::has("traccar-device-map:{$bad->id}:{$bad->updated_at->getTimestamp()}"))->toBeFalse();
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'bad.example.com'));
+    Log::shouldHaveReceived('warning')->with('Traccar device map: server misconfigured', ['traccar_server_id' => $bad->id])->once();
+});
+
+test('a server whose api_token cannot be decrypted is unreachable, and never takes the others down', function () {
+    Log::spy();
+    $good = mapServer('Good', 'good.example.com');
+    $bad = mapServer('Bad', 'bad.example.com');
+    DB::table('traccar_servers')->where('id', $bad->id)->update(['api_token' => 'not-encrypted-at-all']);
+    $bad = $bad->fresh();
+    Http::fake(fakeTraccar('good.example.com', [['id' => 1, 'name' => 'Fine', 'lastUpdate' => '2026-10-02T11:59:00Z']], [traccarPosition(1)]));
+
+    $result = (new GetTraccarDeviceMap)([$good, $bad]);
+
+    expect(collect($result['devices'])->pluck('name')->all())->toBe(['Fine'])
+        ->and($result['unreachable'])->toBe(['Bad'])
+        ->and(Cache::has("traccar-device-map:{$bad->id}:{$bad->updated_at->getTimestamp()}"))->toBeFalse();
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'bad.example.com'));
+    Log::shouldHaveReceived('warning')->with('Traccar device map: server misconfigured', ['traccar_server_id' => $bad->id])->once();
 });

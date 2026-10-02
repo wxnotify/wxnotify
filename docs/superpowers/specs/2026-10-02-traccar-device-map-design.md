@@ -34,7 +34,7 @@ A full-width map above the Traccar Servers table that plots every device, on eve
 ```php
 [
     'devices' => [
-        ['server' => 'Fleet', 'name' => 'Truck 1', 'lat' => 39.74, 'lng' => -104.99,
+        ['server' => 'Fleet', 'key' => '12:1', 'name' => 'Truck 1', 'lat' => 39.74, 'lng' => -104.99,
          'last_checkin' => '2026-10-02T17:15:00+00:00'|null, 'stale' => false],
         …
     ],
@@ -42,6 +42,8 @@ A full-width map above the Traccar Servers table that plots every device, on eve
     'unreachable' => ['Server B'],      // labels of servers that failed or returned malformed data
 ]
 ```
+
+Two deltas to this shape were made during implementation. Each device entry carries a `key` (`"{server id}:{Traccar device id}"`), the stable identity the widget uses to update markers in place across refreshes (a device id alone is not unique across servers). And the widget's `devices()` payload adds `has_servers` (bool, whether the subscriber has any server at all), so the caption can tell "no servers defined" from "servers defined, nothing plottable".
 
 - **Per server**: `GET {base_url}/api/devices` and `GET {base_url}/api/positions`, Bearer token, short timeout (**5 s**, tighter than the poller's 10 s because a viewer is waiting), no redirects followed. Servers are fetched **in parallel** (`Http::pool`) so total time is the slowest server, not the sum.
 - **Join**: positions keyed by `deviceId`; each device with a numeric `latitude`/`longitude` position becomes a map entry. A device with no position counts toward `unplaced`. A **disabled** device (`disabled: true`) is skipped entirely.
@@ -78,6 +80,9 @@ A full-width map above the Traccar Servers table that plots every device, on eve
 - All external strings are rendered with `textContent` (pop-up and caption) — no HTML injection from a hostile or misconfigured Traccar server.
 - Every query is scoped to `auth()->user()`'s own servers.
 - **Flagged, not changed here:** subscriber-supplied `base_url` is fetched server-side with no private-address guard — pre-existing for the poller and `ListTraccarDevices`. This feature adds a fetch on every page view (with a short response, parsed into a narrow shape, redirects disabled in the new action), so it widens that surface slightly but exposes no response bodies. The recommended follow-up is one `TraccarUrlGuard` (block private/reserved hosts, credentials in the URL, and redirects — but, unlike `WebhookUrlGuard`, allow plain `http`, since self-hosted Traccar is commonly `http://host:8082`) applied at form-save and request time to all three Traccar actions. That is a separate change; the owner decides whether it ships with this one.
+- The agreed `TraccarUrlGuard` follow-up should apply at save (Create and Edit, since only Create probes the server today) and at request time to all three Traccar actions, with redirects disabled in each. It should carry over the DNS-vs-HTTP-client TOCTOU note from `.ai/rules/delivery.md` (pinning via `CURLOPT_RESOLVE` is the eventual fix). It can hook into the per-server pre-flight step that `GetTraccarDeviceMap` already runs before building its request pool, so a blocked host lands in `unreachable` like any other misconfigured server.
+- A device reporting exactly (0, 0) ("Null Island", a common no-fix placeholder) is currently plotted like any other position; hiding or flagging those is a possible follow-up.
+- A server that is misconfigured (unparseable `base_url`, e.g. a typo'd port on the unprobed Edit form, or an `api_token` that no longer decrypts) is caught in that pre-flight step, logged with a fixed string and its id only, and reported in `unreachable`; it never fails the whole request. Out-of-range or non-finite coordinates, and non-scalar or non-integer-like ids and names, void that server's result as malformed.
 
 ## Non-goals
 

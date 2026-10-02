@@ -72,3 +72,21 @@ test('the Traccar Servers list page shows the map, with servers and with none', 
 
     livewire(ListTraccarServers::class)->assertSeeLivewire(TraccarDevicesMapWidget::class);
 });
+
+test('a Free-tier subscriber is forbidden from the widget data method', function () {
+    $this->actingAs(User::factory()->create(['tier_override' => Tier::Free]));
+    TraccarServer::factory()->for(auth()->user())->create(['base_url' => 'https://mine.example.com']);
+    Http::fake();
+
+    livewire(TraccarDevicesMapWidget::class)->call('devices')->assertForbidden();
+
+    Http::assertNothingSent();
+});
+
+test('a Plus subscriber gets the payload back from the renderless widget data method', function () {
+    Http::fake();
+
+    livewire(TraccarDevicesMapWidget::class)
+        ->call('devices')
+        ->assertReturned(['devices' => [], 'unplaced' => 0, 'unreachable' => [], 'has_servers' => false]);
+});

@@ -3,6 +3,7 @@
 namespace App\Actions\Traccar;
 
 use App\Models\TraccarServer;
+use GuzzleHttp\Psr7\Uri;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
@@ -73,29 +74,56 @@ class GetTraccarDeviceMap
             return [];
         }
 
-        $responses = Http::pool(function (Pool $pool) use ($servers): array {
-            $requests = [];
-
-            foreach ($servers as $server) {
-                $base = rtrim($server->base_url, '/');
-
-                foreach (['devices', 'positions'] as $endpoint) {
-                    $requests[] = $pool->as("{$endpoint}:{$server->id}")
-                        ->withToken((string) $server->api_token)
-                        ->acceptJson()
-                        ->timeout(self::TIMEOUT_SECONDS)
-                        ->withOptions(['allow_redirects' => false])
-                        ->get("{$base}/api/{$endpoint}");
-                }
-            }
-
-            return $requests;
-        });
-
         $results = [];
+        $pooled = [];
 
         foreach ($servers as $server) {
-            $result = $this->normalize($server, $responses["devices:{$server->id}"] ?? null, $responses["positions:{$server->id}"] ?? null);
+            if ($this->isConfigured($server)) {
+                $pooled[] = $server;
+            } else {
+                Log::warning('Traccar device map: server misconfigured', ['traccar_server_id' => $server->id]);
+                $results[$server->id] = null;
+            }
+        }
+
+        if ($pooled === []) {
+            return $results;
+        }
+
+        try {
+            $responses = Http::pool(function (Pool $pool) use ($pooled): array {
+                $requests = [];
+
+                foreach ($pooled as $server) {
+                    $base = rtrim($server->base_url, '/');
+
+                    foreach (['devices', 'positions'] as $endpoint) {
+                        $requests[] = $pool->as("{$endpoint}:{$server->id}")
+                            ->withToken((string) $server->api_token)
+                            ->acceptJson()
+                            ->timeout(self::TIMEOUT_SECONDS)
+                            ->withOptions(['allow_redirects' => false])
+                            ->get("{$base}/api/{$endpoint}");
+                    }
+                }
+
+                return $requests;
+            });
+        } catch (Throwable) {
+            foreach ($pooled as $server) {
+                Log::warning('Traccar device map: request failed', ['traccar_server_id' => $server->id]);
+                $results[$server->id] = null;
+            }
+
+            return $results;
+        }
+
+        foreach ($pooled as $server) {
+            try {
+                $result = $this->normalize($server, $responses["devices:{$server->id}"] ?? null, $responses["positions:{$server->id}"] ?? null);
+            } catch (Throwable) {
+                $result = $this->malformed($server);
+            }
 
             if ($result !== null) {
                 Cache::put($this->cacheKey($server), $result, now()->addSeconds(self::CACHE_SECONDS));
@@ -105,6 +133,27 @@ class GetTraccarDeviceMap
         }
 
         return $results;
+    }
+
+    /**
+     * Http::pool builds its requests lazily, so an undecryptable token or an
+     * unparseable base_url would otherwise throw mid-pool and take every
+     * server down with it. Doing the same work up front confines the failure
+     * to the one misconfigured server.
+     */
+    private function isConfigured(TraccarServer $server): bool
+    {
+        try {
+            $base = rtrim((string) $server->base_url, '/');
+
+            (string) $server->api_token;
+            new Uri("{$base}/api/devices");
+            new Uri("{$base}/api/positions");
+
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -143,9 +192,9 @@ class GetTraccarDeviceMap
 
         foreach ($positionList as $position) {
             if (! is_array($position)
-                || ! isset($position['deviceId'])
-                || ! is_numeric($position['latitude'] ?? null)
-                || ! is_numeric($position['longitude'] ?? null)
+                || ! $this->isIntegerLike($position['deviceId'] ?? null)
+                || ! $this->isCoordinate($position['latitude'] ?? null, 90)
+                || ! $this->isCoordinate($position['longitude'] ?? null, 180)
             ) {
                 return $this->malformed($server);
             }
@@ -157,7 +206,10 @@ class GetTraccarDeviceMap
         $unplaced = 0;
 
         foreach ($deviceList as $device) {
-            if (! is_array($device) || ! isset($device['id'], $device['name'])) {
+            if (! is_array($device)
+                || ! $this->isIntegerLike($device['id'] ?? null)
+                || ! (is_string($device['name'] ?? null) || is_int($device['name'] ?? null) || is_float($device['name'] ?? null))
+            ) {
                 return $this->malformed($server);
             }
 
@@ -242,10 +294,23 @@ class GetTraccarDeviceMap
         }
     }
 
+    private function isIntegerLike(mixed $value): bool
+    {
+        return is_int($value) || (is_string($value) && preg_match('/^-?\d+$/', $value) === 1);
+    }
+
     /**
-     * @return null
+     * Numeric, finite (is_numeric('1e999') is true, but it casts to INF) and
+     * within +/- $limit degrees.
      */
-    private function malformed(TraccarServer $server)
+    private function isCoordinate(mixed $value, int $limit): bool
+    {
+        return is_numeric($value)
+            && is_finite((float) $value)
+            && abs((float) $value) <= $limit;
+    }
+
+    private function malformed(TraccarServer $server): null
     {
         Log::warning('Traccar device map: server returned a malformed response', ['traccar_server_id' => $server->id]);
 
