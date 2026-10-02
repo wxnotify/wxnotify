@@ -174,3 +174,9 @@ test('the 7-day rows show the detailed forecast text, while the icon alt text st
         ->and(substr_count($html, 'alt="Sunny"'))->toBe(2)
         ->and($html)->not->toContain('alt="Sunny, with a high');
 });
+
+test('the 7-day icon cell and image have fixed widths so long forecast text cannot squeeze them', function () {
+    $html = (new DailySummaryMail('Title', presenterReport(), 'brief'))->render();
+
+    expect($html)->toMatch('/<td[^>]*width="50"[^>]*min-width: 50px[^>]*><img[^>]*width: 40px[^>]*min-width: 40px[^>]*height: 40px/');
+});
