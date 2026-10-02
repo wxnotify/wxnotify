@@ -47,5 +47,6 @@ class CreateAlertRule extends CreateRecord
             collect($this->data['product_ids'] ?? [])->flatten()->filter(fn ($id): bool => is_numeric($id))->values()->all()
         );
         $this->record->notificationChannels()->sync($this->data['channel_ids'] ?? []);
+        $this->record->locations()->sync($this->data['location_ids'] ?? []);
     }
 }

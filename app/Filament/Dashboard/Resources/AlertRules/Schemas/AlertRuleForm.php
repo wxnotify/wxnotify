@@ -458,7 +458,7 @@ class AlertRuleForm
                 ->descriptions(fn (Get $get): array => collect($allowedModes($get))->mapWithKeys(fn (MatchingMode $m) => [$m->value => $m->helperText()])->all())
                 ->required()
                 ->live(),
-            self::locationSelect()
+            self::locationsSelect()
                 ->visible(fn (Get $get): bool => in_array($get('matching_mode'), [MatchingMode::Location->value, MatchingMode::Polygon->value, MatchingMode::RiskArea->value], true)),
             self::wfoField()
                 ->visible(fn (Get $get): bool => $get('matching_mode') === MatchingMode::Wfo->value),
@@ -575,11 +575,53 @@ class AlertRuleForm
      * constructed once the category is known, not present at initial mount
      * like a static schema's fields are). A native <select wire:model>
      * sidesteps the entangle path entirely.
+     *
+     * Threshold/DailySummary/Lightning only -- these categories each pick a
+     * single location directly (no matching_mode concept), so they keep
+     * this singular location_id field. See locationsSelect() below for the
+     * Weather Alerts/SPC & WPC multi-location field.
      */
     protected static function locationSelect(): Select
     {
         return Select::make('location_id')
             ->label('Location')
+            ->options(fn (): array => auth()->user()->locations()->pluck('label', 'id')->all())
+            ->required()
+            ->exists('locations', 'id', fn (Exists $rule): Exists => $rule->where('user_id', auth()->id()))
+            ->createOptionForm(LocationForm::fields())
+            ->createOptionAction(fn (Action $action): Action => $action
+                ->visible(fn (): bool => auth()->user()->canCreateLocation())
+                ->modalHeading('Add a location'))
+            ->createOptionUsing(fn (array $data): int => auth()->user()->locations()->create($data)->getKey())
+            ->helperText(fn (): ?string => match (true) {
+                auth()->user()->locations()->exists() => null,
+                auth()->user()->canCreateLocation() => 'No saved locations yet — use the + button to add one.',
+                default => 'You\'ve reached your location limit — remove one or upgrade to add another.',
+            });
+    }
+
+    /**
+     * Weather Alerts/SPC & WPC only -- Threshold/DailySummary/Lightning
+     * keep the separate singular location_id field (daily summary/
+     * threshold/lightning fields aren't built through this method).
+     * ->multiple() is safe in this dynamic Step::schema(fn (Get $get) =>
+     * ...) context because options() below is a plain closure, not
+     * ->relationship() -- see countyZoneField()'s docblock in this same
+     * file, proven safe here in a real browser already for exactly this
+     * reason. ->exists() applied directly to this multiple() field's array
+     * value works with no extra wiring: Laravel's own validateExists()
+     * (Illuminate\Validation\Concerns\ValidatesAttributes) counts unique
+     * values in the submitted array and requires that many matches from
+     * the scoped query, so a single id belonging to another subscriber
+     * fails the whole field -- verified by reading that method directly,
+     * not assumed, and covered by "a subscriber cannot attach another
+     * subscriber's location via location_ids" below.
+     */
+    protected static function locationsSelect(): Select
+    {
+        return Select::make('location_ids')
+            ->label('Locations')
+            ->multiple()
             ->options(fn (): array => auth()->user()->locations()->pluck('label', 'id')->all())
             ->required()
             ->exists('locations', 'id', fn (Exists $rule): Exists => $rule->where('user_id', auth()->id()))

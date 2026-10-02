@@ -39,6 +39,7 @@ class EditAlertRule extends EditRecord
             ->map(fn ($products) => $products->pluck('id')->all())
             ->all();
         $data['channel_ids'] = $this->record->notificationChannels->pluck('id')->all();
+        $data['location_ids'] = $this->record->locations->pluck('id')->all();
 
         // county_zone_codes is a multi-select over a plain comma-joined
         // string column (not an array/JSON-cast one like product_ids), so
@@ -92,5 +93,6 @@ class EditAlertRule extends EditRecord
             collect($this->data['product_ids'] ?? [])->flatten()->filter(fn ($id): bool => is_numeric($id))->values()->all()
         );
         $this->record->notificationChannels()->sync($this->data['channel_ids'] ?? []);
+        $this->record->locations()->sync($this->data['location_ids'] ?? []);
     }
 }

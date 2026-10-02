@@ -98,7 +98,7 @@ test('creating a weather alerts rule persists the chosen products and matching m
             'category' => 'weather_alerts',
             'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
             'matching_mode' => 'location',
-            'location_id' => $this->location->id,
+            'location_ids' => [$this->location->id],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -107,6 +107,7 @@ test('creating a weather alerts rule persists the chosen products and matching m
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
     expect($rule->matching_mode->value)->toBe('location')
+        ->and($rule->locations->pluck('id')->all())->toBe([$this->location->id])
         ->and($rule->products->pluck('id')->all())->toBe([$tornadoWarning->id])
         ->and($rule->displayName())->toBe('Tornado Warning');
 });
@@ -213,7 +214,7 @@ test('an spc wpc rule for the Convective Outlook can use RiskArea matching mode 
             'product_ids' => [$outlook->category->value => [$outlook->id]],
             'risk_levels' => ['Moderate'],
             'matching_mode' => 'risk_area',
-            'location_id' => $location->id,
+            'location_ids' => [$location->id],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -222,7 +223,7 @@ test('an spc wpc rule for the Convective Outlook can use RiskArea matching mode 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
     expect($rule->matching_mode)->toBe(MatchingMode::RiskArea)
-        ->and($rule->location_id)->toBe($location->id);
+        ->and($rule->locations->pluck('id')->all())->toBe([$location->id]);
 });
 
 test('RiskArea is not offered as a matching mode for weather_alerts -- it only applies to spc_wpc', function () {
@@ -665,4 +666,80 @@ test('changing an alert rule\'s category away from weather_alerts clears a stale
         ->assertHasNoFormErrors();
 
     expect($rule->fresh()->alert_template_id)->toBeNull();
+});
+
+test('creating a weather alerts rule with two locations persists both via the pivot', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $secondLocation = Location::factory()->for($this->user)->create();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
+            'matching_mode' => 'location',
+            'location_ids' => [$this->location->id, $secondLocation->id],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($rule->locations->pluck('id')->sort()->values()->all())
+        ->toBe(collect([$this->location->id, $secondLocation->id])->sort()->values()->all());
+});
+
+test('editing an existing multi-location rule pre-fills every attached location, and saving without changes keeps them all', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $secondLocation = Location::factory()->for($this->user)->create();
+    $rule = AlertRule::factory()->for($this->user)->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => null]);
+    $rule->products()->attach($tornadoWarning);
+    $rule->locations()->attach([$this->location->id, $secondLocation->id]);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet(['location_ids' => [$this->location->id, $secondLocation->id]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->locations->pluck('id')->sort()->values()->all())
+        ->toBe(collect([$this->location->id, $secondLocation->id])->sort()->values()->all());
+});
+
+test('editing a multi-location rule down to one location detaches the rest', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $secondLocation = Location::factory()->for($this->user)->create();
+    $rule = AlertRule::factory()->for($this->user)->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => null]);
+    $rule->products()->attach($tornadoWarning);
+    $rule->locations()->attach([$this->location->id, $secondLocation->id]);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        // ->set('data.X', value), not ->fillForm([...]) -- this file's own
+        // EditAlertRule tests consistently change one field this way (see
+        // 'alert_template_id gets cleared' further down), not fillForm(),
+        // which this file reserves for CreateAlertRule's initial fill.
+        ->set('data.location_ids', [$this->location->id])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->locations->pluck('id')->all())->toBe([$this->location->id]);
+});
+
+test('a subscriber cannot attach another subscriber\'s location via location_ids', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $othersLocation = Location::factory()->for(User::factory())->create();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
+            'matching_mode' => 'location',
+            'location_ids' => [$othersLocation->id],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['location_ids']);
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
 });
