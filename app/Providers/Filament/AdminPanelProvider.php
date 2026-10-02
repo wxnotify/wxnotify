@@ -7,7 +7,7 @@ use App\Filament\Admin\Widgets\AlertRulesByCategoryChart;
 use App\Models\User;
 use Bityukov\CommandCenter\Filament\CommandCenterPlugin;
 use CerealKiller97\FilamentBugReports\BugReportsPlugin;
-use EightCedars\FilamentInactivityGuard\FilamentInactivityGuardPlugin;
+// use EightCedars\FilamentInactivityGuard\FilamentInactivityGuardPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -55,7 +55,7 @@ class AdminPanelProvider extends PanelProvider
                 CommandCenterPlugin::make(),
                 ServiceDeskAdminPlugin::make(),
                 CookieConsentPlugin::make(),
-                FilamentInactivityGuardPlugin::make(),
+                // FilamentInactivityGuardPlugin::make(),
                 BugReportsPlugin::make()
                     ->authorizeManagementUsing(fn (User $user): bool => (bool) $user->is_staff),
                 FilamentSpatieLaravelHealthPlugin::make()
