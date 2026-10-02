@@ -3,6 +3,7 @@
 namespace App\Actions\Weather;
 
 use App\Models\Location;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -28,9 +29,15 @@ class GetNwsPoint
         $lng = number_format((float) $location->lng, 4, '.', '');
 
         return Cache::remember("nws-point:{$lat},{$lng}", now()->addDays(7), function () use ($lat, $lng): ?array {
-            $response = Http::withHeaders(['User-Agent' => $this->userAgent()])
-                ->timeout(10)
-                ->get("https://api.weather.gov/points/{$lat},{$lng}");
+            try {
+                $response = Http::withHeaders(['User-Agent' => $this->userAgent()])
+                    ->timeout(10)
+                    ->get("https://api.weather.gov/points/{$lat},{$lng}");
+            } catch (ConnectionException) {
+                Log::warning('NWS point lookup connection failed');
+
+                return null;
+            }
 
             if (! $response->successful()) {
                 Log::warning('NWS point lookup failed', ['status' => $response->status()]);
@@ -44,14 +51,32 @@ class GetNwsPoint
                 return null;
             }
 
+            $forecast = $this->trustedUrl($properties['forecast'] ?? null);
+            $forecastHourly = $this->trustedUrl($properties['forecastHourly'] ?? null);
+            $observationStations = $this->trustedUrl($properties['observationStations'] ?? null);
+
+            if ($forecast === null && $forecastHourly === null && $observationStations === null) {
+                Log::warning('NWS point lookup returned no usable URLs');
+
+                return null;
+            }
+
             return [
-                'forecast' => $properties['forecast'] ?? null,
-                'forecastHourly' => $properties['forecastHourly'] ?? null,
-                'observationStations' => $properties['observationStations'] ?? null,
+                'forecast' => $forecast,
+                'forecastHourly' => $forecastHourly,
+                'observationStations' => $observationStations,
                 'radarStation' => $properties['radarStation'] ?? null,
                 'timeZone' => $properties['timeZone'] ?? null,
             ];
         });
+    }
+
+    /**
+     * URLs in an NWS response are fetched later, so only api.weather.gov ones are kept.
+     */
+    private function trustedUrl(mixed $url): ?string
+    {
+        return is_string($url) && str_starts_with($url, 'https://api.weather.gov/') ? $url : null;
     }
 
     private function userAgent(): string

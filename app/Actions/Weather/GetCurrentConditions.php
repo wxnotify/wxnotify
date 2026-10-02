@@ -4,6 +4,7 @@ namespace App\Actions\Weather;
 
 use App\Models\Location;
 use App\Support\WeatherIcon;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
@@ -55,22 +56,36 @@ class GetCurrentConditions
     {
         $stations = $this->get($stationsUrl);
 
-        if ($stations === null || ! $stations->successful()) {
-            Log::warning('NWS station list lookup failed', ['status' => $stations?->status()]);
+        if ($stations === null) {
+            Log::warning('NWS station list connection failed');
 
             return null;
         }
 
-        foreach (array_slice($stations->json('features') ?? [], 0, self::MAX_STATIONS) as $feature) {
-            $id = $feature['properties']['stationIdentifier'] ?? null;
+        if (! $stations->successful()) {
+            Log::warning('NWS station list lookup failed', ['status' => $stations->status()]);
 
-            if (! is_string($id) || preg_match('/^[A-Z0-9]{3,5}$/', $id) !== 1) {
+            return null;
+        }
+
+        $features = $stations->json('features');
+
+        foreach (array_slice(is_array($features) ? $features : [], 0, self::MAX_STATIONS) as $feature) {
+            $id = is_array($feature) ? data_get($feature, 'properties.stationIdentifier') : null;
+
+            if (! is_string($id) || preg_match('/^[A-Z0-9]{3,5}\z/', $id) !== 1) {
                 continue;
             }
 
             $observation = $this->get("https://api.weather.gov/stations/{$id}/observations/latest");
 
-            if ($observation === null || ! $observation->successful()) {
+            if ($observation === null) {
+                Log::warning('NWS observation connection failed');
+
+                continue;
+            }
+
+            if (! $observation->successful()) {
                 continue;
             }
 
@@ -93,7 +108,11 @@ class GetCurrentConditions
             return false;
         }
 
-        return Carbon::parse($properties['timestamp'])->gte(now()->subHours(self::MAX_AGE_HOURS));
+        try {
+            return Carbon::parse($properties['timestamp'])->gte(now()->subHours(self::MAX_AGE_HOURS));
+        } catch (InvalidFormatException) {
+            return false;
+        }
     }
 
     /**

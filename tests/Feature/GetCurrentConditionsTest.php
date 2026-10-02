@@ -3,6 +3,7 @@
 use App\Actions\Weather\GetCurrentConditions;
 use App\Actions\Weather\GetNwsPoint;
 use App\Models\Location;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -192,4 +193,70 @@ test('the result is cached for the location', function () {
     (new GetCurrentConditions)($this->location);
 
     Http::assertSentCount(3); // point + station list + one observation, once
+});
+
+test('GetNwsPoint returns null instead of throwing when the points request cannot connect', function () {
+    Http::fake(['api.weather.gov/points/*' => fn () => throw new ConnectionException('timeout')]);
+
+    expect((new GetNwsPoint)($this->location))->toBeNull();
+    expect((new GetCurrentConditions)($this->location))->toBeNull();
+});
+
+test('GetNwsPoint drops a URL on a foreign host and nothing is ever requested from it', function () {
+    nwsFreshHttp();
+    Http::fake([
+        'api.weather.gov/points/*' => Http::response(nwsPoint(['observationStations' => 'https://evil.example/stations'])),
+        'evil.example/*' => Http::response(nwsStations([['id' => 'KEIK']])),
+    ]);
+
+    $point = (new GetNwsPoint)($this->location);
+
+    expect($point['observationStations'])->toBeNull()
+        ->and($point['forecast'])->toBe('https://api.weather.gov/gridpoints/BOU/64,73/forecast');
+    expect((new GetCurrentConditions)($this->location))->toBeNull();
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'evil.example'));
+});
+
+test('GetNwsPoint returns null, uncached, when none of the three URLs is usable', function () {
+    nwsFreshHttp();
+    Http::fake(['api.weather.gov/points/*' => Http::response(nwsPoint([
+        'forecast' => 'https://evil.example/forecast',
+        'forecastHourly' => 'http://api.weather.gov/insecure',
+        'observationStations' => null,
+    ]))]);
+
+    expect((new GetNwsPoint)($this->location))->toBeNull();
+    expect((new GetNwsPoint)($this->location))->toBeNull();
+    Http::assertSentCount(2);
+});
+
+test('a station with a malformed observation timestamp is skipped for the next nearest', function () {
+    ccFake(['KEIK', 'KBJC'], [
+        'KEIK' => nwsObservation(['timestamp' => 'not-a-date']),
+        'KBJC' => nwsObservation(),
+    ]);
+
+    expect((new GetCurrentConditions)($this->location)['station']['id'])->toBe('KBJC');
+});
+
+test('a station list without a features array is treated as no stations', function () {
+    nwsFreshHttp();
+    Http::fake([
+        'api.weather.gov/points/*' => Http::response(nwsPoint()),
+        'api.weather.gov/gridpoints/BOU/64,73/stations' => Http::response(['features' => 'oops']),
+    ]);
+
+    expect((new GetCurrentConditions)($this->location))->toBeNull();
+});
+
+test('a station identifier with a trailing newline never reaches a url', function () {
+    nwsFreshHttp();
+    Http::fake([
+        'api.weather.gov/points/*' => Http::response(nwsPoint()),
+        'api.weather.gov/gridpoints/BOU/64,73/stations' => Http::response(nwsStations([['id' => "KEIK\n"], ['id' => 'KBJC']])),
+        'api.weather.gov/stations/KBJC/observations/latest' => Http::response(nwsObservation()),
+    ]);
+
+    expect((new GetCurrentConditions)($this->location)['station']['id'])->toBe('KBJC');
+    Http::assertSentCount(3);
 });
