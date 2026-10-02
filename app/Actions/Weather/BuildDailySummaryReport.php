@@ -26,7 +26,7 @@ class BuildDailySummaryReport
      */
     public function __invoke(Location $location, bool $includeTestAlerts = false): ?array
     {
-        $forecast = app(GetSevenDayForecast::class)($location);
+        $forecast = $this->guard('forecast', fn (): array => app(GetSevenDayForecast::class)($location)) ?? [];
 
         if ($forecast === []) {
             return null;

@@ -4,9 +4,11 @@ use App\Actions\Weather\BuildDailySummaryReport;
 use App\Models\ActiveWwa;
 use App\Models\Location;
 use App\Models\Product;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     Carbon::setTestNow('2026-10-02 15:00:00'); // 09:00 America/Denver
@@ -118,4 +120,18 @@ test('test alerts are included only when the caller says the owner is a test acc
 
     expect((new BuildDailySummaryReport)($this->location)['alerts'])->toBe([])
         ->and((new BuildDailySummaryReport)($this->location, includeTestAlerts: true)['alerts'])->toHaveCount(1);
+});
+
+test('a connection failure fetching the seven-day forecast returns null and logs only the exception class', function () {
+    Log::spy();
+    nwsFakeEverything([
+        'api.weather.gov/gridpoints/BOU/64,73/forecast' => fn () => throw new ConnectionException('timeout'),
+    ]);
+
+    expect((new BuildDailySummaryReport)($this->location))->toBeNull();
+
+    Log::shouldHaveReceived('warning')->once()->with(
+        'Daily summary forecast section failed',
+        ['exception' => ConnectionException::class],
+    );
 });
