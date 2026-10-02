@@ -11,6 +11,8 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
+use Illuminate\Support\Facades\Http;
 use Livewire\Features\SupportTesting\Testable;
 use Minishlink\WebPush\MessageSentReport;
 use Minishlink\WebPush\Subscription;
@@ -240,4 +242,77 @@ function chanFakePushService(bool $success = true, int $status = 201, bool $expi
     });
 
     return $sent;
+}
+
+/**
+ * Http::fake() calls STACK -- the first matching stub wins, so faking the same
+ * URL a second time in one test is silently ignored. Any test that re-fakes
+ * (e.g. to try a second scenario after Cache::flush()) must start from a fresh
+ * client; every nws* fake helper below does this itself.
+ */
+function nwsFreshHttp(): void
+{
+    Http::swap(new Factory);
+}
+
+/**
+ * Decoded body of an NWS /points response. Overrides replace top-level
+ * `properties` keys.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function nwsPoint(array $overrides = []): array
+{
+    return ['properties' => array_replace([
+        'forecast' => 'https://api.weather.gov/gridpoints/BOU/64,73/forecast',
+        'forecastHourly' => 'https://api.weather.gov/gridpoints/BOU/64,73/forecast/hourly',
+        'forecastGridData' => 'https://api.weather.gov/gridpoints/BOU/64,73',
+        'observationStations' => 'https://api.weather.gov/gridpoints/BOU/64,73/stations',
+        'radarStation' => 'KFTG',
+        'timeZone' => 'America/Denver',
+    ], $overrides)];
+}
+
+/**
+ * @param  array<int, array{id: string, name?: string, lng?: float, lat?: float, elevation_m?: float}>  $stations
+ * @return array<string, mixed>
+ */
+function nwsStations(array $stations): array
+{
+    return ['features' => array_map(fn (array $station): array => [
+        'geometry' => ['type' => 'Point', 'coordinates' => [$station['lng'] ?? -105.05033, $station['lat'] ?? 40.01169]],
+        'properties' => [
+            'stationIdentifier' => $station['id'],
+            'name' => $station['name'] ?? 'Erie Municipal Airport',
+            'elevation' => ['unitCode' => 'wmoUnit:m', 'value' => $station['elevation_m'] ?? 1549.908],
+        ],
+    ], $stations)];
+}
+
+/**
+ * Decoded body of an NWS observations/latest response (recursive overrides,
+ * so ['temperature' => ['value' => null]] nulls just that value).
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function nwsObservation(array $overrides = []): array
+{
+    return ['properties' => array_replace_recursive([
+        'timestamp' => '2026-10-02T14:35:00+00:00',
+        'textDescription' => 'Clear',
+        'icon' => 'https://api.weather.gov/icons/land/day/skc?size=medium',
+        'temperature' => ['value' => 12.0, 'unitCode' => 'wmoUnit:degC'],
+        'dewpoint' => ['value' => 8.0, 'unitCode' => 'wmoUnit:degC'],
+        'windDirection' => ['value' => 0, 'unitCode' => 'wmoUnit:degree_(angle)'],
+        'windSpeed' => ['value' => 0.0, 'unitCode' => 'wmoUnit:km_h-1'],
+        'windGust' => ['value' => null, 'unitCode' => 'wmoUnit:km_h-1'],
+        'barometricPressure' => ['value' => 102510, 'unitCode' => 'wmoUnit:Pa'],
+        'seaLevelPressure' => ['value' => null, 'unitCode' => 'wmoUnit:Pa'],
+        'relativeHumidity' => ['value' => 76.5, 'unitCode' => 'wmoUnit:percent'],
+        'windChill' => ['value' => null, 'unitCode' => 'wmoUnit:degC'],
+        'heatIndex' => ['value' => null, 'unitCode' => 'wmoUnit:degC'],
+        'visibility' => ['value' => 16090, 'unitCode' => 'wmoUnit:m'],
+    ], $overrides)];
 }
