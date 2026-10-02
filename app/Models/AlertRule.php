@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Carbon;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -47,6 +48,50 @@ class AlertRule extends Model
 {
     /** @use HasFactory<AlertRuleFactory> */
     use BlockedDuringMaintenance, HasFactory, LogsActivity;
+
+    /**
+     * DispatchScheduledAlerts delivers each scheduled rule at most once per
+     * calendar day, tracked by last_scheduled_run_on. Changing delivery_time to
+     * a moment that is still ahead of "now" in the rule's own timezone must let
+     * the rule run again today at the new time, or a subscriber who reschedules
+     * after the first delivery silently gets nothing until tomorrow.
+     *
+     * A new time that has already passed today is deliberately left alone:
+     * clearing the stamp then would re-send immediately and retroactively.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function (AlertRule $rule): void {
+            if ($rule->last_scheduled_run_on === null
+                || $rule->isDirty('last_scheduled_run_on')
+                || ! $rule->deliveryTimeChanged()) {
+                return;
+            }
+
+            $timezone = $rule->location?->timezone ?? config('app.timezone');
+            $now = Carbon::now($timezone);
+
+            if ($now->lt($now->copy()->setTimeFromTimeString($rule->delivery_time))) {
+                $rule->last_scheduled_run_on = null;
+            }
+        });
+    }
+
+    /**
+     * Compares clock times, not strings: the column reads back as "08:40:00"
+     * while a form submits "08:40", and that is not a change.
+     */
+    private function deliveryTimeChanged(): bool
+    {
+        if (! $this->isDirty('delivery_time') || blank($this->delivery_time)) {
+            return false;
+        }
+
+        $original = $this->getOriginal('delivery_time');
+
+        return blank($original)
+            || Carbon::parse($original)->format('H:i') !== Carbon::parse($this->delivery_time)->format('H:i');
+    }
 
     public function getActivitylogOptions(): LogOptions
     {
