@@ -8,7 +8,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | docker/emwin-byteblaster/** | .ai/rules/emwin-byteblaster.md |
 | docker/emwin-http/** | .ai/rules/emwin-http.md |
 | tests/Feature/** | .ai/rules/feature.md |
-| app/Filament/** | .ai/rules/filament.md |
+| app/Filament/**, resources/views/filament/** | .ai/rules/filament.md |
 | app/Jobs/DeliverWeatherAlert.php, app/Jobs/DeliverScheduledAlert.php | .ai/rules/jobs.md |
 | app/Models/**, app/Models/Product.php, app/Models/ActiveWwa.php | .ai/rules/models.md |
 | app/Filament/Admin/Pages/** | .ai/rules/pages.md |
