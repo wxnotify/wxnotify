@@ -154,3 +154,61 @@ test('an imperial subscriber\'s form is untouched', function () {
 
     expect(AlertRule::where('user_id', $imperial->id)->sole()->threshold_value)->toBe('32.0');
 });
+
+/**
+ * Edits a stored lightning rule as the Metric subscriber, changing only the
+ * channel so the radius is untouched, and returns the fresh rule.
+ */
+function editLightningRuleWithoutTouchingRadius(object $test, int $storedMiles, int $expectedDisplay): AlertRule
+{
+    $rule = AlertRule::factory()->lightning()->for($test->user)->for($test->location)->create(['radius_miles' => $storedMiles]);
+    $rule->notificationChannels()->attach($test->channel);
+    $otherChannel = NotificationChannel::factory()->for($test->user)->create();
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet(['radius_miles' => $expectedDisplay])
+        ->fillForm(['channel_ids' => [$test->channel->id, $otherChannel->id]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    return $rule->fresh();
+}
+
+test('a rule stored at the minimum radius shows the minimum in km and saves untouched', function () {
+    $minMiles = app(TierThresholdSettings::class)->lightning_min_radius_miles;
+    $minKm = (int) ceil($minMiles * 1.609344);
+
+    $rule = editLightningRuleWithoutTouchingRadius($this, $minMiles, $minKm);
+
+    expect($rule->radius_miles)->toBe($minMiles)
+        ->and($rule->notificationChannels)->toHaveCount(2);
+});
+
+test('a rule stored below the current minimum shows the minimum and saves untouched', function () {
+    $minKm = (int) ceil(app(TierThresholdSettings::class)->lightning_min_radius_miles * 1.609344);
+
+    expect(editLightningRuleWithoutTouchingRadius($this, 5, $minKm)->radius_miles)->toBe(5);
+});
+
+test('a rule stored at the maximum radius shows 80 km and saves untouched, and 80 km is accepted on create', function () {
+    expect(editLightningRuleWithoutTouchingRadius($this, 50, 80)->radius_miles)->toBe(50);
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'lightning', 'location_id' => $this->location->id, 'radius_miles' => 80, 'channel_ids' => [$this->channel->id]])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(AlertRule::where('user_id', $this->user->id)->latest('id')->first()->radius_miles)->toBe(50);
+});
+
+test('a radius the subscriber changes is converted and stored', function () {
+    $rule = AlertRule::factory()->lightning()->for($this->user)->for($this->location)->create(['radius_miles' => 15]);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->fillForm(['radius_miles' => 30])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->radius_miles)->toBe(19);
+});

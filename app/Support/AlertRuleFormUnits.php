@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Enums\ThresholdVariable;
 use App\Models\AlertRule;
+use App\Settings\TierThresholdSettings;
 
 /**
  * Converts the alert form's two unit-bearing fields between what a Metric
@@ -34,7 +35,7 @@ class AlertRuleFormUnits
         }
 
         if (is_numeric($data['radius_miles'] ?? null)) {
-            $data['radius_miles'] = (int) round($units->distanceValue((float) $data['radius_miles']));
+            $data['radius_miles'] = self::displayRadius((float) $data['radius_miles'], $units);
         }
 
         return $data;
@@ -68,11 +69,26 @@ class AlertRuleFormUnits
             $submitted = (int) round((float) $data['radius_miles']);
             $unchanged = $stored !== null
                 && $stored->radius_miles !== null
-                && $submitted === (int) round($units->distanceValue((float) $stored->radius_miles));
+                && $submitted === self::displayRadius((float) $stored->radius_miles, $units);
 
             $data['radius_miles'] = $unchanged ? (int) $stored->radius_miles : (int) round($units->kilometersToMiles($submitted));
         }
 
         return $data;
+    }
+
+    /**
+     * The radius a Metric subscriber sees for a stored mile count, clamped into
+     * the range the form accepts so an untouched rule at (or, for an older
+     * rule, below) the minimum still validates. toDisplay() and toStorage()
+     * both use this, so the unchanged check can never diverge from what the
+     * form showed.
+     */
+    private static function displayRadius(float $storedMiles, Units $units): int
+    {
+        $min = $units->minDistanceDisplay(app(TierThresholdSettings::class)->lightning_min_radius_miles);
+        $max = $units->maxDistanceDisplay(50);
+
+        return max($min, min($max, (int) round($units->distanceValue($storedMiles))));
     }
 }
