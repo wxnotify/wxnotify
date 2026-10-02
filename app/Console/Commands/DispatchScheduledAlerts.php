@@ -3,13 +3,18 @@
 namespace App\Console\Commands;
 
 use App\Actions\Weather\BuildDailySummaryMessage;
+use App\Actions\Weather\BuildDailySummaryReport;
 use App\Actions\Weather\EvaluateThresholdAlert;
 use App\Actions\Weather\GetGridpointForecastData;
 use App\Enums\AlertCategory;
+use App\Enums\MessageBodyStyle;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Evaluates and delivers Threshold Alerts and Daily Weather Summary rules —
@@ -35,6 +40,7 @@ class DispatchScheduledAlerts extends Command
         GetGridpointForecastData $getGridpointData,
         EvaluateThresholdAlert $evaluateThreshold,
         BuildDailySummaryMessage $buildSummary,
+        BuildDailySummaryReport $buildReport,
     ): int {
         $rules = AlertRule::query()
             ->where('is_active', true)
@@ -83,8 +89,10 @@ class DispatchScheduledAlerts extends Command
                 continue;
             }
 
+            $report = $this->reportFor($rule, $buildReport);
+
             foreach ($rule->notificationChannels as $channel) {
-                DeliverScheduledAlert::dispatch($rule->id, $channel->id, $rule->displayName(), $message);
+                DeliverScheduledAlert::dispatch($rule->id, $channel->id, $rule->displayName(), $message, $report);
                 $dispatched++;
             }
         }
@@ -92,6 +100,37 @@ class DispatchScheduledAlerts extends Command
         $this->info("Dispatched {$dispatched} scheduled alert(s).");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The Full Daily Summary's structured payload, built once per rule (not per
+     * channel). Null for everything else: Threshold rules, Brief/Free/unset
+     * message styles (only an explicit Full counts), and a Full rule with no
+     * attached channel that could render it — building the report costs several
+     * NWS requests, so it is skipped when nothing could use it. A build failure
+     * degrades to "Brief only", never to "no delivery".
+     *
+     * @return array<string, mixed>|null
+     */
+    private function reportFor(AlertRule $rule, BuildDailySummaryReport $buildReport): ?array
+    {
+        if ($rule->category !== AlertCategory::DailySummary || $rule->effectiveMessageBodyStyle() !== MessageBodyStyle::Full) {
+            return null;
+        }
+
+        $registry = app(ChannelTypeRegistry::class);
+
+        if (! $rule->notificationChannels->contains(fn ($channel): bool => $registry->find($channel->channel_type)?->supportsRichContent() === true)) {
+            return null;
+        }
+
+        try {
+            return $buildReport($rule->location, (bool) $rule->user->is_test_account);
+        } catch (Throwable $e) {
+            Log::warning('Daily summary report build failed', ['rule_id' => $rule->id, 'exception' => $e::class]);
+
+            return null;
+        }
     }
 
     /**

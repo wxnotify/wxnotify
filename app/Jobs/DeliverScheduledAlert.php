@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Weather\GetRadarSnapshot;
 use App\Actions\Weather\RenderAlertSubject;
 use App\Enums\ChannelTransport;
 use App\Enums\MessageBodyStyle;
@@ -29,11 +30,15 @@ class DeliverScheduledAlert implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * @param  array<string, mixed>|null  $report  the Full Daily Summary's structured payload; null for Brief, Free, Threshold, and for jobs queued before this property existed
+     */
     public function __construct(
         public readonly int $ruleId,
         public readonly int $channelId,
         public readonly string $title,
         public readonly string $body,
+        public readonly ?array $report = null,
     ) {}
 
     public function handle(ChannelDispatcher $dispatcher): void
@@ -76,17 +81,34 @@ class DeliverScheduledAlert implements ShouldQueue
         }
 
         $title = app(RenderAlertSubject::class)($rule);
+        $channelType = app(ChannelTypeRegistry::class)->find($channel->channel_type);
         // Str::limit's word-preserving mode collapses line breaks to spaces, so it must never
         // touch a body bound for a real inbox — see DeliverWeatherAlert for the same rule.
-        $isEmailChannel = app(ChannelTypeRegistry::class)->find($channel->channel_type)?->transport() === ChannelTransport::Mail;
+        $isEmailChannel = $channelType?->transport() === ChannelTransport::Mail;
         $body = (! $isEmailChannel && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief)
             ? Str::limit($this->body, 280, preserveWords: true)
             : $this->body;
 
-        $result = $dispatcher->send($channel, $body, $title, [
+        $meta = [
             'type' => 'alert',
             'rule' => $rule->name,
-        ]);
+        ];
+
+        // A job serialized before $report existed (SerializesModels' native
+        // unserialize() bypasses the constructor) has this typed readonly property
+        // genuinely uninitialized, not null. `??` has isset() semantics, which is
+        // false for an uninitialized property instead of throwing, so it is read
+        // exactly once here and never dereferenced again.
+        $report = $this->report ?? null;
+
+        if ($report !== null && $channelType?->supportsRichContent() === true) {
+            $radarSite = $report['radar_site'] ?? null;
+
+            $meta['daily_summary'] = $report;
+            $meta['daily_summary_radar'] = is_string($radarSite) ? app(GetRadarSnapshot::class)($radarSite) : null;
+        }
+
+        $result = $dispatcher->send($channel, $body, $title, $meta);
 
         // ingested_product_id stays null (the column's default): Threshold
         // Alerts and Daily Weather Summary have no IngestedProduct behind

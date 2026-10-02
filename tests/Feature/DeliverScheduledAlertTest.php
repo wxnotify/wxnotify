@@ -3,6 +3,7 @@
 use App\Enums\Tier;
 use App\Jobs\DeliverScheduledAlert;
 use App\Mail\ChannelMessageMail;
+use App\Mail\DailySummaryMail;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
@@ -172,4 +173,106 @@ test('the default title (no custom template) still reaches Apprise as displayNam
         ->handle(app(ChannelDispatcher::class));
 
     Http::assertSent(fn ($request) => $request['title'] === $rule->displayName());
+});
+
+function dsReport(): array
+{
+    return presenterReport(['radar_site' => 'KFTG']);
+}
+
+test('a Full summary with a report sends the rich mail with the radar image to an email channel', function () {
+    Mail::fake();
+    Http::fake(['radar.weather.gov/*' => Http::response("GIF89a\x01\x00\x01\x00\x00\x00\x00;", 200, ['Content-Type' => 'image/gif'])]);
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['message_body_style' => 'full']);
+    $channel = NotificationChannel::factory()->for($plusUser)->email('subscriber@example.com')->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'Today: Sunny, high 79.', dsReport()))
+        ->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(DailySummaryMail::class, fn (DailySummaryMail $mail) => $mail->hasTo('subscriber@example.com')
+        && $mail->briefText === 'Today: Sunny, high 79.'
+        && $mail->radar !== null
+        && $mail->radar['mime'] === 'image/gif');
+    Mail::assertNotSent(ChannelMessageMail::class);
+    expect(DeliveryLog::sole()->status)->toBe('success');
+});
+
+test('the rich mail is still sent, without radar, when the radar fetch fails', function () {
+    Mail::fake();
+    Http::fake(['radar.weather.gov/*' => Http::response('', 500)]);
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['message_body_style' => 'full']);
+    $channel = NotificationChannel::factory()->for($plusUser)->email('subscriber@example.com')->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'Brief.', dsReport()))
+        ->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(DailySummaryMail::class, fn (DailySummaryMail $mail) => $mail->radar === null);
+});
+
+test('a report with no radar site never requests radar', function () {
+    Mail::fake();
+    Http::fake();
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['message_body_style' => 'full']);
+    $channel = NotificationChannel::factory()->for($plusUser)->email('subscriber@example.com')->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'Brief.', presenterReport(['radar_site' => null])))
+        ->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(DailySummaryMail::class);
+    Http::assertNothingSent();
+});
+
+test('a Full summary report sent to a non-rich channel delivers the Brief text and fetches no radar', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['message_body_style' => 'full']);
+    $channel = NotificationChannel::factory()->for($plusUser)->create(['apprise_url' => 'discord://token/id']);
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'Today: Sunny, high 79.', dsReport()))
+        ->handle(app(ChannelDispatcher::class));
+
+    Http::assertSent(fn ($request) => $request['body'] === 'Today: Sunny, high 79.');
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'radar.weather.gov'));
+    expect(DeliveryLog::sole()->status)->toBe('success');
+});
+
+test('with no report an email channel gets the plain channel message as before', function () {
+    Mail::fake();
+    Http::fake();
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['message_body_style' => 'full']);
+    $channel = NotificationChannel::factory()->for($plusUser)->email('subscriber@example.com')->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'Brief.'))
+        ->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(ChannelMessageMail::class);
+    Mail::assertNotSent(DailySummaryMail::class);
+});
+
+test('a job queued before the report property existed unserializes without it and still delivers', function () {
+    Mail::fake();
+    Http::fake();
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->dailySummary()->for($plusUser)->create(['message_body_style' => 'full']);
+    $channel = NotificationChannel::factory()->for($plusUser)->email('subscriber@example.com')->create();
+
+    // Reproduces a job serialized by the pre-deploy code: native unserialize()
+    // bypasses the constructor, so the new typed readonly `?array $report` is
+    // left genuinely uninitialized (not null).
+    $reflection = new ReflectionClass(DeliverScheduledAlert::class);
+    $job = $reflection->newInstanceWithoutConstructor();
+    foreach (['ruleId' => $rule->id, 'channelId' => $channel->id, 'title' => 'Daily summary', 'body' => 'Brief.'] as $property => $value) {
+        $reflectionProperty = $reflection->getProperty($property);
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue($job, $value);
+    }
+
+    $job->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(ChannelMessageMail::class);
+    expect(DeliveryLog::sole()->status)->toBe('success');
 });
