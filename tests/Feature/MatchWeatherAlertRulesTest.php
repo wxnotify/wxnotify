@@ -683,3 +683,85 @@ test('a real (non-test) product matches every active subscriber as before, regar
 
     Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job) => $job->ruleId === $rule->id);
 });
+
+test('a Location-mode rule with two attached locations fires when only the second one overlaps the product\'s zone', function () {
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $noOverlap = Location::factory()->create(['forecast_zone_ugc' => 'NYZ999']);
+    $overlaps = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location']);
+    $rule->locations()->attach([$noOverlap->id, $overlaps->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a Location-mode rule with zero attached locations never matches', function () {
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location']);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('quiet hours are evaluated against the location that actually matched, not an unmatched sibling location in a different timezone', function () {
+    // $awake is in a timezone where it's NOT currently quiet hours;
+    // $asleep is in a timezone where it IS -- but $awake is the one
+    // that overlaps the product's zone, so delivery must go through.
+    Queue::fake();
+    $product = Product::where('code', 'TO.W')->sole();
+    $asleep = Location::factory()->create(['timezone' => 'America/New_York', 'forecast_zone_ugc' => 'NYZ999']);
+    $awake = Location::factory()->create(['timezone' => 'Pacific/Kiritimati', 'forecast_zone_ugc' => 'NYZ072']);
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'location',
+        'quiet_hours_start' => now('America/New_York')->subHour()->format('H:i:s'),
+        'quiet_hours_end' => now('America/New_York')->addHour()->format('H:i:s'),
+    ]);
+    $rule->locations()->attach([$asleep->id, $awake->id]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a RiskArea-mode rule\'s quiet hours now suppress correctly -- previously silently never applied', function () {
+    // Regression for the incidental bug fixed in this change: RiskArea was
+    // missing from isWithinQuietHours()'s old matching-mode allow-list, so
+    // a RiskArea rule's quiet hours never suppressed anything, even with a
+    // real location and a real timezone.
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $location = Location::factory()->create(['timezone' => 'America/New_York', 'lat' => 34.5, 'lng' => -95.5]);
+    $rule = AlertRule::factory()->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'risk_levels' => ['Slight'],
+        'quiet_hours_start' => now('America/New_York')->subHour()->format('H:i:s'),
+        'quiet_hours_end' => now('America/New_York')->addHour()->format('H:i:s'),
+    ]);
+    $rule->locations()->attach($location);
+    $rule->products()->attach($outlook);
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $rule->notificationChannels()->attach($channel);
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $outlook->id,
+        'risk_level_polygons' => [
+            'Slight' => [['lat' => 30, 'lon' => -100], ['lat' => 30, 'lon' => -90], ['lat' => 40, 'lon' => -90], ['lat' => 40, 'lon' => -100]],
+        ],
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+    expect(DeliveryLog::sole()->status)->toBe('suppressed');
+});
