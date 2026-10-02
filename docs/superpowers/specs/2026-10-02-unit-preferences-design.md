@@ -62,7 +62,7 @@ Stored text is not rewritten: `delivery_logs.subject`, database notifications, a
 
 ## Form conversion and the no-drift guard
 
-- **Threshold value**: the field displays `temperatureValue()`/`speedValue()` of the stored imperial value, to one decimal, trimming `.0`; on save it converts back with `…ToFahrenheit()/speedToMph()` and the column's existing `decimal:1` cast applies. Percent variables (humidity, precip chance) are unit-free and untouched.
+- **Threshold value**: the field displays `temperatureValue()`/`speedValue()` of the stored imperial value, to one decimal, trimming `.0` — except Metric **wind** thresholds (wind speed, gusts), which are **whole km/h** (the stored 0.1 mph is coarser than 0.1 km/h, so a fractional km/h would not come back as the same number; whole km/h always does) — in the form, the rule name and the threshold message (`ThresholdVariable::displayDecimals()`); on save it converts back with `…ToFahrenheit()/speedToMph()` and the column's existing `decimal:1` cast applies. Percent variables (humidity, precip chance) are unit-free and untouched.
 - **Radius**: Metric input is whole km; stored as whole miles (`round(km / 1.609344)`), min/max shown in km (`ceil` of the converted minimum, `floor` of the converted 50-mile maximum) so any displayed-valid value converts to a valid mile count. The admin setting `lightning_min_radius_miles` stays in miles.
 - **No-drift guard**: a stored 35°F displays as 1.7°C; saving without touching the field must not rewrite it to 35.06°F → 35.1°F. The save hook compares the submitted display value to the display value of the stored canonical value and, when they are equal, keeps the stored value unchanged. Same for radius. Changing the *profile* unit never rewrites any stored rule.
 

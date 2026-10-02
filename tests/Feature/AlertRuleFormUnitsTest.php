@@ -76,7 +76,7 @@ test('changing the value converts it back to fahrenheit', function () {
 test('a wind threshold converts km/h to mph and percentages are never converted', function () {
     livewire(CreateAlertRule::class)
         ->fillForm([
-            'category' => 'threshold', 'variable' => 'wind_speed', 'direction' => 'above', 'threshold_value' => 32.2,
+            'category' => 'threshold', 'variable' => 'wind_speed', 'direction' => 'above', 'threshold_value' => 32,
             'timeframe' => 'day', 'location_id' => $this->location->id, 'delivery_time' => '06:00', 'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -92,8 +92,36 @@ test('a wind threshold converts km/h to mph and percentages are never converted'
     $wind = AlertRule::where('variable', 'wind_speed')->sole();
     $humidity = AlertRule::where('variable', 'humidity')->sole();
 
-    expect((float) $wind->threshold_value)->toEqualWithDelta(20.0, 0.1)
+    expect((float) $wind->threshold_value)->toBe(19.9)
         ->and((float) $humidity->threshold_value)->toBe(70.0);
+});
+
+test('an imperial wind rule shows whole km/h and an untouched save keeps its 0.1 mph exactly', function () {
+    $rule = AlertRule::factory()->for($this->user)->for($this->location)->create(['variable' => 'wind_speed', 'direction' => 'above', 'threshold_value' => 20.0]);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet(['threshold_value' => 32.0])
+        ->fillForm(['delivery_time' => '07:30'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->threshold_value)->toBe('20.0');
+});
+
+test('a metric wind threshold typed on create is shown unchanged when the rule is edited', function () {
+    foreach ([30, 56, 97] as $kmh) {
+        $rule = AlertRule::factory()->for($this->user)->for($this->location)->create(['variable' => 'wind_speed', 'direction' => 'above', 'threshold_value' => 1]);
+        $rule->notificationChannels()->attach($this->channel);
+
+        livewire(EditAlertRule::class, ['record' => $rule->id])
+            ->fillForm(['threshold_value' => $kmh])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        livewire(EditAlertRule::class, ['record' => $rule->id])
+            ->assertFormSet(['threshold_value' => (float) $kmh]);
+    }
 });
 
 test('a metric subscriber sets the lightning radius in km, stored as whole miles', function () {
@@ -184,10 +212,16 @@ test('a rule stored at the minimum radius shows the minimum in km and saves unto
         ->and($rule->notificationChannels)->toHaveCount(2);
 });
 
-test('a rule stored below the current minimum shows the minimum and saves untouched', function () {
-    $minKm = (int) ceil(app(TierThresholdSettings::class)->lightning_min_radius_miles * 1.609344);
+test('a legacy rule stored below the minimum shows its true km and, like imperial, must be fixed before saving', function () {
+    $rule = AlertRule::factory()->lightning()->for($this->user)->for($this->location)->create(['radius_miles' => 5]);
+    $rule->notificationChannels()->attach($this->channel);
 
-    expect(editLightningRuleWithoutTouchingRadius($this, 5, $minKm)->radius_miles)->toBe(5);
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet(['radius_miles' => 8])
+        ->call('save')
+        ->assertHasFormErrors(['radius_miles' => 'min']);
+
+    expect($rule->fresh()->radius_miles)->toBe(5);
 });
 
 test('a rule stored at the maximum radius shows 80 km and saves untouched, and 80 km is accepted on create', function () {

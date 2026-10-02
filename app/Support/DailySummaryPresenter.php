@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\UnitSystem;
 use Illuminate\Support\Carbon;
 
 /**
@@ -221,7 +222,7 @@ class DailySummaryPresenter
             return self::DASH;
         }
 
-        $fahrenheit = strtoupper($unit) === 'C' ? (float) $value * 9 / 5 + 32 : (float) $value;
+        $fahrenheit = strtoupper($unit) === 'C' ? (new Units(UnitSystem::Metric))->temperatureToFahrenheit((float) $value) : (float) $value;
 
         return $units->temperature($fahrenheit);
     }

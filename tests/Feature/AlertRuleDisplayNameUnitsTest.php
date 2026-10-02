@@ -14,7 +14,7 @@ test('a threshold rule is named in the owner\'s units, imperial exactly as befor
 
     expect($imperial->displayName())->toBe('Temperature Falls below 32.0°F')
         ->and($metric->displayName())->toBe('Temperature Falls below 0.0°C')
-        ->and($wind->displayName())->toBe('Wind speed Rises above 32.2km/h');
+        ->and($wind->displayName())->toBe('Wind speed Rises above 32km/h');
 });
 
 test('a lightning rule is named in the owner\'s units', function () {

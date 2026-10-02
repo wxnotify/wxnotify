@@ -67,11 +67,24 @@ enum ThresholdVariable: string
     }
 
     /**
-     * One decimal plus the unit, the shape a rule name has always used
-     * ("32.0°F"; Metric "0.0°C").
+     * How many decimals the subscriber sees and types. A Metric wind speed is
+     * whole km/h: storage keeps 0.1 mph, which is coarser than 0.1 km/h, so a
+     * typed fractional km/h would not come back as the same number.
+     */
+    public function displayDecimals(UnitSystem $system): int
+    {
+        return match ($this) {
+            self::WindSpeed, self::Gusts => $system === UnitSystem::Metric ? 0 : 1,
+            default => 1,
+        };
+    }
+
+    /**
+     * The display value plus the unit, the shape a rule name has always used
+     * ("32.0°F"; Metric "0.0°C", Metric wind "32km/h").
      */
     public function format(float $canonical, UnitSystem $system): string
     {
-        return number_format($this->displayValue($canonical, $system), 1, '.', '').$this->unit($system);
+        return number_format($this->displayValue($canonical, $system), $this->displayDecimals($system), '.', '').$this->unit($system);
     }
 }

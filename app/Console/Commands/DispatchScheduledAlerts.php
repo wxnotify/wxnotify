@@ -8,6 +8,7 @@ use App\Actions\Weather\EvaluateThresholdAlert;
 use App\Actions\Weather\GetGridpointForecastData;
 use App\Enums\AlertCategory;
 use App\Enums\MessageBodyStyle;
+use App\Enums\UnitSystem;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
@@ -71,9 +72,11 @@ class DispatchScheduledAlerts extends Command
                 continue;
             }
 
+            $system = Units::forRule($rule)->system;
+
             $message = match ($rule->category) {
-                AlertCategory::Threshold => $this->evaluateThreshold($rule, $getGridpointData, $evaluateThreshold),
-                AlertCategory::DailySummary => $buildSummary($rule->location, Units::forRule($rule)->system),
+                AlertCategory::Threshold => $this->evaluateThreshold($rule, $getGridpointData, $evaluateThreshold, $system),
+                AlertCategory::DailySummary => $buildSummary($rule->location, $system),
                 default => null,
             };
 
@@ -90,7 +93,7 @@ class DispatchScheduledAlerts extends Command
                 continue;
             }
 
-            $report = $this->reportFor($rule, $buildReport);
+            $report = $this->reportFor($rule, $buildReport, $system);
 
             foreach ($rule->notificationChannels as $channel) {
                 DeliverScheduledAlert::dispatch($rule->id, $channel->id, $rule->displayName(), $message, $report);
@@ -113,7 +116,7 @@ class DispatchScheduledAlerts extends Command
      *
      * @return array<string, mixed>|null
      */
-    private function reportFor(AlertRule $rule, BuildDailySummaryReport $buildReport): ?array
+    private function reportFor(AlertRule $rule, BuildDailySummaryReport $buildReport, UnitSystem $system): ?array
     {
         if ($rule->category !== AlertCategory::DailySummary || $rule->effectiveMessageBodyStyle() !== MessageBodyStyle::Full) {
             return null;
@@ -126,7 +129,7 @@ class DispatchScheduledAlerts extends Command
         }
 
         try {
-            return $buildReport($rule->location, (bool) $rule->user->is_test_account, Units::forRule($rule)->system);
+            return $buildReport($rule->location, (bool) $rule->user->is_test_account, $system);
         } catch (Throwable $e) {
             Log::warning('Daily summary report build failed', ['rule_id' => $rule->id, 'exception' => $e::class]);
 
@@ -138,7 +141,7 @@ class DispatchScheduledAlerts extends Command
      * @return string|false|null string to send, false if checked but not
      *                           crossed, null if data was unavailable
      */
-    private function evaluateThreshold(AlertRule $rule, GetGridpointForecastData $getGridpointData, EvaluateThresholdAlert $evaluate): string|false|null
+    private function evaluateThreshold(AlertRule $rule, GetGridpointForecastData $getGridpointData, EvaluateThresholdAlert $evaluate, UnitSystem $system): string|false|null
     {
         $gridpointData = $getGridpointData($rule->location);
 
@@ -152,20 +155,20 @@ class DispatchScheduledAlerts extends Command
             return false;
         }
 
-        $system = Units::forRule($rule)->system;
         $variable = $rule->variable->label();
         $direction = $rule->direction->label();
         $unit = $rule->variable->unit($system);
-        $threshold = $this->trimmedNumber($rule->variable->displayValue((float) $rule->threshold_value, $system));
-        $peakValue = $this->trimmedNumber($rule->variable->displayValue($result['value'], $system));
+        $decimals = $rule->variable->displayDecimals($system);
+        $threshold = $this->trimmedNumber($rule->variable->displayValue((float) $rule->threshold_value, $system), $decimals);
+        $peakValue = $this->trimmedNumber($rule->variable->displayValue($result['value'], $system), $decimals);
         $at = $result['at']->format('g:i A');
 
         return "{$variable} {$direction} {$threshold}{$unit} near {$rule->location->label} "
             ."(peak {$peakValue}{$unit} around {$at}).";
     }
 
-    private function trimmedNumber(float $value): string
+    private function trimmedNumber(float $value, int $decimals): string
     {
-        return rtrim(rtrim(number_format($value, 1), '0'), '.');
+        return Units::number($value, $decimals);
     }
 }

@@ -23,10 +23,29 @@ test('display and canonical values convert, percentages never do', function () {
         ->and(ThresholdVariable::PrecipChance->canonicalValue(40.0, UnitSystem::Metric))->toBe(40.0);
 });
 
-test('format keeps the one-decimal shape a rule name has always used', function () {
+test('format keeps the one-decimal shape a rule name has always used (whole km/h for Metric wind)', function () {
     expect(ThresholdVariable::Temperature->format(32.0, UnitSystem::Imperial))->toBe('32.0°F')
         ->and(ThresholdVariable::Temperature->format(32.0, UnitSystem::Metric))->toBe('0.0°C')
         ->and(ThresholdVariable::Temperature->format(35.0, UnitSystem::Metric))->toBe('1.7°C')
-        ->and(ThresholdVariable::WindSpeed->format(20.0, UnitSystem::Metric))->toBe('32.2km/h')
+        ->and(ThresholdVariable::WindSpeed->format(20.0, UnitSystem::Metric))->toBe('32km/h')
+        ->and(ThresholdVariable::Gusts->format(25.0, UnitSystem::Metric))->toBe('40km/h')
+        ->and(ThresholdVariable::WindSpeed->format(20.0, UnitSystem::Imperial))->toBe('20.0mph')
         ->and(ThresholdVariable::Humidity->format(60.0, UnitSystem::Metric))->toBe('60.0%');
 });
+
+test('a metric subscriber works in whole km/h for wind and one decimal for temperature', function () {
+    expect(ThresholdVariable::WindSpeed->displayDecimals(UnitSystem::Metric))->toBe(0)
+        ->and(ThresholdVariable::Gusts->displayDecimals(UnitSystem::Metric))->toBe(0)
+        ->and(ThresholdVariable::WindSpeed->displayDecimals(UnitSystem::Imperial))->toBe(1)
+        ->and(ThresholdVariable::Temperature->displayDecimals(UnitSystem::Metric))->toBe(1)
+        ->and(ThresholdVariable::Humidity->displayDecimals(UnitSystem::Metric))->toBe(1);
+});
+
+test('every whole km/h from 10 to 150 survives storage at 0.1 mph and comes back as the same number', function (ThresholdVariable $variable) {
+    foreach (range(10, 150) as $kmh) {
+        $stored = round($variable->canonicalValue((float) $kmh, UnitSystem::Metric), 1);
+        $shown = round($variable->displayValue($stored, UnitSystem::Metric), $variable->displayDecimals(UnitSystem::Metric));
+
+        expect($shown)->toBe((float) $kmh);
+    }
+})->with([ThresholdVariable::WindSpeed, ThresholdVariable::Gusts]);

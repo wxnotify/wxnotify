@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Enums\UnitSystem;
+
 /**
  * Rewrites NWS's standardized forecast phrases from imperial to Metric for a
  * Metric subscriber. NWS writes its detailed forecasts and hourly wind text in
@@ -15,15 +17,21 @@ namespace App\Support;
  */
 class NwsTextUnits
 {
-    private const KMH_PER_MPH = 1.609344;
-
-    private const CM_PER_INCH = 2.54;
+    /**
+     * A temperature number (digits or the word "zero") that is not already
+     * converted ("26°C"), a decimal, or a clock time ("5pm"). The digits are
+     * possessive (\d++) on purpose: without it the lookahead lets them
+     * backtrack ("18°C" matches as "1" followed by "8°C"), so a second pass
+     * re-converts an already-converted value into garbage.
+     */
+    private const TEMP = '(-?\d++|zero\b)(?!°|\.\d|\s?[ap]m\b)';
 
     /**
-     * A temperature number that is not already converted ("26°C"), a decimal,
-     * or a clock time ("5pm").
+     * A number that is the second half of a range ("1 and 2 mph", "1 to 2
+     * inches") is never converted on its own, so a range the patterns below do
+     * not recognise keeps its unit token and the whole sentence reverts.
      */
-    private const TEMP = '(-?\d++)(?!°|\.\d|\s?[ap]m\b)';
+    private const NOT_RANGE_END = '(?<!\d and )(?<!\d to )';
 
     public static function toMetric(string $text): string
     {
@@ -52,7 +60,7 @@ class NwsTextUnits
             $converted,
         );
         $converted = preg_replace_callback(
-            '/\b(\d+) mph\b/i',
+            '/'.self::NOT_RANGE_END.'\b(\d+) mph\b/i',
             fn (array $m): string => self::kmh($m[1]).' km/h',
             $converted,
         );
@@ -62,7 +70,12 @@ class NwsTextUnits
             $converted,
         );
         $converted = preg_replace_callback(
-            '/\b(\d+(?:\.\d+)?) inch(?:es)?\b/i',
+            '/\bbetween (\d+(?:\.\d+)?) and (\d+(?:\.\d+)?) inch(?:es)?\b/i',
+            fn (array $m): string => 'between '.self::cm($m[1]).' and '.self::cm($m[2]).' cm',
+            $converted,
+        );
+        $converted = preg_replace_callback(
+            '/'.self::NOT_RANGE_END.'\b(\d+(?:\.\d+)?) inch(?:es)?\b/i',
             fn (array $m): string => self::cm($m[1]).' cm',
             $converted,
         );
@@ -97,16 +110,23 @@ class NwsTextUnits
 
     private static function kmh(string $mph): string
     {
-        return (string) (int) round((float) $mph * self::KMH_PER_MPH);
+        return (string) (int) round(self::metric()->speedValue((float) $mph));
     }
 
     private static function celsius(string $fahrenheit): string
     {
-        return (string) (int) round(((float) $fahrenheit - 32) * 5 / 9);
+        $value = strtolower($fahrenheit) === 'zero' ? 0.0 : (float) $fahrenheit;
+
+        return (string) (int) round(self::metric()->temperatureValue($value));
     }
 
     private static function cm(string $inches): string
     {
-        return Units::number((float) $inches * self::CM_PER_INCH, 1);
+        return Units::number(self::metric()->depthValue((float) $inches), 1);
+    }
+
+    private static function metric(): Units
+    {
+        return new Units(UnitSystem::Metric);
     }
 }

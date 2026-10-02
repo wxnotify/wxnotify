@@ -13,7 +13,8 @@ use App\Settings\TierThresholdSettings;
  *
  * toStorage() carries the no-drift guard: a value the subscriber did not change
  * (the submitted number equals the display of the stored one) is replaced by the
- * stored value itself, so a stored 35.0 degF -- shown as 1.7 degC -- never
+ * stored value itself (at the variable's display decimals: whole km/h for Metric
+ * wind), so a stored 35.0 degF -- shown as 1.7 degC -- never
  * becomes 35.06 -> 35.1 just because the form was saved.
  */
 class AlertRuleFormUnits
@@ -31,7 +32,7 @@ class AlertRuleFormUnits
         $variable = ThresholdVariable::tryFrom((string) ($data['variable'] ?? ''));
 
         if ($variable !== null && is_numeric($data['threshold_value'] ?? null)) {
-            $data['threshold_value'] = round($variable->displayValue((float) $data['threshold_value'], $units->system), 1);
+            $data['threshold_value'] = round($variable->displayValue((float) $data['threshold_value'], $units->system), $variable->displayDecimals($units->system));
         }
 
         if (is_numeric($data['radius_miles'] ?? null)) {
@@ -58,7 +59,7 @@ class AlertRuleFormUnits
             $unchanged = $stored !== null
                 && $stored->variable === $variable
                 && is_numeric($stored->threshold_value)
-                && abs($submitted - round($variable->displayValue((float) $stored->threshold_value, $units->system), 1)) < 0.0001;
+                && abs($submitted - round($variable->displayValue((float) $stored->threshold_value, $units->system), $variable->displayDecimals($units->system))) < 0.0001;
 
             $data['threshold_value'] = $unchanged
                 ? (float) $stored->threshold_value
@@ -78,17 +79,20 @@ class AlertRuleFormUnits
     }
 
     /**
-     * The radius a Metric subscriber sees for a stored mile count, clamped into
-     * the range the form accepts so an untouched rule at (or, for an older
-     * rule, below) the minimum still validates. toDisplay() and toStorage()
-     * both use this, so the unchanged check can never diverge from what the
-     * form showed.
+     * The radius a Metric subscriber sees for a stored mile count. A rule at or
+     * above the minimum is clamped into the range the form accepts (rounding
+     * can land a stored 10 mi just outside it), so an untouched rule still
+     * validates. A legacy rule genuinely below the minimum shows its true
+     * rounded km and is blocked by the field's min rule, exactly as it is for an
+     * Imperial subscriber. toDisplay() and toStorage() both use this, so the
+     * unchanged check can never diverge from what the form showed.
      */
     private static function displayRadius(float $storedMiles, Units $units): int
     {
-        $min = $units->minDistanceDisplay(app(TierThresholdSettings::class)->lightning_min_radius_miles);
-        $max = $units->maxDistanceDisplay(50);
+        $minMiles = app(TierThresholdSettings::class)->lightning_min_radius_miles;
+        $shown = (int) round($units->distanceValue($storedMiles));
+        $shown = min($units->maxDistanceDisplay(50), $shown);
 
-        return max($min, min($max, (int) round($units->distanceValue($storedMiles))));
+        return $storedMiles >= $minMiles ? max($units->minDistanceDisplay($minMiles), $shown) : $shown;
     }
 }

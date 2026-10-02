@@ -275,6 +275,36 @@ test('a metric subscriber\'s threshold alert message is in celsius', function ()
         && ! str_contains($job->body, '°F'));
 });
 
+test('a wind threshold message shows whole km/h for Metric and is unchanged for Imperial', function () {
+    Bus::fake();
+    Http::fake([
+        'api.weather.gov/points/*' => Http::response(['properties' => [
+            'forecast' => 'https://api.weather.gov/gridpoints/TOP/1,1/forecast',
+            'forecastGridData' => 'https://api.weather.gov/gridpoints/TOP/1,1',
+        ]]),
+        'api.weather.gov/gridpoints/TOP/1,1/forecast' => Http::response(['properties' => ['periods' => [
+            ['isDaytime' => true, 'startTime' => '2026-09-14T06:00:00-05:00', 'endTime' => '2026-09-14T18:00:00-05:00'],
+            ['isDaytime' => false, 'startTime' => '2026-09-14T18:00:00-05:00', 'endTime' => '2026-09-15T06:00:00-05:00'],
+        ]]]),
+        'api.weather.gov/gridpoints/TOP/1,1' => Http::response(['properties' => [
+            'windSpeed' => ['values' => [['validTime' => '2026-09-14T14:00:00-05:00/PT1H', 'value' => 40.0]]],
+        ]]),
+    ]);
+
+    foreach (['metric', 'imperial'] as $system) {
+        $location = Location::factory()->for($user = User::factory()->create(['unit_system' => $system]))->create(['timezone' => 'America/Chicago', 'label' => $system]);
+        $rule = AlertRule::factory()->for($user)->for($location)->create([
+            'variable' => 'wind_speed', 'direction' => 'above', 'threshold_value' => 20, 'timeframe' => 'day', 'delivery_time' => '06:00',
+        ]);
+        $rule->notificationChannels()->attach(NotificationChannel::factory()->for($user)->create());
+    }
+
+    $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
+
+    Bus::assertDispatched(DeliverScheduledAlert::class, fn ($job) => str_contains($job->body, 'above 32km/h near metric (peak 40km/h around'));
+    Bus::assertDispatched(DeliverScheduledAlert::class, fn ($job) => str_contains($job->body, 'above 20mph near imperial (peak 24.9mph around'));
+});
+
 test('a metric subscriber\'s Brief daily summary and report are built in metric', function () {
     Bus::fake();
     nwsFakeEverything();

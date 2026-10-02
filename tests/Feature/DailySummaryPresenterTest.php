@@ -238,3 +238,12 @@ test('the plain text of a metric report has no imperial units left', function ()
         ->and($text)->toContain('High 26°C')
         ->and($text)->not->toMatch('/\bmph\b|°F|inHg/');
 });
+
+test('a forecast period flagged Celsius is normalised through Units in either system', function () {
+    $report = presenterReport();
+    $report['periods'][0]['temperature'] = 20;
+    $report['periods'][0]['unit'] = 'C';
+
+    expect(DailySummaryPresenter::present($report)['periods'][0]['temp'])->toBe('High 68°F')
+        ->and(DailySummaryPresenter::present([...$report, 'units' => 'metric'])['periods'][0]['temp'])->toBe('High 20°C');
+});

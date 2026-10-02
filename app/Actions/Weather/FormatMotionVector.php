@@ -8,12 +8,12 @@ use App\Support\Units;
 
 /**
  * Formats an ActiveWwa's motion_direction_degrees/motion_speed_kt into a
- * readable line like "Moving ESE at 20 mph" (or "... at 32 km/h"), for the Motion section of a
- * composed alert template body. No existing compass-direction utility
- * exists elsewhere in this codebase to reuse -- this is new, self-contained
- * logic. Knots are converted to mph (x1.15078) and shown to the nearest
- * whole number in the subscriber's own unit (mph or km/h), even though
- * NWS's own eventMotionDescription parameter (see
+ * readable line like "Moving ESE at 20 mph" (or "... at 32 km/h"), for the
+ * Motion section of a composed alert template body. No existing
+ * compass-direction utility exists elsewhere in this codebase to reuse --
+ * this is new, self-contained logic. Knots are converted to mph (x1.15078)
+ * and shown to the nearest whole number in the subscriber's own unit (mph or
+ * km/h), even though NWS's own eventMotionDescription parameter (see
  * SyncActiveWwa::parseMotion()) reports in knots.
  */
 class FormatMotionVector

@@ -31,27 +31,36 @@ class BuildDailySummaryMessage
         $lines = [];
 
         if ($day !== null) {
-            $lines[] = "{$day['name']}: {$day['shortForecast']}, high {$this->temperature($day, $display)}.";
+            $lines[] = "{$day['name']}: {$day['shortForecast']}{$this->temperatureClause('high', $day, $display)}.";
         }
 
         if ($night !== null) {
-            $lines[] = "{$night['name']}: {$night['shortForecast']}, low {$this->temperature($night, $display)}.";
+            $lines[] = "{$night['name']}: {$night['shortForecast']}{$this->temperatureClause('low', $night, $display)}.";
         }
 
         return implode(' ', $lines);
     }
 
     /**
-     * NWS publishes /forecast periods in degF; honour the period's own unit
-     * flag anyway so a Celsius period is never treated as Fahrenheit.
+     * ", high 88°F" — or nothing when NWS sent no numeric temperature for the
+     * period, so a missing value is never shown as a made-up 0°F. NWS publishes
+     * /forecast periods in degF; honour the period's own unit flag anyway so a
+     * Celsius period is never treated as Fahrenheit.
      *
      * @param  array<string, mixed>  $period
      */
-    private function temperature(array $period, Units $units): string
+    private function temperatureClause(string $label, array $period, Units $units): string
     {
-        $value = (float) $period['temperature'];
-        $fahrenheit = strtoupper((string) ($period['temperatureUnit'] ?? 'F')) === 'C' ? $value * 9 / 5 + 32 : $value;
+        $value = $period['temperature'] ?? null;
 
-        return $units->temperature($fahrenheit);
+        if (! is_numeric($value)) {
+            return '';
+        }
+
+        $fahrenheit = strtoupper((string) ($period['temperatureUnit'] ?? 'F')) === 'C'
+            ? (new Units(UnitSystem::Metric))->temperatureToFahrenheit((float) $value)
+            : (float) $value;
+
+        return ", {$label} {$units->temperature($fahrenheit)}";
     }
 }
