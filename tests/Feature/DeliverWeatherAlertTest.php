@@ -7,6 +7,7 @@ use App\Models\AlertRule;
 use App\Models\AlertTemplate;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
+use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
@@ -374,4 +375,36 @@ test('an email channel alert is mailed with the product text and writes a succes
         && str_contains($mail->messageBody, 'Tornado Warning issued for...'));
     Http::assertNothingSent();
     expect(DeliveryLog::sole()->status)->toBe('success');
+});
+
+test('the delivered subject reflects the location passed via the job, not an arbitrary location on the rule', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $matchedLocation = Location::factory()->create(['label' => 'Matched one']);
+    $otherLocation = Location::factory()->create(['label' => 'Not this one']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => null,
+        'custom_subject_template' => 'Near {location}',
+    ]);
+    $rule->locations()->attach([$matchedLocation->id, $otherLocation->id]);
+    $channel = NotificationChannel::factory()->for($plusUser)->create(['apprise_url' => 'discord://token/id']);
+    $product = IngestedProduct::factory()->create();
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id, $matchedLocation->id))
+        ->handle(app(ChannelDispatcher::class));
+
+    expect(DeliveryLog::sole()->subject)->toBe('Near Matched one');
+});
+
+test('omitting the job\'s locationId renders the subject exactly as it did before this parameter existed', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create(['apprise_url' => 'discord://token/id']);
+    $product = IngestedProduct::factory()->create();
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+
+    expect(DeliveryLog::sole()->subject)->toBe($rule->displayName());
 });

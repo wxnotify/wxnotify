@@ -168,3 +168,31 @@ test('a downgraded Free-tier subscriber no longer gets their attached AlertTempl
 
     expect($result)->toBe($rule->displayName());
 });
+
+test('an explicit $location parameter wins over the rule\'s own location()', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $ruleLocation = Location::factory()->create(['label' => 'Rule default']);
+    $passedLocation = Location::factory()->create(['label' => 'Matched this time']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts',
+        'matching_mode' => 'location',
+        'location_id' => $ruleLocation->id,
+        'custom_subject_template' => 'Near {location}',
+    ]);
+
+    $result = (new RenderAlertSubject)($rule, null, $passedLocation);
+
+    expect($result)->toBe('Near Matched this time');
+});
+
+test('omitting $location falls back to the rule\'s own location(), unchanged from before this parameter existed', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $location = Location::factory()->create(['label' => 'Home']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'threshold',
+        'location_id' => $location->id,
+        'custom_subject_template' => 'Near {location}',
+    ]);
+
+    expect((new RenderAlertSubject)($rule))->toBe('Near Home');
+});

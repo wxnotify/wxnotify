@@ -3,6 +3,7 @@
 namespace App\Actions\Weather;
 
 use App\Models\AlertRule;
+use App\Models\Location;
 use App\Models\Product;
 
 /**
@@ -18,7 +19,15 @@ use App\Models\Product;
  */
 class RenderAlertSubject
 {
-    public function __invoke(AlertRule $rule, ?Product $product = null): string
+    /**
+     * $location is the specific location that matched THIS delivery for a
+     * multi-location Weather Alerts/SPC & WPC rule (see
+     * MatchWeatherAlertRules::matchesAnyLocation()) -- when omitted, falls
+     * back to $rule->location, exactly this method's behavior before this
+     * parameter existed, which is what every non-Weather-Alerts/SPC-WPC
+     * caller (DeliverScheduledAlert) still relies on.
+     */
+    public function __invoke(AlertRule $rule, ?Product $product = null, ?Location $location = null): string
     {
         $templateSubject = $rule->effectiveAlertTemplate()?->subject_template;
         $subjectTemplate = filled($templateSubject) ? $templateSubject : $rule->effectiveCustomSubjectTemplate();
@@ -27,9 +36,11 @@ class RenderAlertSubject
             return $rule->displayName();
         }
 
+        $location ??= $rule->location;
+
         return strtr($subjectTemplate, [
             '{product}' => $product?->name ?? $rule->category->label(),
-            '{location}' => $rule->location?->label ?? ($rule->wfo !== null ? "WFO {$rule->wfo}" : 'your area'),
+            '{location}' => $location?->label ?? ($rule->wfo !== null ? "WFO {$rule->wfo}" : 'your area'),
             '{category}' => $rule->category->label(),
         ]);
     }

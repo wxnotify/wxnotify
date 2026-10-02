@@ -9,6 +9,7 @@ use App\Enums\MessageBodyStyle;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
+use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\Delivery\ChannelDispatcher;
@@ -60,6 +61,7 @@ class DeliverWeatherAlert implements ShouldQueue
         public readonly int $ruleId,
         public readonly int $channelId,
         public readonly int $ingestedProductId,
+        public readonly ?int $locationId = null,
     ) {}
 
     public function handle(ChannelDispatcher $dispatcher): void
@@ -96,8 +98,10 @@ class DeliverWeatherAlert implements ShouldQueue
             return;
         }
 
+        $location = $this->locationId !== null ? Location::find($this->locationId) : null;
+
         if (! $rule->is_active) {
-            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $product->product));
+            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $product->product, $location));
 
             return;
         }
@@ -112,7 +116,7 @@ class DeliverWeatherAlert implements ShouldQueue
         $maxLength = $templatedBody === null && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500;
         $body = $isEmailChannel ? $bodySource : Str::limit($bodySource, $maxLength, preserveWords: true);
 
-        $subject = app(RenderAlertSubject::class)($rule, $product->product);
+        $subject = app(RenderAlertSubject::class)($rule, $product->product, $location);
 
         $result = $dispatcher->send($channel, $body, $subject, [
             'type' => 'alert',
