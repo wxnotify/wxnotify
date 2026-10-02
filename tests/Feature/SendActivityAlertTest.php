@@ -4,6 +4,7 @@ use App\Enums\ActivityAlertType;
 use App\Jobs\SendActivityAlert;
 use App\Models\ActivityAlertRule;
 use App\Models\User;
+use App\Settings\GeneralSettings;
 use App\Support\Apprise\AppriseApiClient;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -24,6 +25,24 @@ test('it sends an apprise notification for an active rule', function () {
     Http::assertSent(fn ($request) => $request['urls'] === 'slack://token/botname/channel'
         && str_contains($request['body'], 'Signed in: subscriber@example.com')
         && $request['title'] === 'WxNotify Activity Alert');
+});
+
+test('the title is prefixed when the message prefix is enabled', function () {
+    Http::fake();
+    $settings = app(GeneralSettings::class);
+    $settings->message_prefix_enabled = true;
+    $settings->message_prefix = '[STAGING]';
+    $settings->save();
+
+    $rule = ActivityAlertRule::factory()->create([
+        'apprise_target' => 'slack://token/botname/channel',
+        'is_active' => true,
+    ]);
+    $user = User::factory()->create();
+
+    (new SendActivityAlert($rule->id, ActivityAlertType::SignedIn, $user->id, now()))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['title'] === '[STAGING] WxNotify Activity Alert');
 });
 
 test('it does nothing if the rule no longer exists', function () {

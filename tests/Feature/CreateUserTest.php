@@ -5,7 +5,7 @@ use App\Filament\Admin\Resources\Users\Pages\EditUser;
 use App\Filament\Admin\Resources\Users\Pages\ListUsers;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Models\User;
-use Filament\Auth\Notifications\ResetPassword as FilamentResetPasswordNotification;
+use App\Notifications\PrefixedResetPassword;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -43,7 +43,10 @@ test('creating a user by emailing a password-reset link sends the link, verifies
         ->and($user->is_owner)->toBeFalse()
         ->and(Hash::check($user->password, $user->password))->toBeFalse();
 
-    Notification::assertSentTo($user, FilamentResetPasswordNotification::class);
+    // PrefixedResetPassword, not Filament's own ResetPassword: AppServiceProvider
+    // binds the container to resolve our subclass instead, so the message
+    // prefix setting (see MessagePrefixTest) can reach this email too.
+    Notification::assertSentTo($user, PrefixedResetPassword::class);
 });
 
 test('the password-reset link points at the dashboard panel, not admin', function () {
@@ -60,7 +63,7 @@ test('the password-reset link points at the dashboard panel, not admin', functio
 
     $user = User::where('email', 'jamie@example.com')->sole();
 
-    Notification::assertSentTo($user, function (FilamentResetPasswordNotification $notification) {
+    Notification::assertSentTo($user, function (PrefixedResetPassword $notification) {
         expect($notification->url)->toContain('/dashboard/')->not->toContain('/admin/');
 
         return true;

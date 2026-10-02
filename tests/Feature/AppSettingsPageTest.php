@@ -19,7 +19,43 @@ test('the page loads the current values of both settings groups', function () {
             'maintenance_mode' => false,
             'plus_locations' => 5,
             'lightning_min_radius_miles' => 10,
+            'message_prefix_enabled' => false,
+            'message_prefix' => '',
         ]);
+});
+
+test('the message prefix field is hidden until the toggle is turned on', function () {
+    $component = livewire(AppSettings::class);
+
+    $component->assertFormFieldHidden('message_prefix');
+
+    $component->set('data.message_prefix_enabled', true);
+
+    $component->assertFormFieldVisible('message_prefix');
+});
+
+test('saving the message prefix persists both fields', function () {
+    livewire(AppSettings::class)
+        ->fillForm([
+            'message_prefix_enabled' => true,
+            'message_prefix' => '[STAGING]',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertNotified();
+
+    expect(app(GeneralSettings::class)->refresh()->message_prefix_enabled)->toBeTrue()
+        ->and(app(GeneralSettings::class)->message_prefix)->toBe('[STAGING]');
+});
+
+test('turning the prefix on with no text is a form error', function () {
+    livewire(AppSettings::class)
+        ->fillForm([
+            'message_prefix_enabled' => true,
+            'message_prefix' => '',
+        ])
+        ->call('save')
+        ->assertHasFormErrors(['message_prefix']);
 });
 
 test('saving writes both groups', function () {

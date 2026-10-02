@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\NotificationChannel;
+use App\Settings\GeneralSettings;
 use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\DeliveryResult;
 use Illuminate\Http\Client\ConnectionException;
@@ -42,6 +43,32 @@ test('an unknown channel type is a failed result, not an exception', function ()
     $result = app(ChannelDispatcher::class)->send($channel, 'body');
 
     expect($result->success)->toBeFalse()->and($result->error)->toContain('carrier-pigeon');
+});
+
+test('the title is prefixed when the message prefix is enabled', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $settings = app(GeneralSettings::class);
+    $settings->message_prefix_enabled = true;
+    $settings->message_prefix = '[STAGING]';
+    $settings->save();
+    $channel = NotificationChannel::factory()->create(['channel_type' => 'discord', 'apprise_url' => 'discord://1/abc/']);
+
+    app(ChannelDispatcher::class)->send($channel, 'body', 'title');
+
+    Http::assertSent(fn ($request) => $request['title'] === '[STAGING] title');
+});
+
+test('a null title is left alone, not turned into a bare prefix', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $settings = app(GeneralSettings::class);
+    $settings->message_prefix_enabled = true;
+    $settings->message_prefix = '[STAGING]';
+    $settings->save();
+    $channel = NotificationChannel::factory()->create(['channel_type' => 'discord', 'apprise_url' => 'discord://1/abc/']);
+
+    app(ChannelDispatcher::class)->send($channel, 'body');
+
+    Http::assertSent(fn ($request) => ! array_key_exists('title', $request->data()));
 });
 
 test('config is stored encrypted and is not written to the activity log', function () {

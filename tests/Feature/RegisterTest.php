@@ -3,7 +3,7 @@
 use App\Enums\Tier;
 use App\Filament\Dashboard\Pages\Auth\Register;
 use App\Models\User;
-use Filament\Auth\Notifications\VerifyEmail;
+use App\Notifications\PrefixedVerifyEmail;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -119,7 +119,10 @@ test('a successful registration actually dispatches the verification email', fun
 
     $user = User::where('email', 'jane@example.com')->sole();
 
-    Notification::assertSentTo($user, VerifyEmail::class);
+    // PrefixedVerifyEmail, not Filament's own VerifyEmail: AppServiceProvider
+    // binds the container to resolve our subclass instead, so the message
+    // prefix setting (see MessagePrefixTest) can reach this email too.
+    Notification::assertSentTo($user, PrefixedVerifyEmail::class);
 });
 
 test('an unverified registrant cannot reach dashboard resources', function () {

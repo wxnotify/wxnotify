@@ -6,6 +6,9 @@ use App\Contracts\PipelineStack;
 use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\User;
+use App\Notifications\PrefixedResetPassword;
+use App\Notifications\PrefixedVerifyEmail;
+use App\Notifications\PrefixedVerifyEmailChange;
 use App\Observers\ActivityLogObserver;
 use App\Observers\IngestedProductObserver;
 use App\Observers\LocationZoneObserver;
@@ -14,20 +17,23 @@ use App\Support\ApplyEmailSettings;
 use App\Support\Filament\AdminLogoutResponse;
 use App\Support\Pipeline\UnmanagedPipelineStack;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
+use Filament\Auth\Notifications\ResetPassword;
+use Filament\Auth\Notifications\VerifyEmail;
+use Filament\Auth\Notifications\VerifyEmailChange;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Support\CauserResolver;
-use Spatie\Health\Facades\Health;
+use Spatie\Health\Checks\Checks\CacheCheck;
+use Spatie\Health\Checks\Checks\DatabaseCheck;
+use Spatie\Health\Checks\Checks\DatabaseConnectionCountCheck;
 use Spatie\Health\Checks\Checks\DebugModeCheck;
 use Spatie\Health\Checks\Checks\EnvironmentCheck;
 use Spatie\Health\Checks\Checks\OptimizedAppCheck;
+use Spatie\Health\Checks\Checks\PingCheck;
 use Spatie\Health\Checks\Checks\ScheduleCheck;
 use Spatie\Health\Checks\Checks\UsedDiskSpaceCheck;
-use Spatie\Health\Checks\Checks\DatabaseCheck;
-use Spatie\Health\Checks\Checks\CacheCheck;
-use Spatie\Health\Checks\Checks\PingCheck;
-use Spatie\Health\Checks\Checks\DatabaseConnectionCountCheck;
+use Spatie\Health\Facades\Health;
 use STS\FilamentImpersonate\ImpersonateManager;
 
 class AppServiceProvider extends ServiceProvider
@@ -39,6 +45,13 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(LogoutResponse::class, AdminLogoutResponse::class);
         $this->app->bind(PipelineStack::class, UnmanagedPipelineStack::class);
+
+        // Lets the message-prefix setting reach account emails too, with no
+        // changes to Filament's own Register/ResetPassword/EditProfile pages
+        // -- they all resolve these classes through the container.
+        $this->app->bind(VerifyEmail::class, PrefixedVerifyEmail::class);
+        $this->app->bind(ResetPassword::class, PrefixedResetPassword::class);
+        $this->app->bind(VerifyEmailChange::class, PrefixedVerifyEmailChange::class);
     }
 
     /**

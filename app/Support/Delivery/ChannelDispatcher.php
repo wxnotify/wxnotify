@@ -10,6 +10,7 @@ use App\Support\Delivery\Transports\MailTransport;
 use App\Support\Delivery\Transports\Transport;
 use App\Support\Delivery\Transports\WebhookTransport;
 use App\Support\Delivery\Transports\WebPushTransport;
+use App\Support\MessagePrefix;
 
 class ChannelDispatcher
 {
@@ -25,6 +26,8 @@ class ChannelDispatcher
         if ($type === null) {
             return DeliveryResult::failed("Unknown channel type [{$channel->channel_type}].");
         }
+
+        $title = $title !== null ? MessagePrefix::apply($title) : null;
 
         return $this->transportFor($type->transport())->send($channel, $body, $title, $meta);
     }

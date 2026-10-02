@@ -6,6 +6,7 @@ use App\Enums\ActivityAlertType;
 use App\Models\ActivityAlertRule;
 use App\Models\User;
 use App\Support\Apprise\AppriseApiClient;
+use App\Support\MessagePrefix;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -51,7 +52,7 @@ class SendActivityAlert implements ShouldQueue
         $delivered = $client->notify(
             url: $rule->apprise_target,
             body: "{$this->type->label()}: {$user->email} at {$this->occurredAt->toDayDateTimeString()} UTC",
-            title: 'WxNotify Activity Alert',
+            title: MessagePrefix::apply('WxNotify Activity Alert'),
         );
 
         if (! $delivered) {

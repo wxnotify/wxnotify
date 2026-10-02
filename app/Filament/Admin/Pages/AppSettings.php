@@ -100,6 +100,16 @@ class AppSettings extends Page implements HasForms
                                         ->maxLength(500)
                                         ->helperText('Optional. Leave empty for the default message.'),
                                 ]),
+                            Section::make('Message prefix')
+                                ->description('Prepends text to every message the system sends -- alert deliveries, channel confirmation codes, activity alerts, and account emails (verification, password reset).')
+                                ->schema([
+                                    Toggle::make('message_prefix_enabled')->label('Message prefix enabled')->live(),
+                                    TextInput::make('message_prefix')
+                                        ->label('Prefix')
+                                        ->maxLength(50)
+                                        ->required(fn (Get $get): bool => (bool) $get('message_prefix_enabled'))
+                                        ->visible(fn (Get $get): bool => (bool) $get('message_prefix_enabled')),
+                                ]),
                         ]),
                         Tab::make('Tier & threshold defaults')->schema([
                             Section::make('Locations')->columns(2)->schema([

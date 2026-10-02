@@ -10,6 +10,10 @@ class GeneralSettings extends Settings
 
     public ?string $maintenance_message;
 
+    public bool $message_prefix_enabled;
+
+    public string $message_prefix;
+
     public static function group(): string
     {
         return 'general';
