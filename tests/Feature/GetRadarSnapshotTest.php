@@ -44,7 +44,7 @@ test('a site code that is not three or four uppercase letters/digits never makes
 
     expect((new GetRadarSnapshot)($site))->toBeNull();
     Http::assertNothingSent();
-})->with(['../etc', 'kftg', 'KFTGX', 'KF', 'KF/TG', '']);
+})->with(['../etc', 'kftg', 'KFTGX', 'KF', 'KF/TG', '', "KFTG\n"]);
 
 test('the request goes to the fixed radar host and does not follow redirects', function () {
     Http::fake(['radar.weather.gov/*' => Http::response(RADAR_GIF, 200, ['Content-Type' => 'image/gif'])]);

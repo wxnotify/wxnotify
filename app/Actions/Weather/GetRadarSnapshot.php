@@ -33,7 +33,7 @@ class GetRadarSnapshot
      */
     public function __invoke(string $site): ?array
     {
-        if (preg_match('/^[A-Z0-9]{3,4}$/', $site) !== 1) {
+        if (preg_match('/^[A-Z0-9]{3,4}\z/', $site) !== 1) {
             return null;
         }
 
