@@ -81,6 +81,11 @@ class AlertRule extends Model
         return $this->belongsTo(Location::class);
     }
 
+    public function locations(): BelongsToMany
+    {
+        return $this->belongsToMany(Location::class);
+    }
+
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class);

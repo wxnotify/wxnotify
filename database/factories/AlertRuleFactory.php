@@ -59,4 +59,16 @@ class AlertRuleFactory extends Factory
             'delivery_time' => '07:00',
         ]);
     }
+
+    /**
+     * Attaches the given locations via the alert_rule_location pivot after
+     * the rule is created -- mirrors how tests already attach products()/
+     * notificationChannels() explicitly, not via definition().
+     */
+    public function locations(Location ...$locations): static
+    {
+        return $this->afterCreating(function (AlertRule $rule) use ($locations): void {
+            $rule->locations()->attach(collect($locations)->pluck('id'));
+        });
+    }
 }
