@@ -195,8 +195,198 @@ more than one location."
 ```
 
 ---
+### Task 2: Thread the matched location into delivery and subject rendering
 
-### Task 2: Matching engine — GeographyMatch + multi-location loop
+**Files:**
+- Modify: `app/Actions/Weather/RenderAlertSubject.php`
+- Modify: `app/Jobs/DeliverWeatherAlert.php`
+- Test: `tests/Feature/RenderAlertSubjectTest.php` (append)
+- Test: `tests/Feature/DeliverWeatherAlertTest.php` (append)
+
+**Interfaces:**
+- Consumes: `AlertRule::locations()` from Task 1 (used only by this task's own new `DeliverWeatherAlertTest.php` test — neither `RenderAlertSubject` nor `DeliverWeatherAlert` touch the matching engine). Deliberately done before Task 3's matching-engine refactor: both new parameters are optional and backward-compatible, so this task has no real dependency on `GeographyMatch` existing yet, while Task 3's `dispatchOrSuppress()` rewrite calls both of this task's new signatures directly and would fail with an `ArgumentCountError` if attempted first.
+- Produces: `RenderAlertSubject::__invoke(AlertRule $rule, ?Product $product = null, ?Location $location = null): string` (used by Task 3's `dispatchOrSuppress()`). `DeliverWeatherAlert::__construct(int $ruleId, int $channelId, int $ingestedProductId, ?int $locationId = null)` (also used by Task 3's `dispatchOrSuppress()`).
+
+This task's governing rule: `.ai/rules/jobs.md`'s `Str::limit(..., preserveWords: true)` note is unaffected (nothing here touches body truncation) — included for completeness since this file matches that rule's path glob.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `tests/Feature/RenderAlertSubjectTest.php`:
+```php
+test('an explicit $location parameter wins over the rule\'s own location()', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $ruleLocation = Location::factory()->create(['label' => 'Rule default']);
+    $passedLocation = Location::factory()->create(['label' => 'Matched this time']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts',
+        'matching_mode' => 'location',
+        'location_id' => $ruleLocation->id,
+        'custom_subject_template' => 'Near {location}',
+    ]);
+
+    $result = (new RenderAlertSubject)($rule, null, $passedLocation);
+
+    expect($result)->toBe('Near Matched this time');
+});
+
+test('omitting $location falls back to the rule\'s own location(), unchanged from before this parameter existed', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $location = Location::factory()->create(['label' => 'Home']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'threshold',
+        'location_id' => $location->id,
+        'custom_subject_template' => 'Near {location}',
+    ]);
+
+    expect((new RenderAlertSubject)($rule))->toBe('Near Home');
+});
+```
+
+Append to `tests/Feature/DeliverWeatherAlertTest.php`:
+```php
+test('the delivered subject reflects the location passed via the job, not an arbitrary location on the rule', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $matchedLocation = Location::factory()->create(['label' => 'Matched one']);
+    $otherLocation = Location::factory()->create(['label' => 'Not this one']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => null,
+        'custom_subject_template' => 'Near {location}',
+    ]);
+    $rule->locations()->attach([$matchedLocation->id, $otherLocation->id]);
+    $channel = NotificationChannel::factory()->for($plusUser)->create(['apprise_url' => 'discord://token/id']);
+    $product = IngestedProduct::factory()->create();
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id, $matchedLocation->id))
+        ->handle(app(ChannelDispatcher::class));
+
+    expect(DeliveryLog::sole()->subject)->toBe('Near Matched one');
+});
+
+test('omitting the job\'s locationId renders the subject exactly as it did before this parameter existed', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create(['apprise_url' => 'discord://token/id']);
+    $product = IngestedProduct::factory()->create();
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+
+    expect(DeliveryLog::sole()->subject)->toBe($rule->displayName());
+});
+```
+Add `use App\Models\Location;` to `DeliverWeatherAlertTest.php`'s top-level `use` statements — confirmed not already present (its existing tests never reference `Location` directly).
+
+- [ ] **Step 2: Run to verify they fail**
+
+```bash
+docker exec wxnotify-nextgen-front-end-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/RenderAlertSubjectTest.php tests/Feature/DeliverWeatherAlertTest.php"
+```
+Expected: FAIL — `RenderAlertSubject::__invoke()` doesn't accept a 3rd argument yet; `DeliverWeatherAlert`'s constructor doesn't accept a 4th.
+
+- [ ] **Step 3: Update `RenderAlertSubject`**
+
+```php
+<?php
+
+namespace App\Actions\Weather;
+
+use App\Models\AlertRule;
+use App\Models\Location;
+use App\Models\Product;
+
+/**
+ * Renders a per-rule custom notification subject/title via plain
+ * placeholder substitution -- logic-less strtr(), nothing executable,
+ * since a subscriber-authored template runs on every dispatch of their
+ * alerts. Priority: an attached AlertTemplate's subject_template first
+ * (via effectiveAlertTemplate(), tier- and category-gated), then the
+ * rule's own custom_subject_template (via
+ * effectiveCustomSubjectTemplate()), then AlertRule::displayName() (the
+ * existing admin/list-table label, unchanged and untouched by this class)
+ * when neither is set.
+ */
+class RenderAlertSubject
+{
+    /**
+     * $location is the specific location that matched THIS delivery for a
+     * multi-location Weather Alerts/SPC & WPC rule (see
+     * MatchWeatherAlertRules::matchesAnyLocation()) -- when omitted, falls
+     * back to $rule->location, exactly this method's behavior before this
+     * parameter existed, which is what every non-Weather-Alerts/SPC-WPC
+     * caller (DeliverScheduledAlert) still relies on.
+     */
+    public function __invoke(AlertRule $rule, ?Product $product = null, ?Location $location = null): string
+    {
+        $templateSubject = $rule->effectiveAlertTemplate()?->subject_template;
+        $subjectTemplate = filled($templateSubject) ? $templateSubject : $rule->effectiveCustomSubjectTemplate();
+
+        if (blank($subjectTemplate)) {
+            return $rule->displayName();
+        }
+
+        $location ??= $rule->location;
+
+        return strtr($subjectTemplate, [
+            '{product}' => $product?->name ?? $rule->category->label(),
+            '{location}' => $location?->label ?? ($rule->wfo !== null ? "WFO {$rule->wfo}" : 'your area'),
+            '{category}' => $rule->category->label(),
+        ]);
+    }
+}
+```
+
+- [ ] **Step 4: Update `DeliverWeatherAlert`**
+
+In `app/Jobs/DeliverWeatherAlert.php`, add `use App\Models\Location;` to the imports. Replace the constructor:
+```php
+    public function __construct(
+        public readonly int $ruleId,
+        public readonly int $channelId,
+        public readonly int $ingestedProductId,
+        public readonly ?int $locationId = null,
+    ) {}
+```
+
+Inside `handle()`, after `$product = IngestedProduct::find($this->ingestedProductId);` and its null-check (so `$location` is resolved once, after the earlier null-guards, before either `RenderAlertSubject` call site uses it), add:
+```php
+        $location = $this->locationId !== null ? Location::find($this->locationId) : null;
+```
+
+Then update both existing `RenderAlertSubject` calls to pass it as the 3rd argument:
+```php
+            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $product->product, $location));
+```
+and
+```php
+        $subject = app(RenderAlertSubject::class)($rule, $product->product, $location);
+```
+(Everything else in `handle()` — body composition, `$dispatcher->send(...)`, the `DeliveryLog::create(...)` call — is unchanged.)
+
+- [ ] **Step 5: Run the tests**
+
+```bash
+docker exec wxnotify-nextgen-front-end-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/RenderAlertSubjectTest.php tests/Feature/DeliverWeatherAlertTest.php tests/Feature/MatchWeatherAlertRulesTest.php tests/Feature/DeliverScheduledAlertTest.php"
+```
+Expected: all PASS. `DeliverScheduledAlertTest.php` is included specifically to confirm `RenderAlertSubject`'s new optional 3rd parameter doesn't disturb `DeliverScheduledAlert`'s existing 2-argument call (`app(RenderAlertSubject::class)($rule)`), which must keep behaving exactly as before.
+
+- [ ] **Step 6: Pint and commit**
+
+```bash
+docker exec wxnotify-nextgen-front-end-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
+git add app/Actions/Weather/RenderAlertSubject.php app/Jobs/DeliverWeatherAlert.php tests/Feature/RenderAlertSubjectTest.php tests/Feature/DeliverWeatherAlertTest.php
+git commit -m "Thread the matched location through delivery to subject rendering
+
+DeliverWeatherAlert carries an optional locationId from
+dispatchOrSuppress()'s GeographyMatch; RenderAlertSubject's {location}
+placeholder now reflects whichever location actually matched this
+specific delivery for a multi-location rule, falling back to the
+rule's own location() exactly as before when none is passed."
+```
+
+---
+### Task 3: Matching engine — GeographyMatch + multi-location loop
 
 **Files:**
 - Create: `app/Support/Geography/GeographyMatch.php`
@@ -204,8 +394,8 @@ more than one location."
 - Modify: `tests/Feature/MatchWeatherAlertRulesTest.php` (16 existing tests, listed in Step 1 below)
 
 **Interfaces:**
-- Consumes: `AlertRule::locations()` from Task 1.
-- Produces: `GeographyMatch::matched(?Location $location = null): self`, `GeographyMatch::notMatched(): self`, public readonly `bool $matched` / `?Location $location`. `MatchWeatherAlertRules::matchesGeography(AlertRule $rule, IngestedProduct $product): GeographyMatch` (was `bool`) — Task 3 and Task 4 both read this return type.
+- Consumes: `AlertRule::locations()` from Task 1; `RenderAlertSubject`'s new optional 3rd parameter and `DeliverWeatherAlert`'s new optional 4th constructor parameter from Task 2 — this task's `dispatchOrSuppress()` rewrite (Step 4 below) calls both with the matched location, so Task 2 must already be done.
+- Produces: `GeographyMatch::matched(?Location $location = null): self`, `GeographyMatch::notMatched(): self`, public readonly `bool $matched` / `?Location $location`. `MatchWeatherAlertRules::matchesGeography(AlertRule $rule, IngestedProduct $product): GeographyMatch` (was `bool`) — Task 4 reads this return type.
 
 This task's governing rules: `.ai/rules/pipeline.md` ("A Forecast Discussion rule means the AFD product specifically" — the `ForecastDiscussion` branch's WFO-only check must stay exactly as-is, just wrapped in `GeographyMatch`) and `.ai/rules/models.md` (`ActiveWwa::forProduct()` usage inside `matchesActiveWwaPolygon()` must not be re-derived — leave that method untouched).
 
@@ -569,14 +759,13 @@ entirely, subsumed by whether a location actually matched)."
 ```
 
 ---
-
-### Task 3: New multi-location matching coverage
+### Task 4: New multi-location matching coverage
 
 **Files:**
 - Test: `tests/Feature/MatchWeatherAlertRulesTest.php` (append new tests)
 
 **Interfaces:**
-- Consumes: `GeographyMatch`, `AlertRule::locations()`, `AlertRuleFactory::locations()` from Tasks 1–2.
+- Consumes: `AlertRule::locations()`/`AlertRuleFactory::locations()` from Task 1, `GeographyMatch`-driven matching from Task 3.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -666,12 +855,12 @@ test('a RiskArea-mode rule\'s quiet hours now suppress correctly -- previously s
 });
 ```
 
-- [ ] **Step 2: Run to verify they pass against Task 2's implementation**
+- [ ] **Step 2: Run to verify they pass against Task 3's implementation**
 
 ```bash
 docker exec wxnotify-nextgen-front-end-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/MatchWeatherAlertRulesTest.php"
 ```
-Expected: PASS. (These exercise behavior Task 2 already implements — this task is pure coverage, not new production code. If the RiskArea quiet-hours test fails, Task 2's `isWithinQuietHours()` replacement was applied incorrectly — go back and re-check that step before continuing.)
+Expected: PASS. (These exercise behavior Task 3 already implements — this task is pure coverage, not new production code. If the RiskArea quiet-hours test fails, Task 3's `isWithinQuietHours()` replacement was applied incorrectly — go back and re-check that step before continuing.)
 
 - [ ] **Step 3: Pint and commit**
 
@@ -682,199 +871,6 @@ git commit -m "Add coverage for multi-location matching and the RiskArea quiet-h
 ```
 
 ---
-
-### Task 4: Thread the matched location into delivery and subject rendering
-
-**Files:**
-- Modify: `app/Actions/Weather/RenderAlertSubject.php`
-- Modify: `app/Jobs/DeliverWeatherAlert.php`
-- Test: `tests/Feature/RenderAlertSubjectTest.php` (append)
-- Test: `tests/Feature/DeliverWeatherAlertTest.php` (append)
-
-**Interfaces:**
-- Consumes: `?Location` from Task 2's `GeographyMatch`/`dispatchOrSuppress()`.
-- Produces: `RenderAlertSubject::__invoke(AlertRule $rule, ?Product $product = null, ?Location $location = null): string`. `DeliverWeatherAlert::__construct(int $ruleId, int $channelId, int $ingestedProductId, ?int $locationId = null)`.
-
-This task's governing rule: `.ai/rules/jobs.md`'s `Str::limit(..., preserveWords: true)` note is unaffected (nothing here touches body truncation) — included for completeness since this file matches that rule's path glob.
-
-- [ ] **Step 1: Write the failing tests**
-
-Append to `tests/Feature/RenderAlertSubjectTest.php`:
-```php
-test('an explicit $location parameter wins over the rule\'s own location()', function () {
-    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
-    $ruleLocation = Location::factory()->create(['label' => 'Rule default']);
-    $passedLocation = Location::factory()->create(['label' => 'Matched this time']);
-    $rule = AlertRule::factory()->for($plusUser)->create([
-        'category' => 'weather_alerts',
-        'matching_mode' => 'location',
-        'location_id' => $ruleLocation->id,
-        'custom_subject_template' => 'Near {location}',
-    ]);
-
-    $result = (new RenderAlertSubject)($rule, null, $passedLocation);
-
-    expect($result)->toBe('Near Matched this time');
-});
-
-test('omitting $location falls back to the rule\'s own location(), unchanged from before this parameter existed', function () {
-    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
-    $location = Location::factory()->create(['label' => 'Home']);
-    $rule = AlertRule::factory()->for($plusUser)->create([
-        'category' => 'threshold',
-        'location_id' => $location->id,
-        'custom_subject_template' => 'Near {location}',
-    ]);
-
-    expect((new RenderAlertSubject)($rule))->toBe('Near Home');
-});
-```
-
-Append to `tests/Feature/DeliverWeatherAlertTest.php`:
-```php
-test('the delivered subject reflects the location passed via the job, not an arbitrary location on the rule', function () {
-    Http::fake(['*/notify/*' => Http::response(status: 200)]);
-
-    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
-    $matchedLocation = Location::factory()->create(['label' => 'Matched one']);
-    $otherLocation = Location::factory()->create(['label' => 'Not this one']);
-    $rule = AlertRule::factory()->for($plusUser)->create([
-        'category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => null,
-        'custom_subject_template' => 'Near {location}',
-    ]);
-    $rule->locations()->attach([$matchedLocation->id, $otherLocation->id]);
-    $channel = NotificationChannel::factory()->for($plusUser)->create(['apprise_url' => 'discord://token/id']);
-    $product = IngestedProduct::factory()->create();
-
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id, $matchedLocation->id))
-        ->handle(app(ChannelDispatcher::class));
-
-    expect(DeliveryLog::sole()->subject)->toBe('Near Matched one');
-});
-
-test('omitting the job\'s locationId renders the subject exactly as it did before this parameter existed', function () {
-    Http::fake(['*/notify/*' => Http::response(status: 200)]);
-
-    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
-    $channel = NotificationChannel::factory()->for($rule->user)->create(['apprise_url' => 'discord://token/id']);
-    $product = IngestedProduct::factory()->create();
-
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
-
-    expect(DeliveryLog::sole()->subject)->toBe($rule->displayName());
-});
-```
-Add `use App\Models\Location;` to `DeliverWeatherAlertTest.php`'s top-level `use` statements — confirmed not already present (its existing tests never reference `Location` directly).
-
-- [ ] **Step 2: Run to verify they fail**
-
-```bash
-docker exec wxnotify-nextgen-front-end-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/RenderAlertSubjectTest.php tests/Feature/DeliverWeatherAlertTest.php"
-```
-Expected: FAIL — `RenderAlertSubject::__invoke()` doesn't accept a 3rd argument yet; `DeliverWeatherAlert`'s constructor doesn't accept a 4th.
-
-- [ ] **Step 3: Update `RenderAlertSubject`**
-
-```php
-<?php
-
-namespace App\Actions\Weather;
-
-use App\Models\AlertRule;
-use App\Models\Location;
-use App\Models\Product;
-
-/**
- * Renders a per-rule custom notification subject/title via plain
- * placeholder substitution -- logic-less strtr(), nothing executable,
- * since a subscriber-authored template runs on every dispatch of their
- * alerts. Priority: an attached AlertTemplate's subject_template first
- * (via effectiveAlertTemplate(), tier- and category-gated), then the
- * rule's own custom_subject_template (via
- * effectiveCustomSubjectTemplate()), then AlertRule::displayName() (the
- * existing admin/list-table label, unchanged and untouched by this class)
- * when neither is set.
- */
-class RenderAlertSubject
-{
-    /**
-     * $location is the specific location that matched THIS delivery for a
-     * multi-location Weather Alerts/SPC & WPC rule (see
-     * MatchWeatherAlertRules::matchesAnyLocation()) -- when omitted, falls
-     * back to $rule->location, exactly this method's behavior before this
-     * parameter existed, which is what every non-Weather-Alerts/SPC-WPC
-     * caller (DeliverScheduledAlert) still relies on.
-     */
-    public function __invoke(AlertRule $rule, ?Product $product = null, ?Location $location = null): string
-    {
-        $templateSubject = $rule->effectiveAlertTemplate()?->subject_template;
-        $subjectTemplate = filled($templateSubject) ? $templateSubject : $rule->effectiveCustomSubjectTemplate();
-
-        if (blank($subjectTemplate)) {
-            return $rule->displayName();
-        }
-
-        $location ??= $rule->location;
-
-        return strtr($subjectTemplate, [
-            '{product}' => $product?->name ?? $rule->category->label(),
-            '{location}' => $location?->label ?? ($rule->wfo !== null ? "WFO {$rule->wfo}" : 'your area'),
-            '{category}' => $rule->category->label(),
-        ]);
-    }
-}
-```
-
-- [ ] **Step 4: Update `DeliverWeatherAlert`**
-
-In `app/Jobs/DeliverWeatherAlert.php`, add `use App\Models\Location;` to the imports. Replace the constructor:
-```php
-    public function __construct(
-        public readonly int $ruleId,
-        public readonly int $channelId,
-        public readonly int $ingestedProductId,
-        public readonly ?int $locationId = null,
-    ) {}
-```
-
-Inside `handle()`, after `$product = IngestedProduct::find($this->ingestedProductId);` and its null-check (so `$location` is resolved once, after the earlier null-guards, before either `RenderAlertSubject` call site uses it), add:
-```php
-        $location = $this->locationId !== null ? Location::find($this->locationId) : null;
-```
-
-Then update both existing `RenderAlertSubject` calls to pass it as the 3rd argument:
-```php
-            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $product->product, $location));
-```
-and
-```php
-        $subject = app(RenderAlertSubject::class)($rule, $product->product, $location);
-```
-(Everything else in `handle()` — body composition, `$dispatcher->send(...)`, the `DeliveryLog::create(...)` call — is unchanged.)
-
-- [ ] **Step 5: Run the tests**
-
-```bash
-docker exec wxnotify-nextgen-front-end-1 bash -lc "cd /var/www/html && vendor/bin/pest tests/Feature/RenderAlertSubjectTest.php tests/Feature/DeliverWeatherAlertTest.php tests/Feature/MatchWeatherAlertRulesTest.php tests/Feature/DeliverScheduledAlertTest.php"
-```
-Expected: all PASS. `DeliverScheduledAlertTest.php` is included specifically to confirm `RenderAlertSubject`'s new optional 3rd parameter doesn't disturb `DeliverScheduledAlert`'s existing 2-argument call (`app(RenderAlertSubject::class)($rule)`), which must keep behaving exactly as before.
-
-- [ ] **Step 6: Pint and commit**
-
-```bash
-docker exec wxnotify-nextgen-front-end-1 bash -lc "cd /var/www/html && vendor/bin/pint --dirty --format agent"
-git add app/Actions/Weather/RenderAlertSubject.php app/Jobs/DeliverWeatherAlert.php tests/Feature/RenderAlertSubjectTest.php tests/Feature/DeliverWeatherAlertTest.php
-git commit -m "Thread the matched location through delivery to subject rendering
-
-DeliverWeatherAlert carries an optional locationId from
-dispatchOrSuppress()'s GeographyMatch; RenderAlertSubject's {location}
-placeholder now reflects whichever location actually matched this
-specific delivery for a multi-location rule, falling back to the
-rule's own location() exactly as before when none is passed."
-```
-
----
-
 ### Task 5: Multi-select form field, page wiring, browser verification
 
 **Files:**
@@ -884,7 +880,7 @@ rule's own location() exactly as before when none is passed."
 - Modify: `tests/Feature/AlertRuleResourceTest.php` (2 existing tests updated, new tests added)
 
 **Interfaces:**
-- Consumes: `AlertRule::locations()`, `GeographyMatch`-driven matching from Tasks 1–2 (this task doesn't touch matching directly, only the form that feeds it).
+- Consumes: `AlertRule::locations()` from Task 1 (this task doesn't touch matching directly, only the form that feeds it).
 
 This task's governing rule: `.ai/rules/filament.md`'s dynamic-Wizard-step entangle bug note and its `countyZoneField()` precedent (`->multiple()` is safe here specifically because `options()` is a plain closure, not `->relationship()`) — re-read that note before starting this task if picking it up fresh.
 
@@ -1158,6 +1154,7 @@ detect an entangle desync."
 
 ## Self-review notes (completed during planning, not a step to re-run)
 
-- **Spec coverage**: every section of the design spec maps to a task — storage/backfill (Task 1), GeographyMatch + matching loop + quiet hours (Task 2), the incidental RiskArea fix (Task 2, covered by Task 3), subject rendering (Task 4), the form (Task 5), and the full enumerated existing-test list (Task 2, Step 1).
-- **Type consistency checked**: `GeographyMatch::matched()`/`notMatched()` (Task 2) used identically in Task 2's own `matchesGeography()`/`matchesAnyLocation()`; `?Location $location` parameter name and position consistent between `RenderAlertSubject` (Task 4) and its callers in `MatchWeatherAlertRules` (Task 2) and `DeliverWeatherAlert` (Task 4); `location_ids` field name consistent between the form (Task 5), `CreateAlertRule`/`EditAlertRule` (Task 5), and every test that fills or asserts it (Task 5).
+- **Spec coverage**: every section of the design spec maps to a task — storage/backfill (Task 1), subject/delivery threading (Task 2), GeographyMatch + matching loop + quiet hours (Task 3), the incidental RiskArea fix (Task 3, covered by Task 4), the form (Task 5), and the full enumerated existing-test list (Task 3, Step 1).
+- **Type consistency checked**: `GeographyMatch::matched()`/`notMatched()` (Task 3) used identically in Task 3's own `matchesGeography()`/`matchesAnyLocation()`; `?Location $location` parameter name and position consistent between `RenderAlertSubject` (Task 2) and its callers in `MatchWeatherAlertRules` (Task 3) and `DeliverWeatherAlert` (Task 2); `location_ids` field name consistent between the form (Task 5), `CreateAlertRule`/`EditAlertRule` (Task 5), and every test that fills or asserts it (Task 5).
+- **Ordering dependency caught during subagent-driven-development's pre-flight scan** (not in the original self-review): Task 3's `dispatchOrSuppress()` calls `RenderAlertSubject`'s 3-arg form and `DeliverWeatherAlert::dispatch()`'s 4-arg form, which don't exist until the task that was originally numbered 4. Since both new parameters are optional/backward-compatible, that task has no real dependency on Task 3 and was moved ahead of it (now Task 2) rather than restructured — tasks were reordered and renumbered, no task content changed.
 - **No placeholders**: every step with a code change shows the exact before/after or complete new file; the one place this plan intentionally defers a decision (Step 7 of Task 5, the browser check) is a verification step, not implementation, and says exactly what to look for.
