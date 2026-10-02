@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Tier;
+use App\Enums\UnitSystem;
 use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use Database\Factories\UserFactory;
@@ -21,7 +22,7 @@ use Marcelodelgado\Announcements\Traits\HasAnnouncements;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['name', 'email', 'password', 'is_test_account'])]
+#[Fillable(['name', 'email', 'password', 'is_test_account', 'unit_system'])]
 #[Hidden(['password', 'remember_token', 'app_authentication_secret'])]
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, MustVerifyEmail
 {
@@ -191,6 +192,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'is_owner' => 'boolean',
             'is_test_account' => 'boolean',
             'tier_override' => Tier::class,
+            'unit_system' => UnitSystem::class,
         ];
     }
 

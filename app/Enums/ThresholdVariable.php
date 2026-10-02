@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Support\Units;
+
 enum ThresholdVariable: string
 {
     case Temperature = 'temperature';
@@ -25,12 +27,51 @@ enum ThresholdVariable: string
         };
     }
 
-    public function unit(): string
+    public function unit(UnitSystem $system = UnitSystem::Imperial): string
     {
+        $metric = $system === UnitSystem::Metric;
+
         return match ($this) {
-            self::Temperature, self::FeelsLike, self::Dewpoint => '°F',
-            self::WindSpeed, self::Gusts => 'mph',
+            self::Temperature, self::FeelsLike, self::Dewpoint => $metric ? '°C' : '°F',
+            self::WindSpeed, self::Gusts => $metric ? 'km/h' : 'mph',
             self::Humidity, self::PrecipChance => '%',
         };
+    }
+
+    /**
+     * The stored (imperial) value as the subscriber's system shows it.
+     */
+    public function displayValue(float $canonical, UnitSystem $system): float
+    {
+        $units = new Units($system);
+
+        return match ($this) {
+            self::Temperature, self::FeelsLike, self::Dewpoint => $units->temperatureValue($canonical),
+            self::WindSpeed, self::Gusts => $units->speedValue($canonical),
+            self::Humidity, self::PrecipChance => $canonical,
+        };
+    }
+
+    /**
+     * A value typed in the subscriber's system, as the stored imperial value.
+     */
+    public function canonicalValue(float $display, UnitSystem $system): float
+    {
+        $units = new Units($system);
+
+        return match ($this) {
+            self::Temperature, self::FeelsLike, self::Dewpoint => $units->temperatureToFahrenheit($display),
+            self::WindSpeed, self::Gusts => $units->speedToMph($display),
+            self::Humidity, self::PrecipChance => $display,
+        };
+    }
+
+    /**
+     * One decimal plus the unit, the shape a rule name has always used
+     * ("32.0°F"; Metric "0.0°C").
+     */
+    public function format(float $canonical, UnitSystem $system): string
+    {
+        return number_format($this->displayValue($canonical, $system), 1, '.', '').$this->unit($system);
     }
 }
