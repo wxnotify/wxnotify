@@ -23,10 +23,11 @@ class DailySummaryPresenter
         $current = $report['current'] ?? null;
         $radarSite = $report['radar_site'] ?? null;
         $timezone = $report['timezone'] ?? config('app.timezone');
+        $units = Units::fromReport($report);
 
         return [
             'location' => (string) ($report['location'] ?? ''),
-            'station_line' => $current !== null ? self::stationLine($current['station']) : null,
+            'station_line' => $current !== null ? self::stationLine($current['station'], $units) : null,
             'sun_line' => self::sunLine($report['sun'] ?? null),
             'sun' => self::sunTimes($report['sun'] ?? null),
             'alerts' => isset($report['alerts']) ? array_map(fn (array $alert): array => [
@@ -34,25 +35,25 @@ class DailySummaryPresenter
                 'headline' => $alert['headline'] ?? null,
                 'until' => isset($alert['expires']) ? 'until '.Carbon::parse($alert['expires'])->format('D g:i A') : null,
             ], $report['alerts']) : null,
-            'current' => $current !== null ? self::currentSection($current) : null,
+            'current' => $current !== null ? self::currentSection($current, $units) : null,
             'radar_alt' => is_string($radarSite) ? "Radar near {$report['location']} from {$radarSite}" : null,
             'radar_caption' => is_string($radarSite) ? 'Radar as of '.Carbon::now($timezone)->format('D, M j \a\t g:i A') : null,
             'hourly' => isset($report['hourly']) ? array_map(fn (array $hour): array => [
                 'time' => Carbon::parse($hour['time'])->format('g A'),
                 'icon_url' => WeatherIcon::url($hour['icon']['period'], $hour['icon']['code']),
-                'temp' => self::temperature($hour['temperature'], $hour['unit']),
+                'temp' => self::temperature($hour['temperature'], $hour['unit'], $units),
                 'precip' => isset($hour['precip_chance']) ? $hour['precip_chance'].'%' : self::DASH,
-                'wind' => filled($hour['wind']) ? $hour['wind'] : self::DASH,
+                'wind' => filled($hour['wind']) ? self::prose($hour['wind'], $units) : self::DASH,
                 'summary' => (string) $hour['summary'],
             ], $report['hourly']) : null,
             'periods' => array_map(fn (array $period): array => [
                 'icon_url' => WeatherIcon::url($period['icon']['period'], $period['icon']['code']),
                 'name' => (string) $period['name'],
                 'date' => isset($period['date']) ? Carbon::parse($period['date'])->format('D, M j') : null,
-                'summary' => (string) $period['summary'],
+                'summary' => self::prose((string) $period['summary'], $units),
                 // Reports queued before `short` existed fall back to the summary for the alt text.
                 'alt' => (string) ($period['short'] ?? $period['summary']),
-                'temp' => $period['label'].' '.self::temperature($period['temperature'], $period['unit']),
+                'temp' => $period['label'].' '.self::temperature($period['temperature'], $period['unit'], $units),
             ], $report['periods'] ?? []),
         ];
     }
@@ -129,7 +130,7 @@ class DailySummaryPresenter
     /**
      * @param  array<string, mixed>  $station
      */
-    private static function stationLine(array $station): string
+    private static function stationLine(array $station, Units $units): string
     {
         $line = 'Reporting station: '.(filled($station['name']) ? "{$station['name']} ({$station['id']})" : $station['id']);
 
@@ -138,7 +139,7 @@ class DailySummaryPresenter
         }
 
         if ($station['elevation_ft'] !== null) {
-            $line .= ' — elev. '.number_format($station['elevation_ft']).' ft';
+            $line .= ' — elev. '.$units->elevation($station['elevation_ft']);
         }
 
         return $line;
@@ -168,19 +169,19 @@ class DailySummaryPresenter
      * @param  array<string, mixed>  $current
      * @return array<string, mixed>
      */
-    private static function currentSection(array $current): array
+    private static function currentSection(array $current, Units $units): array
     {
         return [
             'icon_url' => WeatherIcon::url($current['icon']['period'], $current['icon']['code']),
             'description' => filled($current['description'] ?? null) ? (string) $current['description'] : null,
             'rows' => [
-                ['Temperature', self::degrees($current['temperature_f'])],
-                ['Feels like', self::degrees($current['feels_like_f'])],
+                ['Temperature', self::degrees($current['temperature_f'], $units)],
+                ['Feels like', self::degrees($current['feels_like_f'], $units)],
                 ['Humidity', $current['humidity_pct'] !== null ? (int) round($current['humidity_pct']).'%' : self::DASH],
-                ['Wind', self::wind($current['wind'])],
-                ['Barometer', $current['barometer_inhg'] !== null ? number_format($current['barometer_inhg'], 2).' inHg' : self::DASH],
-                ['Dewpoint', self::degrees($current['dewpoint_f'])],
-                ['Visibility', $current['visibility_mi'] !== null ? round($current['visibility_mi'], 1).' mi' : self::DASH],
+                ['Wind', self::wind($current['wind'], $units)],
+                ['Barometer', $current['barometer_inhg'] !== null ? $units->pressure($current['barometer_inhg']) : self::DASH],
+                ['Dewpoint', self::degrees($current['dewpoint_f'], $units)],
+                ['Visibility', $current['visibility_mi'] !== null ? $units->distance($current['visibility_mi'], 1) : self::DASH],
             ],
             'updated' => 'Last updated '.Carbon::parse($current['observed_at'])->format('D, M j \a\t g:i A'),
         ];
@@ -189,7 +190,7 @@ class DailySummaryPresenter
     /**
      * @param  array{direction: ?string, speed_mph: ?float, gust_mph: ?float}  $wind
      */
-    private static function wind(array $wind): string
+    private static function wind(array $wind, Units $units): string
     {
         if ($wind['speed_mph'] === null) {
             return self::DASH;
@@ -199,18 +200,38 @@ class DailySummaryPresenter
             return 'Calm';
         }
 
-        $text = trim(($wind['direction'] ?? '').' '.(int) round($wind['speed_mph']).' mph');
+        $text = trim(($wind['direction'] ?? '').' '.$units->speed($wind['speed_mph']));
 
-        return $wind['gust_mph'] !== null ? $text.', gusting '.(int) round($wind['gust_mph']).' mph' : $text;
+        return $wind['gust_mph'] !== null ? $text.', gusting '.$units->speed($wind['gust_mph']) : $text;
     }
 
-    private static function degrees(?float $value): string
+    private static function degrees(?float $value, Units $units): string
     {
-        return $value === null ? self::DASH : (int) round($value).'°F';
+        return $value === null ? self::DASH : $units->temperature($value);
     }
 
-    private static function temperature(mixed $value, string $unit): string
+    /**
+     * NWS forecast periods carry their own unit flag (always F in practice); a
+     * Celsius value is normalised to Fahrenheit first so Units stays the only
+     * place that converts.
+     */
+    private static function temperature(mixed $value, string $unit, Units $units): string
     {
-        return is_numeric($value) ? (int) round((float) $value)."°{$unit}" : self::DASH;
+        if (! is_numeric($value)) {
+            return self::DASH;
+        }
+
+        $fahrenheit = strtoupper($unit) === 'C' ? (float) $value * 9 / 5 + 32 : (float) $value;
+
+        return $units->temperature($fahrenheit);
+    }
+
+    /**
+     * NWS writes prose and hourly wind in imperial units; Imperial subscribers
+     * see it untouched, Metric subscribers get the recognized phrases converted.
+     */
+    private static function prose(string $text, Units $units): string
+    {
+        return $units->isMetric() ? NwsTextUnits::toMetric($text) : $text;
     }
 }

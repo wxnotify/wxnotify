@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Weather\BuildDailySummaryMessage;
+use App\Enums\UnitSystem;
 use App\Models\Location;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
@@ -33,4 +34,18 @@ test('it returns null when the forecast cannot be fetched', function () {
     $location = Location::factory()->for(User::factory())->create();
 
     expect((new BuildDailySummaryMessage)($location))->toBeNull();
+});
+
+test('a metric subscriber gets the Brief temperatures in celsius', function () {
+    Http::fake([
+        'api.weather.gov/points/*' => Http::response(['properties' => ['forecast' => 'https://api.weather.gov/gridpoints/TOP/1,1/forecast']]),
+        'api.weather.gov/gridpoints/*' => Http::response(['properties' => ['periods' => [
+            ['name' => 'Today', 'isDaytime' => true, 'temperature' => 88, 'temperatureUnit' => 'F', 'shortForecast' => 'Sunny'],
+            ['name' => 'Tonight', 'isDaytime' => false, 'temperature' => 64, 'temperatureUnit' => 'F', 'shortForecast' => 'Clear'],
+        ]]]),
+    ]);
+    $location = Location::factory()->for(User::factory())->create();
+
+    expect((new BuildDailySummaryMessage)($location, UnitSystem::Metric))
+        ->toBe("Today: Sunny, high 31\u{b0}C. Tonight: Clear, low 18\u{b0}C.");
 });

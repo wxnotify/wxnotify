@@ -198,3 +198,43 @@ test('the plain text puts the sun line right after the location, before the stat
     expect(strpos($text, 'Sunrise 6:57 AM'))->toBeLessThan(strpos($text, 'Reporting station'))
         ->and(strpos($text, 'Home'))->toBeLessThan(strpos($text, 'Sunrise'));
 });
+
+test('a metric report renders every measurement in metric units', function () {
+    $view = DailySummaryPresenter::present(presenterReport(['units' => 'metric']));
+
+    $rows = collect($view['current']['rows'])->mapWithKeys(fn (array $row): array => [$row[0] => $row[1]]);
+
+    expect($rows['Temperature'])->toBe('12°C')
+        ->and($rows['Feels like'])->toBe('10°C')
+        ->and($rows['Wind'])->toBe('NE 16 km/h, gusting 32 km/h')
+        ->and($rows['Barometer'])->toBe('1025 hPa')
+        ->and($rows['Dewpoint'])->toBe('8°C')
+        ->and($rows['Visibility'])->toBe('16.1 km')
+        ->and($view['station_line'])->toBe('Reporting station: Erie Municipal Airport (KEIK) — 40.0117, -105.0503 — elev. 1,550 m')
+        ->and($view['hourly'][0]['temp'])->toBe('12°C')
+        ->and($view['hourly'][0]['wind'])->toBe('8 km/h NW')
+        ->and($view['periods'][0]['temp'])->toBe('High 26°C')
+        ->and($view['periods'][0]['summary'])->toBe('Sunny, with a high near 26°C. East southeast wind 3 to 10 km/h.');
+});
+
+test('a report with no units key, or an imperial one, renders exactly as before', function () {
+    // The radar caption stamps "now" to the minute; pin it so the two renders cannot straddle a minute.
+    Carbon::setTestNow('2026-10-02 15:00:00');
+
+    $without = DailySummaryPresenter::present(presenterReport());
+    $imperial = DailySummaryPresenter::present(presenterReport(['units' => 'imperial']));
+
+    expect($imperial)->toBe($without)
+        ->and($without['current']['rows'][0])->toBe(['Temperature', '54°F'])
+        ->and($without['periods'][0]['summary'])->toBe('Sunny, with a high near 79. East southeast wind 2 to 6 mph.');
+
+    Carbon::setTestNow();
+});
+
+test('the plain text of a metric report has no imperial units left', function () {
+    $text = DailySummaryPresenter::text(DailySummaryPresenter::present(presenterReport(['units' => 'metric'])), hasRadar: false);
+
+    expect($text)->toContain('Temperature: 12°C')
+        ->and($text)->toContain('High 26°C')
+        ->and($text)->not->toMatch('/\bmph\b|°F|inHg/');
+});

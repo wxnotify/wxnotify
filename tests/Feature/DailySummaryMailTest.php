@@ -180,3 +180,14 @@ test('the 7-day icon cell and image have fixed widths so long forecast text cann
 
     expect($html)->toMatch('/<td[^>]*width="50"[^>]*min-width: 50px[^>]*><img[^>]*width: 40px[^>]*min-width: 40px[^>]*height: 40px/');
 });
+
+test('a metric subscriber\'s email shows metric units and no imperial ones', function () {
+    $html = (new DailySummaryMail('Title', presenterReport(['units' => 'metric']), 'brief'))->render();
+
+    expect($html)->toContain('12°C')
+        ->and($html)->toContain('1025 hPa')
+        ->and($html)->toContain('16.1 km')
+        ->and($html)->not->toContain('°F')
+        ->and($html)->not->toContain('inHg')
+        ->and($html)->not->toContain(' mph');
+});

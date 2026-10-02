@@ -2,6 +2,7 @@
 
 namespace App\Actions\Weather;
 
+use App\Enums\UnitSystem;
 use App\Models\Location;
 use App\Support\SunTimes;
 use App\Support\WeatherIcon;
@@ -26,7 +27,7 @@ class BuildDailySummaryReport
     /**
      * @return array<string, mixed>|null
      */
-    public function __invoke(Location $location, bool $includeTestAlerts = false): ?array
+    public function __invoke(Location $location, bool $includeTestAlerts = false, UnitSystem $units = UnitSystem::Imperial): ?array
     {
         $forecast = $this->guard('forecast', fn (): array => app(GetSevenDayForecast::class)($location)) ?? [];
 
@@ -39,6 +40,7 @@ class BuildDailySummaryReport
         return [
             'location' => $location->label,
             'timezone' => $timezone,
+            'units' => $units->value,
             'sun' => $this->guard('sun', fn () => SunTimes::forLocation($location)),
             'alerts' => $this->guard('alerts', fn (): array => app(GetActiveAlertsForLocation::class)($location, $includeTestAlerts)),
             'current' => $this->guard('current conditions', fn () => app(GetCurrentConditions::class)($location)),

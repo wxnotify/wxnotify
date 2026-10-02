@@ -2,6 +2,7 @@
 
 use App\Actions\Weather\BuildDailySummaryReport;
 use App\Enums\Tier;
+use App\Enums\UnitSystem;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Models\Location;
@@ -234,7 +235,7 @@ test('a failure while building the report still delivers the Brief summary', fun
     nwsFakeEverything();
     app()->bind(BuildDailySummaryReport::class, fn () => new class extends BuildDailySummaryReport
     {
-        public function __invoke(Location $location, bool $includeTestAlerts = false): ?array
+        public function __invoke(Location $location, bool $includeTestAlerts = false, UnitSystem $units = UnitSystem::Imperial): ?array
         {
             throw new RuntimeException('boom');
         }
@@ -257,4 +258,32 @@ test('a Threshold rule never gets a report', function () {
     $this->artisan('alerts:dispatch-scheduled');
 
     Bus::assertDispatched(DeliverScheduledAlert::class, fn ($job) => $job->report === null);
+});
+
+test('a metric subscriber\'s threshold alert message is in celsius', function () {
+    Bus::fake();
+    fakeGridDataForThreshold(overnightLow: 27.0);
+
+    $location = Location::factory()->for($user = User::factory()->create(['unit_system' => 'metric']))->create(['timezone' => 'America/Chicago']);
+    $rule = AlertRule::factory()->for($user)->for($location)->create(['threshold_value' => 32, 'delivery_time' => '06:00']);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($user)->create());
+
+    $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
+
+    Bus::assertDispatched(DeliverScheduledAlert::class, fn ($job) => str_contains($job->body, 'below 0°C')
+        && str_contains($job->body, 'peak -2.8°C')
+        && ! str_contains($job->body, '°F'));
+});
+
+test('a metric subscriber\'s Brief daily summary and report are built in metric', function () {
+    Bus::fake();
+    nwsFakeEverything();
+    $rule = summaryRule('full', [NotificationChannel::factory()->email('a@example.com')]);
+    $rule->user->update(['unit_system' => 'metric']);
+
+    $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
+
+    Bus::assertDispatched(DeliverScheduledAlert::class, fn ($job) => $job->report['units'] === 'metric'
+        && str_contains($job->body, '°C')
+        && ! str_contains($job->body, '°F'));
 });

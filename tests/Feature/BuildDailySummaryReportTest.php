@@ -2,6 +2,7 @@
 
 use App\Actions\Weather\BuildDailySummaryReport;
 use App\Actions\Weather\GetActiveAlertsForLocation;
+use App\Enums\UnitSystem;
 use App\Models\ActiveWwa;
 use App\Models\Location;
 use App\Models\Product;
@@ -162,4 +163,11 @@ test('a period with no detailed forecast falls back to its short forecast for th
         ->and($report['periods'][0]['short'])->toBe('Sunny')
         ->and($report['periods'][1]['summary'])->toBe('Mostly Clear')
         ->and($report['periods'][2]['summary'])->toBe('Sunny. High near 84, with temperatures falling to around 81 in the afternoon.');
+});
+
+test('the report records the unit system it was built for, defaulting to imperial', function () {
+    nwsFakeEverything();
+
+    expect((new BuildDailySummaryReport)($this->location)['units'])->toBe('imperial')
+        ->and((new BuildDailySummaryReport)($this->location, units: UnitSystem::Metric)['units'])->toBe('metric');
 });

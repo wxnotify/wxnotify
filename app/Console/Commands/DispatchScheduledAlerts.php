@@ -11,6 +11,7 @@ use App\Enums\MessageBodyStyle;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\Units;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -72,7 +73,7 @@ class DispatchScheduledAlerts extends Command
 
             $message = match ($rule->category) {
                 AlertCategory::Threshold => $this->evaluateThreshold($rule, $getGridpointData, $evaluateThreshold),
-                AlertCategory::DailySummary => $buildSummary($rule->location),
+                AlertCategory::DailySummary => $buildSummary($rule->location, Units::forRule($rule)->system),
                 default => null,
             };
 
@@ -125,7 +126,7 @@ class DispatchScheduledAlerts extends Command
         }
 
         try {
-            return $buildReport($rule->location, (bool) $rule->user->is_test_account);
+            return $buildReport($rule->location, (bool) $rule->user->is_test_account, Units::forRule($rule)->system);
         } catch (Throwable $e) {
             Log::warning('Daily summary report build failed', ['rule_id' => $rule->id, 'exception' => $e::class]);
 
@@ -151,11 +152,12 @@ class DispatchScheduledAlerts extends Command
             return false;
         }
 
+        $system = Units::forRule($rule)->system;
         $variable = $rule->variable->label();
         $direction = $rule->direction->label();
-        $unit = $rule->variable->unit();
-        $threshold = $this->trimmedNumber((float) $rule->threshold_value);
-        $peakValue = $this->trimmedNumber($result['value']);
+        $unit = $rule->variable->unit($system);
+        $threshold = $this->trimmedNumber($rule->variable->displayValue((float) $rule->threshold_value, $system));
+        $peakValue = $this->trimmedNumber($rule->variable->displayValue($result['value'], $system));
         $at = $result['at']->format('g:i A');
 
         return "{$variable} {$direction} {$threshold}{$unit} near {$rule->location->label} "
