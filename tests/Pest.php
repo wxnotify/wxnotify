@@ -316,3 +316,46 @@ function nwsObservation(array $overrides = []): array
         'visibility' => ['value' => 16090, 'unitCode' => 'wmoUnit:m'],
     ], $overrides)];
 }
+
+/**
+ * @return array<int, array<string, mixed>>
+ */
+function nwsForecastPeriods(): array
+{
+    return [
+        ['name' => 'Today', 'startTime' => '2026-10-02T09:00:00-06:00', 'isDaytime' => true, 'temperature' => 79, 'temperatureUnit' => 'F', 'shortForecast' => 'Sunny', 'icon' => 'https://api.weather.gov/icons/land/day/few?size=medium'],
+        ['name' => 'Tonight', 'startTime' => '2026-10-02T18:00:00-06:00', 'isDaytime' => false, 'temperature' => 50, 'temperatureUnit' => 'F', 'shortForecast' => 'Mostly Clear', 'icon' => 'https://api.weather.gov/icons/land/night/few?size=medium'],
+        ['name' => 'Saturday', 'startTime' => '2026-10-03T06:00:00-06:00', 'isDaytime' => true, 'temperature' => 84, 'temperatureUnit' => 'F', 'shortForecast' => 'Sunny', 'icon' => 'https://api.weather.gov/icons/land/day/few?size=medium'],
+    ];
+}
+
+/**
+ * Fakes every NWS endpoint the Full Daily Summary touches. $overrides is keyed
+ * by the same URL pattern used below and replaces that entry's response.
+ *
+ * @param  array<string, mixed>  $overrides
+ */
+function nwsFakeEverything(array $overrides = []): void
+{
+    nwsFreshHttp();
+
+    $hourly = collect(range(0, 15))->map(function (int $i): array {
+        $start = Illuminate\Support\Carbon::parse('2026-10-02T09:00:00-06:00')->addHours($i);
+
+        return [
+            'startTime' => $start->toIso8601String(), 'endTime' => $start->copy()->addHour()->toIso8601String(),
+            'temperature' => 50 + $i, 'temperatureUnit' => 'F',
+            'probabilityOfPrecipitation' => ['value' => 10], 'windSpeed' => '5 mph', 'windDirection' => 'NW',
+            'icon' => 'https://api.weather.gov/icons/land/day/few?size=small', 'shortForecast' => 'Sunny',
+        ];
+    })->all();
+
+    Http::fake(array_replace([
+        'api.weather.gov/points/*' => Http::response(nwsPoint()),
+        'api.weather.gov/gridpoints/BOU/64,73/forecast/hourly' => Http::response(['properties' => ['periods' => $hourly]]),
+        'api.weather.gov/gridpoints/BOU/64,73/forecast' => Http::response(['properties' => ['periods' => nwsForecastPeriods()]]),
+        'api.weather.gov/gridpoints/BOU/64,73/stations' => Http::response(nwsStations([['id' => 'KEIK']])),
+        'api.weather.gov/stations/KEIK/observations/latest' => Http::response(nwsObservation()),
+        'radar.weather.gov/*' => Http::response("GIF89a\x01\x00\x01\x00\x00\x00\x00;", 200, ['Content-Type' => 'image/gif']),
+    ], $overrides));
+}
