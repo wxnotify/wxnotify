@@ -4,9 +4,11 @@ namespace App\Actions\Weather;
 
 use App\Enums\AlertCategory;
 use App\Enums\AlertTemplateSection;
+use App\Enums\UnitSystem;
 use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\IngestedProduct;
+use App\Support\Units;
 
 /**
  * Composes the labeled-lines message body for a rule with an attached
@@ -40,17 +42,18 @@ class ComposeTemplatedAlertBody
         }
 
         $activeWwa = $this->findActiveWwa($product);
+        $units = Units::forRule($rule)->system;
 
         $lines = collect(AlertTemplateSection::cases())
             ->filter(fn (AlertTemplateSection $section): bool => in_array($section, $checked, true))
-            ->map(fn (AlertTemplateSection $section): ?string => $this->renderSection($section, $product, $activeWwa))
+            ->map(fn (AlertTemplateSection $section): ?string => $this->renderSection($section, $product, $activeWwa, $units))
             ->filter()
             ->values();
 
         return $lines->isEmpty() ? null : $lines->implode("\n");
     }
 
-    private function renderSection(AlertTemplateSection $section, IngestedProduct $product, ?ActiveWwa $activeWwa): ?string
+    private function renderSection(AlertTemplateSection $section, IngestedProduct $product, ?ActiveWwa $activeWwa, UnitSystem $units): ?string
     {
         $value = match ($section) {
             AlertTemplateSection::Hazard => $product->hazard,
@@ -58,7 +61,7 @@ class ComposeTemplatedAlertBody
             AlertTemplateSection::Impact => $product->impact,
             AlertTemplateSection::LocationsImpacted => $product->locations_impacted,
             AlertTemplateSection::Expiration => $activeWwa?->expires?->diffForHumans(),
-            AlertTemplateSection::Motion => app(FormatMotionVector::class)($activeWwa),
+            AlertTemplateSection::Motion => app(FormatMotionVector::class)($activeWwa, $units),
             AlertTemplateSection::CallToAction => $product->call_to_action,
         };
 

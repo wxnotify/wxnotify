@@ -3,6 +3,7 @@
 namespace App\Filament\Dashboard\Widgets;
 
 use App\Models\DeliveryLog;
+use App\Support\Units;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -36,7 +37,7 @@ class RecentAlertsWidget extends TableWidget
             ->columns([
                 TextColumn::make('subject')
                     ->label('Alert')
-                    ->getStateUsing(fn (DeliveryLog $record): string => $record->subject ?? $record->alertRule?->displayName() ?? 'Alert'),
+                    ->getStateUsing(fn (DeliveryLog $record): string => $record->subject ?? $record->alertRule?->displayName(Units::for(auth()->user())->system) ?? 'Alert'),
                 TextColumn::make('channel_type')
                     ->label('Channel')
                     ->badge(),

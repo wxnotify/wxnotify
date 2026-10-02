@@ -9,7 +9,9 @@ use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
 use App\Enums\Tier;
+use App\Enums\UnitSystem;
 use App\Models\Concerns\BlockedDuringMaintenance;
+use App\Support\Units;
 use Database\Factories\AlertRuleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -165,7 +167,7 @@ class AlertRule extends Model
         return $this->user->tier() !== Tier::Free ? $this->message_body_style : null;
     }
 
-    public function displayName(): string
+    public function displayName(?UnitSystem $units = null): string
     {
         if (filled($this->name)) {
             return $this->name;
@@ -174,8 +176,8 @@ class AlertRule extends Model
         return match ($this->category) {
             AlertCategory::WeatherAlerts, AlertCategory::SpcWpc => $this->products->pluck('name')->join(', ') ?: $this->category->label(),
             AlertCategory::DailySummary => "Daily summary for {$this->location?->label}",
-            AlertCategory::Threshold => "{$this->variable?->label()} {$this->direction?->label()} {$this->threshold_value}{$this->variable?->unit()}",
-            AlertCategory::Lightning => "Lightning within {$this->radius_miles} mi of {$this->location?->label}",
+            AlertCategory::Threshold => "{$this->variable?->label()} {$this->direction?->label()} {$this->variable?->format((float) $this->threshold_value, $units ?? Units::forRule($this)->system)}",
+            AlertCategory::Lightning => 'Lightning within '.(new Units($units ?? Units::forRule($this)->system))->distance((float) $this->radius_miles, 0)." of {$this->location?->label}",
         };
     }
 }

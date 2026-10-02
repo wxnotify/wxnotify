@@ -4,6 +4,7 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Tables;
 
 use App\Enums\AlertCategory;
 use App\Models\AlertRule;
+use App\Support\Units;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -21,7 +22,7 @@ class AlertRulesTable
             ->columns([
                 TextColumn::make('displayName')
                     ->label('Alert')
-                    ->getStateUsing(fn (AlertRule $record): string => $record->displayName())
+                    ->getStateUsing(fn (AlertRule $record): string => $record->displayName(Units::for(auth()->user())->system))
                     ->searchable(query: fn ($query, string $search) => $query->where('name', 'like', "%{$search}%")),
                 TextColumn::make('category')
                     ->badge()

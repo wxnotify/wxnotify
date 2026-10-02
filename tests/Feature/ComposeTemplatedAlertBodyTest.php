@@ -82,6 +82,20 @@ test('pulls expiration and motion from the matching ActiveWwa row via the VTEC k
     expect($result)->toBe("Expiration: 1 hour from now\nMotion: Moving SW at 39 mph");
 });
 
+test('renders the motion speed in the rule owner\'s units', function () {
+    $metricUser = User::factory()->create(['tier_override' => Tier::Plus, 'unit_system' => 'metric']);
+    $template = AlertTemplate::factory()->for($metricUser)->create(['sections' => [AlertTemplateSection::Motion->value]]);
+    $rule = AlertRule::factory()->for($metricUser)->create(['category' => 'weather_alerts', 'alert_template_id' => $template->id]);
+    // ActiveWwa first, for the same observer-upsert reason as the motion test above.
+    ActiveWwa::factory()->create([...vtecKeyFor(), 'motion_direction_degrees' => 231, 'motion_speed_kt' => 34]);
+    $product = IngestedProduct::factory()->create(vtecKeyFor());
+
+    $result = (new ComposeTemplatedAlertBody)($rule, $product);
+
+    expect($result)->toContain('Motion: Moving SW at 63 km/h')
+        ->and($result)->not->toContain('mph');
+});
+
 test('returns null when the rule has no attached template', function () {
     $rule = AlertRule::factory()->create(['alert_template_id' => null]);
     $product = IngestedProduct::factory()->create();

@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Weather\FormatMotionVector;
+use App\Enums\UnitSystem;
 use App\Models\ActiveWwa;
 
 test('formats a real motion vector into a compass direction and mph', function () {
@@ -39,4 +40,11 @@ test('returns null when motion_speed_kt is missing', function () {
     $wwa = ActiveWwa::factory()->make(['motion_direction_degrees' => 231, 'motion_speed_kt' => null]);
 
     expect((new FormatMotionVector)($wwa))->toBeNull();
+});
+
+test('a metric subscriber sees the motion speed in km/h', function () {
+    $wwa = ActiveWwa::factory()->make(['motion_direction_degrees' => 231, 'motion_speed_kt' => 34]);
+
+    expect((new FormatMotionVector)($wwa, UnitSystem::Metric))->toBe('Moving SW at 63 km/h')
+        ->and((new FormatMotionVector)($wwa))->toBe('Moving SW at 39 mph');
 });
