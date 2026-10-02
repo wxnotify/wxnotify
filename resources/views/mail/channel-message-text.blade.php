@@ -1,4 +1,4 @@
-{{ config('app.name') }}
+{!! config('app.name') !!}
 
 {!! $messageBody !!}
 @isset($viewUrl)

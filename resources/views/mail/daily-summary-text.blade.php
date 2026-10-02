@@ -1,3 +1,3 @@
-{{ config('app.name') }}
+{!! config('app.name') !!}
 
 {!! $summaryText !!}

@@ -74,3 +74,11 @@ test('the view url cannot break out of the href attribute or inject a script tag
         ->and($matches)->toHaveCount(2)
         ->and($matches[1])->not->toContain('>');
 });
+
+test('the plain text alternative does not html-escape the app name', function () {
+    config(['app.name' => 'Wx & Co']);
+
+    (new ChannelMessageMail('Title', 'body'))
+        ->assertSeeInText('Wx & Co')
+        ->assertDontSeeInText('&amp;');
+});

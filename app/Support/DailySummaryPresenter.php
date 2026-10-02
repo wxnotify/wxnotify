@@ -28,11 +28,11 @@ class DailySummaryPresenter
             'location' => (string) ($report['location'] ?? ''),
             'station_line' => $current !== null ? self::stationLine($current['station']) : null,
             'sun_line' => self::sunLine($report['sun'] ?? null),
-            'alerts' => array_map(fn (array $alert): array => [
+            'alerts' => isset($report['alerts']) ? array_map(fn (array $alert): array => [
                 'event' => (string) $alert['event'],
                 'headline' => $alert['headline'] ?? null,
                 'until' => isset($alert['expires']) ? 'until '.Carbon::parse($alert['expires'])->format('D g:i A') : null,
-            ], $report['alerts'] ?? []),
+            ], $report['alerts']) : null,
             'current' => $current !== null ? self::currentSection($current) : null,
             'radar_alt' => is_string($radarSite) ? "Radar near {$report['location']} from {$radarSite}" : null,
             'radar_caption' => is_string($radarSite) ? 'Radar as of '.Carbon::now($timezone)->format('D, M j \a\t g:i A') : null,
@@ -47,7 +47,7 @@ class DailySummaryPresenter
             'periods' => array_map(fn (array $period): array => [
                 'icon_url' => WeatherIcon::url($period['icon']['period'], $period['icon']['code']),
                 'name' => (string) $period['name'],
-                'date' => isset($period['date']) ? Carbon::parse($period['date'])->format('D, M j') : '',
+                'date' => isset($period['date']) ? Carbon::parse($period['date'])->format('D, M j') : null,
                 'summary' => (string) $period['summary'],
                 'temp' => $period['label'].' '.self::temperature($period['temperature'], $period['unit']),
             ], $report['periods'] ?? []),
@@ -70,11 +70,13 @@ class DailySummaryPresenter
         $lines[] = '';
         $lines[] = 'ALERTS IN EFFECT';
 
-        if ($view['alerts'] === []) {
+        if ($view['alerts'] === null) {
+            $lines[] = 'Alert information is unavailable right now.';
+        } elseif ($view['alerts'] === []) {
             $lines[] = 'No active alerts.';
         }
 
-        foreach ($view['alerts'] as $alert) {
+        foreach ($view['alerts'] ?? [] as $alert) {
             $detail = $alert['headline'] !== null ? " — {$alert['headline']}" : '';
             $until = $alert['until'] !== null ? " ({$alert['until']})" : '';
             $lines[] = "{$alert['event']}{$detail}{$until}";
@@ -83,7 +85,10 @@ class DailySummaryPresenter
         if ($view['current'] !== null) {
             $lines[] = '';
             $lines[] = 'CURRENT CONDITIONS';
-            $lines[] = $view['current']['description'];
+
+            if ($view['current']['description'] !== null) {
+                $lines[] = $view['current']['description'];
+            }
 
             foreach ($view['current']['rows'] as [$label, $value]) {
                 $lines[] = "{$label}: {$value}";
@@ -111,7 +116,8 @@ class DailySummaryPresenter
         $lines[] = '7-DAY FORECAST';
 
         foreach ($view['periods'] as $period) {
-            $lines[] = "{$period['name']} ({$period['date']}): {$period['summary']} — {$period['temp']}";
+            $name = $period['date'] !== null ? "{$period['name']} ({$period['date']})" : $period['name'];
+            $lines[] = "{$name}: {$period['summary']} — {$period['temp']}";
         }
 
         return implode("\n", $lines);
@@ -122,7 +128,7 @@ class DailySummaryPresenter
      */
     private static function stationLine(array $station): string
     {
-        $line = "Reporting station: {$station['name']} ({$station['id']})";
+        $line = 'Reporting station: '.(filled($station['name']) ? "{$station['name']} ({$station['id']})" : $station['id']);
 
         if ($station['lat'] !== null && $station['lng'] !== null) {
             $line .= ' — '.number_format($station['lat'], 4, '.', '').', '.number_format($station['lng'], 4, '.', '');
@@ -151,7 +157,7 @@ class DailySummaryPresenter
     {
         return [
             'icon_url' => WeatherIcon::url($current['icon']['period'], $current['icon']['code']),
-            'description' => (string) ($current['description'] ?? ''),
+            'description' => filled($current['description'] ?? null) ? (string) $current['description'] : null,
             'rows' => [
                 ['Temperature', self::degrees($current['temperature_f'])],
                 ['Feels like', self::degrees($current['feels_like_f'])],

@@ -62,6 +62,7 @@ class GetActiveAlertsForLocation
             ->sortBy([
                 fn (ActiveWwa $a, ActiveWwa $b): int => $this->rank($a) <=> $this->rank($b),
                 fn (ActiveWwa $a, ActiveWwa $b): int => ($a->expires?->getTimestamp() ?? PHP_INT_MAX) <=> ($b->expires?->getTimestamp() ?? PHP_INT_MAX),
+                fn (ActiveWwa $a, ActiveWwa $b): int => $a->id <=> $b->id,
             ])
             ->map(fn (ActiveWwa $wwa): array => [
                 'event' => $wwa->product?->name ?? 'Weather alert',

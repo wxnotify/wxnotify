@@ -47,7 +47,7 @@ class DispatchScheduledAlerts extends Command
             ->whereIn('category', [AlertCategory::Threshold, AlertCategory::DailySummary])
             ->whereNotNull('delivery_time')
             ->whereNotNull('location_id')
-            ->with(['location', 'notificationChannels'])
+            ->with(['user', 'location', 'notificationChannels'])
             ->get();
 
         $dispatched = 0;

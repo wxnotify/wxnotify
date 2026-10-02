@@ -17,7 +17,9 @@ use Throwable;
  *
  * The 7-day forecast is the one required section: without it there is nothing
  * to send (null), exactly like Brief. Every other section is built inside its
- * own guard so a failure omits just that section.
+ * own guard so a failure omits just that section. Alerts are the exception to
+ * "omit": a failed lookup stays null (not []) so the email can say the alerts
+ * are unavailable instead of claiming there are none.
  */
 class BuildDailySummaryReport
 {
@@ -38,7 +40,7 @@ class BuildDailySummaryReport
             'location' => $location->label,
             'timezone' => $timezone,
             'sun' => $this->guard('sun', fn () => SunTimes::forLocation($location)),
-            'alerts' => $this->guard('alerts', fn (): array => app(GetActiveAlertsForLocation::class)($location, $includeTestAlerts)) ?? [],
+            'alerts' => $this->guard('alerts', fn (): array => app(GetActiveAlertsForLocation::class)($location, $includeTestAlerts)),
             'current' => $this->guard('current conditions', fn () => app(GetCurrentConditions::class)($location)),
             'radar_site' => $this->guard('radar site', fn (): ?string => $this->radarSite($location)),
             'hourly' => $this->guard('hourly forecast', fn () => app(GetHourlyForecast::class)($location)),

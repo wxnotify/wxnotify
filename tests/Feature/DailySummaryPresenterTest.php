@@ -126,3 +126,51 @@ test('the plain text says there are no active alerts when the list is empty', fu
 
     expect($text)->toContain("ALERTS IN EFFECT\nNo active alerts.");
 });
+
+test('a failed alert lookup passes through as null and the text says alerts are unavailable', function () {
+    $view = DailySummaryPresenter::present(presenterReport(['alerts' => null]));
+    $text = DailySummaryPresenter::text($view, hasRadar: false);
+
+    expect($view['alerts'])->toBeNull()
+        ->and($text)->toContain("ALERTS IN EFFECT\nAlert information is unavailable right now.")
+        ->and($text)->not->toContain('No active alerts.');
+});
+
+test('a station with no name is shown by its id alone', function () {
+    $report = presenterReport();
+    $report['current']['station']['name'] = null;
+
+    expect(DailySummaryPresenter::present($report)['station_line'])->toBe('Reporting station: KEIK — 40.0117, -105.0503 — elev. 5,085 ft');
+
+    $report['current']['station']['name'] = '  ';
+    expect(DailySummaryPresenter::present($report)['station_line'])->toStartWith('Reporting station: KEIK — ');
+});
+
+test('a forecast period with no date is named alone, with no empty parentheses or date span', function () {
+    $report = presenterReport();
+    $report['periods'][0]['date'] = null;
+
+    $view = DailySummaryPresenter::present($report);
+    $text = DailySummaryPresenter::text($view, hasRadar: false);
+    $html = view('mail.partials.daily-summary', ['s' => $view, 'hasRadar' => false])->render();
+
+    expect($view['periods'][0]['date'])->toBeNull()
+        ->and($text)->toContain('Today: Sunny — High 79°F')
+        ->and($text)->not->toContain('()')
+        ->and($html)->not->toContain('<span style="color: #6b7280; font-size: 12px;"></span>')
+        ->and($html)->toContain('<strong>Today</strong>');
+});
+
+test('a blank current conditions description leaves no empty heading, no blank text line and a sensible alt', function () {
+    $report = presenterReport();
+    $report['current']['description'] = '';
+
+    $view = DailySummaryPresenter::present($report);
+    $text = DailySummaryPresenter::text($view, hasRadar: false);
+    $html = view('mail.partials.daily-summary', ['s' => $view, 'hasRadar' => false])->render();
+
+    expect($view['current']['description'])->toBeNull()
+        ->and($text)->toContain("CURRENT CONDITIONS\nTemperature: 54°F")
+        ->and($html)->not->toContain('font-weight: 600;"></div>')
+        ->and($html)->toContain('alt="Current conditions"');
+});

@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Weather\BuildDailySummaryReport;
+use App\Actions\Weather\GetActiveAlertsForLocation;
 use App\Models\ActiveWwa;
 use App\Models\Location;
 use App\Models\Product;
@@ -73,6 +74,19 @@ test('a failing optional section is omitted without losing the rest of the repor
         ->and($report['periods'])->toHaveCount(3)
         ->and($report['sun'])->not->toBeNull()
         ->and($report['alerts'])->toBe([]);
+});
+
+test('a failed alert lookup is null, not an empty list, while the other sections survive', function () {
+    nwsFakeEverything();
+    $this->mock(GetActiveAlertsForLocation::class, fn ($mock) => $mock->shouldReceive('__invoke')->andThrow(new RuntimeException('db down')));
+    Log::spy();
+
+    $report = (new BuildDailySummaryReport)($this->location);
+
+    expect($report['alerts'])->toBeNull()
+        ->and($report['periods'])->toHaveCount(3)
+        ->and($report['current'])->not->toBeNull();
+    Log::shouldHaveReceived('warning')->with('Daily summary alerts section failed', ['exception' => RuntimeException::class])->once();
 });
 
 test('an exception thrown inside a section is swallowed into that section being empty', function () {

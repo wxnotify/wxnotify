@@ -24,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('shapefile:scan')->daily();
-        $schedule->command('alerts:dispatch-scheduled')->everyFifteenMinutes();
+        $schedule->command('alerts:dispatch-scheduled')->everyFifteenMinutes()->withoutOverlapping(30);
         $schedule->command('traccar:poll-positions')->everyFiveMinutes()->withoutOverlapping();
         $schedule->command('pipeline:prune-deliveries')->hourly();
     })

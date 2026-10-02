@@ -45,6 +45,54 @@ test('the html renders every section in order under the branded header', functio
     expect($positions)->toBe(collect($positions)->sort()->values()->all());
 });
 
+test('an alert row reads as one phrase once the html is collapsed', function () {
+    $html = (new DailySummaryMail('Title', presenterReport(), 'brief'))->render();
+    $visible = str_replace("\u{00A0}", ' ', html_entity_decode(strip_tags($html)));
+
+    expect($visible)->toContain('Wind Advisory · until Fri 3:00 PM');
+});
+
+test('the radar image declares a width for clients that ignore max-width', function () {
+    $html = (new DailySummaryMail('Title', presenterReport(), 'brief', ['bytes' => MAIL_GIF, 'mime' => 'image/gif']))->render();
+
+    expect($html)->toMatch('/<img src="cid:radar-snapshot"[^>]*width="570"/');
+});
+
+test('a failed alert lookup says alerts are unavailable instead of claiming there are none', function () {
+    $mail = new DailySummaryMail('Title', presenterReport(['alerts' => null]), 'brief');
+    $html = $mail->render();
+
+    expect($html)->toContain('Alerts in Effect')
+        ->and($html)->toContain('Alert information is unavailable right now.')
+        ->and($html)->not->toContain('No active alerts.');
+
+    $mail->assertSeeInText("ALERTS IN EFFECT\nAlert information is unavailable right now.")
+        ->assertDontSeeInText('No active alerts.');
+});
+
+test('the plain text alternative does not html-escape the app name', function () {
+    config(['app.name' => 'Wx & Co']);
+
+    (new DailySummaryMail('Title', presenterReport(), 'brief'))
+        ->assertSeeInText('Wx & Co')
+        ->assertDontSeeInText('&amp;');
+});
+
+test('a report with twelve hourly rows renders twelve hourly rows', function () {
+    $report = presenterReport();
+    $report['hourly'] = array_map(fn (int $hour): array => [
+        'time' => sprintf('2026-10-02T%02d:00:00-06:00', $hour),
+        'icon' => ['period' => 'day', 'code' => 'sct'],
+        'temperature' => 50 + $hour, 'unit' => 'F', 'precip_chance' => 10, 'wind' => '5 mph NW', 'summary' => 'Partly Sunny',
+    ], range(9, 20));
+
+    $html = (new DailySummaryMail('Title', $report, 'brief'))->render();
+
+    expect(substr_count($html, '/images/weather/day/sct.png'))->toBe(12)
+        ->and($html)->toContain('9 AM')
+        ->and($html)->toContain('8 PM');
+});
+
 test('the radar section is absent when no image was fetched', function () {
     $html = (new DailySummaryMail('Title', presenterReport(), 'brief'))->render();
 

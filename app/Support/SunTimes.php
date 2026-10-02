@@ -10,8 +10,10 @@ use Illuminate\Support\Carbon;
  * PHP's date_sun_info() (NWS publishes neither). date_sun_info() resolves "the
  * day" from the timestamp's UTC date, so a zone far east of UTC (Pacific/
  * Auckland) given its own local noon would land on the previous calendar day;
- * anchoring on UTC noon of the *local* calendar date returns the right day
- * everywhere (verified for Denver, Honolulu and Auckland).
+ * anchoring on UTC noon of the *local* calendar date returns the local
+ * calendar day for zones from UTC-12 to UTC+12 (verified for Denver, Honolulu,
+ * Auckland, Guam and Pago Pago). UTC+13/+14 zones (Tonga, Kiribati; outside NWS
+ * coverage) land one day late.
  */
 class SunTimes
 {

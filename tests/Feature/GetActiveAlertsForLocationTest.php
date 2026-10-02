@@ -114,3 +114,14 @@ test('a location whose zones cannot be resolved matches only by polygon and neve
 
     expect(collect((new GetActiveAlertsForLocation)($location))->pluck('event')->all())->toBe(['Polygon One']);
 });
+
+test('alerts with the same family and expiry come out in id order', function () {
+    $expires = now()->addHours(2);
+    $first = alertFor('Wind Advisory', 'advisory', ['ugc_codes' => ['COZ040'], 'expires' => $expires, 'headline' => 'first']);
+    $second = alertFor('Frost Advisory', 'advisory', ['ugc_codes' => ['COZ040'], 'expires' => $expires, 'headline' => 'second']);
+    $third = alertFor('Dense Fog Advisory', 'advisory', ['ugc_codes' => ['COZ040'], 'expires' => $expires, 'headline' => 'third']);
+
+    expect(collect((new GetActiveAlertsForLocation)($this->location))->pluck('headline')->all())->toBe(['first', 'second', 'third'])
+        ->and($first->id)->toBeLessThan($second->id)
+        ->and($second->id)->toBeLessThan($third->id);
+});

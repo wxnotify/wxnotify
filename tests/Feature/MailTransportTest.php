@@ -133,3 +133,24 @@ test('without a daily_summary payload the plain channel message is still sent', 
     Mail::assertSent(ChannelMessageMail::class);
     Mail::assertNotSent(DailySummaryMail::class);
 });
+
+test('a daily summary that cannot be rendered falls back to the plain brief message with a fixed log', function () {
+    Mail::fake();
+    Log::spy();
+    $channel = NotificationChannel::factory()->email('subscriber@example.com')->create();
+    $malformed = presenterReport(['periods' => [['name' => 'x', 'date' => null, 'summary' => 's', 'label' => 'High', 'temperature' => 1, 'unit' => 'F', 'icon' => ['period' => 'day', 'code' => ['not-a-string']]]]]);
+
+    $result = app(MailTransport::class)->send($channel, 'Brief text', 'Daily summary for Home', [
+        'daily_summary' => $malformed,
+        'url' => 'https://wxnotify.test/p/1',
+    ]);
+
+    expect($result->success)->toBeTrue();
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->hasTo('subscriber@example.com')
+        && $mail->messageTitle === 'Daily summary for Home'
+        && $mail->messageBody === 'Brief text'
+        && $mail->viewUrl === 'https://wxnotify.test/p/1');
+    Mail::assertNotSent(DailySummaryMail::class);
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $message === 'Daily summary email could not be rendered, sending the brief instead'
+        && $context === ['notification_channel_id' => $channel->id, 'exception' => TypeError::class])->once();
+});
