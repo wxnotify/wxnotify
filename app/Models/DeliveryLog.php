@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['alert_rule_id', 'notification_channel_id', 'user_id', 'channel_type', 'status', 'error_detail', 'subject', 'ingested_product_id', 'dispatched_at'])]
+#[Fillable(['alert_rule_id', 'notification_channel_id', 'user_id', 'channel_type', 'status', 'category', 'error_detail', 'subject', 'ingested_product_id', 'dispatched_at'])]
 class DeliveryLog extends Model
 {
     /** @use HasFactory<DeliveryLogFactory> */
