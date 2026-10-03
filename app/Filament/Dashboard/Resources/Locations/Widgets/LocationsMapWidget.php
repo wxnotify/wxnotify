@@ -22,8 +22,13 @@ class LocationsMapWidget extends Widget
     protected static bool $isLazy = false;
 
     /**
-     * Mirrors the resource's gate. Filament checks canView() on every
-     * hydrate, so locations() is unreachable to anyone who cannot open the page.
+     * Mirrors the resource's gate, so it will start protecting this widget if
+     * a LocationPolicy is added. Today there is no policy and
+     * LocationResource::canAccess() returns true for everyone, so this is
+     * effectively a no-op. What actually protects locations() is Filament's
+     * Authenticate, registered as Livewire persistent middleware (the update
+     * endpoint re-authenticates), the data being scoped to auth()->user(), and
+     * the component having no public state to tamper with.
      */
     public static function canView(): bool
     {

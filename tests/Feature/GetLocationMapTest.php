@@ -35,6 +35,8 @@ test('a stationary location is placed with its address, never stale, and an edit
             'stale' => false,
             'updated_at' => null,
         ])
+        ->and($result['locations'][0]['lat'])->toBeFloat()
+        ->and($result['locations'][0]['lng'])->toBeFloat()
         ->and($result['locations'][0]['edit_url'])->toEndWith("/locations/{$location->id}/edit");
 });
 

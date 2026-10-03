@@ -45,7 +45,8 @@ test('the widget renders a map container that Livewire leaves alone and no exter
         ->assertSeeHtml('data-locations-map')
         ->assertSeeHtml('data-locations-caption')
         ->assertSeeHtml('wire:ignore')
-        ->assertSeeHtml('if (! window.wxMapHelpers)');
+        ->assertSeeHtml('if (! window.wxMapHelpers)')
+        ->call('locations');
 
     Http::assertNothingSent();
 });
