@@ -75,6 +75,54 @@ test('both modes reject credentials, non-http schemes and malformed URLs', funct
     'not a url' => 'nonsense',
 ]);
 
+test('both modes refuse non-ASCII or percent-encoded hosts and query strings even when DNS looks public', function (string $mode, string $url) {
+    config(['wxnotify.mode' => $mode]);
+
+    expect(traccarGuard()->violation($url))->toBeString();
+})->with(['cloud', 'selfhost'])->with([
+    'unicode host' => 'http://ä.example.com',
+    'percent-encoded letter' => 'http://%61.example.com',
+    'percent-encoded localhost' => 'http://%6c%6fcalhost:8082',
+    'ipv6 zone id' => 'http://[fe80::1%25eth0]',
+    'space in host' => 'http://exa mple.com',
+    'ideographic full stop' => 'http://example。com',
+    'query string' => 'https://traccar.example.com/?x=1',
+    'fragment' => 'https://traccar.example.com/#frag',
+    'bare question mark' => 'https://traccar.example.com?',
+    'bare hash' => 'https://traccar.example.com/#',
+]);
+
+test('both modes give fixed messages for non-ASCII hosts and query strings that never echo the host', function (string $mode) {
+    config(['wxnotify.mode' => $mode]);
+
+    expect(traccarGuard()->violation('http://ä-secret.example.com'))
+        ->toBe('Enter the server host name in plain ASCII (use the xn-- form for international names).')
+        ->and(traccarGuard()->violation('https://secret-host.example.com/?token=abc'))
+        ->toBe('The URL must not contain a query string or fragment.');
+})->with(['cloud', 'selfhost']);
+
+test('cloud still allows punycode names, underscores, public IPv4 and bracketed public IPv6 hosts', function (string $url) {
+    config(['wxnotify.mode' => 'cloud']);
+
+    expect(traccarGuard()->violation($url))->toBeNull();
+})->with([
+    'punycode' => 'http://xn--4ca.example.com',
+    'hyphen, underscore, digit and port' => 'https://my-traccar_1.example.com:8082',
+    'public ipv4' => 'http://93.184.216.34:8082',
+    'public ipv6' => 'http://[2606:4700::1111]:8082',
+]);
+
+test('selfhost still allows ordinary host syntax', function (string $url) {
+    config(['wxnotify.mode' => 'selfhost']);
+
+    expect(traccarGuard()->violation($url))->toBeNull();
+})->with([
+    'punycode' => 'http://xn--4ca.example.com',
+    'hyphen, underscore, digit and port' => 'https://my-traccar_1.example.com:8082',
+    'public ipv4' => 'http://93.184.216.34:8082',
+    'public ipv6' => 'http://[2606:4700::1111]:8082',
+]);
+
 test('selfhost allows private and LAN targets', function (string $url) {
     config(['wxnotify.mode' => 'selfhost']);
 

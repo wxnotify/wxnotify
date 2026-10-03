@@ -16,7 +16,10 @@ use Closure;
  * the same network as WxNotify is the expected self-hosted setup: it then defers
  * to HeartbeatUrlGuard, which allows private hosts and refuses only cloud-metadata
  * and link-local targets. Both modes require http(s) and forbid credentials in
- * the URL. Messages are fixed strings and never repeat any part of the URL.
+ * the URL, require a plain-ASCII host (curl converts IDN and percent-decodes host
+ * names, so the guard and the client would otherwise look up different names) and
+ * forbid a query or fragment (the app appends API paths to the base URL).
+ * Messages are fixed strings and never repeat any part of the URL.
  *
  * The guard's DNS lookup and the HTTP client's own lookup are separate (the same
  * accepted TOCTOU gap as WebhookUrlGuard).
@@ -51,6 +54,14 @@ final class TraccarUrlGuard
 
         if (isset($parts['user']) || isset($parts['pass'])) {
             return 'The URL must not contain a username or password.';
+        }
+
+        if (preg_match('/[^A-Za-z0-9.\-_:\[\]]/', $parts['host']) === 1) {
+            return 'Enter the server host name in plain ASCII (use the xn-- form for international names).';
+        }
+
+        if (isset($parts['query']) || isset($parts['fragment']) || str_contains($url, '?') || str_contains($url, '#')) {
+            return 'The URL must not contain a query string or fragment.';
         }
 
         if (config('wxnotify.mode') === 'selfhost') {
