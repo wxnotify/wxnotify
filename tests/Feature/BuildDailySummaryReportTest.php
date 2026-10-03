@@ -173,42 +173,57 @@ test('the report records the unit system it was built for, defaulting to imperia
         ->and((new BuildDailySummaryReport)($this->location, units: UnitSystem::Metric)['units'])->toBe('metric');
 });
 
-test('a location with no timezone is rendered in the owner\'s profile timezone', function () {
+/**
+ * A report for a stationary Denver-area location whose own timezone and owner's profile timezone are given,
+ * with one active alert so every time-bearing section (alerts, current, hourly, periods, sun) is non-empty.
+ *
+ * @return array<string, mixed>
+ */
+function reportForTimezones(?string $locationTimezone, ?string $profileTimezone): array
+{
     nwsFakeEverything();
+    ActiveWwa::factory()->create([
+        'product_id' => Product::factory()->create(['name' => 'Wind Advisory', 'family' => 'advisory'])->id,
+        'ugc_codes' => ['COZ040'],
+        'expires' => '2026-10-02 21:00:00',
+    ]);
     $location = Location::factory()->create([
-        'user_id' => User::factory()->create(['timezone' => 'America/Denver'])->id,
-        'lat' => 40.0031694, 'lng' => -104.997011, 'timezone' => null,
+        'user_id' => User::factory()->create(['timezone' => $profileTimezone])->id,
+        'lat' => 40.0031694, 'lng' => -104.997011, 'timezone' => $locationTimezone,
         'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014',
     ]);
 
-    $report = (new BuildDailySummaryReport)($location);
+    return (new BuildDailySummaryReport)($location);
+}
+
+test('a location with no timezone is rendered in the owner\'s profile timezone', function () {
+    $report = reportForTimezones(null, 'America/Denver');
 
     expect($report['timezone'])->toBe('America/Denver')
         ->and($report['periods'][0]['date'])->toBe('2026-10-02T09:00:00-06:00')
-        ->and($report['sun']['sunrise'])->toEndWith('-06:00');
+        ->and($report['sun']['sunrise'])->toEndWith('-06:00')
+        ->and($report['hourly'][0]['time'])->toBe('2026-10-02T09:00:00-06:00')
+        ->and($report['alerts'][0]['expires'])->toBe('2026-10-02T15:00:00-06:00')
+        ->and($report['current']['observed_at'])->toEndWith('-06:00');
 });
 
 test('a location with no timezone and an owner with none falls back to the app timezone', function () {
-    nwsFakeEverything();
-    $location = Location::factory()->create([
-        'user_id' => User::factory()->create(['timezone' => null])->id,
-        'lat' => 40.0031694, 'lng' => -104.997011, 'timezone' => null,
-        'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014',
-    ]);
-
-    $report = (new BuildDailySummaryReport)($location);
+    $report = reportForTimezones(null, null);
 
     expect($report['timezone'])->toBe(config('app.timezone'))
-        ->and($report['periods'][0]['date'])->toEndWith('+00:00');
+        ->and($report['periods'][0]['date'])->toEndWith('+00:00')
+        ->and($report['hourly'][0]['time'])->toBe('2026-10-02T15:00:00+00:00')
+        ->and($report['alerts'][0]['expires'])->toBe('2026-10-02T21:00:00+00:00')
+        ->and($report['current']['observed_at'])->toEndWith('+00:00');
 });
 
 test('a location with its own timezone ignores the owner\'s profile timezone', function () {
-    nwsFakeEverything();
-    $location = Location::factory()->create([
-        'user_id' => User::factory()->create(['timezone' => 'Pacific/Honolulu'])->id,
-        'lat' => 40.0031694, 'lng' => -104.997011, 'timezone' => 'America/Denver',
-        'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014',
-    ]);
+    $report = reportForTimezones('America/Denver', 'Pacific/Honolulu');
 
-    expect((new BuildDailySummaryReport)($location)['timezone'])->toBe('America/Denver');
+    expect($report['timezone'])->toBe('America/Denver')
+        ->and($report['periods'][0]['date'])->toBe('2026-10-02T09:00:00-06:00')
+        ->and($report['sun']['sunrise'])->toEndWith('-06:00')
+        ->and($report['hourly'][0]['time'])->toBe('2026-10-02T09:00:00-06:00')
+        ->and($report['alerts'][0]['expires'])->toBe('2026-10-02T15:00:00-06:00')
+        ->and($report['current']['observed_at'])->toEndWith('-06:00');
 });
