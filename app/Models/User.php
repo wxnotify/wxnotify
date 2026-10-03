@@ -22,7 +22,7 @@ use Marcelodelgado\Announcements\Traits\HasAnnouncements;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['name', 'email', 'password', 'is_test_account', 'unit_system'])]
+#[Fillable(['name', 'email', 'password', 'is_test_account', 'unit_system', 'timezone'])]
 #[Hidden(['password', 'remember_token', 'app_authentication_secret'])]
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, MustVerifyEmail
 {
