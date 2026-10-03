@@ -96,3 +96,16 @@ The brainstorm fixed the widgets and the four Needs-attention checks; these deta
 ## Rules to record
 
 Add a short "My Alerts widgets" note to `.ai/rules/filament.md`: these widgets read only the database and scope every query to `auth()->user()` (the resource's `canView()` allows everyone); coverage comes from `delivery_logs` evidence, never from re-implementing the matching rules; names are rendered escaped; and `GetActiveAlertsForLocation::activeFor()` is the shared source for active warnings.
+
+## Revisions after the final review
+
+The shipped code differs from the sections above in these ways:
+
+- **Refresh event (point 4 of the judgment calls changes)**: the stats and Needs attention widgets (and, harmlessly, Active now) re-render on a `my-alerts-changed` Livewire event, which the table's Active toggle, row delete and bulk delete dispatch, so they no longer go stale after an inline change. The stats widget is no longer lazy (no empty placeholder flash).
+- **Needs attention wording**: delivery does not check `verified_at`, so the copy no longer claims an unverified channel "can't deliver". It reads "isn't verified yet — confirm it so alerts using it are sure to reach you (A, B, C and N more)"; a failing channel reads "its last delivery failed 3 hours ago (4 failures in 7 days)". Failing-channel rows sort by label without regard to case. Whether delivery should require verification is an open owner decision.
+- **Active now wording**: "Not sent (quiet hours)" and "No alert sent for this warning"; the footnote says an earlier-issued warning may show "No alert sent" even though updates to it may reach the subscriber.
+- **Dates in times**: a time that is not on the current calendar day (judged in the location's timezone) shows the weekday, e.g. "Sat 4:15 PM".
+- **Empty state**: the action result carries `has_position`; when locations exist but none has a position the widget says "None of your locations has a position yet, so there's nothing to check." instead of "No active weather alerts at your locations."
+- **Failed stat**: always shows a description and icon (a danger warning triangle above zero, a success check at zero) alongside its color.
+- **Queries**: the coverage lookup is bounded to deliveries from one day before the event's first ingest and to the success/suppressed/failure statuses; the stats aggregate filters the same three statuses; Active now fetches only locations with a position in SQL.
+- **Read path writes**: `ResolveLocationZones` saves quietly, so rendering Active now never trips maintenance mode or writes an activity row.
