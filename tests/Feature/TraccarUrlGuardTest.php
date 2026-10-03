@@ -36,6 +36,24 @@ test('cloud blocks loopback, private, metadata and reserved targets', function (
     '.internal name' => 'http://traccar.internal',
     '.lan name' => 'http://traccar.lan',
     '.local name' => 'http://traccar.local',
+    'decimal shorthand' => 'http://2130706433',
+    'hex shorthand' => 'http://0x7f.1',
+    'short dotted shorthand' => 'http://127.1',
+    'octal shorthand' => 'http://0177.0.0.1',
+    'trailing-dot localhost' => 'http://localhost.',
+    'uppercase localhost' => 'http://LOCALHOST',
+]);
+
+test('cloud rejects a numeric-shorthand host with a fixed message that does not echo it', function (string $url) {
+    config(['wxnotify.mode' => 'cloud']);
+
+    expect(traccarGuard()->violation($url))
+        ->toBe('The URL host must be a name or a standard IP address, not a numeric shorthand.');
+})->with([
+    'decimal' => 'http://2130706433',
+    'hex' => 'http://0x7f.1',
+    'short dotted' => 'http://127.1',
+    'octal' => 'http://0177.0.0.1',
 ]);
 
 test('cloud blocks a host name that resolves to a private address, and one that does not resolve', function () {

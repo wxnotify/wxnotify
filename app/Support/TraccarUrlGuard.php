@@ -57,11 +57,23 @@ final class TraccarUrlGuard
             return $this->heartbeat->violation($url);
         }
 
-        return match ($this->webhook->hostRisk($parts['host'])) {
+        $host = rtrim(strtolower(trim($parts['host'], '[]')), '.');
+
+        if ($this->isNumericShorthandHost($host)) {
+            return 'The URL host must be a name or a standard IP address, not a numeric shorthand.';
+        }
+
+        return match ($this->webhook->hostRisk($host)) {
             'name' => 'That host name points at a private network address.',
             'unresolved' => 'That host name could not be resolved.',
             'private' => 'That address resolves to a private or reserved network, which is not allowed.',
             default => null,
         };
+    }
+
+    private function isNumericShorthandHost(string $host): bool
+    {
+        return filter_var($host, FILTER_VALIDATE_IP) === false
+            && preg_match('/^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+))*$/i', $host) === 1;
     }
 }
