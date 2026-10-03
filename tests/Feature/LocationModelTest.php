@@ -25,3 +25,39 @@ test('a mobile location given a fix via withFix() has one', function () {
     expect((float) $location->lat)->toBe(39.0997);
     expect((float) $location->lng)->toBe(-94.5786);
 });
+
+test('saving a location as stationary clears every Traccar and mobile field', function () {
+    $location = Location::factory()->mobile()->withFix(39.0997, -94.5786)->create([
+        'traccar_device_id' => 7,
+        'traccar_device_name' => 'Truck',
+        'mobile_update_interval_minutes' => 15,
+        'mobile_position_updated_at' => now(),
+    ]);
+
+    $location->update(['type' => LocationType::Stationary]);
+
+    $location->refresh();
+    expect($location->type)->toBe(LocationType::Stationary)
+        ->and($location->traccar_server_id)->toBeNull()
+        ->and($location->traccar_device_id)->toBeNull()
+        ->and($location->traccar_device_name)->toBeNull()
+        ->and($location->mobile_source)->toBeNull()
+        ->and($location->mobile_update_interval_minutes)->toBeNull()
+        ->and($location->mobile_position_updated_at)->toBeNull()
+        ->and($location->hasFix())->toBeTrue(); // the coordinates are the subscriber's pin now
+});
+
+test('saving a mobile location keeps its Traccar link', function () {
+    $location = Location::factory()->mobile()->withFix(39.0997, -94.5786)->create([
+        'traccar_device_id' => 7,
+        'mobile_update_interval_minutes' => 15,
+    ]);
+
+    $location->update(['label' => 'Renamed']);
+
+    $location->refresh();
+    expect($location->traccar_server_id)->not->toBeNull()
+        ->and($location->traccar_device_id)->toBe(7)
+        ->and($location->mobile_update_interval_minutes)->toBe(15)
+        ->and($location->mobile_position_updated_at)->not->toBeNull();
+});

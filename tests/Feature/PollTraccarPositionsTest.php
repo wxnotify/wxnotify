@@ -2,6 +2,7 @@
 
 use App\Models\Location;
 use App\Models\TraccarServer;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Spatie\Activitylog\Models\Activity;
 
@@ -135,5 +136,29 @@ test('a mobile location with no update interval set is never polled', function (
 
     $this->artisan('traccar:poll-positions')->assertSuccessful();
 
+    Http::assertNothingSent();
+});
+
+test('a location that is no longer mobile is never polled, even if it still carries Traccar ids', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = Location::factory()->mobile()->create([
+        'traccar_server_id' => $server->id,
+        'traccar_device_id' => 1,
+        'mobile_update_interval_minutes' => 15,
+    ]);
+
+    // A legacy row: switched to stationary before saving a stationary location cleared its Traccar link.
+    DB::table('locations')->where('id', $location->id)->update(['type' => 'stationary', 'lat' => 40.0, 'lng' => -105.0]);
+
+    Http::fake(['traccar.example.com/api/positions' => Http::response([
+        ['deviceId' => 1, 'latitude' => 10.0, 'longitude' => 10.0, 'fixTime' => null],
+    ])]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    $location->refresh();
+    expect((float) $location->lat)->toBe(40.0)
+        ->and((float) $location->lng)->toBe(-105.0)
+        ->and($location->mobile_position_updated_at)->toBeNull();
     Http::assertNothingSent();
 });

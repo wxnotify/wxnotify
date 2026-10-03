@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Actions\Traccar\PollTraccarServer;
+use App\Enums\LocationType;
 use App\Models\Location;
 use App\Models\TraccarServer;
 use Illuminate\Console\Command;
@@ -26,7 +27,10 @@ class PollTraccarPositions extends Command
 
     public function handle(PollTraccarServer $poll): int
     {
+        // type = mobile is checked explicitly: a location switched to stationary
+        // before saving cleared its Traccar link must never have its pin moved.
         $dueLocations = Location::query()
+            ->where('type', LocationType::Mobile->value)
             ->whereNotNull('traccar_server_id')
             ->whereNotNull('traccar_device_id')
             ->whereNotNull('mobile_update_interval_minutes')

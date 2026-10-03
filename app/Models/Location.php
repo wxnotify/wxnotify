@@ -23,6 +23,30 @@ class Location extends Model
     /** @use HasFactory<LocationFactory> */
     use BlockedDuringMaintenance, HasFactory, LogsActivity;
 
+    /**
+     * A stationary location carries no Traccar link: the form hides the mobile
+     * fields once the type is Stationary, so they would otherwise stay set on
+     * the row after a Mobile -> Stationary edit and keep a (now stationary)
+     * location tied to a device. Enforced here rather than on one Filament page
+     * so every write path keeps the invariant; the poller also filters on type
+     * for rows that predate it.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Location $location): void {
+            if ($location->type === LocationType::Stationary) {
+                $location->forceFill([
+                    'mobile_source' => null,
+                    'traccar_server_id' => null,
+                    'traccar_device_id' => null,
+                    'traccar_device_name' => null,
+                    'mobile_update_interval_minutes' => null,
+                    'mobile_position_updated_at' => null,
+                ]);
+            }
+        });
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         // logAll() preserves original behavior for every real field (including

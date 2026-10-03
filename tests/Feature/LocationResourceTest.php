@@ -326,3 +326,36 @@ test('editing a location never replaces its stored timezone with the profile def
     livewire(EditLocation::class, ['record' => $location->id])
         ->assertFormSet(['timezone' => 'America/Denver']);
 });
+
+test('switching a mobile location to stationary on the edit page drops its Traccar link and keeps the new pin', function () {
+    $this->user->update(['tier_override' => Tier::Plus]);
+    $server = TraccarServer::factory()->for($this->user)->create(['base_url' => 'https://traccar.example.com']);
+    $location = Location::factory()->mobile()->withFix(39.0997, -94.5786)->create([
+        'user_id' => $this->user->id,
+        'traccar_server_id' => $server->id,
+        'traccar_device_id' => 7,
+        'traccar_device_name' => 'Truck',
+        'mobile_update_interval_minutes' => 15,
+    ]);
+
+    livewire(EditLocation::class, ['record' => $location->id])
+        ->fillForm([
+            'type' => 'stationary',
+            'lat' => 40.015,
+            'lng' => -105.27,
+            'address' => '1 Pearl St, Boulder',
+            'timezone' => 'America/Denver',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $location->refresh();
+    expect($location->type->value)->toBe('stationary')
+        ->and((float) $location->lat)->toBe(40.015)
+        ->and((float) $location->lng)->toBe(-105.27)
+        ->and($location->traccar_server_id)->toBeNull()
+        ->and($location->traccar_device_id)->toBeNull()
+        ->and($location->traccar_device_name)->toBeNull()
+        ->and($location->mobile_update_interval_minutes)->toBeNull()
+        ->and($location->mobile_position_updated_at)->toBeNull();
+});
