@@ -632,6 +632,48 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ---
 
+### Task 4: Weather displays use the fallback too (added after Task 2's review)
+
+Task 2's reviewer found five weather-display sites that still compute `$location->timezone ?? config('app.timezone')` inline. Without this task, a timezone-less (e.g. mobile) Location with a Daily Summary would be *scheduled* in the owner's profile timezone but its email would render times (forecast dates, sunrise/sunset, hourly, alerts, observation times) in UTC. Ruling: use the same fallback so schedule and rendering agree; behavior with no profile timezone is unchanged.
+
+**Files:**
+- Modify: `app/Support/SunTimes.php` (~line 29), `app/Actions/Weather/BuildDailySummaryReport.php` (~line 38), `app/Actions/Weather/GetHourlyForecast.php` (~line 47), `app/Actions/Weather/GetActiveAlertsForLocation.php` (~line 39), `app/Actions/Weather/GetCurrentConditions.php` (~line 125)
+- Test: extend the existing test file for `BuildDailySummaryReport` (find it with `grep -rl BuildDailySummaryReport tests`), and the existing `SunTimes` test file if present (else add one case to the daily-summary report test, since the report embeds sun times)
+
+**Interfaces:**
+- Consumes: `Timezones::forLocation(Location): ?string` (Task 1).
+- Produces: each site resolves `Timezones::forLocation($location) ?? config('app.timezone')` (a Location's own timezone, else the owner's profile timezone, else the app timezone).
+
+- [ ] **Step 1: Write the failing tests**
+
+In the `BuildDailySummaryReport` test file add two cases modelled on that file's existing setup (same HTTP fakes/clock): (1) a Location with `timezone => null` owned by a user with `timezone => 'America/Denver'` yields a report whose `timezone` is `America/Denver` and whose `periods[0]['date']` carries the Denver offset; (2) the same Location when the owner has `timezone => null` yields `config('app.timezone')` (unchanged behavior). Add a third: a Location with its own timezone ignores the owner's profile timezone. If `SunTimes` has its own tests add the same pair there (sunrise/sunset rendered in the profile zone).
+
+- [ ] **Step 2: Run to verify they fail**
+
+Run: the test file(s) edited above.
+Expected: the profile-timezone cases FAIL; the unset and own-timezone cases and every existing test pass.
+
+- [ ] **Step 3: Switch the five sites**
+
+Replace each `$location->timezone ?? config('app.timezone')` with `Timezones::forLocation($location) ?? config('app.timezone')` (+ `use App\Support\Timezones;`). Make no other change. Keep docblocks accurate ("the location's timezone" becomes "the location's timezone, else the owner's profile timezone"). Check that none of these call sites passes a Location whose `user` relation could be absent (a Location always has an owner).
+
+- [ ] **Step 4: Run to verify they pass, plus every suite that touches these actions**
+
+Run: `grep -rl "BuildDailySummaryReport\|GetHourlyForecast\|GetActiveAlertsForLocation\|GetCurrentConditions\|SunTimes\|DailySummary" tests` and run all those files.
+Expected: all PASS.
+
+- [ ] **Step 5: Pint and commit**
+
+```bash
+vendor/bin/pint --dirty --format agent
+git add app/Support/SunTimes.php app/Actions/Weather/BuildDailySummaryReport.php app/Actions/Weather/GetHourlyForecast.php app/Actions/Weather/GetActiveAlertsForLocation.php app/Actions/Weather/GetCurrentConditions.php tests/Feature
+git commit -m "Render weather summaries in the profile timezone for locations without one
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+```
+
+---
+
 ## Post-implementation verification (controller, in a real browser)
 
 1. Migrate the dev database (`php artisan migrate --force` in the container). Create a throwaway subscriber (random password, test-only) plus a few seeded `delivery_logs` and a stationary Location, log in through the local app.
