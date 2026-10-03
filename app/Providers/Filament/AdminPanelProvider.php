@@ -27,6 +27,7 @@ use JeffersonGoncalves\Filament\CookieConsent\CookieConsentPlugin;
 use JeffersonGoncalves\Filament\OneTimeOperations\OneTimeOperationsPlugin;
 use JeffersonGoncalves\FilamentServiceDesk\ServiceDeskAdminPlugin;
 use ShuvroRoy\FilamentSpatieLaravelHealth\FilamentSpatieLaravelHealthPlugin;
+use Wallacemartinss\FilamentOnboarding\FilamentOnboardingPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -64,6 +65,13 @@ class AdminPanelProvider extends PanelProvider
                     ->navigationIcon('heroicon-o-cpu-chip')
                     ->navigationLabel('Application Health'),
                 OneTimeOperationsPlugin::make(),
+                FilamentOnboardingPlugin::make()
+                    ->manageFlows()
+                    ->launcher(false)
+                    ->tours(false)
+                    ->navigationGroup('Navigation')
+                    ->navigationIcon('heroicon-o-map')
+                    ->navigationSort(70),
             ])
             ->middleware([
                 EncryptCookies::class,

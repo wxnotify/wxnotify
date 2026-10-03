@@ -46,6 +46,7 @@ use JeffersonGoncalves\FilamentServiceDesk\ServiceDeskUserPlugin;
 use Laravel\Socialite\Contracts\User as SocialiteUserContract;
 use Swis\Filament\Backgrounds\FilamentBackgroundsPlugin;
 use Swis\Filament\Backgrounds\ImageProviders\MyImages;
+use Wallacemartinss\FilamentOnboarding\FilamentOnboardingPlugin;
 
 class DashboardPanelProvider extends PanelProvider
 {
@@ -146,6 +147,12 @@ class DashboardPanelProvider extends PanelProvider
                     ->serviceCatalog(false),
                 BugReportsPlugin::make()
                     ->authorizeManagementUsing(fn (User $user): bool => (bool) $user->is_staff),
+                FilamentOnboardingPlugin::make()
+                    ->launcher()                        // floating checklist, on every page
+                    ->tours()                           // guided tours
+                    ->progressPage()                    // optional page laying the journey out
+                    ->launcherPosition('bottom-right')  // bottom-left, top-right, top-left
+                    ->modalPosition('center'),          // where images and videos open
             ])
             ->renderHook(
                 PanelsRenderHook::BODY_END,
