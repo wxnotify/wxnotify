@@ -4,6 +4,7 @@ namespace App\Filament\Dashboard\Resources\Locations\Pages;
 
 use App\Filament\Dashboard\Resources\Concerns\DescribesListPage;
 use App\Filament\Dashboard\Resources\Locations\LocationResource;
+use App\Filament\Dashboard\Resources\Locations\Widgets\LocationsMapWidget;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
@@ -21,6 +22,13 @@ class ListLocations extends ListRecords
                 ->tooltip(fn (): ?string => auth()->user()->canCreateLocation()
                     ? null
                     : 'You\'ve reached your plan\'s location limit — upgrade to add more.'),
+        ];
+    }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            LocationsMapWidget::class,
         ];
     }
 

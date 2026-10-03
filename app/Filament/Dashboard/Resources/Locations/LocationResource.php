@@ -7,6 +7,7 @@ use App\Filament\Dashboard\Resources\Locations\Pages\EditLocation;
 use App\Filament\Dashboard\Resources\Locations\Pages\ListLocations;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
 use App\Filament\Dashboard\Resources\Locations\Tables\LocationsTable;
+use App\Filament\Dashboard\Resources\Locations\Widgets\LocationsMapWidget;
 use App\Models\Location;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -47,6 +48,13 @@ class LocationResource extends Resource
     {
         return [
             //
+        ];
+    }
+
+    public static function getWidgets(): array
+    {
+        return [
+            LocationsMapWidget::class,
         ];
     }
 
