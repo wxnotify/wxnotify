@@ -140,3 +140,55 @@ test('an existing server can be edited', function () {
 
     assertDatabaseHas(TraccarServer::class, ['id' => $server->id, 'label' => 'Renamed']);
 });
+
+test('a Traccar server pointing at a private address is rejected in cloud mode', function () {
+    config(['wxnotify.mode' => 'cloud']);
+    $this->actingAs(User::factory()->create(['tier_override' => Tier::Plus]));
+    Http::fake();
+
+    livewire(CreateTraccarServer::class)
+        ->fillForm(['label' => 'Internal', 'base_url' => 'http://192.168.1.50:8082', 'api_token' => 'tok'])
+        ->call('create')
+        ->assertHasFormErrors(['base_url']);
+
+    expect(TraccarServer::count())->toBe(0);
+    Http::assertNothingSent();
+});
+
+test('a Traccar server pointing at a private address is accepted in selfhost mode', function () {
+    config(['wxnotify.mode' => 'selfhost']);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $this->actingAs($user);
+    Http::fake(['192.168.1.50:8082/api/positions' => Http::response([])]);
+
+    livewire(CreateTraccarServer::class)
+        ->fillForm(['label' => 'LAN', 'base_url' => 'http://192.168.1.50:8082', 'api_token' => 'tok'])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(TraccarServer::where('user_id', $user->id)->where('label', 'LAN')->exists())->toBeTrue();
+});
+
+test('the metadata address is rejected even in selfhost mode', function () {
+    config(['wxnotify.mode' => 'selfhost']);
+    $this->actingAs(User::factory()->create(['tier_override' => Tier::Plus]));
+
+    livewire(CreateTraccarServer::class)
+        ->fillForm(['label' => 'Bad', 'base_url' => 'http://169.254.169.254', 'api_token' => 'tok'])
+        ->call('create')
+        ->assertHasFormErrors(['base_url']);
+});
+
+test('editing a server to a private address is rejected in cloud mode', function () {
+    config(['wxnotify.mode' => 'cloud']);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $this->actingAs($user);
+    $server = TraccarServer::factory()->for($user)->create(['base_url' => 'https://traccar.example.com']);
+
+    livewire(EditTraccarServer::class, ['record' => $server->id])
+        ->fillForm(['base_url' => 'http://10.0.0.5:8082'])
+        ->call('save')
+        ->assertHasFormErrors(['base_url']);
+
+    expect($server->fresh()->base_url)->toBe('https://traccar.example.com');
+});

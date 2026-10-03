@@ -2,6 +2,7 @@
 
 use App\Actions\Traccar\PollTraccarServer;
 use App\Models\TraccarServer;
+use App\Support\TraccarUrlGuard;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -88,4 +89,27 @@ test('a position entry with a non-numeric latitude resolves the whole response t
     ]);
 
     expect((new PollTraccarServer)($server))->toBeNull();
+});
+
+test('a server whose URL violates the guard is never called and resolves to null', function () {
+    config(['wxnotify.mode' => 'cloud']);
+    app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(fn (string $host): array => ['10.0.0.5']));
+    $server = TraccarServer::factory()->create(['base_url' => 'http://traccar.internal.example.com:8082']);
+
+    Http::fake();
+
+    expect((new PollTraccarServer)($server))->toBeNull();
+    Http::assertNothingSent();
+});
+
+test('a redirect is not followed and resolves to null', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake([
+        'traccar.example.com/api/positions' => Http::response('', 302, ['Location' => 'https://elsewhere.example.com/api/positions']),
+        'elsewhere.example.com/*' => Http::response([['deviceId' => 1, 'latitude' => 39.0, 'longitude' => -94.0]]),
+    ]);
+
+    expect((new PollTraccarServer)($server))->toBeNull();
+    Http::assertSentCount(1);
 });

@@ -3,6 +3,7 @@
 namespace App\Actions\Traccar;
 
 use App\Models\TraccarServer;
+use App\Support\TraccarUrlGuard;
 use GuzzleHttp\Psr7\Uri;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
@@ -78,11 +79,14 @@ class GetTraccarDeviceMap
         $pooled = [];
 
         foreach ($servers as $server) {
-            if ($this->isConfigured($server)) {
-                $pooled[] = $server;
-            } else {
+            if (! $this->isConfigured($server)) {
                 Log::warning('Traccar device map: server misconfigured', ['traccar_server_id' => $server->id]);
                 $results[$server->id] = null;
+            } elseif (app(TraccarUrlGuard::class)->violation((string) $server->base_url) !== null) {
+                Log::warning('Traccar server URL refused', ['traccar_server_id' => $server->id]);
+                $results[$server->id] = null;
+            } else {
+                $pooled[] = $server;
             }
         }
 

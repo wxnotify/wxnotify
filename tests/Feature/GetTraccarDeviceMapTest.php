@@ -2,6 +2,7 @@
 
 use App\Actions\Traccar\GetTraccarDeviceMap;
 use App\Models\TraccarServer;
+use App\Support\TraccarUrlGuard;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -264,4 +265,23 @@ test('a server whose api_token cannot be decrypted is unreachable, and never tak
         ->and(Cache::has("traccar-device-map:{$bad->id}:{$bad->updated_at->getTimestamp()}"))->toBeFalse();
     Http::assertNotSent(fn ($request) => str_contains($request->url(), 'bad.example.com'));
     Log::shouldHaveReceived('warning')->with('Traccar device map: server misconfigured', ['traccar_server_id' => $bad->id])->once();
+});
+
+test('a server whose URL violates the guard is excluded without affecting the others', function () {
+    config(['wxnotify.mode' => 'cloud']);
+    app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(
+        fn (string $host): array => $host === 'internal.example.com' ? ['10.0.0.5'] : ['93.184.216.34'],
+    ));
+    $bad = mapServer('Internal', 'internal.example.com');
+    $good = mapServer('Fleet', 'fleet.example.com');
+    Http::fake([
+        ...fakeTraccar('fleet.example.com', [['id' => 1, 'name' => 'Truck 1', 'lastUpdate' => '2026-10-02T11:55:00Z']], [traccarPosition(1)]),
+        ...fakeTraccar('internal.example.com', [['id' => 9, 'name' => 'Leaked', 'lastUpdate' => '2026-10-02T11:55:00Z']], [traccarPosition(9)]),
+    ]);
+
+    $result = (new GetTraccarDeviceMap)([$bad, $good]);
+
+    expect(collect($result['devices'])->pluck('server')->unique()->all())->toBe(['Fleet'])
+        ->and($result['unreachable'])->toBe(['Internal']);
+    Http::assertNotSent(fn ($request) => str_contains((string) $request->url(), 'internal.example.com'));
 });

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Dashboard\Resources\TraccarServers\Schemas;
 
+use App\Rules\SafeTraccarUrl;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
@@ -29,6 +30,7 @@ class TraccarServerForm
             TextInput::make('base_url')
                 ->label('Server URL')
                 ->url()
+                ->rule(new SafeTraccarUrl)
                 ->placeholder('https://demo.traccar.org')
                 ->required()
                 ->maxLength(255),

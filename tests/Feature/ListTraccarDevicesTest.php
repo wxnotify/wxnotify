@@ -2,6 +2,7 @@
 
 use App\Actions\Traccar\ListTraccarDevices;
 use App\Models\TraccarServer;
+use App\Support\TraccarUrlGuard;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -84,4 +85,27 @@ test('a genuinely empty device list (a valid JSON array with zero entries) resol
     Http::fake(['traccar.example.com/api/devices' => Http::response([], 200)]);
 
     expect((new ListTraccarDevices)($server))->toBe([]);
+});
+
+test('a server whose URL violates the guard is never called and resolves to null', function () {
+    config(['wxnotify.mode' => 'cloud']);
+    app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(fn (string $host): array => ['10.0.0.5']));
+    $server = TraccarServer::factory()->create(['base_url' => 'http://traccar.internal.example.com:8082']);
+
+    Http::fake();
+
+    expect((new ListTraccarDevices)($server))->toBeNull();
+    Http::assertNothingSent();
+});
+
+test('a redirect is not followed and resolves to null', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake([
+        'traccar.example.com/api/devices' => Http::response('', 302, ['Location' => 'https://elsewhere.example.com/api/devices']),
+        'elsewhere.example.com/*' => Http::response([['id' => 1, 'name' => 'Leaked']]),
+    ]);
+
+    expect((new ListTraccarDevices)($server))->toBeNull();
+    Http::assertSentCount(1);
 });

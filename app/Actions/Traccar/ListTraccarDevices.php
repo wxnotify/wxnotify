@@ -3,6 +3,7 @@
 namespace App\Actions\Traccar;
 
 use App\Models\TraccarServer;
+use App\Support\TraccarUrlGuard;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -25,9 +26,16 @@ class ListTraccarDevices
      */
     public function __invoke(TraccarServer $server): ?array
     {
+        if (app(TraccarUrlGuard::class)->violation((string) $server->base_url) !== null) {
+            Log::warning('Traccar server URL refused', ['traccar_server_id' => $server->id]);
+
+            return null;
+        }
+
         try {
             $response = Http::withToken($server->api_token)
                 ->timeout(10)
+                ->withoutRedirecting()
                 ->get(rtrim($server->base_url, '/').'/api/devices');
         } catch (Throwable $e) {
             Log::warning('Failed to reach Traccar server for devices', [
