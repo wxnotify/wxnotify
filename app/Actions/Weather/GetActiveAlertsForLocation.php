@@ -4,6 +4,7 @@ namespace App\Actions\Weather;
 
 use App\Models\ActiveWwa;
 use App\Models\Location;
+use App\Support\Timezones;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -36,7 +37,7 @@ class GetActiveAlertsForLocation
         $zones = $this->zonesFor($location);
         $lng = (float) $location->lng;
         $lat = (float) $location->lat;
-        $timezone = $location->timezone ?? config('app.timezone');
+        $timezone = Timezones::forLocation($location) ?? config('app.timezone');
 
         $alerts = ActiveWwa::query()
             ->with('product')

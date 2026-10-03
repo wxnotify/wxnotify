@@ -5,6 +5,7 @@ namespace App\Actions\Weather;
 use App\Enums\UnitSystem;
 use App\Models\Location;
 use App\Support\SunTimes;
+use App\Support\Timezones;
 use App\Support\WeatherIcon;
 use Closure;
 use Illuminate\Support\Carbon;
@@ -14,7 +15,7 @@ use Throwable;
 /**
  * Builds the queue-serializable report the Full Daily Summary email renders:
  * plain nested arrays only (no models, Carbon instances or closures), with
- * timestamps as ISO-8601 strings in the location's timezone.
+ * timestamps as ISO-8601 strings in the location's timezone, else the owner's profile timezone.
  *
  * The 7-day forecast is the one required section: without it there is nothing
  * to send (null), exactly like Brief. Every other section is built inside its
@@ -35,7 +36,7 @@ class BuildDailySummaryReport
             return null;
         }
 
-        $timezone = $location->timezone ?? config('app.timezone');
+        $timezone = Timezones::forLocation($location) ?? config('app.timezone');
 
         return [
             'location' => $location->label,

@@ -6,6 +6,7 @@ use App\Enums\UnitSystem;
 use App\Models\ActiveWwa;
 use App\Models\Location;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -170,4 +171,44 @@ test('the report records the unit system it was built for, defaulting to imperia
 
     expect((new BuildDailySummaryReport)($this->location)['units'])->toBe('imperial')
         ->and((new BuildDailySummaryReport)($this->location, units: UnitSystem::Metric)['units'])->toBe('metric');
+});
+
+test('a location with no timezone is rendered in the owner\'s profile timezone', function () {
+    nwsFakeEverything();
+    $location = Location::factory()->create([
+        'user_id' => User::factory()->create(['timezone' => 'America/Denver'])->id,
+        'lat' => 40.0031694, 'lng' => -104.997011, 'timezone' => null,
+        'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014',
+    ]);
+
+    $report = (new BuildDailySummaryReport)($location);
+
+    expect($report['timezone'])->toBe('America/Denver')
+        ->and($report['periods'][0]['date'])->toBe('2026-10-02T09:00:00-06:00')
+        ->and($report['sun']['sunrise'])->toEndWith('-06:00');
+});
+
+test('a location with no timezone and an owner with none falls back to the app timezone', function () {
+    nwsFakeEverything();
+    $location = Location::factory()->create([
+        'user_id' => User::factory()->create(['timezone' => null])->id,
+        'lat' => 40.0031694, 'lng' => -104.997011, 'timezone' => null,
+        'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014',
+    ]);
+
+    $report = (new BuildDailySummaryReport)($location);
+
+    expect($report['timezone'])->toBe(config('app.timezone'))
+        ->and($report['periods'][0]['date'])->toEndWith('+00:00');
+});
+
+test('a location with its own timezone ignores the owner\'s profile timezone', function () {
+    nwsFakeEverything();
+    $location = Location::factory()->create([
+        'user_id' => User::factory()->create(['timezone' => 'Pacific/Honolulu'])->id,
+        'lat' => 40.0031694, 'lng' => -104.997011, 'timezone' => 'America/Denver',
+        'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014',
+    ]);
+
+    expect((new BuildDailySummaryReport)($location)['timezone'])->toBe('America/Denver');
 });

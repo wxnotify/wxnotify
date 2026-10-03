@@ -3,6 +3,7 @@
 namespace App\Actions\Weather;
 
 use App\Models\Location;
+use App\Support\Timezones;
 use App\Support\WeatherIcon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
@@ -44,7 +45,7 @@ class GetHourlyForecast
             Cache::put($cacheKey, $periods, now()->addHour());
         }
 
-        $timezone = $location->timezone ?? config('app.timezone');
+        $timezone = Timezones::forLocation($location) ?? config('app.timezone');
 
         $upcoming = collect($periods)
             ->filter(fn (mixed $period): bool => is_array($period)

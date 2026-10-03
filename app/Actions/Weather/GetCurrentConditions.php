@@ -3,6 +3,7 @@
 namespace App\Actions\Weather;
 
 use App\Models\Location;
+use App\Support\Timezones;
 use App\Support\WeatherIcon;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\Client\ConnectionException;
@@ -122,7 +123,7 @@ class GetCurrentConditions
      */
     private function normalize(array $feature, array $properties, Location $location): array
     {
-        $timezone = $location->timezone ?? config('app.timezone');
+        $timezone = Timezones::forLocation($location) ?? config('app.timezone');
         $temperatureF = $this->celsiusToFahrenheit($this->value($properties, 'temperature'));
         $feelsLikeC = $this->value($properties, 'windChill') ?? $this->value($properties, 'heatIndex');
         $windSpeed = $this->kmhToMph($this->value($properties, 'windSpeed'));
