@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
-test('the migration backfills each existing log row from its rule and leaves orphaned rows null', function () {
+test('the backfill migration fills each existing log row from its rule and leaves orphaned rows null', function () {
     $threshold = AlertRule::factory()->create(); // category: threshold
     $lightning = AlertRule::factory()->lightning()->create();
 
@@ -24,7 +24,10 @@ test('the migration backfills each existing log row from its rule and leaves orp
     $orphan = DeliveryLog::factory()->for($threshold->user)->create(['alert_rule_id' => null, 'category' => null]);
     $alreadySet = DeliveryLog::factory()->for($threshold->user)->create(['alert_rule_id' => $threshold->id, 'category' => 'daily_summary']);
 
-    (require database_path('migrations/2026_10_03_100001_add_category_to_delivery_logs_table.php'))->up();
+    $backfill = require database_path('migrations/2026_10_03_100002_backfill_delivery_log_category.php');
+
+    $backfill->up();
+    $backfill->up(); // a re-run changes nothing
 
     expect($withRule->fresh()->category)->toBe('threshold')
         ->and($withOtherRule->fresh()->category)->toBe('lightning')
@@ -32,7 +35,7 @@ test('the migration backfills each existing log row from its rule and leaves orp
         ->and($alreadySet->fresh()->category)->toBe('threshold'); // the backfill is authoritative for rows that have a rule
 });
 
-test('the migration is safe to run when the column already exists', function () {
+test('the add-column migration is safe to run when the column already exists', function () {
     $migration = require database_path('migrations/2026_10_03_100001_add_category_to_delivery_logs_table.php');
 
     $migration->up();

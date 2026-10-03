@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -14,8 +13,9 @@ return new class extends Migration
      * accurate. The index serves the dashboard charts' filter exactly
      * (this subscriber, successful rows, a date range).
      *
-     * Idempotent on purpose: the schema change is guarded and the backfill runs
-     * every time, so a test can re-run it against rows it has just inserted.
+     * Guarded so it is safe to run when the column already exists. Existing rows
+     * are filled by the following backfill migration, kept separate so its
+     * full-table UPDATE does not run under this migration's schema lock.
      */
     public function up(): void
     {
@@ -25,14 +25,6 @@ return new class extends Migration
                 $table->index(['user_id', 'status', 'dispatched_at']);
             });
         }
-
-        // Rows whose rule is already gone cannot be recovered and stay null ("Other").
-        DB::statement('
-            UPDATE delivery_logs
-            SET category = alert_rules.category
-            FROM alert_rules
-            WHERE delivery_logs.alert_rule_id = alert_rules.id
-        ');
     }
 
     public function down(): void
