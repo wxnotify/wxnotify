@@ -7,6 +7,7 @@ use App\Filament\Dashboard\Resources\AlertRules\Pages\EditAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
 use App\Filament\Dashboard\Resources\AlertRules\Tables\AlertRulesTable;
+use App\Filament\Dashboard\Resources\AlertRules\Widgets\ActiveNowWidget;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\AlertStatsWidget;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\NeedsAttentionWidget;
 use App\Models\AlertRule;
@@ -59,6 +60,7 @@ class AlertRuleResource extends Resource
         return [
             AlertStatsWidget::class,
             NeedsAttentionWidget::class,
+            ActiveNowWidget::class,
         ];
     }
 

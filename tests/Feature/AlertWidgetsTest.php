@@ -1,12 +1,15 @@
 <?php
 
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
+use App\Filament\Dashboard\Resources\AlertRules\Widgets\ActiveNowWidget;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\AlertStatsWidget;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\NeedsAttentionWidget;
+use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\Location;
 use App\Models\NotificationChannel;
+use App\Models\Product;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
@@ -125,4 +128,45 @@ test('Needs attention appears second on the My Alerts page', function () {
     livewire(ListAlertRules::class)
         ->assertSeeLivewire(AlertStatsWidget::class)
         ->assertSeeLivewire(NeedsAttentionWidget::class);
+});
+
+test('Active now invites a subscriber with no locations to add one', function () {
+    livewire(ActiveNowWidget::class)->assertSee('Add a location to see active weather alerts here');
+});
+
+test('Active now says so when nothing is active at the subscriber\'s locations', function () {
+    Location::factory()->for($this->user)->create(['lat' => 40.0, 'lng' => -105.0, 'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014']);
+
+    livewire(ActiveNowWidget::class)->assertSee('No active weather alerts at your locations');
+});
+
+test('Active now shows each warning with where it applies and whether an alert was sent', function () {
+    Location::factory()->for($this->user)->create(['label' => 'Home', 'lat' => 40.0, 'lng' => -105.0, 'timezone' => 'America/Denver', 'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014']);
+    ActiveWwa::factory()->create([
+        'product_id' => Product::factory()->create(['name' => 'Tornado Warning', 'family' => 'warning'])->id,
+        'ugc_codes' => ['COZ040'], 'expires' => now()->addHour(),
+    ]);
+
+    livewire(ActiveNowWidget::class)
+        ->assertSee('Tornado Warning')
+        ->assertSee('Home')
+        ->assertSee('None of your alerts matched this warning')
+        ->assertSeeHtml('wire:poll.60s');
+});
+
+test('Active now escapes subscriber-supplied location names', function () {
+    Location::factory()->for($this->user)->create(['label' => '<script>alert(1)</script>', 'lat' => 40.0, 'lng' => -105.0, 'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014']);
+    ActiveWwa::factory()->create([
+        'product_id' => Product::factory()->create(['name' => 'Tornado Warning', 'family' => 'warning'])->id,
+        'ugc_codes' => ['COZ040'], 'expires' => now()->addHour(),
+    ]);
+
+    livewire(ActiveNowWidget::class)->assertDontSeeHtml('<script>alert(1)</script>');
+});
+
+test('all three widgets appear on the My Alerts page in order', function () {
+    livewire(ListAlertRules::class)
+        ->assertSeeLivewire(AlertStatsWidget::class)
+        ->assertSeeLivewire(NeedsAttentionWidget::class)
+        ->assertSeeLivewire(ActiveNowWidget::class);
 });

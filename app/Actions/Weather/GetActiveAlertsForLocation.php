@@ -6,6 +6,7 @@ use App\Models\ActiveWwa;
 use App\Models\Location;
 use App\Support\Timezones;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * Watches/warnings/advisories/statements currently in effect at a location,
@@ -34,10 +35,31 @@ class GetActiveAlertsForLocation
             return [];
         }
 
+        $timezone = Timezones::forLocation($location) ?? config('app.timezone');
+
+        return $this->activeFor($location, $includeTest)
+            ->map(fn (ActiveWwa $wwa): array => [
+                'event' => $wwa->product?->name ?? 'Weather alert',
+                'headline' => $wwa->headline,
+                'expires' => $wwa->expires?->copy()->setTimezone($timezone)->toIso8601String(),
+                'family' => $wwa->product?->family?->value,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return Collection<int, ActiveWwa> with product loaded, sorted by family rank, expiry, id
+     */
+    public function activeFor(Location $location, bool $includeTest = false): Collection
+    {
+        if (! $location->hasFix()) {
+            return new Collection;
+        }
+
         $zones = $this->zonesFor($location);
         $lng = (float) $location->lng;
         $lat = (float) $location->lat;
-        $timezone = Timezones::forLocation($location) ?? config('app.timezone');
 
         $alerts = ActiveWwa::query()
             ->with('product')
@@ -59,20 +81,20 @@ class GetActiveAlertsForLocation
             })
             ->get();
 
-        return $alerts
-            ->sortBy([
-                fn (ActiveWwa $a, ActiveWwa $b): int => $this->rank($a) <=> $this->rank($b),
-                fn (ActiveWwa $a, ActiveWwa $b): int => ($a->expires?->getTimestamp() ?? PHP_INT_MAX) <=> ($b->expires?->getTimestamp() ?? PHP_INT_MAX),
-                fn (ActiveWwa $a, ActiveWwa $b): int => $a->id <=> $b->id,
-            ])
-            ->map(fn (ActiveWwa $wwa): array => [
-                'event' => $wwa->product?->name ?? 'Weather alert',
-                'headline' => $wwa->headline,
-                'expires' => $wwa->expires?->copy()->setTimezone($timezone)->toIso8601String(),
-                'family' => $wwa->product?->family?->value,
-            ])
-            ->values()
-            ->all();
+        return self::sorted($alerts);
+    }
+
+    /**
+     * @param  Collection<int, ActiveWwa>  $wwas
+     * @return Collection<int, ActiveWwa>
+     */
+    public static function sorted(Collection $wwas): Collection
+    {
+        return $wwas->sortBy([
+            fn (ActiveWwa $a, ActiveWwa $b): int => self::rankOf($a) <=> self::rankOf($b),
+            fn (ActiveWwa $a, ActiveWwa $b): int => ($a->expires?->getTimestamp() ?? PHP_INT_MAX) <=> ($b->expires?->getTimestamp() ?? PHP_INT_MAX),
+            fn (ActiveWwa $a, ActiveWwa $b): int => $a->id <=> $b->id,
+        ])->values();
     }
 
     /**
@@ -88,7 +110,7 @@ class GetActiveAlertsForLocation
         return array_values(array_filter([$location->forecast_zone_ugc, $location->county_ugc]));
     }
 
-    private function rank(ActiveWwa $wwa): int
+    private static function rankOf(ActiveWwa $wwa): int
     {
         return self::FAMILY_RANK[$wwa->product?->family?->value] ?? 99;
     }

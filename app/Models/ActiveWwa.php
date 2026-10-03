@@ -60,9 +60,11 @@ class ActiveWwa extends Model
     }
 
     /**
+     * The VTEC composite key of an IngestedProduct or an ActiveWwa row (both carry the five vtec_* columns).
+     *
      * @return array{vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int}
      */
-    public static function vtecKeyFor(IngestedProduct $product): array
+    public static function vtecKeyFor(IngestedProduct|self $product): array
     {
         return [
             'vtec_office' => $product->vtec_office,
