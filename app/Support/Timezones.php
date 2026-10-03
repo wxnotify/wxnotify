@@ -6,6 +6,7 @@ use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\User;
 use DateTimeZone;
+use IntlTimeZone;
 
 /**
  * The one place that decides what a stored timezone means. A Location's own
@@ -21,6 +22,27 @@ final class Timezones
     public static function isValid(?string $timezone): bool
     {
         return filled($timezone) && in_array($timezone, DateTimeZone::listIdentifiers(), true);
+    }
+
+    /**
+     * Returns a valid canonical identifier for the given timezone, or null.
+     * Browsers (Chromium/ICU) can report legacy aliases such as
+     * America/Indianapolis or Asia/Calcutta that the timezone select never
+     * offers; ICU's canonical IANA id is used when this build supports it.
+     */
+    public static function normalise(?string $timezone): ?string
+    {
+        if (blank($timezone)) {
+            return null;
+        }
+
+        if (self::isValid($timezone)) {
+            return $timezone;
+        }
+
+        $canonical = method_exists(IntlTimeZone::class, 'getIanaID') ? IntlTimeZone::getIanaID($timezone) : false;
+
+        return is_string($canonical) && self::isValid($canonical) ? $canonical : null;
     }
 
     public static function forUser(?User $user): ?string

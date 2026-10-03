@@ -3,6 +3,7 @@
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\Locations\LocationResource;
 use App\Filament\Dashboard\Resources\Locations\Pages\CreateLocation;
+use App\Filament\Dashboard\Resources\Locations\Pages\EditLocation;
 use App\Filament\Dashboard\Resources\Locations\Pages\ListLocations;
 use App\Models\Location;
 use App\Models\TraccarServer;
@@ -316,4 +317,12 @@ test('the mobile-location notice points at the profile timezone', function () {
     livewire(CreateLocation::class)
         ->fillForm(['type' => 'mobile'])
         ->assertSee('timezone on your Profile page');
+});
+
+test('editing a location never replaces its stored timezone with the profile default', function () {
+    $this->user->update(['timezone' => 'America/Chicago']);
+    $location = Location::factory()->for($this->user)->create(['timezone' => 'America/Denver']);
+
+    livewire(EditLocation::class, ['record' => $location->id])
+        ->assertFormSet(['timezone' => 'America/Denver']);
 });

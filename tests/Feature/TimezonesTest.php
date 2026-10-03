@@ -52,3 +52,19 @@ test('forRule prefers the location timezone, then the profile timezone, then the
 
     expect(Timezones::forRule($ruleWithoutZone->fresh()))->toBe(config('app.timezone'));
 });
+
+test('normalise keeps a valid identifier and drops anything it cannot make valid', function (?string $timezone, ?string $expected) {
+    expect(Timezones::normalise($timezone))->toBe($expected);
+})->with([
+    'a canonical zone' => ['America/Denver', 'America/Denver'],
+    'garbage' => ['Mars/Olympus_Mons', null],
+    'null' => [null, null],
+    'an empty string' => ['', null],
+]);
+
+test('normalise turns a legacy alias into a valid canonical identifier or null, depending on the ICU build', function (string $alias) {
+    $normalised = Timezones::normalise($alias);
+
+    expect($normalised === null || Timezones::isValid($normalised))->toBeTrue()
+        ->and($normalised)->not->toBe($alias);
+})->with(['America/Indianapolis', 'America/Louisville', 'Asia/Calcutta', 'Etc/UTC']);

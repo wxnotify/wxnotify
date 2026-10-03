@@ -3,8 +3,10 @@
 namespace App\Filament\Dashboard\Pages\Auth;
 
 use App\Enums\UnitSystem;
+use App\Support\Timezones;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Forms\Components\ToggleButtons;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Tapp\FilamentTimezoneField\Forms\Components\TimezoneSelect;
 
@@ -27,6 +29,11 @@ class EditProfile extends BaseEditProfile
                     ->label('Timezone')
                     ->searchable()
                     ->getTimezoneFromBrowser()
+                    ->afterStateUpdated(function (?string $state, Set $set): void {
+                        if (filled($state) && ! Timezones::isValid($state)) {
+                            $set('timezone', Timezones::normalise($state));
+                        }
+                    })
                     ->helperText('Used when a location has no timezone of its own (such as a mobile location), for the day boundaries on your dashboard charts, and as the starting value for new locations. A location\'s own timezone always takes priority. Clear it to stop using one.'),
                 $this->getPasswordFormComponent(),
                 $this->getPasswordConfirmationFormComponent(),
