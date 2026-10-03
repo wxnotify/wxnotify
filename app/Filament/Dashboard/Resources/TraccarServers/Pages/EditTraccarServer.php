@@ -2,8 +2,8 @@
 
 namespace App\Filament\Dashboard\Resources\TraccarServers\Pages;
 
+use App\Filament\Dashboard\Resources\TraccarServers\Tables\TraccarServersTable;
 use App\Filament\Dashboard\Resources\TraccarServers\TraccarServerResource;
-use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditTraccarServer extends EditRecord
@@ -13,7 +13,7 @@ class EditTraccarServer extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            TraccarServersTable::guardedDeleteAction(),
         ];
     }
 }

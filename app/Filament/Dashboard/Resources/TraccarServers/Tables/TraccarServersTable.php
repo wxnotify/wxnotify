@@ -2,11 +2,16 @@
 
 namespace App\Filament\Dashboard\Resources\TraccarServers\Tables;
 
+use App\Models\TraccarServer;
+use App\Support\LocationDeletionGuard;
 use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 
 class TraccarServersTable
 {
@@ -43,8 +48,55 @@ class TraccarServersTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    self::guardedDeleteBulkAction(),
                 ]),
             ]);
+    }
+
+    /**
+     * Deleting a server deletes its mobile locations through the database, so
+     * it is refused while an alert still uses any of them (see
+     * LocationDeletionGuard). Used by the Edit page's header action.
+     */
+    public static function guardedDeleteAction(): DeleteAction
+    {
+        return DeleteAction::make()
+            ->before(function (DeleteAction $action, TraccarServer $record): void {
+                $alerts = LocationDeletionGuard::alertsUsingServer($record);
+
+                if ($alerts->isEmpty()) {
+                    return;
+                }
+
+                Notification::make()
+                    ->danger()
+                    ->persistent()
+                    ->title("Can't delete {$record->label}")
+                    ->body('Its locations are used by: '.LocationDeletionGuard::summary($alerts).'. Remove them from those alerts first.')
+                    ->send();
+
+                $action->cancel();
+            });
+    }
+
+    public static function guardedDeleteBulkAction(): DeleteBulkAction
+    {
+        return DeleteBulkAction::make()
+            ->using(function (DeleteBulkAction $action, Collection $records): void {
+                foreach ($records as $record) {
+                    $alerts = LocationDeletionGuard::alertsUsingServer($record);
+
+                    if ($alerts->isNotEmpty()) {
+                        $action->reportBulkProcessingFailure(
+                            key: "in-use-{$record->id}",
+                            message: e($record->label).' has locations used by: '.LocationDeletionGuard::summary($alerts).'.',
+                        );
+
+                        continue;
+                    }
+
+                    $record->delete() || $action->reportBulkProcessingFailure();
+                }
+            });
     }
 }
