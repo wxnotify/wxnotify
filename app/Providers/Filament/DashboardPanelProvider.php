@@ -5,6 +5,8 @@ namespace App\Providers\Filament;
 use App\Actions\Support\GenerateChatwootIdentityHash;
 use App\Filament\Dashboard\Pages\Auth\EditProfile;
 use App\Filament\Dashboard\Pages\Auth\Register;
+use App\Filament\Dashboard\Widgets\AlertsByCategoryChart;
+use App\Filament\Dashboard\Widgets\AlertsPerDayChart;
 use App\Filament\Dashboard\Widgets\AnnouncementsWidget;
 use App\Filament\Dashboard\Widgets\RecentAlertsWidget;
 use App\Http\Middleware\RedirectAdmins;
@@ -76,6 +78,8 @@ class DashboardPanelProvider extends PanelProvider
             ->widgets([
                 AnnouncementsWidget::class,
                 RecentAlertsWidget::class,
+                AlertsPerDayChart::class,
+                AlertsByCategoryChart::class,
                 // AccountWidget::class,
                 // FilamentInfoWidget::class,
             ])
