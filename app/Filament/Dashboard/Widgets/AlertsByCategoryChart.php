@@ -27,7 +27,7 @@ class AlertsByCategoryChart extends ChartWidget
         'other' => '#9ca3af',
     ];
 
-    protected static ?int $sort = 2;
+    protected static ?int $sort = -2;
 
     protected int|string|array $columnSpan = 1;
 

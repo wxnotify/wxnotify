@@ -3,6 +3,8 @@
 use App\Enums\AlertCategory;
 use App\Filament\Dashboard\Widgets\AlertsByCategoryChart;
 use App\Filament\Dashboard\Widgets\AlertsPerDayChart;
+use App\Filament\Dashboard\Widgets\AnnouncementsWidget;
+use App\Filament\Dashboard\Widgets\RecentAlertsWidget;
 use App\Models\DeliveryLog;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -126,4 +128,16 @@ test('both charts appear on the subscriber dashboard', function () {
     livewire(Dashboard::class)
         ->assertSeeLivewire(AlertsPerDayChart::class)
         ->assertSeeLivewire(AlertsByCategoryChart::class);
+});
+
+test('the charts sit between the announcements and the recent alerts table, line chart first', function () {
+    $sorts = collect([
+        AnnouncementsWidget::class,
+        AlertsPerDayChart::class,
+        AlertsByCategoryChart::class,
+        RecentAlertsWidget::class,
+    ])->map(fn (string $widget): int => $widget::getSort());
+
+    expect($sorts->all())->toBe($sorts->sort()->values()->all())
+        ->and($sorts->unique())->toHaveCount(4);
 });
