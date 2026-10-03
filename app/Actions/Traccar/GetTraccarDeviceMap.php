@@ -3,6 +3,7 @@
 namespace App\Actions\Traccar;
 
 use App\Models\TraccarServer;
+use App\Support\TraccarPosition;
 use App\Support\TraccarUrlGuard;
 use GuzzleHttp\Psr7\Uri;
 use Illuminate\Http\Client\Pool;
@@ -197,10 +198,15 @@ class GetTraccarDeviceMap
         foreach ($positionList as $position) {
             if (! is_array($position)
                 || ! $this->isIntegerLike($position['deviceId'] ?? null)
-                || ! $this->isCoordinate($position['latitude'] ?? null, 90)
-                || ! $this->isCoordinate($position['longitude'] ?? null, 180)
+                || ! TraccarPosition::isCoordinate($position['latitude'] ?? null, 90)
+                || ! TraccarPosition::isCoordinate($position['longitude'] ?? null, 180)
             ) {
                 return $this->malformed($server);
+            }
+
+            // Well-formed but no GPS fix (flagged invalid, or 0,0): the device simply has no position yet.
+            if (! TraccarPosition::hasFix($position)) {
+                continue;
             }
 
             $byDevice[(int) $position['deviceId']] = $position;
@@ -301,17 +307,6 @@ class GetTraccarDeviceMap
     private function isIntegerLike(mixed $value): bool
     {
         return is_int($value) || (is_string($value) && preg_match('/^-?\d+$/', $value) === 1);
-    }
-
-    /**
-     * Numeric, finite (is_numeric('1e999') is true, but it casts to INF) and
-     * within +/- $limit degrees.
-     */
-    private function isCoordinate(mixed $value, int $limit): bool
-    {
-        return is_numeric($value)
-            && is_finite((float) $value)
-            && abs((float) $value) <= $limit;
     }
 
     private function malformed(TraccarServer $server): null

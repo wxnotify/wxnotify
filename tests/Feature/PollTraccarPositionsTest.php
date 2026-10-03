@@ -162,3 +162,25 @@ test('a location that is no longer mobile is never polled, even if it still carr
         ->and($location->mobile_position_updated_at)->toBeNull();
     Http::assertNothingSent();
 });
+
+test('a device reporting an invalid position keeps its last good fix and is not stamped as updated', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = Location::factory()->mobile()->withFix(39.0997, -94.5786)->create([
+        'traccar_server_id' => $server->id,
+        'traccar_device_id' => 1,
+        'mobile_update_interval_minutes' => 15,
+        'mobile_position_updated_at' => now()->subMinutes(30),
+    ]);
+    $stampBefore = $location->fresh()->mobile_position_updated_at;
+
+    Http::fake(['traccar.example.com/api/positions' => Http::response([
+        ['deviceId' => 1, 'latitude' => 0, 'longitude' => 0, 'fixTime' => null, 'valid' => false],
+    ])]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    $location->refresh();
+    expect((float) $location->lat)->toBe(39.0997)
+        ->and((float) $location->lng)->toBe(-94.5786)
+        ->and($location->mobile_position_updated_at->equalTo($stampBefore))->toBeTrue();
+});

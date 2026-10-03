@@ -113,3 +113,52 @@ test('a redirect is not followed and resolves to null', function () {
     expect((new PollTraccarServer)($server))->toBeNull();
     Http::assertSentCount(1);
 });
+
+test('a position Traccar flags as invalid is skipped without voiding the rest of the batch', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake([
+        'traccar.example.com/api/positions' => Http::response([
+            ['deviceId' => 1, 'latitude' => 39.0997, 'longitude' => -94.5786, 'fixTime' => null, 'valid' => true],
+            ['deviceId' => 2, 'latitude' => 41.8781, 'longitude' => -87.6298, 'fixTime' => null, 'valid' => false],
+            ['deviceId' => 3, 'latitude' => 35.0, 'longitude' => -100.0, 'fixTime' => null],
+        ]),
+    ]);
+
+    $positions = (new PollTraccarServer)($server);
+
+    expect(array_keys($positions))->toBe([1, 3]);
+});
+
+test('a position at exactly 0,0 is skipped, but a single zero coordinate is a real position', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake([
+        'traccar.example.com/api/positions' => Http::response([
+            ['deviceId' => 1, 'latitude' => 0, 'longitude' => 0, 'fixTime' => null],
+            ['deviceId' => 2, 'latitude' => 0.0, 'longitude' => 0.0, 'fixTime' => null],
+            ['deviceId' => 3, 'latitude' => 0, 'longitude' => -80.0, 'fixTime' => null],
+            ['deviceId' => 4, 'latitude' => 25.0, 'longitude' => 0, 'fixTime' => null],
+        ]),
+    ]);
+
+    expect(array_keys((new PollTraccarServer)($server)))->toBe([3, 4]);
+});
+
+test('an out-of-range or non-finite coordinate voids the whole response, as malformed data does', function (mixed $latitude, mixed $longitude) {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+
+    Http::fake([
+        'traccar.example.com/api/positions' => Http::response([
+            ['deviceId' => 1, 'latitude' => 39.0, 'longitude' => -94.0, 'fixTime' => null],
+            ['deviceId' => 2, 'latitude' => $latitude, 'longitude' => $longitude, 'fixTime' => null],
+        ]),
+    ]);
+
+    expect((new PollTraccarServer)($server))->toBeNull();
+})->with([
+    'latitude above 90' => [90.5, -94.0],
+    'latitude below -90' => [-91, -94.0],
+    'longitude above 180' => [39.0, 180.5],
+    'non-finite latitude' => ['1e999', -94.0],
+]);

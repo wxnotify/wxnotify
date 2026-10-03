@@ -285,3 +285,23 @@ test('a server whose URL violates the guard is excluded without affecting the ot
         ->and($result['unreachable'])->toBe(['Internal']);
     Http::assertNotSent(fn ($request) => str_contains((string) $request->url(), 'internal.example.com'));
 });
+
+test('a device whose position is flagged invalid or sits at 0,0 is counted as unplaced, not drawn', function () {
+    $server = mapServer('Fleet', 'fleet.example.com');
+    Http::fake(fakeTraccar('fleet.example.com', [
+        ['id' => 1, 'name' => 'Placed', 'lastUpdate' => '2026-10-02T11:59:00Z'],
+        ['id' => 2, 'name' => 'No GPS fix', 'lastUpdate' => '2026-10-02T11:59:00Z'],
+        ['id' => 3, 'name' => 'Null Island', 'lastUpdate' => '2026-10-02T11:59:00Z'],
+        ['id' => 4, 'name' => 'On the equator', 'lastUpdate' => '2026-10-02T11:59:00Z'],
+    ], [
+        traccarPosition(1),
+        [...traccarPosition(2), 'valid' => false],
+        traccarPosition(3, 0.0, 0.0),
+        traccarPosition(4, 0.0, -78.5),
+    ]));
+
+    $result = (new GetTraccarDeviceMap)([$server]);
+
+    expect(collect($result['devices'])->pluck('name')->all())->toBe(['Placed', 'On the equator'])
+        ->and($result['unplaced'])->toBe(2);
+});

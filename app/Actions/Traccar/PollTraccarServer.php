@@ -3,6 +3,7 @@
 namespace App\Actions\Traccar;
 
 use App\Models\TraccarServer;
+use App\Support\TraccarPosition;
 use App\Support\TraccarUrlGuard;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -75,14 +76,20 @@ class PollTraccarServer
         foreach ($positions as $position) {
             if (! is_array($position)
                 || ! isset($position['deviceId'], $position['latitude'], $position['longitude'])
-                || ! is_numeric($position['latitude'])
-                || ! is_numeric($position['longitude'])
+                || ! TraccarPosition::isCoordinate($position['latitude'], 90)
+                || ! TraccarPosition::isCoordinate($position['longitude'], 180)
             ) {
                 Log::warning('Traccar server returned a malformed position entry', [
                     'traccar_server_id' => $server->id,
                 ]);
 
                 return null;
+            }
+
+            // Well-formed but no GPS fix (flagged invalid, or 0,0): leave this device
+            // out so the caller keeps its last good position instead of overwriting it.
+            if (! TraccarPosition::hasFix($position)) {
+                continue;
             }
 
             $result[$position['deviceId']] = [
