@@ -2,8 +2,11 @@
 
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\AlertStatsWidget;
+use App\Filament\Dashboard\Resources\AlertRules\Widgets\NeedsAttentionWidget;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
+use App\Models\Location;
+use App\Models\NotificationChannel;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
@@ -78,4 +81,48 @@ test('the stats widget does not poll and spans the full width', function () {
 
     expect((fn () => $this->getPollingInterval())->call($widget))->toBeNull()
         ->and((fn () => $this->columnSpan)->call($widget))->toBe('full');
+});
+
+test('Needs attention shows an all-clear when nothing is wrong', function () {
+    livewire(NeedsAttentionWidget::class)->assertSee('All your alerts look healthy');
+});
+
+test('Needs attention lists each problem with a link to the fix', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'Work email', 'verified_at' => null]);
+    $alert = AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->for($this->user)->create())->create(['name' => 'Morning summary']);
+    $alert->notificationChannels()->attach($channel->id);
+    $paused = AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->for($this->user)->create())->create(['name' => 'Storm warnings', 'is_active' => false]);
+
+    livewire(NeedsAttentionWidget::class)
+        ->assertSee('Work email')
+        ->assertSee("isn't verified yet")
+        ->assertSee('Storm warnings')
+        ->assertSee('is turned off')
+        ->assertSeeHtml(route('filament.dashboard.resources.alert-rules.edit', ['record' => $paused->id]))
+        ->assertSeeHtml(route('filament.dashboard.resources.notification-channels.index'));
+});
+
+test('Needs attention shows at most 8 rows and counts the rest', function () {
+    foreach (range(1, 11) as $i) {
+        AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->for($this->user)->create())->create(['name' => sprintf('Paused %02d', $i), 'is_active' => false]);
+    }
+
+    livewire(NeedsAttentionWidget::class)
+        ->assertSee('Paused 08')
+        ->assertDontSee('Paused 09')
+        ->assertSee('and 3 more');
+});
+
+test('Needs attention escapes subscriber-supplied names', function () {
+    AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->for($this->user)->create())->create(['name' => '<script>alert(1)</script>', 'is_active' => false]);
+
+    livewire(NeedsAttentionWidget::class)
+        ->assertDontSeeHtml('<script>alert(1)</script>')
+        ->assertSee('<script>alert(1)</script>', escape: true);
+});
+
+test('Needs attention appears second on the My Alerts page', function () {
+    livewire(ListAlertRules::class)
+        ->assertSeeLivewire(AlertStatsWidget::class)
+        ->assertSeeLivewire(NeedsAttentionWidget::class);
 });

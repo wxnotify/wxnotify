@@ -8,6 +8,7 @@ use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
 use App\Filament\Dashboard\Resources\AlertRules\Tables\AlertRulesTable;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\AlertStatsWidget;
+use App\Filament\Dashboard\Resources\AlertRules\Widgets\NeedsAttentionWidget;
 use App\Models\AlertRule;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -57,6 +58,7 @@ class AlertRuleResource extends Resource
     {
         return [
             AlertStatsWidget::class,
+            NeedsAttentionWidget::class,
         ];
     }
 

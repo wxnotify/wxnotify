@@ -1,0 +1,202 @@
+<?php
+
+use App\Actions\Alerts\GetAlertsNeedingAttention;
+use App\Models\AlertRule;
+use App\Models\DeliveryLog;
+use App\Models\Location;
+use App\Models\NotificationChannel;
+use App\Models\User;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+
+beforeEach(function () {
+    Carbon::setTestNow('2026-10-03 12:00:00');
+    $this->user = User::factory()->create();
+});
+
+afterEach(function () {
+    Carbon::setTestNow();
+});
+
+function attentionRows(User $user): array
+{
+    return (new GetAlertsNeedingAttention)($user);
+}
+
+/** @return array<int, string> "kind: subject" for each row, in order */
+function attentionSummary(User $user): array
+{
+    return array_map(fn (array $row): string => "{$row['kind']}: {$row['subject']}", attentionRows($user));
+}
+
+function channelAttempt(User $user, NotificationChannel $channel, string $status, string|Carbon $when): void
+{
+    DeliveryLog::factory()->for($user)->create([
+        'notification_channel_id' => $channel->id, 'status' => $status, 'dispatched_at' => $when, 'error_detail' => 'secret-destination https://hooks.example.com/token',
+    ]);
+}
+
+function attentionAlert(User $user, array $channels = [], array $attributes = []): AlertRule
+{
+    $alert = AlertRule::factory()->dailySummary()->for($user)->for(Location::factory()->for($user)->create())->create($attributes);
+    $alert->notificationChannels()->attach(collect($channels)->pluck('id'));
+
+    return $alert;
+}
+
+test('a channel whose latest attempt in 7 days failed is reported with a count and a relative time', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'My Discord']);
+    channelAttempt($this->user, $channel, 'failure', now()->subDays(2));
+    channelAttempt($this->user, $channel, 'failure', now()->subHours(3));
+    channelAttempt($this->user, $channel, 'success', now()->subDays(3));
+
+    $rows = attentionRows($this->user);
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0])->toMatchArray(['kind' => 'channel_failing', 'severity' => 'danger', 'subject' => 'My Discord', 'target' => ['type' => 'channels', 'id' => null]])
+        ->and($rows[0]['detail'])->toBe('had a failed delivery 3 hours ago (2 failures in 7 days)');
+});
+
+test('a success after the failures clears the channel; old failures do not count', function () {
+    $recovered = NotificationChannel::factory()->for($this->user)->create(['label' => 'Recovered']);
+    channelAttempt($this->user, $recovered, 'failure', now()->subHours(5));
+    channelAttempt($this->user, $recovered, 'success', now()->subHour());
+
+    $old = NotificationChannel::factory()->for($this->user)->create(['label' => 'Old trouble']);
+    channelAttempt($this->user, $old, 'failure', now()->subDays(8));
+
+    expect(attentionRows($this->user))->toBe([]);
+});
+
+test('skipped and suppressed attempts do not make a channel failing or healthy', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'My Discord']);
+    channelAttempt($this->user, $channel, 'failure', now()->subHours(6));
+    channelAttempt($this->user, $channel, 'suppressed', now()->subHour());
+    channelAttempt($this->user, $channel, 'skipped', now()->subMinutes(10));
+
+    expect(attentionSummary($this->user))->toBe(['channel_failing: My Discord']);
+});
+
+test('an unverified channel used by an active alert is reported with up to three alert names', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'Work email', 'verified_at' => null]);
+    foreach (['Alpha', 'Bravo', 'Charlie', 'Delta'] as $name) {
+        attentionAlert($this->user, [$channel], ['name' => $name]);
+    }
+
+    $rows = attentionRows($this->user);
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0])->toMatchArray(['kind' => 'channel_unverified', 'severity' => 'warning', 'subject' => 'Work email'])
+        ->and($rows[0]['detail'])->toBe("isn't verified yet, so alerts using it can't deliver (Alpha, Bravo, Charlie and 1 more)");
+});
+
+test('an unverified channel that no active alert uses is not reported', function () {
+    NotificationChannel::factory()->for($this->user)->create(['verified_at' => null]);
+    $used = NotificationChannel::factory()->for($this->user)->create(['verified_at' => null]);
+    attentionAlert($this->user, [$used], ['is_active' => false, 'name' => 'Paused']);
+
+    expect(array_column(attentionRows($this->user), 'kind'))->toBe(['alert_inactive']);
+});
+
+test('a channel that is both failing and unverified appears once, as failing', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'Both', 'verified_at' => null]);
+    attentionAlert($this->user, [$channel]);
+    channelAttempt($this->user, $channel, 'failure', now()->subHour());
+
+    expect(attentionSummary($this->user))->toBe(['channel_failing: Both']);
+});
+
+test('an active scheduled alert on a mobile location with no position is reported', function () {
+    $truck = Location::factory()->mobile()->for($this->user)->create(['label' => 'Truck']);
+    foreach (['daily' => AlertRule::factory()->dailySummary(), 'lightning' => AlertRule::factory()->lightning(), 'threshold' => AlertRule::factory()] as $name => $factory) {
+        $factory->for($this->user)->for($truck)->create(['name' => "{$name} alert"]);
+    }
+
+    $rows = attentionRows($this->user);
+
+    expect(array_column($rows, 'kind'))->toBe(['location_no_position', 'location_no_position', 'location_no_position'])
+        ->and($rows[0])->toMatchArray(['severity' => 'warning', 'detail' => 'is waiting for Truck to report a position', 'target' => ['type' => 'location', 'id' => $truck->id]]);
+});
+
+test('a mobile location with a position, a stationary location, or an inactive alert is not a position problem', function () {
+    $withFix = Location::factory()->mobile()->withFix(40.0, -105.0)->for($this->user)->create();
+    $noFix = Location::factory()->mobile()->for($this->user)->create();
+    AlertRule::factory()->dailySummary()->for($this->user)->for($withFix)->create();
+    AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->for($this->user)->create())->create();
+    AlertRule::factory()->dailySummary()->for($this->user)->for($noFix)->create(['is_active' => false, 'name' => 'Paused']);
+
+    expect(attentionSummary($this->user))->toBe(['alert_inactive: Paused']);
+});
+
+test('an inactive alert is reported once, as inactive', function () {
+    attentionAlert($this->user, [], ['is_active' => false, 'name' => 'Storm warnings']);
+
+    $rows = attentionRows($this->user);
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0])->toMatchArray(['kind' => 'alert_inactive', 'severity' => 'gray', 'subject' => 'Storm warnings', 'detail' => 'is turned off'])
+        ->and($rows[0]['target']['type'])->toBe('alert');
+});
+
+test('rows are ordered failing, unverified, no position, inactive and then by name', function () {
+    $failing = NotificationChannel::factory()->for($this->user)->create(['label' => 'Zed channel']);
+    channelAttempt($this->user, $failing, 'failure', now()->subHour());
+    $unverified = NotificationChannel::factory()->for($this->user)->create(['label' => 'Alpha email', 'verified_at' => null]);
+    attentionAlert($this->user, [$unverified], ['name' => 'Uses alpha']);
+    AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->mobile()->for($this->user)->create(['label' => 'Truck']))->create(['name' => 'Truck summary']);
+    attentionAlert($this->user, [], ['is_active' => false, 'name' => 'Beta off']);
+    attentionAlert($this->user, [], ['is_active' => false, 'name' => 'Alpha off']);
+
+    expect(attentionSummary($this->user))->toBe([
+        'channel_failing: Zed channel',
+        'channel_unverified: Alpha email',
+        'location_no_position: Truck summary',
+        'alert_inactive: Alpha off',
+        'alert_inactive: Beta off',
+    ]);
+});
+
+test('a healthy subscriber has no rows', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create();
+    attentionAlert($this->user, [$channel]);
+    channelAttempt($this->user, $channel, 'success', now()->subHour());
+
+    expect(attentionRows($this->user))->toBe([]);
+});
+
+test('another subscriber\'s problems never appear, and no row leaks a destination or error detail', function () {
+    $stranger = User::factory()->create();
+    $theirs = NotificationChannel::factory()->for($stranger)->create(['label' => 'Their channel', 'verified_at' => null]);
+    attentionAlert($stranger, [$theirs], ['is_active' => false, 'name' => 'Their alert']);
+    channelAttempt($stranger, $theirs, 'failure', now()->subHour());
+
+    $mine = NotificationChannel::factory()->for($this->user)->create(['label' => 'Mine']);
+    channelAttempt($this->user, $mine, 'failure', now()->subHour());
+
+    $json = json_encode(attentionRows($this->user));
+
+    expect(attentionSummary($this->user))->toBe(['channel_failing: Mine'])
+        ->and($json)->not->toContain('Their')->not->toContain('secret-destination')->not->toContain('hooks.example.com');
+});
+
+test('the number of queries does not grow with the number of problems', function () {
+    $count = function (int $problems): int {
+        AlertRule::query()->where('user_id', $this->user->id)->delete();
+        NotificationChannel::query()->where('user_id', $this->user->id)->delete();
+        foreach (range(1, $problems) as $i) {
+            $channel = NotificationChannel::factory()->for($this->user)->create(['verified_at' => null]);
+            attentionAlert($this->user, [$channel], ['is_active' => $i % 2 === 0]);
+            channelAttempt($this->user, NotificationChannel::factory()->for($this->user)->create(), 'failure', now()->subHour());
+        }
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        attentionRows($this->user);
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $queries;
+    };
+
+    // Two is the smallest set that has both an active and an inactive alert.
+    expect($count(8))->toBe($count(2));
+});

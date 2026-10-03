@@ -4,6 +4,7 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Pages;
 
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\AlertStatsWidget;
+use App\Filament\Dashboard\Resources\AlertRules\Widgets\NeedsAttentionWidget;
 use App\Filament\Dashboard\Resources\Concerns\DescribesListPage;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
@@ -26,6 +27,7 @@ class ListAlertRules extends ListRecords
     {
         return [
             AlertStatsWidget::class,
+            NeedsAttentionWidget::class,
         ];
     }
 
