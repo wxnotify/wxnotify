@@ -23,7 +23,7 @@ beforeEach(function () {
  * @param  array<int, Location>  $locations
  * @param  array<int, NotificationChannel>  $channels
  */
-function weatherRule(User $user, array $locations = [], array $channels = [], string $mode = 'location'): AlertRule
+function alertColumnsWeatherRule(User $user, array $locations = [], array $channels = [], string $mode = 'location'): AlertRule
 {
     $rule = AlertRule::factory()->for($user)->create([
         'category' => 'weather_alerts', 'matching_mode' => $mode, 'location_id' => null,
@@ -47,7 +47,7 @@ test('every matching mode has a short label', function () {
 test('a location-mode weather alert lists its locations in order', function () {
     $home = Location::factory()->for($this->user)->create(['label' => 'Home']);
     $cabin = Location::factory()->for($this->user)->create(['label' => 'Cabin']);
-    $rule = weatherRule($this->user, [$home, $cabin]);
+    $rule = alertColumnsWeatherRule($this->user, [$home, $cabin]);
 
     livewire(ListAlertRules::class)
         ->assertTableColumnStateSet('location_labels', ['Home', 'Cabin'], $rule);
@@ -55,7 +55,7 @@ test('a location-mode weather alert lists its locations in order', function () {
 
 test('polygon and risk-area alerts list their saved locations too', function (string $mode) {
     $home = Location::factory()->for($this->user)->create(['label' => 'Home']);
-    $rule = weatherRule($this->user, [$home], mode: $mode);
+    $rule = alertColumnsWeatherRule($this->user, [$home], mode: $mode);
 
     livewire(ListAlertRules::class)
         ->assertTableColumnStateSet('location_labels', ['Home'], $rule);
@@ -74,7 +74,7 @@ test('scheduled alerts show their single location', function () {
 });
 
 test('alerts not tied to a saved location show their matching mode', function (string $mode, string $label) {
-    $rule = weatherRule($this->user, mode: $mode);
+    $rule = alertColumnsWeatherRule($this->user, mode: $mode);
 
     livewire(ListAlertRules::class)
         ->assertTableColumnStateSet('location_labels', [$label], $rule);
@@ -85,7 +85,7 @@ test('alerts not tied to a saved location show their matching mode', function (s
 ]);
 
 test('an alert that should have locations but has none shows None', function () {
-    $listless = weatherRule($this->user, []);
+    $listless = alertColumnsWeatherRule($this->user, []);
     $orphaned = AlertRule::factory()->dailySummary()->for($this->user)->create(['location_id' => null]);
 
     livewire(ListAlertRules::class)
@@ -96,8 +96,8 @@ test('an alert that should have locations but has none shows None', function () 
 test('the channels column lists each attached channel, and shows None when there are none', function () {
     $discord = NotificationChannel::factory()->for($this->user)->create(['label' => 'My Discord']);
     $email = NotificationChannel::factory()->for($this->user)->create(['label' => 'Work email']);
-    $with = weatherRule($this->user, [], [$discord, $email], mode: 'nationwide');
-    $without = weatherRule($this->user, [], [], mode: 'nationwide');
+    $with = alertColumnsWeatherRule($this->user, [], [$discord, $email], mode: 'nationwide');
+    $without = alertColumnsWeatherRule($this->user, [], [], mode: 'nationwide');
 
     livewire(ListAlertRules::class)
         ->assertTableColumnStateSet('notificationChannels.label', ['My Discord', 'Work email'], $with)
@@ -121,8 +121,8 @@ test('another subscriber\'s alerts, locations and channels never appear', functi
     $stranger = User::factory()->create();
     $theirLocation = Location::factory()->for($stranger)->create(['label' => 'Their Place']);
     $theirChannel = NotificationChannel::factory()->for($stranger)->create(['label' => 'Their Channel']);
-    $theirs = weatherRule($stranger, [$theirLocation], [$theirChannel]);
-    $mine = weatherRule($this->user, [Location::factory()->for($this->user)->create(['label' => 'Home'])], [], mode: 'location');
+    $theirs = alertColumnsWeatherRule($stranger, [$theirLocation], [$theirChannel]);
+    $mine = alertColumnsWeatherRule($this->user, [Location::factory()->for($this->user)->create(['label' => 'Home'])], [], mode: 'location');
 
     livewire(ListAlertRules::class)
         ->assertCanSeeTableRecords([$mine])
@@ -138,7 +138,8 @@ test('the number of queries does not grow with the number of alerts', function (
         foreach (range(1, $alerts) as $i) {
             $locations = Location::factory()->for($this->user)->count(2)->create()->all();
             $channels = NotificationChannel::factory()->for($this->user)->count(2)->create()->all();
-            weatherRule($this->user, $locations, $channels);
+            alertColumnsWeatherRule($this->user, $locations, $channels);
+            AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->for($this->user)->create())->create();
         }
 
         DB::flushQueryLog();
@@ -160,9 +161,28 @@ test('a list longer than three is rendered expandable', function () {
     $locations = collect(['One', 'Two', 'Three', 'Four'])
         ->map(fn (string $label) => Location::factory()->for($this->user)->create(['label' => $label]))
         ->all();
-    weatherRule($this->user, $locations);
+    alertColumnsWeatherRule($this->user, $locations);
 
     livewire(ListAlertRules::class)
         ->assertSeeHtmlInOrder(['isLimited: true', 'One', 'Two', 'Three', 'x-show="! isLimited"', 'Four'])
         ->assertSeeHtml('x-on:click.prevent.stop="isLimited = false"');
+});
+
+test('mode labels and None render as gray badges while location names are colored', function () {
+    alertColumnsWeatherRule($this->user, mode: 'nationwide');
+    alertColumnsWeatherRule($this->user, [Location::factory()->for($this->user)->create(['label' => 'Cabin'])]);
+    alertColumnsWeatherRule($this->user, []);
+
+    $html = livewire(ListAlertRules::class)->html();
+
+    // Filament's gray badge carries no fi-color-* class; any other color does (fi-color-primary, ...).
+    $badgeClasses = function (string $text) use ($html): string {
+        preg_match('/<span class="([^"]*\bfi-badge\b[^"]*)"[^>]*>\s*'.preg_quote($text, '/').'\s*</s', $html, $matches);
+
+        return $matches[1] ?? 'BADGE NOT FOUND';
+    };
+
+    expect($badgeClasses('Nationwide'))->not->toContain('fi-color-')->not->toBe('BADGE NOT FOUND')
+        ->and($badgeClasses('None'))->not->toContain('fi-color-')->not->toBe('BADGE NOT FOUND')
+        ->and($badgeClasses('Cabin'))->toContain('fi-color-primary');
 });
