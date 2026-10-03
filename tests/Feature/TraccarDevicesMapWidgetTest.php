@@ -93,7 +93,7 @@ test('a Plus subscriber gets the payload back from the renderless widget data me
 
 test('the widget loads the shared map helpers and no longer defines its own', function () {
     livewire(TraccarDevicesMapWidget::class)
-        ->assertSeeHtml('wxMapHelpers')
+        ->assertSeeHtml('if (! window.wxMapHelpers)')
         ->assertDontSeeHtml('const formatCheckin')
         ->assertDontSeeHtml('const relativeTime')
         ->assertDontSeeHtml('const pinIcon');
