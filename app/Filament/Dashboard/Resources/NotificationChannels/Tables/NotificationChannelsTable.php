@@ -6,6 +6,8 @@ use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Actions\Channels\SendTestNotification;
 use App\Actions\Channels\VerifyChannelConfirmationCode;
 use App\Models\NotificationChannel;
+use App\Support\AlertNameSummary;
+use App\Support\ChannelDeletionGuard;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\WebhookChannelType;
 use Filament\Actions\Action;
@@ -19,6 +21,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 
 class NotificationChannelsTable
 {
@@ -107,11 +110,11 @@ class NotificationChannelsTable
                         ? [...$data, ...WebhookChannelType::formFromConfig($record->config)]
                         : $data)
                     ->using(self::saveChannel(...)),
-                DeleteAction::make(),
+                self::guardedDeleteAction(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    self::guardedDeleteBulkAction(),
                 ]),
             ]);
     }
@@ -168,5 +171,69 @@ class NotificationChannelsTable
         }
 
         return $record;
+    }
+
+    /**
+     * Refuses to delete a channel that is some alert's only one (it would
+     * leave that alert unable to deliver). A channel shared with other
+     * channels on every alert it serves is deleted, and the confirmation says
+     * how many other alerts it will be removed from.
+     */
+    public static function guardedDeleteAction(): DeleteAction
+    {
+        return DeleteAction::make()
+            ->modalDescription(function (NotificationChannel $record): string {
+                $others = ChannelDeletionGuard::alertsKeepingOtherChannels($record);
+
+                if ($others === 0) {
+                    return __('filament-actions::modal.confirmation');
+                }
+
+                return $others === 1
+                    ? 'It will also be removed from 1 other alert; that alert keeps its other channels.'
+                    : "It will also be removed from {$others} other alerts; they keep their other channels.";
+            })
+            ->before(function (DeleteAction $action, NotificationChannel $record): void {
+                $alerts = ChannelDeletionGuard::alertsLeftWithoutChannel($record);
+
+                if ($alerts->isEmpty()) {
+                    return;
+                }
+
+                Notification::make()
+                    ->danger()
+                    ->persistent()
+                    ->title("Can't delete {$record->label}")
+                    ->body('It\'s the only channel for: '.AlertNameSummary::of($alerts).'. Add another channel to those alerts first.')
+                    ->send();
+
+                $action->cancel();
+            });
+    }
+
+    /**
+     * Deletes the channels that are safe and reports the ones that would
+     * strand an alert. Records are checked one at a time against the current
+     * state, so selecting every channel of an alert deletes all but the last.
+     */
+    public static function guardedDeleteBulkAction(): DeleteBulkAction
+    {
+        return DeleteBulkAction::make()
+            ->using(function (DeleteBulkAction $action, Collection $records): void {
+                foreach ($records as $record) {
+                    $alerts = ChannelDeletionGuard::alertsLeftWithoutChannel($record);
+
+                    if ($alerts->isNotEmpty()) {
+                        $action->reportBulkProcessingFailure(
+                            key: "only-channel-{$record->id}",
+                            message: e($record->label).' is the only channel for: '.AlertNameSummary::of($alerts).'.',
+                        );
+
+                        continue;
+                    }
+
+                    $record->delete() || $action->reportBulkProcessingFailure();
+                }
+            });
     }
 }

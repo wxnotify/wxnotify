@@ -4,6 +4,8 @@ use App\Models\NotificationChannel;
 use App\Support\Delivery\Pauser;
 use App\Support\TraccarUrlGuard;
 use Carbon\Carbon;
+use Filament\Notifications\Livewire\Notifications;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Wizard;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
@@ -390,4 +392,18 @@ function presenterReport(array $overrides = []): array
         'hourly' => [['time' => '2026-10-02T09:00:00-06:00', 'icon' => ['period' => 'day', 'code' => 'few'], 'temperature' => 54, 'unit' => 'F', 'precip_chance' => 10, 'wind' => '5 mph NW', 'summary' => 'Sunny']],
         'periods' => [['name' => 'Today', 'date' => '2026-10-02T09:00:00-06:00', 'summary' => 'Sunny, with a high near 79. East southeast wind 2 to 6 mph.', 'short' => 'Sunny', 'label' => 'High', 'temperature' => 79, 'unit' => 'F', 'icon' => ['period' => 'day', 'code' => 'few']]],
     ], $overrides);
+}
+
+/**
+ * The bodies of the notifications Filament has queued for the current user, as one string.
+ * Reading them consumes them, so call it once and don't combine it with assertNotified().
+ */
+function sentNotificationBodies(): string
+{
+    $notifications = new Notifications;
+    $notifications->mount();
+
+    return $notifications->notifications
+        ->map(fn (Notification $notification): string => (string) $notification->getBody())
+        ->implode(' ');
 }

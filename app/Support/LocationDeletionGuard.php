@@ -20,8 +20,6 @@ use Illuminate\Support\Collection;
  */
 final class LocationDeletionGuard
 {
-    private const NAMED_ALERTS = 5;
-
     /**
      * @return Collection<int, AlertRule>
      */
@@ -39,17 +37,11 @@ final class LocationDeletionGuard
     }
 
     /**
-     * "A, B, C, D, E (and 2 more)": the first five alert names, escaped for HTML.
-     *
      * @param  Collection<int, AlertRule>  $alerts
      */
     public static function summary(Collection $alerts): string
     {
-        $names = $alerts->map(fn (AlertRule $alert): string => e($alert->displayName()))->values();
-        $listed = $names->take(self::NAMED_ALERTS)->implode(', ');
-        $rest = $names->count() - self::NAMED_ALERTS;
-
-        return $rest > 0 ? "{$listed} (and {$rest} more)" : $listed;
+        return AlertNameSummary::of($alerts);
     }
 
     /**

@@ -14,8 +14,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Filament\Notifications\Livewire\Notifications;
-use Filament\Notifications\Notification;
 
 use function Pest\Livewire\livewire;
 
@@ -24,15 +22,6 @@ beforeEach(function () {
     $this->user = User::factory()->create(['tier_override' => Tier::Pro]);
     $this->actingAs($this->user);
 });
-
-/** The bodies of the notifications Filament has queued for the current user, as one string. */
-function sentNotificationBodies(): string
-{
-    $notifications = new Notifications;
-    $notifications->mount();
-
-    return $notifications->notifications->map(fn (Notification $notification): string => (string) $notification->getBody())->implode(' ');
-}
 
 /** A Daily Summary alert that uses the location through its single location_id. */
 function scheduledAlertUsing(Location $location, string $name = 'Morning summary'): AlertRule
