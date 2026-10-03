@@ -284,3 +284,36 @@ test('creating a mobile location without a device is rejected', function () {
 
     expect(Location::where('user_id', $user->id)->exists())->toBeFalse();
 });
+
+test('a new location\'s timezone starts as the subscriber\'s profile timezone', function () {
+    $this->user->update(['timezone' => 'America/Chicago']);
+
+    livewire(CreateLocation::class)->assertFormSet(['timezone' => 'America/Chicago']);
+});
+
+test('a new location\'s timezone is left blank for browser detection when the subscriber has no profile timezone', function () {
+    livewire(CreateLocation::class)->assertFormSet(['timezone' => null]);
+});
+
+test('a timezone chosen on the location form is saved over the profile default', function () {
+    $this->user->update(['timezone' => 'America/Chicago']);
+
+    livewire(CreateLocation::class)
+        ->fillForm([
+            'label' => 'Relative',
+            'lat' => 39.8283,
+            'lng' => -98.5795,
+            'address' => 'Somewhere, KS',
+            'timezone' => 'America/New_York',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Location::where('label', 'Relative')->sole()->timezone)->toBe('America/New_York');
+});
+
+test('the mobile-location notice points at the profile timezone', function () {
+    livewire(CreateLocation::class)
+        ->fillForm(['type' => 'mobile'])
+        ->assertSee('timezone on your Profile page');
+});

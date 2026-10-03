@@ -122,3 +122,39 @@ test('by-category is empty when there is nothing in the range, and honours the r
     expect($this->stats->byCategory($this->user, 30))->toBe([])
         ->and($this->stats->byCategory($this->user, 90))->toHaveCount(1);
 });
+
+test('the profile timezone beats the newest location', function () {
+    Location::factory()->for($this->user)->create(['timezone' => 'America/New_York']);
+    $this->user->update(['timezone' => 'Pacific/Honolulu']);
+
+    expect($this->stats->timezoneFor($this->user->fresh()))->toBe('Pacific/Honolulu');
+});
+
+test('without a profile timezone a newer location that has no timezone does not flip the charts to UTC', function () {
+    Location::factory()->for($this->user)->create(['timezone' => 'America/Denver', 'created_at' => now()->subDay()]);
+    Location::factory()->for($this->user)->create(['timezone' => null, 'created_at' => now()]); // e.g. a mobile location
+
+    expect($this->stats->timezoneFor($this->user))->toBe('America/Denver');
+});
+
+test('an invalid profile timezone is ignored', function () {
+    Location::factory()->for($this->user)->create(['timezone' => 'America/Denver']);
+    $this->user->forceFill(['timezone' => 'Mars/Olympus_Mons'])->save();
+
+    expect($this->stats->timezoneFor($this->user->fresh()))->toBe('America/Denver');
+});
+
+test('with no profile timezone and no location timezone the charts use UTC', function () {
+    Location::factory()->for($this->user)->create(['timezone' => null]);
+
+    expect($this->stats->timezoneFor($this->user))->toBe('UTC');
+});
+
+test('a profile timezone moves the day boundary of the per-day counts', function () {
+    $this->user->update(['timezone' => 'America/Denver']);
+    logAt($this->user, '2026-10-02 02:00:00'); // 2026-10-01 20:00 Denver
+
+    $result = $this->stats->perDay($this->user->fresh(), 7);
+
+    expect($result['counts'][5])->toBe(1)->and($result['counts'][6])->toBe(0);
+});

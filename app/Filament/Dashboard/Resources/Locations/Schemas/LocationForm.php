@@ -6,6 +6,7 @@ use App\Actions\Traccar\ListTraccarDevices;
 use App\Actions\Weather\ResolveTimezoneFromCoordinates;
 use App\Enums\LocationType;
 use App\Enums\MobileSource;
+use App\Support\Timezones;
 use Fahiem\FilamentPinpoint\Pinpoint;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -56,10 +57,11 @@ class LocationForm
             TimezoneSelect::make('timezone')
                 ->label('Timezone')
                 ->searchable()
+                ->default(fn (): ?string => Timezones::forUser(auth()->user()))
                 ->getTimezoneFromBrowser()
                 ->required()
                 ->visible($isStationary)
-                ->helperText('Defaults to your browser\'s detected timezone — change it if this location is somewhere else (e.g. a relative\'s house). Used for this location\'s quiet hours.'),
+                ->helperText('Starts as your profile timezone when you\'ve set one, otherwise your browser\'s detected timezone — change it if this location is somewhere else (e.g. a relative\'s house). Used for this location\'s quiet hours.'),
         ];
     }
 
@@ -150,7 +152,7 @@ class LocationForm
                 ->helperText('Tighter intervals sharpen how current this location is, at the cost of more Traccar/device battery use.'),
             Placeholder::make('mobile_quiet_hours_note')
                 ->label('')
-                ->content('Mobile locations don\'t have a fixed timezone, so quiet hours on alert rules tied to this location won\'t take effect.')
+                ->content('Mobile locations don\'t have a fixed timezone, so quiet hours on alert rules tied to this location use the timezone on your Profile page. Until you set one there, they won\'t take effect.')
                 ->visible($visible),
         ];
     }

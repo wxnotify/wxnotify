@@ -5,6 +5,7 @@ namespace App\Actions\Dashboard;
 use App\Enums\AlertCategory;
 use App\Models\DeliveryLog;
 use App\Models\User;
+use App\Support\Timezones;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -14,9 +15,9 @@ use Illuminate\Support\Carbon;
  * (one per channel); failures, quiet-hours suppression and skipped rows are
  * excluded.
  *
- * Days are bucketed in the timezone of the subscriber's most recently added
- * Location (users have no timezone of their own), falling back to UTC, so an
- * evening alert lands on the right local day. dispatched_at is stored as a
+ * Days are bucketed in the subscriber's profile timezone, else the timezone of
+ * their most recently added Location that has one, else UTC, so an evening
+ * alert lands on the right local day. dispatched_at is stored as a
  * naive UTC timestamp, so the bucket expression reinterprets it as UTC and then
  * converts to the subscriber's zone.
  */
@@ -26,9 +27,15 @@ class GetAlertDeliveryStats
 
     public function timezoneFor(User $user): string
     {
-        $timezone = $user->locations()->latest()->latest('id')->value('timezone');
+        $profile = Timezones::forUser($user);
 
-        return is_string($timezone) && in_array($timezone, timezone_identifiers_list(), true) ? $timezone : 'UTC';
+        if ($profile !== null) {
+            return $profile;
+        }
+
+        $timezone = $user->locations()->whereNotNull('timezone')->latest()->latest('id')->value('timezone');
+
+        return Timezones::isValid($timezone) ? $timezone : 'UTC';
     }
 
     /**
