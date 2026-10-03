@@ -12,6 +12,7 @@ use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Support\Geography\GeographyMatch;
+use App\Support\Timezones;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -416,6 +417,9 @@ class MatchWeatherAlertRules
      * specific location. These always deliver regardless of any
      * quiet_hours_start/end value on the row.
      *
+     * A matched Location with no timezone of its own uses the owner's
+     * profile timezone; if neither resolves, the rule is not suppressed.
+     *
      * Uses the location that actually matched THIS delivery, not an
      * arbitrary or aggregated location across every location the rule has
      * attached -- see the design spec for why that's the only well-defined
@@ -427,7 +431,7 @@ class MatchWeatherAlertRules
             return false;
         }
 
-        $timezone = $matchedLocation?->timezone;
+        $timezone = $matchedLocation === null ? null : Timezones::forLocation($matchedLocation);
         if ($timezone === null) {
             return false;
         }

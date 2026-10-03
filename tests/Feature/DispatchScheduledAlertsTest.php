@@ -317,3 +317,32 @@ test('a metric subscriber\'s Brief daily summary and report are built in metric'
         && str_contains($job->body, '°C')
         && ! str_contains($job->body, '°F'));
 });
+
+test('a location with no timezone is scheduled in the owner\'s profile timezone', function () {
+    Bus::fake();
+    fakeGridDataForThreshold(overnightLow: 27.0);
+
+    // 12:00 UTC is 02:00 in Honolulu: a 06:00 delivery time is not due there, though it is due in UTC.
+    $user = User::factory()->create(['timezone' => 'Pacific/Honolulu']);
+    $location = Location::factory()->for($user)->create(['timezone' => null]);
+    $rule = AlertRule::factory()->for($user)->for($location)->create(['threshold_value' => 32, 'delivery_time' => '06:00']);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($user)->create());
+
+    $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
+
+    Bus::assertNotDispatched(DeliverScheduledAlert::class);
+});
+
+test('a location with no timezone and no profile timezone is scheduled in UTC, as before', function () {
+    Bus::fake();
+    fakeGridDataForThreshold(overnightLow: 27.0);
+
+    $user = User::factory()->create(['timezone' => null]);
+    $location = Location::factory()->for($user)->create(['timezone' => null]);
+    $rule = AlertRule::factory()->for($user)->for($location)->create(['threshold_value' => 32, 'delivery_time' => '06:00']);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($user)->create());
+
+    $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
+
+    Bus::assertDispatched(DeliverScheduledAlert::class);
+});

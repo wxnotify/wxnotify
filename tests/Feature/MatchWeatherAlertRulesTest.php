@@ -796,3 +796,69 @@ test('a RiskArea-mode rule\'s quiet hours now suppress correctly -- previously s
     expect(DeliveryLog::sole()->status)->toBe('suppressed')
         ->and(DeliveryLog::sole()->subject)->toBe('Alert for Moore OK');
 });
+
+function quietHoursRuleForOwnedLocation(?string $profileTimezone, ?string $locationTimezone, string $quietAroundTimezone = 'America/New_York'): array
+{
+    $user = User::factory()->create(['timezone' => $profileTimezone]);
+    $location = Location::factory()->for($user)->create(['timezone' => $locationTimezone, 'forecast_zone_ugc' => 'NYZ072']);
+    $rule = AlertRule::factory()->for($user)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'location',
+        'quiet_hours_start' => now($quietAroundTimezone)->subHour()->format('H:i:s'),
+        'quiet_hours_end' => now($quietAroundTimezone)->addHour()->format('H:i:s'),
+    ]);
+    $product = Product::where('code', 'TO.W')->sole();
+    $rule->locations()->attach($location);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($user)->create());
+
+    return [$rule, createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']])];
+}
+
+test('a matched location with no timezone is quiet-hours suppressed in the owner\'s profile timezone', function () {
+    Queue::fake();
+    [$rule, $ingested] = quietHoursRuleForOwnedLocation(profileTimezone: 'America/New_York', locationTimezone: null);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+    expect(DeliveryLog::sole()->status)->toBe('suppressed');
+});
+
+test('a matched location with no timezone is not suppressed when the owner has no profile timezone', function () {
+    Queue::fake();
+    [$rule, $ingested] = quietHoursRuleForOwnedLocation(profileTimezone: null, locationTimezone: null);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+    expect(DeliveryLog::count())->toBe(0);
+});
+
+test('a location\'s own timezone beats the profile timezone for quiet hours', function () {
+    Queue::fake();
+    // Quiet hours surround "now" in New York, so a profile timezone of New York would suppress;
+    // the location's own Pacific/Kiritimati (a different hour of the day) must decide instead.
+    [$rule, $ingested] = quietHoursRuleForOwnedLocation(profileTimezone: 'America/New_York', locationTimezone: 'Pacific/Kiritimati');
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a nationwide rule is never quiet-hours suppressed, even when the owner has a profile timezone', function () {
+    Queue::fake();
+    $user = User::factory()->create(['timezone' => 'America/New_York']);
+    $product = Product::where('code', 'TO.W')->sole();
+    $rule = AlertRule::factory()->for($user)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'quiet_hours_start' => '00:00:00', 'quiet_hours_end' => '23:59:59',
+    ]);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+    expect(DeliveryLog::where('status', 'suppressed')->count())->toBe(0);
+});

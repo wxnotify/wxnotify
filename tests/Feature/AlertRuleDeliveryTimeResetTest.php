@@ -4,6 +4,7 @@ use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\NotificationChannel;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 
@@ -82,4 +83,29 @@ test('after rescheduling to later today the dispatcher delivers at the new time'
     $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
 
     Bus::assertDispatched(DeliverScheduledAlert::class, fn ($job) => $job->ruleId === $this->rule->id);
+});
+
+test('a location with no timezone uses the owner\'s profile timezone for what later today means', function () {
+    // 16:53 UTC is 06:53 in Honolulu, so 08:00 there is still ahead (it has already passed in UTC).
+    $user = User::factory()->create(['timezone' => 'Pacific/Honolulu']);
+    $location = Location::factory()->for($user)->create(['timezone' => null, 'lat' => 21.3, 'lng' => -157.8]);
+    $rule = AlertRule::factory()->dailySummary()->for($user)->for($location)->create([
+        'delivery_time' => '05:00', 'last_scheduled_run_on' => '2026-10-02',
+    ]);
+
+    $rule->update(['delivery_time' => '08:00']);
+
+    expect($rule->fresh()->last_scheduled_run_on)->toBeNull();
+});
+
+test('a location with no timezone and no profile timezone still means UTC', function () {
+    $user = User::factory()->create(['timezone' => null]);
+    $location = Location::factory()->for($user)->create(['timezone' => null, 'lat' => 21.3, 'lng' => -157.8]);
+    $rule = AlertRule::factory()->dailySummary()->for($user)->for($location)->create([
+        'delivery_time' => '05:00', 'last_scheduled_run_on' => '2026-10-02',
+    ]);
+
+    $rule->update(['delivery_time' => '08:00']); // 08:00 UTC has already passed at 16:53 UTC
+
+    expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe('2026-10-02');
 });

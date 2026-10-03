@@ -12,6 +12,7 @@ use App\Enums\UnitSystem;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\Timezones;
 use App\Support\Units;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -23,8 +24,8 @@ use Throwable;
  * the two categories with no inbound product to react to, just a
  * subscriber-chosen delivery_time to re-check against. Intended to run
  * every 15 minutes (see bootstrap/app.php); each rule fires at most once
- * per calendar day in its own location's timezone, tracked via
- * last_scheduled_run_on.
+ * per calendar day in its own location's timezone (the owner's profile
+ * timezone when the location has none), tracked via last_scheduled_run_on.
  *
  * A rule only advances last_scheduled_run_on once real forecast data was
  * actually fetched — a transient NWS API failure leaves it unset so the
@@ -59,7 +60,7 @@ class DispatchScheduledAlerts extends Command
                 continue;
             }
 
-            $timezone = $rule->location->timezone ?? config('app.timezone');
+            $timezone = Timezones::forRule($rule);
             $now = Carbon::now($timezone);
 
             if ($rule->last_scheduled_run_on?->isSameDay($now)) {

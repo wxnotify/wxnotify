@@ -11,6 +11,7 @@ use App\Enums\ThresholdVariable;
 use App\Enums\Tier;
 use App\Enums\UnitSystem;
 use App\Models\Concerns\BlockedDuringMaintenance;
+use App\Support\Timezones;
 use App\Support\Units;
 use Database\Factories\AlertRuleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -70,7 +71,7 @@ class AlertRule extends Model
                 return;
             }
 
-            $timezone = $rule->location?->timezone ?? config('app.timezone');
+            $timezone = Timezones::forRule($rule);
             $now = Carbon::now($timezone);
 
             if ($now->lt($now->copy()->setTimeFromTimeString($rule->delivery_time))) {
