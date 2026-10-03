@@ -2,6 +2,7 @@
 
 use App\Models\NotificationChannel;
 use App\Support\Delivery\Pauser;
+use App\Support\TraccarUrlGuard;
 use Carbon\Carbon;
 use Filament\Schemas\Components\Wizard;
 use GuzzleHttp\Client;
@@ -34,6 +35,10 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(fn () => app()->instance(
+        TraccarUrlGuard::class,
+        new TraccarUrlGuard(fn (string $host): array => ['93.184.216.34']),
+    ))
     ->in('Feature');
 
 /*

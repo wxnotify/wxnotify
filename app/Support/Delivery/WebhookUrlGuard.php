@@ -101,8 +101,10 @@ class WebhookUrlGuard
      * Why the host must not be reached — 'name', 'unresolved' or 'private' —
      * or null when it is safe. Callers turn the reason into their own wording;
      * the classification itself is shared so the IP-range rules exist once.
+     * Callers outside this class (TraccarUrlGuard) use it for the shared IP
+     * classification and supply their own wording.
      */
-    private function hostRisk(string $host): ?string
+    public function hostRisk(string $host): ?string
     {
         if ($this->privateNetworksAllowed()) {
             return null;
