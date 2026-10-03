@@ -80,4 +80,9 @@ class TraccarServerResource extends Resource
             TraccarDevicesMapWidget::class,
         ];
     }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return static::getModel()::count();
+    }
 }
