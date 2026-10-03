@@ -4,8 +4,10 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Widgets;
 
 use App\Actions\Alerts\GetAlertStats;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
+use App\Filament\Dashboard\Resources\AlertRules\Tables\AlertRulesTable;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Livewire\Attributes\On;
 
 /**
  * The stats strip above the My Alerts table. Database only; every number comes
@@ -15,6 +17,8 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
  */
 class AlertStatsWidget extends StatsOverviewWidget
 {
+    protected static bool $isLazy = false;
+
     protected ?string $pollingInterval = null;
 
     protected int|string|array $columnSpan = 'full';
@@ -23,6 +27,12 @@ class AlertStatsWidget extends StatsOverviewWidget
     {
         return AlertRuleResource::canAccess();
     }
+
+    /**
+     * Re-render (and so re-read the numbers) when the table changes an alert.
+     */
+    #[On(AlertRulesTable::CHANGED_EVENT)]
+    public function refreshStats(): void {}
 
     /**
      * @return int|array<string, ?int>|null
@@ -46,12 +56,20 @@ class AlertStatsWidget extends StatsOverviewWidget
                 ->description($this->trend($stats['deliveries'], $stats['previous_deliveries']))
                 ->chart($stats['daily'])
                 ->color('primary'),
-            Stat::make('Failed deliveries, last 7 days', $stats['failures'])
-                ->color($stats['failures'] > 0 ? 'danger' : 'success'),
+            $this->failedStat($stats['failures']),
             Stat::make('Held for quiet hours, last 7 days', $stats['held'])
                 ->description('Not sent because of quiet hours')
                 ->color('gray'),
         ];
+    }
+
+    private function failedStat(int $failures): Stat
+    {
+        $stat = Stat::make('Failed deliveries, last 7 days', $failures);
+
+        return $failures > 0
+            ? $stat->description('Across all channels, including ones that have recovered')->descriptionIcon('heroicon-m-exclamation-triangle')->descriptionColor('danger')->color('danger')
+            : $stat->description('No failures')->descriptionIcon('heroicon-m-check-circle')->descriptionColor('success')->color('success');
     }
 
     private function trend(int $current, int $previous): string

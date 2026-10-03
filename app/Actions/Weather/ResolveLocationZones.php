@@ -18,6 +18,10 @@ use Illuminate\Support\Facades\DB;
  * fire_zones store state_zone as e.g. "NY001" (no type letter), and counties
  * has no zone-letter code at all, only a 5-digit FIPS. Real UGC codes
  * ("NYZ001"/"NYC001") are derived here from the state + zone/fips columns.
+ *
+ * The three columns are a derived cache, not a subscriber edit, and this runs
+ * on read paths (the My Alerts "Active now" widget), so it saves quietly: no
+ * maintenance-mode block (BlockedDuringMaintenance) and no activity-log row.
  */
 class ResolveLocationZones
 {
@@ -30,7 +34,7 @@ class ResolveLocationZones
             'forecast_zone_ugc' => $this->resolveZoneUgc('public_zones', $lng, $lat),
             'county_ugc' => $this->resolveCountyUgc($lng, $lat),
             'fire_weather_zone_ugc' => $this->resolveZoneUgc('fire_zones', $lng, $lat),
-        ])->save();
+        ])->saveQuietly();
     }
 
     private function resolveZoneUgc(string $table, float $lng, float $lat): ?string

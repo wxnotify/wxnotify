@@ -4,9 +4,11 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Widgets;
 
 use App\Actions\Alerts\GetAlertsNeedingAttention;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
+use App\Filament\Dashboard\Resources\AlertRules\Tables\AlertRulesTable;
 use App\Filament\Dashboard\Resources\Locations\LocationResource;
 use App\Filament\Dashboard\Resources\NotificationChannels\NotificationChannelResource;
 use Filament\Widgets\Widget;
+use Livewire\Attributes\On;
 
 /**
  * "Needs attention" above the My Alerts table: alerts and channels that can't
@@ -28,6 +30,12 @@ class NeedsAttentionWidget extends Widget
     {
         return AlertRuleResource::canAccess();
     }
+
+    /**
+     * Re-render (and so re-read the rows) when the table changes an alert.
+     */
+    #[On(AlertRulesTable::CHANGED_EVENT)]
+    public function refreshRows(): void {}
 
     /**
      * @return array{rows: list<array<string, mixed>>, more: int, count: int}

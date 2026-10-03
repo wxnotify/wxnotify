@@ -4,7 +4,10 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Widgets;
 
 use App\Actions\Alerts\GetActiveNowAtMyLocations;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
+use App\Filament\Dashboard\Resources\AlertRules\Tables\AlertRulesTable;
 use Filament\Widgets\Widget;
+use Illuminate\Support\Carbon;
+use Livewire\Attributes\On;
 
 /**
  * "Active now at your locations" above the My Alerts table. Reads only our own
@@ -25,10 +28,36 @@ class ActiveNowWidget extends Widget
     }
 
     /**
+     * Harmless re-render when the table changes an alert (the numbers here do
+     * not depend on alerts; the action's 60 s cache still applies).
+     */
+    #[On(AlertRulesTable::CHANGED_EVENT)]
+    public function refreshActiveNow(): void {}
+
+    /**
      * @return array<string, mixed>
      */
     protected function getViewData(): array
     {
-        return app(GetActiveNowAtMyLocations::class)(auth()->user());
+        $result = app(GetActiveNowAtMyLocations::class)(auth()->user());
+
+        $result['events'] = array_map(fn (array $event): array => [
+            ...$event,
+            'expires_label' => $event['expires'] ? self::timeLabel($event['expires']) : null,
+            'alerted_at_label' => $event['alerted_at'] ? self::timeLabel($event['alerted_at']) : null,
+        ], $result['events']);
+
+        return $result;
+    }
+
+    /**
+     * "4:15 PM" for a time today, "Sat 4:15 PM" otherwise -- judged in the
+     * value's own offset (the location's timezone), not the server's.
+     */
+    private static function timeLabel(string $iso): string
+    {
+        $time = Carbon::parse($iso);
+
+        return $time->format($time->isSameDay(Carbon::now($time->getTimezone())) ? 'g:i A' : 'D g:i A');
     }
 }

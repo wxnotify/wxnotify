@@ -2,6 +2,7 @@
 
 use App\Actions\Alerts\GetActiveNowAtMyLocations;
 use App\Actions\Weather\GetActiveAlertsForLocation;
+use App\Filament\Dashboard\Resources\AlertRules\Widgets\ActiveNowWidget;
 use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
@@ -9,8 +10,13 @@ use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\User;
+use App\Settings\GeneralSettings;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Spatie\Activitylog\Models\Activity;
+
+use function Pest\Livewire\livewire;
 
 beforeEach(function () {
     Carbon::setTestNow('2026-10-03 15:00:00');
@@ -104,6 +110,31 @@ test('status precedence is alerted over held over failed over none', function ()
         ->and($byEvent['Mixed one'])->toBe('alerted')->and($byEvent['Silent one'])->toBe('none');
 });
 
+test('suppressed and failed deliveries with no success read as held; failed alone reads as failed', function () {
+    $both = activeNowWarning('Both');
+    activeNowDelivery($this->user, $both, 'failure');
+    activeNowDelivery($this->user, $both, 'suppressed');
+    $failedOnly = activeNowWarning('Failed only');
+    activeNowDelivery($this->user, $failedOnly, 'failure');
+
+    $byEvent = collect((new GetActiveNowAtMyLocations)($this->user)['events'])->pluck('status', 'event');
+
+    expect($byEvent['Both'])->toBe('held')->and($byEvent['Failed only'])->toBe('failed');
+});
+
+test('a delivery from before the event first existed is not coverage, and a skipped row never is', function () {
+    $wwa = activeNowWarning(attributes: ['created_at' => now()->subHours(2)]);
+    activeNowDelivery($this->user, $wwa, 'success', when: now()->subDays(2));
+    activeNowDelivery($this->user, $wwa, 'skipped', when: now()->subMinutes(30));
+
+    expect((new GetActiveNowAtMyLocations)($this->user)['events'][0]['status'])->toBe('none');
+
+    activeNowDelivery($this->user, $wwa, 'success', when: now()->subDay()->subHours(1)); // within a day before the first ingest: still counts
+
+    Cache::flush();
+    expect((new GetActiveNowAtMyLocations)($this->user)['events'][0]['status'])->toBe('alerted');
+});
+
 test('only this subscriber\'s deliveries count as coverage', function () {
     $wwa = activeNowWarning();
     activeNowDelivery(User::factory()->create(), $wwa, 'success');
@@ -119,12 +150,27 @@ test('a delivery for a different event does not cover this one', function () {
     expect((new GetActiveNowAtMyLocations)($this->user)['events'][0]['status'])->toBe('none');
 });
 
-test('test warnings and locations without a position are ignored', function () {
+test('test warnings are ignored', function () {
     activeNowWarning('Test warning', attributes: ['is_test' => true]);
-    Location::factory()->mobile()->for($this->user)->create(['label' => 'Truck']);
-    $result = (new GetActiveNowAtMyLocations)($this->user);
 
-    expect($result['events'])->toBe([]);
+    expect((new GetActiveNowAtMyLocations)($this->user)['events'])->toBe([]);
+});
+
+test('locations without a position are filtered out by the query, so they neither match nor count toward the cap', function () {
+    $loner = User::factory()->create();
+    Location::factory()->mobile()->count(26)->for($loner)->create(['forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014']);
+    activeNowWarning();
+
+    $result = (new GetActiveNowAtMyLocations)($loner);
+
+    expect($result)->toBe(['events' => [], 'more' => 0, 'has_locations' => true, 'has_position' => false, 'capped' => false]);
+
+    Location::factory()->for($loner)->create(['label' => 'Fixed', 'lat' => 40.0, 'lng' => -105.0, 'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014']);
+    Cache::flush();
+    $result = (new GetActiveNowAtMyLocations)($loner);
+
+    expect($result['capped'])->toBeFalse()->and($result['has_position'])->toBeTrue()
+        ->and($result['events'][0]['locations'])->toBe(['Fixed']);
 });
 
 test('events are sorted by family then expiry and capped at 6 with a count of the rest', function () {
@@ -153,20 +199,27 @@ test('the result is cached for 60 seconds per subscriber', function () {
 });
 
 test('only the first 25 locations with a position are looked at, and the result says so', function () {
-    Location::factory()->for($this->user)->count(25)->create(['lat' => 41.0, 'lng' => -100.0, 'forecast_zone_ugc' => 'COZ777', 'county_ugc' => 'COC777']);
+    // Home + 24 others = 25 looked at; the 26th (created last) is past the cap and is the only one in the warning's zone.
+    Location::factory()->for($this->user)->count(24)->create(['lat' => 41.0, 'lng' => -100.0, 'forecast_zone_ugc' => 'COZ777', 'county_ugc' => 'COC777']);
+    Location::factory()->for($this->user)->create(['label' => 'Twenty-sixth', 'lat' => 42.0, 'lng' => -101.0, 'forecast_zone_ugc' => 'COZ888', 'county_ugc' => 'COC888']);
+    activeNowWarning('Beyond the cap', zone: 'COZ888');
 
-    expect((new GetActiveNowAtMyLocations)($this->user)['capped'])->toBeTrue();
+    $result = (new GetActiveNowAtMyLocations)($this->user);
+
+    expect($result['capped'])->toBeTrue()->and($result['events'])->toBe([]);
 
     Cache::flush();
-    Location::query()->where('user_id', $this->user->id)->where('label', '!=', 'Home')->limit(5)->delete();
+    Location::query()->where('label', 'Twenty-sixth')->delete();
 
-    expect((new GetActiveNowAtMyLocations)($this->user)['capped'])->toBeFalse();
+    $result = (new GetActiveNowAtMyLocations)($this->user);
+
+    expect($result['capped'])->toBeFalse();
 });
 
 test('a subscriber with no locations says so', function () {
     $loner = User::factory()->create();
 
-    expect((new GetActiveNowAtMyLocations)($loner))->toBe(['events' => [], 'more' => 0, 'has_locations' => false, 'capped' => false]);
+    expect((new GetActiveNowAtMyLocations)($loner))->toBe(['events' => [], 'more' => 0, 'has_locations' => false, 'has_position' => false, 'capped' => false]);
 });
 
 test('extracting activeFor() left GetActiveAlertsForLocation\'s output unchanged', function () {
@@ -180,4 +233,36 @@ test('extracting activeFor() left GetActiveAlertsForLocation\'s output unchanged
             'expires' => '2026-10-03T10:00:00-06:00', 'family' => 'warning',
         ]);
     expect((new GetActiveAlertsForLocation)->activeFor($this->home)->pluck('id')->all())->toHaveCount(1);
+});
+
+test('resolving a location\'s zones while reading is quiet: it works in maintenance mode and writes no activity row', function () {
+    foreach (['public_zones' => ['zone' => '040', 'state_zone' => 'CO040', 'name' => 'Test Zone'], 'fire_zones' => ['zone' => '040', 'state_zone' => 'CO040', 'name' => 'Test Fire'], 'counties' => ['countyname' => 'Test County', 'fips' => '08014']] as $table => $attributes) {
+        DB::table($table)->insert([
+            'state' => 'CO', 'cwa' => 'BOU', ...$attributes, 'lon' => 0, 'lat' => 0,
+            'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-106 39, -104 39, -104 41, -106 41, -106 39))')), 4269)"),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    $resolving = Location::factory()->for($this->user)->create(['label' => 'Fresh', 'lat' => 40.0, 'lng' => -105.0, 'timezone' => 'America/Denver']);
+    $resolving->forceFill(['forecast_zone_ugc' => null, 'county_ugc' => null, 'fire_weather_zone_ugc' => null])->saveQuietly();
+    activeNowWarning('Tornado Warning', zone: 'COZ040');
+    $this->actingAs($this->user);
+    $settings = app(GeneralSettings::class);
+    $settings->maintenance_mode = true;
+    $settings->save();
+    Activity::query()->delete();
+
+    $lookup = (new GetActiveAlertsForLocation)($resolving);
+
+    expect($lookup)->toHaveCount(1)
+        ->and($resolving->fresh()->forecast_zone_ugc)->toBe('COZ040')
+        ->and($resolving->fresh()->county_ugc)->toBe('COC014')
+        ->and(Activity::query()->get()->toArray())->toBe([]);
+
+    $resolving->forceFill(['forecast_zone_ugc' => null, 'county_ugc' => null])->saveQuietly();
+    Cache::flush();
+
+    livewire(ActiveNowWidget::class)->assertSee('Tornado Warning');
+    expect($resolving->fresh()->forecast_zone_ugc)->toBe('COZ040')->and(Activity::query()->count())->toBe(0);
 });

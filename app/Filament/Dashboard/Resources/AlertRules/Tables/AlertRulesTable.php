@@ -12,12 +12,19 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
 class AlertRulesTable
 {
+    /**
+     * Dispatched by the table's inline toggle and delete actions so the page's
+     * header widgets (stats, needs attention, active now) re-read the data.
+     */
+    public const CHANGED_EVENT = 'my-alerts-changed';
+
     private const NONE = 'None';
 
     public static function configure(Table $table): Table
@@ -51,7 +58,8 @@ class AlertRulesTable
                     ->expandableLimitedList()
                     ->toggleable(),
                 ToggleColumn::make('is_active')
-                    ->label('Active'),
+                    ->label('Active')
+                    ->afterStateUpdated(fn (HasTable $livewire) => $livewire->dispatch(self::CHANGED_EVENT)),
                 TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime()
@@ -64,11 +72,13 @@ class AlertRulesTable
             ])
             ->recordActions([
                 EditAction::make(),
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->after(fn (HasTable $livewire) => $livewire->dispatch(self::CHANGED_EVENT)),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->after(fn (HasTable $livewire) => $livewire->dispatch(self::CHANGED_EVENT)),
                 ]),
             ]);
     }

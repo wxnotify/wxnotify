@@ -22,6 +22,10 @@ use Illuminate\Support\Facades\Cache;
  * A warning issued before an alert existed therefore reads "none". Precedence
  * per event: alerted, held (quiet hours), failed, none.
  *
+ * A delivery cannot predate the event's first ingest, so the query is bounded
+ * to one day before the active row was created (and to the three statuses the
+ * (user_id, status, dispatched_at) index serves).
+ *
  * Database only; cached 60 s per subscriber; looks at the first 25 locations
  * with a position and shows the first 6 events.
  */
@@ -34,7 +38,7 @@ class GetActiveNowAtMyLocations
     private const CACHE_SECONDS = 60;
 
     /**
-     * @return array{events: list<array<string, mixed>>, more: int, has_locations: bool, capped: bool}
+     * @return array{events: list<array<string, mixed>>, more: int, has_locations: bool, has_position: bool, capped: bool}
      */
     public function __invoke(User $user): array
     {
@@ -46,14 +50,14 @@ class GetActiveNowAtMyLocations
     }
 
     /**
-     * @return array{events: list<array<string, mixed>>, more: int, has_locations: bool, capped: bool}
+     * @return array{events: list<array<string, mixed>>, more: int, has_locations: bool, has_position: bool, capped: bool}
      */
     private function compute(User $user): array
     {
-        $withPosition = $user->locations()->orderBy('id')->get()->filter(fn (Location $location): bool => $location->hasFix())->values();
+        $withPosition = $user->locations()->whereNotNull('lat')->whereNotNull('lng')->orderBy('id')->limit(self::MAX_LOCATIONS + 1)->get();
 
         if ($withPosition->isEmpty()) {
-            return ['events' => [], 'more' => 0, 'has_locations' => $user->locations()->exists(), 'capped' => false];
+            return ['events' => [], 'more' => 0, 'has_locations' => $user->locations()->exists(), 'has_position' => false, 'capped' => false];
         }
 
         $capped = $withPosition->count() > self::MAX_LOCATIONS;
@@ -74,7 +78,7 @@ class GetActiveNowAtMyLocations
 
         $events = $shown->map(fn (ActiveWwa $wwa): array => $this->eventRow($user, $wwa, $grouped[$wwa->id]['locations']))->values()->all();
 
-        return ['events' => $events, 'more' => max(0, $sorted->count() - self::MAX_EVENTS), 'has_locations' => true, 'capped' => $capped];
+        return ['events' => $events, 'more' => max(0, $sorted->count() - self::MAX_EVENTS), 'has_locations' => true, 'has_position' => true, 'capped' => $capped];
     }
 
     /**
@@ -88,6 +92,8 @@ class GetActiveNowAtMyLocations
 
         $logs = DeliveryLog::query()
             ->where('user_id', $user->id)
+            ->whereIn('status', ['success', 'suppressed', 'failure'])
+            ->where('dispatched_at', '>=', $wwa->created_at->copy()->subDay())
             ->whereIn('ingested_product_id', IngestedProduct::query()->select('id')->where(ActiveWwa::vtecKeyFor($wwa))->where('is_test', false))
             ->with(['alertRule.products', 'alertRule.location'])
             ->orderByDesc('dispatched_at')
