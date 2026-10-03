@@ -54,7 +54,7 @@ test('a channel whose latest attempt in 7 days failed is reported with a count a
 
     expect($rows)->toHaveCount(1)
         ->and($rows[0])->toMatchArray(['kind' => 'channel_failing', 'severity' => 'danger', 'subject' => 'My Discord', 'target' => ['type' => 'channels', 'id' => null]])
-        ->and($rows[0]['detail'])->toBe('had a failed delivery 3 hours ago (2 failures in 7 days)');
+        ->and($rows[0]['detail'])->toBe('its last delivery failed 3 hours ago (2 failures in 7 days)');
 });
 
 test('a success after the failures clears the channel; old failures do not count', function () {
@@ -87,7 +87,23 @@ test('an unverified channel used by an active alert is reported with up to three
 
     expect($rows)->toHaveCount(1)
         ->and($rows[0])->toMatchArray(['kind' => 'channel_unverified', 'severity' => 'warning', 'subject' => 'Work email'])
-        ->and($rows[0]['detail'])->toBe("isn't verified yet, so alerts using it can't deliver (Alpha, Bravo, Charlie and 1 more)");
+        ->and($rows[0]['detail'])->toBe("isn't verified yet — confirm it so alerts using it are sure to reach you (Alpha, Bravo, Charlie and 1 more)");
+});
+
+test('an alert on a verified and an unverified channel lists only the unverified one', function () {
+    $verified = NotificationChannel::factory()->for($this->user)->create(['label' => 'Verified email', 'verified_at' => now()]);
+    $unverified = NotificationChannel::factory()->for($this->user)->create(['label' => 'Pending SMS', 'verified_at' => null]);
+    attentionAlert($this->user, [$verified, $unverified], ['name' => 'Both channels']);
+
+    expect(attentionSummary($this->user))->toBe(['channel_unverified: Pending SMS']);
+});
+
+test('failing channels are sorted by label without regard to case', function () {
+    foreach (['banana', 'Cherry', 'apple'] as $label) {
+        channelAttempt($this->user, NotificationChannel::factory()->for($this->user)->create(['label' => $label]), 'failure', now()->subHour());
+    }
+
+    expect(attentionSummary($this->user))->toBe(['channel_failing: apple', 'channel_failing: banana', 'channel_failing: Cherry']);
 });
 
 test('an unverified channel that no active alert uses is not reported', function () {
@@ -187,6 +203,7 @@ test('the number of queries does not grow with the number of problems', function
             $channel = NotificationChannel::factory()->for($this->user)->create(['verified_at' => null]);
             attentionAlert($this->user, [$channel], ['is_active' => $i % 2 === 0]);
             channelAttempt($this->user, NotificationChannel::factory()->for($this->user)->create(), 'failure', now()->subHour());
+            AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->mobile()->for($this->user)->create())->create(['name' => null]);
         }
         DB::flushQueryLog();
         DB::enableQueryLog();

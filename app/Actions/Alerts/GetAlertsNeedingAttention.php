@@ -77,8 +77,8 @@ class GetAlertsNeedingAttention
         return NotificationChannel::query()
             ->where('user_id', $user->id)
             ->whereIn('id', $latest->keys())
-            ->orderBy('label')
             ->get()
+            ->sortBy(fn (NotificationChannel $channel): string => mb_strtolower((string) $channel->label))
             ->mapWithKeys(function (NotificationChannel $channel) use ($latest, $failureCounts): array {
                 $failures = (int) $failureCounts[$channel->id];
 
@@ -86,7 +86,7 @@ class GetAlertsNeedingAttention
                     'kind' => 'channel_failing',
                     'severity' => 'danger',
                     'subject' => (string) $channel->label,
-                    'detail' => 'had a failed delivery '.$latest[$channel->id]->dispatched_at->diffForHumans()
+                    'detail' => 'its last delivery failed '.$latest[$channel->id]->dispatched_at->diffForHumans()
                         .' ('.$failures.' '.($failures === 1 ? 'failure' : 'failures').' in '.self::WINDOW_DAYS.' days)',
                     'target' => ['type' => 'channels', 'id' => null],
                 ]];
@@ -133,7 +133,7 @@ class GetAlertsNeedingAttention
                     'kind' => 'channel_unverified',
                     'severity' => 'warning',
                     'subject' => (string) $channel->label,
-                    'detail' => "isn't verified yet, so alerts using it can't deliver (".$listed.($rest > 0 ? " and {$rest} more" : '').')',
+                    'detail' => "isn't verified yet — confirm it so alerts using it are sure to reach you (".$listed.($rest > 0 ? " and {$rest} more" : '').')',
                     'target' => ['type' => 'channels', 'id' => null],
                 ];
             })

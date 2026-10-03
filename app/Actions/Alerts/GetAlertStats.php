@@ -12,6 +12,10 @@ use App\Models\User;
  * are active, and what happened to their deliveries over a rolling 7 days
  * (one delivery_logs row per channel, so these are "deliveries", not alerts).
  * Database only, scoped to the given user.
+ *
+ * The counts use a rolling window (now minus 7 / 14 days) while the sparkline
+ * (`daily`) buckets by the subscriber's calendar days, so the sparkline's total
+ * can differ slightly from `deliveries`.
  */
 class GetAlertStats
 {
@@ -30,6 +34,7 @@ class GetAlertStats
 
         $deliveries = DeliveryLog::query()
             ->where('user_id', $user->id)
+            ->whereIn('status', ['success', 'failure', 'suppressed'])
             ->where('dispatched_at', '>=', $before)
             ->selectRaw(
                 "count(*) filter (where status = 'success' and dispatched_at >= ?) as deliveries,

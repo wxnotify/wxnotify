@@ -58,6 +58,28 @@ test('the previous 7 days are counted for the trend', function () {
     expect($stats['previous_deliveries'])->toBe(2)->and($stats['deliveries'])->toBe(1);
 });
 
+test('the window boundaries are exact: now-7d is current, now-14d is previous, just older is neither', function () {
+    statsDelivery($this->user, 'success', now()->subDays(7));                  // exactly 7 days: current
+    statsDelivery($this->user, 'success', now()->subDays(7)->subSecond());     // just before: previous
+    statsDelivery($this->user, 'success', now()->subDays(14));                 // exactly 14 days: previous
+    statsDelivery($this->user, 'success', now()->subDays(14)->subSecond());    // older: neither
+
+    $stats = (new GetAlertStats)($this->user);
+
+    expect($stats['deliveries'])->toBe(1)->and($stats['previous_deliveries'])->toBe(2);
+});
+
+test('failures and holds in the previous window are not counted', function () {
+    statsDelivery($this->user, 'failure', now()->subDays(8));
+    statsDelivery($this->user, 'suppressed', now()->subDays(10));
+    statsDelivery($this->user, 'failure', now()->subDays(7));   // exactly at the boundary: current
+    statsDelivery($this->user, 'suppressed', now()->subDay());
+
+    $stats = (new GetAlertStats)($this->user);
+
+    expect($stats['failures'])->toBe(1)->and($stats['held'])->toBe(1);
+});
+
 test('only this subscriber\'s deliveries are counted', function () {
     statsDelivery($this->user, 'success', now()->subHour());
     statsDelivery(User::factory()->create(), 'success', now()->subHour());
