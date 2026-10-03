@@ -23,6 +23,21 @@ enum MatchingMode: string
         };
     }
 
+    /**
+     * A few words for a table cell; label() is a sentence for the form.
+     */
+    public function shortLabel(): string
+    {
+        return match ($this) {
+            self::Nationwide => 'Nationwide',
+            self::Location => 'By location',
+            self::Wfo => 'Issuing office',
+            self::CountyZone => 'County/zone',
+            self::Polygon => 'By polygon',
+            self::RiskArea => 'By risk area',
+        };
+    }
+
     public function helperText(): string
     {
         return match ($this) {

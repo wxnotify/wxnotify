@@ -3,6 +3,7 @@
 namespace App\Filament\Dashboard\Resources\AlertRules\Tables;
 
 use App\Enums\AlertCategory;
+use App\Enums\MatchingMode;
 use App\Models\AlertRule;
 use App\Support\Units;
 use Filament\Actions\BulkActionGroup;
@@ -13,12 +14,16 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class AlertRulesTable
 {
+    private const NONE = 'None';
+
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['location', 'locations', 'notificationChannels', 'products']))
             ->columns([
                 TextColumn::make('displayName')
                     ->label('Alert')
@@ -28,6 +33,23 @@ class AlertRulesTable
                     ->badge()
                     ->formatStateUsing(fn (AlertCategory $state): string => $state->label())
                     ->icon(fn (AlertCategory $state): string => $state->icon()),
+                TextColumn::make('location_labels')
+                    ->label('Locations')
+                    ->getStateUsing(fn (AlertRule $record): array => self::locationLabels($record))
+                    ->badge()
+                    ->color(fn (string $state): string => in_array($state, self::mutedLabels(), true) ? 'gray' : 'primary')
+                    ->listWithLineBreaks()
+                    ->limitList(3)
+                    ->expandableLimitedList()
+                    ->toggleable(),
+                TextColumn::make('notificationChannels.label')
+                    ->label('Channels')
+                    ->badge()
+                    ->placeholder(self::NONE)
+                    ->listWithLineBreaks()
+                    ->limitList(3)
+                    ->expandableLimitedList()
+                    ->toggleable(),
                 ToggleColumn::make('is_active')
                     ->label('Active'),
                 TextColumn::make('created_at')
@@ -49,5 +71,41 @@ class AlertRulesTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * Where an alert applies: its saved locations, or -- for matching modes
+     * that are not tied to a saved location -- the mode's short name.
+     *
+     * @return list<string>
+     */
+    private static function locationLabels(AlertRule $record): array
+    {
+        if (in_array($record->category, [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc], true)) {
+            $mode = $record->matching_mode;
+
+            if (in_array($mode, [MatchingMode::Nationwide, MatchingMode::Wfo, MatchingMode::CountyZone], true)) {
+                return [$mode->shortLabel()];
+            }
+
+            $labels = $record->locations->pluck('label')->all();
+        } else {
+            $labels = array_filter([$record->location?->label]);
+        }
+
+        return $labels === [] ? [self::NONE] : array_values($labels);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function mutedLabels(): array
+    {
+        return [
+            self::NONE,
+            MatchingMode::Nationwide->shortLabel(),
+            MatchingMode::Wfo->shortLabel(),
+            MatchingMode::CountyZone->shortLabel(),
+        ];
     }
 }
