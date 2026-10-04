@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Traccar\ListTraccarDevices;
 use App\Actions\Traccar\PollTraccarServer;
 use App\Enums\LocationType;
 use App\Models\Location;
@@ -82,11 +83,14 @@ class PollTraccarPositions extends Command
         $server->forceFill(['last_polled_at' => now(), 'last_poll_error' => null])->save();
 
         $updated = 0;
+        $unreported = [];
 
         foreach ($locations as $location) {
             $position = $positions[$location->traccar_device_id] ?? null;
 
             if ($position === null) {
+                $unreported[] = $location;
+
                 continue;
             }
 
@@ -110,6 +114,7 @@ class PollTraccarPositions extends Command
                     // When Traccar says the device was located, kept as it was when this
                     // position carries no usable fixTime.
                     'mobile_position_fixed_at' => $this->fixedAt($position['fixTime']) ?? $location->mobile_position_fixed_at,
+                    'traccar_device_missing_at' => null,
                 ])->save();
             } finally {
                 $location->enableLogging();
@@ -118,7 +123,53 @@ class PollTraccarPositions extends Command
             $updated++;
         }
 
+        $this->reconcileMissingDevices($server, $unreported);
+
         return $updated;
+    }
+
+    /**
+     * /api/positions lists only devices that have a position, so a device that was
+     * deleted from the server (demo servers re-issue device IDs) looks the same as one
+     * that has not reported yet. For the locations that got no position, ask the server
+     * for its device list and mark the ones whose device is gone, keeping the time it
+     * was first noticed; a device that is there clears a stale mark. When the list
+     * cannot be fetched nothing changes: whether the device exists is unknown.
+     *
+     * @param  list<Location>  $unreported
+     */
+    private function reconcileMissingDevices(TraccarServer $server, array $unreported): void
+    {
+        if ($unreported === []) {
+            return;
+        }
+
+        $devices = app(ListTraccarDevices::class)($server);
+
+        if ($devices === null) {
+            return;
+        }
+
+        $deviceIds = array_map('intval', array_column($devices, 'id'));
+
+        foreach ($unreported as $location) {
+            $missingAt = in_array((int) $location->traccar_device_id, $deviceIds, true)
+                ? null
+                : ($location->traccar_device_missing_at ?? now());
+
+            if ($missingAt?->timestamp === $location->traccar_device_missing_at?->timestamp) {
+                continue;
+            }
+
+            // Bookkeeping, not a subscriber edit: keep it out of the activity log.
+            $location->disableLogging();
+
+            try {
+                $location->forceFill(['traccar_device_missing_at' => $missingAt])->save();
+            } finally {
+                $location->enableLogging();
+            }
+        }
     }
 
     private function fixedAt(?string $fixTime): ?CarbonImmutable

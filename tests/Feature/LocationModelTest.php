@@ -80,3 +80,17 @@ test('a mobile location\'s position time is its Traccar fix time, a stationary o
         ->and($waiting->positionLocatedAt())->toBeNull()
         ->and($stationary->positionLocatedAt()->equalTo($stationary->created_at))->toBeTrue();
 });
+
+test('the missing-device mark is cleared when the location\'s device changes, and when it becomes stationary', function () {
+    $location = Location::factory()->mobile()->withFix(39.0, -94.0)->create(['traccar_device_id' => 33, 'traccar_device_missing_at' => now()->subDay()]);
+
+    $location->update(['label' => 'Renamed']);
+    expect($location->refresh()->traccar_device_missing_at)->not->toBeNull();
+
+    $location->update(['traccar_device_id' => 38]);
+    expect($location->refresh()->traccar_device_missing_at)->toBeNull();
+
+    $location->forceFill(['traccar_device_missing_at' => now()])->saveQuietly();
+    $location->update(['type' => LocationType::Stationary]);
+    expect($location->refresh()->traccar_device_missing_at)->toBeNull();
+});

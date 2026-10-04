@@ -4,11 +4,13 @@ namespace App\Filament\Dashboard\Resources\Locations\Tables;
 
 use App\Models\Location;
 use App\Support\LocationDeletionGuard;
+use Carbon\CarbonInterface;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
@@ -26,8 +28,13 @@ class LocationsTable
                     ->badge(),
                 TextColumn::make('position_updated')
                     ->label('Position updated')
-                    ->state(fn (Location $record) => $record->positionLocatedAt())
-                    ->since()
+                    ->state(fn (Location $record): CarbonInterface|string|null => $record->hasMissingDevice() ? 'Device not found on server' : $record->positionLocatedAt())
+                    ->formatStateUsing(fn (CarbonInterface|string|null $state): ?string => $state instanceof CarbonInterface ? $state->diffForHumans() : $state)
+                    ->icon(fn (Location $record): ?Heroicon => $record->hasMissingDevice() ? Heroicon::OutlinedExclamationTriangle : null)
+                    ->color(fn (Location $record): ?string => $record->hasMissingDevice() ? 'danger' : null)
+                    ->tooltip(fn (Location $record): ?string => $record->hasMissingDevice()
+                        ? 'This device no longer exists on the Traccar server. Edit this location and pick its device again.'
+                        : null)
                     ->placeholder('—')
                     ->toggleable(),
                 TextColumn::make('address')

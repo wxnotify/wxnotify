@@ -134,6 +134,34 @@ test('an active scheduled alert on a mobile location with no position is reporte
         ->and($rows[0])->toMatchArray(['severity' => 'warning', 'detail' => 'is waiting for Truck to report a position', 'target' => ['type' => 'location', 'id' => $truck->id]]);
 });
 
+test('an active scheduled alert on a mobile location whose device is gone is a device problem, replacing the position row', function () {
+    $gone = Location::factory()->mobile()->withFix(40.0, -105.0)->for($this->user)->create(['label' => 'Truck', 'traccar_device_missing_at' => now()->subDay()]);
+    $goneNoFix = Location::factory()->mobile()->for($this->user)->create(['label' => 'Van', 'traccar_device_missing_at' => now()->subDay()]);
+    $waiting = Location::factory()->mobile()->for($this->user)->create(['label' => 'Bike']);
+    $a = AlertRule::factory()->dailySummary()->for($this->user)->for($gone)->create(['name' => 'Truck summary']);
+    AlertRule::factory()->dailySummary()->for($this->user)->for($goneNoFix)->create(['name' => 'Van summary']);
+    AlertRule::factory()->dailySummary()->for($this->user)->for($waiting)->create(['name' => 'Bike summary']);
+
+    $rows = attentionRows($this->user);
+
+    expect(array_map(fn (array $row): string => "{$row['kind']}: {$row['subject']}", $rows))->toBe([
+        'location_device_missing: Truck summary',
+        'location_device_missing: Van summary',
+        'location_no_position: Bike summary',
+    ])->and($rows[0])->toMatchArray([
+        'severity' => 'warning',
+        'detail' => "can't follow Truck: its Traccar device no longer exists on the server",
+        'target' => ['type' => 'location', 'id' => $gone->id],
+    ]);
+});
+
+test('a missing device on an inactive alert or a stationary location is not reported as a device problem', function () {
+    $gone = Location::factory()->mobile()->for($this->user)->create(['traccar_device_missing_at' => now()]);
+    AlertRule::factory()->dailySummary()->for($this->user)->for($gone)->create(['is_active' => false, 'name' => 'Paused']);
+
+    expect(attentionSummary($this->user))->toBe(['alert_inactive: Paused']);
+});
+
 test('a mobile location with a position, a stationary location, or an inactive alert is not a position problem', function () {
     $withFix = Location::factory()->mobile()->withFix(40.0, -105.0)->for($this->user)->create();
     $noFix = Location::factory()->mobile()->for($this->user)->create();

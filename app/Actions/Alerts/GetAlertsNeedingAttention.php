@@ -16,8 +16,9 @@ use Illuminate\Support\Collection;
  * Database only, scoped to the given user. Rows hold plain text (the view
  * escapes it) and never an error detail, destination, URL or token.
  *
- * Order: failing channels, unverified channels, mobile locations with no
- * position, inactive alerts -- each group by name. A channel appears once
+ * Order: failing channels, unverified channels, mobile locations whose device is
+ * gone, mobile locations with no position, inactive alerts -- each group by name.
+ * A channel appears once
  * (failing wins over unverified); an inactive alert appears only as inactive,
  * and the position/verification checks look at active alerts only.
  */
@@ -37,6 +38,7 @@ class GetAlertsNeedingAttention
         return [
             ...$failing->values()->all(),
             ...$this->unverifiedChannels($user, $failing->keys()->all()),
+            ...$this->mobileLocationsWithMissingDevice($user),
             ...$this->mobileLocationsWithoutPosition($user),
             ...$this->inactiveAlerts($user),
         ];
@@ -142,6 +144,34 @@ class GetAlertsNeedingAttention
     }
 
     /**
+     * Active scheduled alerts on a mobile location whose Traccar device no longer
+     * exists on the server (see PollTraccarPositions): it is never updated again until
+     * the subscriber picks its device again, whether or not it ever had a position.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function mobileLocationsWithMissingDevice(User $user): array
+    {
+        return AlertRule::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->whereIn('category', array_map(fn (AlertCategory $category): string => $category->value, self::SCHEDULED))
+            ->whereHas('location', fn ($query) => $query->where('type', LocationType::Mobile->value)->whereNotNull('traccar_device_missing_at'))
+            ->with(['location', 'products', 'user'])
+            ->get()
+            ->sortBy(fn (AlertRule $alert): string => mb_strtolower($alert->displayName()))
+            ->map(fn (AlertRule $alert): array => [
+                'kind' => 'location_device_missing',
+                'severity' => 'warning',
+                'subject' => $alert->displayName(),
+                'detail' => "can't follow ".$alert->location->label.': its Traccar device no longer exists on the server',
+                'target' => ['type' => 'location', 'id' => $alert->location->id],
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function mobileLocationsWithoutPosition(User $user): array
@@ -150,7 +180,7 @@ class GetAlertsNeedingAttention
             ->where('user_id', $user->id)
             ->where('is_active', true)
             ->whereIn('category', array_map(fn (AlertCategory $category): string => $category->value, self::SCHEDULED))
-            ->whereHas('location', fn ($query) => $query->where('type', LocationType::Mobile->value)->where(fn ($q) => $q->whereNull('lat')->orWhereNull('lng')))
+            ->whereHas('location', fn ($query) => $query->where('type', LocationType::Mobile->value)->whereNull('traccar_device_missing_at')->where(fn ($q) => $q->whereNull('lat')->orWhereNull('lng')))
             ->with(['location', 'products', 'user'])
             ->get()
             ->sortBy(fn (AlertRule $alert): string => mb_strtolower($alert->displayName()))

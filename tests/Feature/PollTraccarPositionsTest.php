@@ -246,3 +246,99 @@ test('a poll with no position for the device leaves the fix time untouched', fun
 
     expect($location->refresh()->mobile_position_fixed_at->toDateTimeString())->toBe('2026-09-01 08:00:00');
 });
+
+/**
+ * @param  array<int, array<string, mixed>>  $positions
+ * @param  array<int, array<string, mixed>>|int  $devices  the device list, or an HTTP status for a failing /api/devices
+ */
+function fakeTraccarServer(array $positions, array|int $devices): void
+{
+    Http::fake([
+        'traccar.example.com/api/positions' => Http::response($positions),
+        'traccar.example.com/api/devices' => is_int($devices) ? Http::response('', $devices) : Http::response($devices),
+    ]);
+}
+
+function dueMobileLocation(TraccarServer $server, int $deviceId, array $attributes = []): Location
+{
+    return Location::factory()->mobile()->create([
+        'traccar_server_id' => $server->id,
+        'traccar_device_id' => $deviceId,
+        'mobile_update_interval_minutes' => 15,
+        ...$attributes,
+    ]);
+}
+
+test('a device the server\'s device list no longer contains is marked missing, keeping the first time it was noticed', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = dueMobileLocation($server, 33);
+    fakeTraccarServer([], [['id' => 38, 'name' => 'iPhone']]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    $firstNoticed = $location->refresh()->traccar_device_missing_at;
+    expect($firstNoticed)->not->toBeNull();
+
+    $this->travel(20)->minutes();
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect($location->refresh()->traccar_device_missing_at->equalTo($firstNoticed))->toBeTrue();
+});
+
+test('a device that exists but has no position yet is not marked missing, and a stale mark is cleared', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = dueMobileLocation($server, 38, ['traccar_device_missing_at' => now()->subDay()]);
+    fakeTraccarServer([], [['id' => 38, 'name' => 'iPhone']]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect($location->refresh()->traccar_device_missing_at)->toBeNull();
+});
+
+test('a position arriving for the device clears the mark and the devices list is not requested', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = dueMobileLocation($server, 38, ['traccar_device_missing_at' => now()->subDay()]);
+    fakeTraccarServer([['deviceId' => 38, 'latitude' => 40.0, 'longitude' => -105.0, 'fixTime' => '2026-10-04T02:59:31.000+00:00']], []);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect($location->refresh()->traccar_device_missing_at)->toBeNull();
+    Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/api/devices'));
+});
+
+test('the devices list is not requested when every due location got a position', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    dueMobileLocation($server, 1);
+    fakeTraccarServer([['deviceId' => 1, 'latitude' => 40.0, 'longitude' => -105.0, 'fixTime' => null]], []);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/api/devices'));
+});
+
+test('a failing devices request changes nothing, since whether the device exists is unknown', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $marked = dueMobileLocation($server, 33, ['traccar_device_missing_at' => now()->subDay()->startOfSecond()]);
+    $unmarked = dueMobileLocation($server, 34);
+    fakeTraccarServer([], 500);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect($marked->refresh()->traccar_device_missing_at)->not->toBeNull()
+        ->and($unmarked->refresh()->traccar_device_missing_at)->toBeNull()
+        ->and($server->refresh()->last_poll_error)->toBeNull();
+});
+
+test('only the locations whose device is gone are marked, and marking does not touch the activity log', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $gone = dueMobileLocation($server, 33);
+    $present = dueMobileLocation($server, 38);
+    fakeTraccarServer([], [['id' => 38, 'name' => 'iPhone']]);
+    $before = Activity::where('subject_type', Location::class)->count();
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect($gone->refresh()->traccar_device_missing_at)->not->toBeNull()
+        ->and($present->refresh()->traccar_device_missing_at)->toBeNull()
+        ->and(Activity::where('subject_type', Location::class)->count())->toBe($before);
+});

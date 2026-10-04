@@ -371,3 +371,26 @@ test('the Position updated column shows the creation date for stationary and the
         ->assertTableColumnFormattedStateSet('position_updated', '12 minutes ago', $located)
         ->assertTableColumnStateSet('position_updated', null, $waiting);
 });
+
+test('a mobile location whose device is gone shows a warning in the list instead of a time', function () {
+    $gone = Location::factory()->mobile()->for($this->user)->create(['mobile_position_fixed_at' => now()->subHour(), 'traccar_device_missing_at' => now()->subDay()]);
+
+    livewire(ListLocations::class)
+        ->assertTableColumnFormattedStateSet('position_updated', 'Device not found on server', $gone);
+});
+
+test('editing a location whose device is gone shows the warning, until another device is chosen', function () {
+    $server = TraccarServer::factory()->for($this->user)->create();
+    $gone = Location::factory()->mobile()->for($this->user)->create([
+        'traccar_server_id' => $server->id, 'traccar_device_id' => 33, 'traccar_device_missing_at' => now()->subDay(),
+    ]);
+    $healthy = Location::factory()->mobile()->for($this->user)->create(['traccar_server_id' => $server->id, 'traccar_device_id' => 38]);
+
+    livewire(EditLocation::class, ['record' => $gone->id])
+        ->assertSee('no longer exists on the Traccar server')
+        ->fillForm(['traccar_device_id' => 38])
+        ->assertDontSee('no longer exists on the Traccar server');
+
+    livewire(EditLocation::class, ['record' => $healthy->id])
+        ->assertDontSee('no longer exists on the Traccar server');
+});

@@ -44,7 +44,13 @@ class Location extends Model
                     'mobile_update_interval_minutes' => null,
                     'mobile_position_updated_at' => null,
                     'mobile_position_fixed_at' => null,
+                    'traccar_device_missing_at' => null,
                 ]);
+            }
+
+            // A different device is a fresh start: whatever was noticed about the old one no longer applies.
+            if ($location->isDirty('traccar_device_id') && ! $location->isDirty('traccar_device_missing_at')) {
+                $location->forceFill(['traccar_device_missing_at' => null]);
             }
         });
     }
@@ -53,13 +59,13 @@ class Location extends Model
     {
         // logAll() preserves original behavior for every real field (including
         // lat/lng, whether a stationary pin is repositioned or a mobile fix is
-        // manually corrected). Only mobile_position_updated_at and mobile_position_fixed_at
-        // are excluded: they're bookkeeping timestamps that tick every 5-30 minutes forever purely
+        // manually corrected). Only mobile_position_updated_at, mobile_position_fixed_at and
+        // traccar_device_missing_at are excluded: they're bookkeeping timestamps that tick every 5-30 minutes forever purely
         // from Traccar polling, not user-meaningful data, and would otherwise
         // drown out everything else about this model in noise.
         return LogOptions::defaults()
             ->logAll()
-            ->logExcept(['mobile_position_updated_at', 'mobile_position_fixed_at'])
+            ->logExcept(['mobile_position_updated_at', 'mobile_position_fixed_at', 'traccar_device_missing_at'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -73,6 +79,7 @@ class Location extends Model
             'mobile_source' => MobileSource::class,
             'mobile_position_updated_at' => 'datetime',
             'mobile_position_fixed_at' => 'datetime',
+            'traccar_device_missing_at' => 'datetime',
         ];
     }
 
@@ -102,6 +109,11 @@ class Location extends Model
      * the time Traccar says its device was last located (null until the first fix
      * arrives), a stationary location's is when it was created.
      */
+    public function hasMissingDevice(): bool
+    {
+        return $this->type === LocationType::Mobile && $this->traccar_device_missing_at !== null;
+    }
+
     public function positionLocatedAt(): ?CarbonInterface
     {
         return $this->type === LocationType::Mobile ? $this->mobile_position_fixed_at : $this->created_at;

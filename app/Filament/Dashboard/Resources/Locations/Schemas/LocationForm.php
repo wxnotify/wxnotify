@@ -6,6 +6,7 @@ use App\Actions\Traccar\ListTraccarDevices;
 use App\Actions\Weather\ResolveTimezoneFromCoordinates;
 use App\Enums\LocationType;
 use App\Enums\MobileSource;
+use App\Models\Location;
 use App\Support\Timezones;
 use Fahiem\FilamentPinpoint\Pinpoint;
 use Filament\Forms\Components\Hidden;
@@ -13,6 +14,7 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -121,6 +123,18 @@ class LocationForm
                 ->helperText(fn (): ?string => auth()->user()->traccarServers()->exists()
                     ? null
                     : 'No Traccar servers yet — add one under Tools → Traccar Servers first.'),
+            Callout::make('This location\'s device is missing')
+                ->key('traccar_device_missing_notice')
+                ->color('warning')
+                ->icon('heroicon-o-exclamation-triangle')
+                ->description(fn (?Location $record): string => 'The device linked here no longer exists on the Traccar server'
+                    .($record?->traccar_device_missing_at !== null ? ' (first noticed '.$record->traccar_device_missing_at->diffForHumans().')' : '')
+                    .', so this location is not being updated. Pick its device again below.')
+                ->visible(fn (?Location $record, Get $get): bool => $visible($get)
+                    && $record?->hasMissingDevice() === true
+                    && (int) $get('traccar_device_id') === (int) $record->traccar_device_id
+                    && (int) $get('traccar_server_id') === (int) $record->traccar_server_id)
+                ->columnSpanFull(),
             Select::make('traccar_device_id')
                 ->label('Device')
                 ->options(fn (Get $get): array => self::deviceOptions($get('traccar_server_id')))
