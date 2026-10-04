@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\AppTokenController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\IngestEmwinProductController;
@@ -24,6 +25,8 @@ Route::prefix('v1')->group(function (): void {
 
     Route::middleware(['auth:sanctum', ExtendAppTokenExpiry::class, 'ability:app', 'throttle:app-api'])->group(function (): void {
         Route::get('/me', MeController::class)->name('api.v1.me');
+        Route::get('/alerts', [AlertController::class, 'index'])->name('api.v1.alerts.index');
+        Route::get('/alerts/{id}', [AlertController::class, 'show'])->whereNumber('id')->name('api.v1.alerts.show');
         Route::delete('/auth/token', [AppTokenController::class, 'destroy'])->name('api.v1.auth.token.destroy');
     });
 });
