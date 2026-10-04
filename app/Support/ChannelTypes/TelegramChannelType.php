@@ -57,7 +57,8 @@ class TelegramChannelType implements ChannelType
 
     /**
      * The chat ID isn't secret (the bot token is what actually grants send
-     * access), so it's shown in full rather than masked.
+     * access), so it's shown in full rather than masked. The bare ID is
+     * shown; destinationLabel() is the caption that says what it is.
      */
     public function displaySummary(NotificationChannel $record): string
     {
@@ -65,6 +66,11 @@ class TelegramChannelType implements ChannelType
             return '—';
         }
 
-        return 'Chat '.rawurldecode($matches[1]);
+        return rawurldecode($matches[1]);
+    }
+
+    public function destinationLabel(): string
+    {
+        return 'Telegram chat ID';
     }
 }

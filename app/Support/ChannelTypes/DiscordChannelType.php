@@ -64,4 +64,9 @@ class DiscordChannelType implements ChannelType
 
         return self::maskLast4($matches[1]);
     }
+
+    public function destinationLabel(): string
+    {
+        return 'Discord webhook';
+    }
 }

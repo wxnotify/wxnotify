@@ -26,6 +26,36 @@ test('the list page explains what it\'s for', function () {
         ->assertSee('Where your alerts actually get delivered');
 });
 
+test('the Destination column captions each value with what it is', function () {
+    NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'label' => 'Work Pushover',
+        'apprise_url' => 'pover://abcdefghijklmnopqrstuvwxyz1234@zyxwvutsrqponmlkjihgfedcba4321',
+    ]);
+    NotificationChannel::factory()->for($this->user)->email('first@example.com')->create(['label' => 'My Email']);
+    NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'telegram', 'label' => 'Family Chat', 'apprise_url' => 'tgram://123%3AABC-token/-100123456',
+    ]);
+
+    livewire(ListNotificationChannels::class)
+        ->assertSee('••••1234')
+        ->assertSee('Pushover user key')
+        ->assertSee('first@example.com')
+        ->assertSee('Email address')
+        ->assertSee('-100123456')
+        ->assertSee('Telegram chat ID')
+        ->assertDontSee('ABC-token');
+});
+
+test('a destination value that cannot be read shows no caption', function () {
+    NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'label' => 'Broken Pushover', 'apprise_url' => 'not-a-pushover-url',
+    ]);
+
+    livewire(ListNotificationChannels::class)
+        ->assertSee('—')
+        ->assertDontSee('Pushover user key');
+});
+
 test('the Destination column tells apart two channels of the same type', function () {
     // Regression: the table previously showed only Label/Type/Verified, so
     // two Email channels with different labels were indistinguishable --

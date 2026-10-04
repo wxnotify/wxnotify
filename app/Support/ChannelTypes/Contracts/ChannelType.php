@@ -74,4 +74,12 @@ interface ChannelType
      * webhook URL, bot token, API key, etc.).
      */
     public function displaySummary(NotificationChannel $record): string;
+
+    /**
+     * A short fixed caption saying what `displaySummary()` shows ("Pushover user
+     * key", "Email address"), displayed in small gray text under the value in the
+     * subscriber's Channels table. Never derived from the record, so it can never
+     * carry a secret.
+     */
+    public function destinationLabel(): string;
 }

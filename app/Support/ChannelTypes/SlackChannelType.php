@@ -64,4 +64,9 @@ class SlackChannelType implements ChannelType
 
         return self::maskLast4($matches[3]);
     }
+
+    public function destinationLabel(): string
+    {
+        return 'Slack webhook';
+    }
 }

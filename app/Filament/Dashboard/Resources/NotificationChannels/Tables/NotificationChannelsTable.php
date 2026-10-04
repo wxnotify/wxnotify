@@ -37,7 +37,12 @@ class NotificationChannelsTable
                     ->badge(),
                 TextColumn::make('destination')
                     ->label('Destination')
-                    ->state(fn (NotificationChannel $record): string => app(ChannelTypeRegistry::class)->find($record->channel_type)?->displaySummary($record) ?? '—'),
+                    ->state(fn (NotificationChannel $record): string => app(ChannelTypeRegistry::class)->find($record->channel_type)?->displaySummary($record) ?? '—')
+                    ->description(function (NotificationChannel $record): ?string {
+                        $type = app(ChannelTypeRegistry::class)->find($record->channel_type);
+
+                        return $type !== null && $type->displaySummary($record) !== '—' ? $type->destinationLabel() : null;
+                    }),
                 IconColumn::make('verified_at')
                     ->label('Verified')
                     ->boolean()

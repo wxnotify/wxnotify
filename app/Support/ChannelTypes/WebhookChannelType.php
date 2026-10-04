@@ -347,4 +347,9 @@ class WebhookChannelType implements ChannelType
 
         return is_string($host) && $host !== '' ? $host : '—';
     }
+
+    public function destinationLabel(): string
+    {
+        return 'Webhook host';
+    }
 }

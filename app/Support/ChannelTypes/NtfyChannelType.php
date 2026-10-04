@@ -82,4 +82,9 @@ class NtfyChannelType implements ChannelType
 
         return $host === '' ? $masked : "{$host} {$masked}";
     }
+
+    public function destinationLabel(): string
+    {
+        return 'ntfy server and topic';
+    }
 }

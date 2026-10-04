@@ -203,8 +203,30 @@ test('telegram\'s destination summary shows the chat id in full but never the bo
     $record = NotificationChannel::factory()->make(['apprise_url' => 'tgram://123%3AABC-token/-100123456']);
 
     expect((new TelegramChannelType)->displaySummary($record))
-        ->toBe('Chat -100123456')
+        ->toBe('-100123456')
         ->not->toContain('ABC-token');
+});
+
+test('every channel type captions its destination value with a fixed, secret-free caption', function () {
+    $captions = app(ChannelTypeRegistry::class)->all()
+        ->mapWithKeys(fn ($type): array => [$type->slug() => $type->destinationLabel()])
+        ->all();
+
+    expect($captions)->toEqual([
+        'discord' => 'Discord webhook',
+        'email' => 'Email address',
+        'msteams' => 'Teams workflow',
+        'ntfy' => 'ntfy server and topic',
+        'pushover' => 'Pushover user key',
+        'slack' => 'Slack webhook',
+        'telegram' => 'Telegram chat ID',
+        'webhook' => 'Webhook host',
+        'webpush' => 'Push service',
+    ]);
+
+    foreach ($captions as $caption) {
+        expect($caption)->not->toContain('://')->not->toContain('•');
+    }
 });
 
 test('discord\'s destination summary masks the webhook token to its last 4 characters', function () {

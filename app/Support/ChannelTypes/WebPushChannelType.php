@@ -116,6 +116,11 @@ class WebPushChannelType implements ChannelType
         return is_string($host) && $host !== '' ? $host : '—';
     }
 
+    public function destinationLabel(): string
+    {
+        return 'Push service';
+    }
+
     private static function describeBrowser(string $userAgent): string
     {
         $browser = match (true) {

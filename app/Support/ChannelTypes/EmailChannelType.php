@@ -73,4 +73,9 @@ class EmailChannelType implements ChannelType
     {
         return $record->config['to'] ?? '—';
     }
+
+    public function destinationLabel(): string
+    {
+        return 'Email address';
+    }
 }
