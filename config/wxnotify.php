@@ -20,6 +20,26 @@ return [
     // domain, which is what local development and self-hosting use.
     'product_domain' => env('WXNOTIFY_PRODUCT_DOMAIN'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Client IP behind a proxy
+    |--------------------------------------------------------------------------
+    |
+    | Both are off by default: the client is the connecting address and every
+    | forwarding header is ignored, since any client can send one. See
+    | App\Support\ClientIp.
+    |
+    | trusted_proxies  `*`, or a comma list of load balancer / CDN IPs or CIDRs
+    |                  whose X-Forwarded-For is believed (application-wide).
+    | header           A header to prefer over that, e.g. CF-Connecting-IP for
+    |                  Cloudflare. Only believed from a trusted proxy.
+    |
+    */
+    'client_ip' => [
+        'trusted_proxies' => env('WXNOTIFY_TRUSTED_PROXIES'),
+        'header' => env('WXNOTIFY_CLIENT_IP_HEADER'),
+    ],
+
     'webhooks' => [
         // Honored only when mode === 'selfhost': lets a self-hosted instance
         // deliver to services on its own private network.

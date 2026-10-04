@@ -14,6 +14,7 @@ use App\Observers\IngestedProductObserver;
 use App\Observers\LocationZoneObserver;
 use App\Observers\UserActivityObserver;
 use App\Support\ApplyEmailSettings;
+use App\Support\ClientIp;
 use App\Support\Filament\AdminLogoutResponse;
 use App\Support\Pipeline\UnmanagedPipelineStack;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
@@ -60,6 +61,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->app->make(ApplyEmailSettings::class)();
+
+        ClientIp::configureProxies();
 
         // Without this, activity logged while an admin impersonates a
         // subscriber attributes to the subscriber (Auth::user() during

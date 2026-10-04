@@ -104,3 +104,31 @@ test('failed() logs the exhausted-retries error with structured context', functi
             && $context['user_id'] === $user->id
             && $context['exception'] === 'connection refused');
 });
+
+test('the message names the client IP when the event came from a request', function () {
+    Http::fake();
+    $rule = ActivityAlertRule::factory()->create(['apprise_target' => 'slack://token/botname/channel', 'is_active' => true]);
+    $user = User::factory()->create(['email' => 'subscriber@example.com']);
+
+    (new SendActivityAlert($rule->id, ActivityAlertType::SignedIn, $user->id, Carbon::parse('2026-09-05 12:00:00'), '203.0.113.9'))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['body'] === 'Signed in: subscriber@example.com at Sat, Sep 5, 2026 12:00 PM UTC from 203.0.113.9');
+});
+
+test('the message has no IP part when there was no request, and a job queued before this field existed still runs', function () {
+    Http::fake();
+    $rule = ActivityAlertRule::factory()->create(['apprise_target' => 'slack://token/botname/channel', 'is_active' => true]);
+    $user = User::factory()->create(['email' => 'subscriber@example.com']);
+
+    (new SendActivityAlert($rule->id, ActivityAlertType::SignedIn, $user->id, Carbon::parse('2026-09-05 12:00:00')))->handle(app(AppriseApiClient::class));
+
+    // A payload serialized before ipAddress existed unserializes with it uninitialized, bypassing the constructor.
+    $legacy = (new ReflectionClass(SendActivityAlert::class))->newInstanceWithoutConstructor();
+    foreach (['ruleId' => $rule->id, 'type' => ActivityAlertType::SignedIn, 'userId' => $user->id, 'occurredAt' => Carbon::parse('2026-09-05 12:00:00')] as $property => $value) {
+        (new ReflectionProperty(SendActivityAlert::class, $property))->setValue($legacy, $value);
+    }
+    $legacy->handle(app(AppriseApiClient::class));
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn ($request) => $request['body'] === 'Signed in: subscriber@example.com at Sat, Sep 5, 2026 12:00 PM UTC');
+});

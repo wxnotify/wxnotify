@@ -5,6 +5,7 @@ use App\Enums\ActivityAlertType;
 use App\Jobs\SendActivityAlert;
 use App\Models\ActivityAlertRule;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
@@ -116,4 +117,34 @@ test('a dispatch failure for one rule is logged and does not stop the others or 
     Log::shouldHaveReceived('error')
         ->twice()
         ->withArgs(fn ($message, $context) => in_array($context['rule_id'], [$ruleA->id, $ruleB->id], true));
+});
+
+test('the dispatched job carries the client IP of the request that caused the event', function () {
+    Queue::fake();
+    ActivityAlertRule::factory()->create(['scope' => 'all_subscribers', 'activity_types' => [ActivityAlertType::SignedIn->value], 'is_active' => true]);
+    $user = User::factory()->create();
+
+    app()->instance('request', Request::create('/login', 'POST', server: ['REMOTE_ADDR' => '198.51.100.7']));
+
+    (new MatchActivityAlertRules)($user, ActivityAlertType::SignedIn);
+
+    Queue::assertPushed(SendActivityAlert::class, fn ($job) => $job->ipAddress === '198.51.100.7');
+});
+
+test('the job carries no IP when staff caused the event, or there was no client address', function () {
+    Queue::fake();
+    ActivityAlertRule::factory()->create(['scope' => 'all_subscribers', 'activity_types' => [ActivityAlertType::NameChanged->value], 'is_active' => true]);
+    $subscriber = User::factory()->create();
+    $staff = User::factory()->create(['is_staff' => true]);
+
+    app()->instance('request', Request::create('/admin', 'POST', server: ['REMOTE_ADDR' => '198.51.100.7']));
+    $this->actingAs($staff);
+    (new MatchActivityAlertRules)($subscriber, ActivityAlertType::NameChanged);
+
+    app()->instance('request', Request::create('/', 'GET', server: ['REMOTE_ADDR' => '']));
+    $this->actingAs($subscriber);
+    (new MatchActivityAlertRules)($subscriber, ActivityAlertType::NameChanged);
+
+    Queue::assertPushed(SendActivityAlert::class, 2);
+    Queue::assertNotPushed(SendActivityAlert::class, fn ($job) => $job->ipAddress !== null);
 });
