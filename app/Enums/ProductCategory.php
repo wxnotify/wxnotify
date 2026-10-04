@@ -13,6 +13,8 @@ enum ProductCategory: string
     case Coastal = 'coastal';
     case Marine = 'marine';
     case OtherForecastsOutlooksDiscussionsAndReports = 'other_forecasts_outlooks_discussions_and_reports';
+    case ConvectiveOutlooks = 'convective_outlooks';
+    case OtherDiscussionsReportsAndOutlooks = 'other_discussions_reports_and_outlooks';
     case NonMeteorologicalHazardsAndAdministrativeMessages = 'non_meteorological_hazards_and_administrative_messages';
     case AirportRelated = 'airport_related';
 
@@ -28,6 +30,8 @@ enum ProductCategory: string
             self::Coastal => 'Coastal',
             self::Marine => 'Marine',
             self::OtherForecastsOutlooksDiscussionsAndReports => 'Other Forecasts, Outlooks, Discussions, and Reports',
+            self::ConvectiveOutlooks => 'Convective Outlooks',
+            self::OtherDiscussionsReportsAndOutlooks => 'Other Discussions, Reports, and Outlooks',
             self::NonMeteorologicalHazardsAndAdministrativeMessages => 'Non-Meteorological Hazards and Administrative Messages',
             self::AirportRelated => 'Airport-related',
         };
@@ -49,6 +53,8 @@ enum ProductCategory: string
             self::Marine => 'fas-ship',
             self::NonMeteorologicalHazardsAndAdministrativeMessages => 'fas-house-tsunami',
             self::OtherForecastsOutlooksDiscussionsAndReports => 'fas-temperature-high',
+            self::ConvectiveOutlooks => 'fas-cloud-bolt',
+            self::OtherDiscussionsReportsAndOutlooks => 'fas-file-lines',
             self::AirportRelated => 'fas-plane',
         };
     }

@@ -82,8 +82,8 @@ class ProductCatalogSeeder extends Seeder
         'CFY' => ['code' => 'CF.Y', 'category' => ProductCategory::Coastal, 'wea_warning' => false],
         'SCY' => ['code' => 'SC.Y', 'category' => ProductCategory::Marine, 'wea_warning' => false],
         'AFD' => ['code' => 'AFD', 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
-        'DY1' => ['code' => 'SPC.OUTLOOK', 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
-        'SWO' => ['code' => 'SPC.MD', 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
+        'DY1' => ['code' => 'SPC.OUTLOOK', 'category' => ProductCategory::ConvectiveOutlooks, 'wea_warning' => false],
+        'SWO' => ['code' => 'SPC.MD', 'category' => ProductCategory::OtherDiscussionsReportsAndOutlooks, 'wea_warning' => false],
     ];
 
     /**
@@ -160,11 +160,11 @@ class ProductCatalogSeeder extends Seeder
         'HWO' => ['name' => 'Hazardous Weather Outlook', 'family' => ProductFamily::Informational, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
         'NOW' => ['name' => 'Short-Term Forecast (NOWCast)', 'family' => ProductFamily::Informational, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
         'REC' => ['name' => 'Recreational Report', 'family' => ProductFamily::Informational, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
-        'DY2' => ['name' => 'SPC Day 2 Convective Outlook', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
-        'DY3' => ['name' => 'SPC Day 3 Convective Outlook', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
-        'D48' => ['name' => 'SPC Day 4-8 Convective Outlook', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
-        'PWO' => ['name' => 'SPC Public Severe Weather Outlook (Statewide)', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
-        'STA' => ['name' => 'SPC Tornado and Severe Thunderstorm Reports', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
+        'DY2' => ['name' => 'SPC Day 2 Convective Outlook', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::ConvectiveOutlooks, 'wea_warning' => false],
+        'DY3' => ['name' => 'SPC Day 3 Convective Outlook', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::ConvectiveOutlooks, 'wea_warning' => false],
+        'D48' => ['name' => 'SPC Day 4-8 Convective Outlook', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::ConvectiveOutlooks, 'wea_warning' => false],
+        'PWO' => ['name' => 'SPC Public Severe Weather Outlook (Statewide)', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::OtherDiscussionsReportsAndOutlooks, 'wea_warning' => false],
+        'STA' => ['name' => 'SPC Tornado and Severe Thunderstorm Reports', 'family' => ProductFamily::SpcWpc, 'category' => ProductCategory::OtherDiscussionsReportsAndOutlooks, 'wea_warning' => false],
         'LSR' => ['name' => 'Local Storm Report', 'family' => ProductFamily::Informational, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
         'RER' => ['name' => 'Record Event Report', 'family' => ProductFamily::Informational, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
         'LCO' => ['name' => 'Local Cooperative Observation', 'family' => ProductFamily::Informational, 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
