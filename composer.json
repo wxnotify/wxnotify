@@ -26,6 +26,7 @@
         "johnrivera7/filament-cybersecurity": "^1.0",
         "laravel-notification-channels/webpush": "^13.0",
         "laravel/framework": "^13.17",
+        "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
         "marcelodelgado/filament-announcements": "^1.0",
         "owenvoke/blade-fontawesome": "^3.3",
