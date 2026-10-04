@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Channels\RevealChannelUrl;
 use App\Filament\Dashboard\Resources\NotificationChannels\Pages\ListNotificationChannels;
 use App\Models\NotificationChannel;
 use App\Models\User;
@@ -8,6 +9,8 @@ use Filament\Actions\Testing\TestAction;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Spatie\Activitylog\Models\Activity;
+use STS\FilamentImpersonate\ImpersonateManager;
 
 use function Pest\Livewire\livewire;
 
@@ -444,4 +447,110 @@ test('editing a non-webhook channel still never writes its config', function () 
 
     expect($channel->fresh()->label)->toBe('Renamed discord')
         ->and($channel->fresh()->config)->toBe(['keep' => 'me']);
+});
+
+test('the edit form offers a hidden URL field for channels that have an Apprise URL', function (string $channelType, string $url) {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['channel_type' => $channelType, 'apprise_url' => $url]);
+
+    livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->assertSchemaComponentVisible('apprise_url_preview')
+        ->assertSchemaStateSet(['apprise_url_preview' => null]);
+})->with([
+    'pushover' => ['pushover', 'pover://uKey1234567890@aTok0987654321'],
+    'discord' => ['discord', 'discord://123456789/abcDEF-token_123/'],
+    'slack' => ['slack', 'slack://T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXWXYZ/'],
+    'telegram' => ['telegram', 'tgram://123%3AABC-token/-100123456'],
+    'ntfy' => ['ntfy', 'ntfy://wxnotify-a1b2c3'],
+]);
+
+test('the edit form has no URL field for email, web push or webhook channels', function () {
+    $channels = [
+        NotificationChannel::factory()->for($this->user)->email()->create(),
+        NotificationChannel::factory()->for($this->user)->webPush()->create(),
+        NotificationChannel::factory()->for($this->user)->webhook()->create(),
+    ];
+
+    foreach ($channels as $channel) {
+        livewire(ListNotificationChannels::class)
+            ->mountAction(TestAction::make('edit')->table($channel))
+            ->assertSchemaComponentHidden('apprise_url_preview');
+    }
+});
+
+test('before Reveal the URL is nowhere in the rendered edit form or its snapshot', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+    ]);
+
+    $component = livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->assertDontSee('uKey1234567890')
+        ->assertDontSee('aTok0987654321');
+
+    expect(json_encode($component->snapshot))->not->toContain('uKey1234567890')->not->toContain('aTok0987654321');
+});
+
+test('saving the edit form never changes the stored URL, even if the preview field is submitted', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'label' => 'Old', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+    ]);
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('edit')->table($channel), data: [
+            'label' => 'New',
+            'apprise_url_preview' => 'pover://attacker@attacker',
+        ])
+        ->assertHasNoActionErrors();
+
+    $fresh = $channel->fresh();
+
+    expect($fresh->label)->toBe('New')->and($fresh->apprise_url)->toBe('pover://uKey1234567890@aTok0987654321');
+});
+
+test('Reveal fills the URL field with the exact URL and logs it, and Hide empties it again', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+    ]);
+    $reveal = TestAction::make('revealAppriseUrl')->schemaComponent('apprise_url_preview');
+    $hide = TestAction::make('hideAppriseUrl')->schemaComponent('apprise_url_preview');
+
+    livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->callAction([$reveal])
+        ->assertSchemaStateSet(['apprise_url_preview' => 'pover://uKey1234567890@aTok0987654321'])
+        ->callAction([$hide])
+        ->assertSchemaStateSet(['apprise_url_preview' => null]);
+
+    expect(Activity::where('subject_id', $channel->id)->where('event', 'revealed')->count())->toBe(1);
+});
+
+test('Reveal is disabled while staff impersonate, so nothing is revealed or logged', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+    ]);
+    $this->mock(ImpersonateManager::class, fn ($mock) => $mock->shouldReceive('isImpersonating')->andReturn(true));
+    $reveal = TestAction::make('revealAppriseUrl')->schemaComponent('apprise_url_preview');
+
+    livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->assertActionDisabled([$reveal])
+        ->callAction([$reveal])
+        ->assertSchemaStateSet(['apprise_url_preview' => null]);
+
+    expect(Activity::where('event', 'revealed')->exists())->toBeFalse();
+});
+
+test('Reveal refuses with a notice and leaves the field empty when the action returns no URL', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+    ]);
+    $this->mock(RevealChannelUrl::class, fn ($mock) => $mock->shouldReceive('__invoke')->once()
+        ->andReturn(['url' => null, 'error' => 'You can only reveal your own channels.']));
+
+    livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->callAction([TestAction::make('revealAppriseUrl')->schemaComponent('apprise_url_preview')])
+        ->assertSchemaStateSet(['apprise_url_preview' => null])
+        ->assertNotified('Couldn\'t reveal the URL');
 });

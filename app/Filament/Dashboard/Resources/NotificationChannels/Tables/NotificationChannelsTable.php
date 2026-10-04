@@ -111,9 +111,15 @@ class NotificationChannelsTable
                             ->send();
                     }),
                 EditAction::make()
-                    ->mutateRecordDataUsing(fn (array $data, NotificationChannel $record): array => $record->channel_type === 'webhook'
-                        ? [...$data, ...WebhookChannelType::formFromConfig($record->config)]
-                        : $data)
+                    // The modal's state is the record's whole attribute array and travels to the browser
+                    // in the Livewire snapshot, so the decrypted Apprise URL must be dropped here: the
+                    // owner gets it only through the Reveal action (RevealChannelUrl), never prefilled.
+                    ->mutateRecordDataUsing(fn (array $data, NotificationChannel $record): array => Arr::except(
+                        $record->channel_type === 'webhook'
+                            ? [...$data, ...WebhookChannelType::formFromConfig($record->config)]
+                            : $data,
+                        ['apprise_url'],
+                    ))
                     ->using(self::saveChannel(...)),
                 self::guardedDeleteAction(),
             ])
