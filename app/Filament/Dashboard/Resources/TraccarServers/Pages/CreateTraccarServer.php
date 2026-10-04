@@ -39,10 +39,12 @@ class CreateTraccarServer extends CreateRecord
             'api_token' => $data['api_token'],
         ]);
 
-        if (app(PollTraccarServer::class)($probe) === null) {
+        $probeResult = app(PollTraccarServer::class)->poll($probe);
+
+        if ($probeResult['positions'] === null) {
             Notification::make()
                 ->title('Couldn\'t connect to this Traccar server')
-                ->body('Check the server URL and API token, then try again.')
+                ->body(($probeResult['error'] ?? 'Check the server URL and API token.').' Check the server URL and API token, then try again.')
                 ->danger()
                 ->send();
 

@@ -3,6 +3,7 @@
 namespace App\Actions\Traccar;
 
 use App\Models\TraccarServer;
+use App\Support\TraccarFailure;
 use App\Support\TraccarPosition;
 use App\Support\TraccarUrlGuard;
 use Illuminate\Support\Facades\Http;
@@ -25,12 +26,24 @@ class PollTraccarServer
      */
     public function __invoke(TraccarServer $server): ?array
     {
-        $pinned = app(TraccarUrlGuard::class)->requestOptions((string) $server->base_url);
+        return $this->poll($server)['positions'];
+    }
+
+    /**
+     * Like __invoke(), but also says why a poll failed, in a fixed message that is
+     * safe to store and show (see TraccarFailure).
+     *
+     * @return array{positions: ?array<int, array{lat: float, lng: float, fixTime: ?string}>, error: ?string}
+     */
+    public function poll(TraccarServer $server): array
+    {
+        $guard = app(TraccarUrlGuard::class);
+        $pinned = $guard->requestOptions((string) $server->base_url);
 
         if ($pinned === null) {
             Log::warning('Traccar server URL refused', ['traccar_server_id' => $server->id]);
 
-            return null;
+            return $this->failed($guard->violation((string) $server->base_url) ?? 'That host name could not be resolved.');
         }
 
         try {
@@ -45,7 +58,7 @@ class PollTraccarServer
                 'exception' => $e->getMessage(),
             ]);
 
-            return null;
+            return $this->failed(TraccarFailure::forException($e));
         }
 
         if (! $response->successful()) {
@@ -54,7 +67,7 @@ class PollTraccarServer
                 'status' => $response->status(),
             ]);
 
-            return null;
+            return $this->failed(TraccarFailure::forStatus($response->status()));
         }
 
         // A malformed whole-response body or any single malformed position
@@ -71,7 +84,7 @@ class PollTraccarServer
                 'traccar_server_id' => $server->id,
             ]);
 
-            return null;
+            return $this->failed(TraccarFailure::MALFORMED);
         }
 
         $result = [];
@@ -86,7 +99,7 @@ class PollTraccarServer
                     'traccar_server_id' => $server->id,
                 ]);
 
-                return null;
+                return $this->failed(TraccarFailure::MALFORMED);
             }
 
             // Well-formed but no GPS fix (flagged invalid, or 0,0): leave this device
@@ -102,6 +115,14 @@ class PollTraccarServer
             ];
         }
 
-        return $result;
+        return ['positions' => $result, 'error' => null];
+    }
+
+    /**
+     * @return array{positions: null, error: string}
+     */
+    private function failed(string $error): array
+    {
+        return ['positions' => null, 'error' => $error];
     }
 }

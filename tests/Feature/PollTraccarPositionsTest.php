@@ -184,3 +184,17 @@ test('a device reporting an invalid position keeps its last good fix and is not 
         ->and((float) $location->lng)->toBe(-94.5786)
         ->and($location->mobile_position_updated_at->equalTo($stampBefore))->toBeTrue();
 });
+
+test('a failed poll stores the specific reason, and the next success clears it', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    Location::factory()->mobile()->create(['traccar_server_id' => $server->id, 'traccar_device_id' => 1]);
+
+    Http::fake(['traccar.example.com/api/positions' => Http::sequence()->push('', 401)->push([])]);
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect($server->refresh()->last_poll_error)->toBe('The server rejected the API token (HTTP 401). Check that the token is still valid.');
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect($server->refresh()->last_poll_error)->toBeNull();
+});

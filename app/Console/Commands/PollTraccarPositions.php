@@ -65,7 +65,7 @@ class PollTraccarPositions extends Command
     private function pollServer(TraccarServer $server, Collection $locations, PollTraccarServer $poll): int
     {
         try {
-            $positions = $poll($server);
+            ['positions' => $positions, 'error' => $error] = $poll->poll($server);
         } catch (Throwable $e) {
             $this->recordFailure($server, $e->getMessage());
 
@@ -73,7 +73,7 @@ class PollTraccarPositions extends Command
         }
 
         if ($positions === null) {
-            $this->recordFailure($server, 'Traccar server unreachable or returned an error.');
+            $this->recordFailure($server, $error ?? 'Traccar server unreachable or returned an error.');
 
             return 0;
         }

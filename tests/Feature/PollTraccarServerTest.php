@@ -3,6 +3,8 @@
 use App\Actions\Traccar\PollTraccarServer;
 use App\Models\TraccarServer;
 use App\Support\TraccarUrlGuard;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Psr7\Request;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -187,4 +189,70 @@ test('a host name that does not resolve is refused before any request is sent', 
 
     expect((new PollTraccarServer)($server))->toBeNull();
     Http::assertNothingSent();
+});
+
+test('poll() reports a specific, fixed reason for each kind of failure', function (string $case, string $expected) {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com', 'api_token' => 'secret-token']);
+
+    Http::fake(['traccar.example.com/api/positions' => match ($case) {
+        '401' => Http::response('', 401),
+        '403' => Http::response('', 403),
+        '404' => Http::response('', 404),
+        '429' => Http::response('', 429),
+        '502' => Http::response('', 502),
+        '302' => Http::response('', 302, ['Location' => 'https://elsewhere.example.com']),
+        '418' => Http::response('', 418),
+        'malformed body' => Http::response('not json', 200),
+        'malformed entry' => Http::response([['deviceId' => 1, 'latitude' => 'x', 'longitude' => 2]]),
+        'timeout' => fn () => throw new ConnectionException('cURL error 28: https://traccar.example.com/api/positions secret-token', 0, new ConnectException('x', new Request('GET', '/'), null, ['errno' => 28])),
+        'dns' => fn () => throw new ConnectionException('cURL error 6', 0, new ConnectException('x', new Request('GET', '/'), null, ['errno' => 6])),
+        'refused' => fn () => throw new ConnectionException('cURL error 7', 0, new ConnectException('x', new Request('GET', '/'), null, ['errno' => 7])),
+        'tls' => fn () => throw new ConnectionException('cURL error 60', 0, new ConnectException('x', new Request('GET', '/'), null, ['errno' => 60])),
+        'other' => fn () => throw new ConnectionException('boom https://traccar.example.com secret-token'),
+    }]);
+
+    $result = (new PollTraccarServer)->poll($server);
+
+    expect($result['positions'])->toBeNull()
+        ->and($result['error'])->toBe($expected)
+        ->and($result['error'])->not->toContain('secret-token')->not->toContain('traccar.example.com');
+})->with([
+    '401' => ['401', 'The server rejected the API token (HTTP 401). Check that the token is still valid.'],
+    '403' => ['403', 'The server rejected the API token (HTTP 403). Check that the token is still valid.'],
+    '404' => ['404', 'The server answered HTTP 404. Check the server URL.'],
+    '429' => ['429', 'The server is rate limiting requests (HTTP 429). Polling will retry.'],
+    '502' => ['502', 'The Traccar server reported an error (HTTP 502).'],
+    '302' => ['302', 'The server redirected the request (HTTP 302). Use the server\'s final URL.'],
+    '418' => ['418', 'The server answered HTTP 418.'],
+    'malformed body' => ['malformed body', 'The server sent a response WxNotify could not understand.'],
+    'malformed entry' => ['malformed entry', 'The server sent a response WxNotify could not understand.'],
+    'timeout' => ['timeout', 'The server took too long to respond.'],
+    'dns' => ['dns', 'The server\'s host name could not be found.'],
+    'refused' => ['refused', 'The server refused the connection. Check the host and port.'],
+    'tls' => ['tls', 'Could not make a secure (HTTPS) connection. Check the server\'s certificate.'],
+    'other' => ['other', 'Could not connect to the server.'],
+]);
+
+test('poll() reports the guard\'s message for a URL it refuses, and for a host that does not resolve', function () {
+    config(['wxnotify.mode' => 'cloud']);
+    $server = TraccarServer::factory()->create(['base_url' => 'http://traccar.internal.example.com:8082']);
+    Http::fake();
+
+    app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(fn (string $host): array => ['10.0.0.5']));
+    $private = (new PollTraccarServer)->poll($server);
+
+    app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(fn (string $host): array => []));
+    config(['wxnotify.mode' => 'selfhost']);
+    $unresolved = (new PollTraccarServer)->poll($server);
+
+    expect($private['error'])->toBe('That address resolves to a private or reserved network, which is not allowed.')
+        ->and($unresolved['error'])->toBe('That host name could not be resolved.');
+    Http::assertNothingSent();
+});
+
+test('poll() reports no error on success', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    Http::fake(['traccar.example.com/api/positions' => Http::response([])]);
+
+    expect((new PollTraccarServer)->poll($server))->toBe(['positions' => [], 'error' => null]);
 });

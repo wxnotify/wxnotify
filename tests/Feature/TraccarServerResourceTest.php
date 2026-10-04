@@ -66,6 +66,20 @@ test('a server that cannot be reached at all is not created', function () {
     assertDatabaseMissing(TraccarServer::class, ['user_id' => $user->id, 'label' => 'Unreachable Server']);
 });
 
+test('a rejected token is named in the create notification', function () {
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $this->actingAs($user);
+
+    Http::fake(['rejecting.example.com/*' => Http::response('', 401)]);
+
+    livewire(CreateTraccarServer::class)
+        ->fillForm(['label' => 'Rejecting Server', 'base_url' => 'https://rejecting.example.com', 'api_token' => 'tok123'])
+        ->call('create');
+
+    expect(sentNotificationBodies())->toContain('The server rejected the API token (HTTP 401)');
+    assertDatabaseMissing(TraccarServer::class, ['user_id' => $user->id, 'label' => 'Rejecting Server']);
+});
+
 test('a Free subscriber cannot access the resource at all', function () {
     $user = User::factory()->create(['tier_override' => Tier::Free]);
     $this->actingAs($user);
