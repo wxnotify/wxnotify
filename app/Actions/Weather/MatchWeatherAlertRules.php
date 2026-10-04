@@ -196,6 +196,11 @@ class MatchWeatherAlertRules
      * than being silently, permanently unmatchable; [] means extraction was
      * attempted and found no categorical risk stated today, which is a
      * genuine non-match for any specific-level filter.
+     *
+     * Only the levels in the product's own `risk_level_options` count: a rule watching both the
+     * Convective Outlook and the Fire Weather Outlook holds both categories' ticks in one list, and
+     * a level ticked for one category must not filter the other's products. `matchesRiskArea()`
+     * already ranks only levels found in the product's options, so it needs no equivalent change.
      */
     private function matchesRiskLevel(AlertRule $rule, IngestedProduct $product): bool
     {
@@ -203,11 +208,21 @@ class MatchWeatherAlertRules
             return true;
         }
 
+        // The rule's levels are one flat list across every category it watches (the form
+        // keeps a checklist per category), so only the levels this product itself offers
+        // count for it. None of them belonging to it means the subscriber ticked nothing
+        // for this product's category: no filter, i.e. every level.
+        $relevant = array_values(array_intersect($rule->risk_levels, $product->product?->risk_level_options ?? []));
+
+        if ($relevant === []) {
+            return true;
+        }
+
         if ($product->risk_levels === null) {
             return true;
         }
 
-        return array_intersect($rule->risk_levels, $product->risk_levels) !== [];
+        return array_intersect($relevant, $product->risk_levels) !== [];
     }
 
     /**

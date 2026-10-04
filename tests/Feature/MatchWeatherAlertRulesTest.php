@@ -11,6 +11,7 @@ use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
+use Database\Seeders\ProductCatalogSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -861,4 +862,79 @@ test('a nationwide rule is never quiet-hours suppressed, even when the owner has
 
     Queue::assertPushed(DeliverWeatherAlert::class);
     expect(DeliveryLog::where('status', 'suppressed')->count())->toBe(0);
+});
+
+function riskRule(array $productCodes, array $riskLevels): AlertRule
+{
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null, 'risk_levels' => $riskLevels]);
+    $rule->products()->attach(Product::whereIn('code', $productCodes)->pluck('id'));
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+
+    return $rule;
+}
+
+test('a rule with only a Fire level ticked still matches a Day 1 outlook that states other levels', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    riskRule(['SPC.OUTLOOK', 'SPC.FIRE'], ['Elevated']);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Marginal', 'Slight']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('a Convective level still filters the Day 1 outlook when a Fire level is ticked as well', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    riskRule(['SPC.OUTLOOK', 'SPC.FIRE'], ['Elevated', 'High']);
+
+    (new MatchWeatherAlertRules)(createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Marginal', 'Slight']]));
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+
+    (new MatchWeatherAlertRules)(createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Slight', 'High']]));
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('Convective levels never block the Fire Weather Outlook', function () {
+    Queue::fake();
+    $fire = Product::where('code', 'SPC.FIRE')->sole();
+    riskRule(['SPC.OUTLOOK', 'SPC.FIRE'], ['High']);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $fire->id, 'risk_levels' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('levels that belong to none of the rule\'s product options apply no filter', function () {
+    $this->seed(ProductCatalogSeeder::class);
+    Queue::fake();
+    $day2 = Product::where('code', 'DY2')->sole(); // has no risk_level_options
+    riskRule(['DY2'], ['High']);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $day2->id, 'risk_levels' => ['Marginal']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('the risk-area threshold ignores a ticked level from another category', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $location = Location::factory()->create(['lat' => 31, 'lng' => -99]); // inside Slight only
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'risk_area', 'risk_levels' => ['Elevated']]);
+    $rule->locations()->attach($location);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $outlook->id,
+        'risk_level_polygons' => [
+            'Slight' => [['lat' => 30, 'lon' => -100], ['lat' => 30, 'lon' => -90], ['lat' => 40, 'lon' => -90], ['lat' => 40, 'lon' => -100]],
+        ],
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
 });
