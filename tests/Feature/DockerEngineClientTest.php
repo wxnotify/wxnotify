@@ -3,7 +3,6 @@
 use App\Support\Pipeline\DockerEngineClient;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
-use RuntimeException;
 
 test('status returns the container state when the container exists', function () {
     Http::fake([

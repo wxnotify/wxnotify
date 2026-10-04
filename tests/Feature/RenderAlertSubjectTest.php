@@ -203,7 +203,10 @@ test('without a template, a product alert is titled with the product that fired,
     $rule = AlertRule::factory()->create(['category' => $category, 'name' => null, 'custom_subject_template' => null]);
     $rule->products()->attach([$day1->id, $d48->id]);
 
-    expect($rule->displayName())->toBe('SPC Day 1 Convective Outlook, SPC Day 4-8 Convective Outlook')
+    // The rule's products come back in no guaranteed order, so compare as a set.
+    $listed = collect(explode(', ', $rule->displayName()))->sort()->values()->all();
+
+    expect($listed)->toBe(['SPC Day 1 Convective Outlook', 'SPC Day 4-8 Convective Outlook'])
         ->and((new RenderAlertSubject)($rule, $d48))->toBe('SPC Day 4-8 Convective Outlook')
         ->and((new RenderAlertSubject)($rule, $day1))->toBe('SPC Day 1 Convective Outlook');
 })->with(['weather_alerts', 'spc_wpc']);
