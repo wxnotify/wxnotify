@@ -1,6 +1,13 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Native\Mobile\Browser;
+use Native\Mobile\Network;
+use Native\Mobile\SecureStorage;
+use Tests\Fakes\FakeNetwork;
+use Tests\Fakes\InMemorySecureStorage;
+use Tests\Fakes\RecordingBrowser;
 use Tests\TestCase;
 
 /*
@@ -15,7 +22,21 @@ use Tests\TestCase;
 */
 
 pest()->extend(TestCase::class)
- // ->use(RefreshDatabase::class)
+    ->use(RefreshDatabase::class)
+    ->beforeEach(function () {
+        // Every native capability the app touches is replaced by an in-memory fake, and any
+        // HTTP request a test did not fake fails at once.
+        $this->secureStorage = new InMemorySecureStorage;
+        $this->browser = new RecordingBrowser;
+        $this->network = new FakeNetwork;
+
+        app()->instance(SecureStorage::class, $this->secureStorage);
+        app()->instance(Browser::class, $this->browser);
+        app()->instance(Network::class, $this->network);
+
+        config(['wxnotify.api_url' => 'https://wx.test']);
+        Http::preventStrayRequests();
+    })
     ->in('Feature');
 
 /*
