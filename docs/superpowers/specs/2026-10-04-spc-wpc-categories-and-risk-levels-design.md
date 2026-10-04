@@ -63,8 +63,9 @@ The existing catch-all category "Other Forecasts, Outlooks, Discussions, and Rep
 
 - For a given ingested product, the rule's **relevant** levels are `array_intersect(rule.risk_levels, product.product.risk_level_options)`.
 - If the relevant set is empty, the rule applies no risk filter to that product (matches at every level), exactly as an empty list does today.
-- Otherwise `matchesRiskLevel()` requires the product's extracted `risk_levels` to intersect the relevant set (null extraction still means "match on product and geography alone", unchanged), and the risk-area threshold is the lowest-ranked level in the relevant set, ranked by position in the product's own options.
-- Effect: ticking only "Enhanced" while also watching the Fire Weather Outlook no longer stops fire alerts (previously the flat list made every fire alert fail the filter).
+- Otherwise `matchesRiskLevel()` requires the product's extracted `risk_levels` to intersect the relevant set (null extraction still means "match on product and geography alone", unchanged).
+- The risk-area threshold (`matchesRiskArea()`) already ignores selected levels that are not in the product's own options (`array_search` against that product's `risk_level_options`, non-matches dropped, no selection meaning rank 0), so it needs no code change; it gets a regression test, because the flat list now routinely holds levels from another category.
+- Effect: ticking only a Fire level (or any level belonging to another category) no longer stops the Day 1 Convective Outlook from matching. Before, the flat list was intersected with every product's extracted levels, so `['Elevated']` never matched an outlook stating `['Marginal', 'Slight']`, even though the subscriber ticked no convective level. (Fire products themselves are unaffected either way: their extracted levels are null, so they match on product and geography alone.)
 - Rules with no `risk_levels`, and products with no `risk_level_options`, behave exactly as before.
 
 ## Not included
@@ -80,7 +81,7 @@ Pest feature tests (container; the full suite in parallel with 6 processes):
 
 - **Data**: the migration moves exactly the seven products, leaves a product whose category staff changed, and reverses; a freshly migrated and seeded catalog equals the snapshot; the category enum has unique values and non-empty labels and icons.
 - **Form**: the SPC & WPC form lists sections in the owner's order; Fire Weather shows its five choices only with the Fire Weather Outlook selected; Convective Outlooks shows its five only with the Day 1 outlook selected and not with only Day 2, Day 3 or Day 4-8; Flooding and Other… never show a list; both lists together never mix options; the helper text notes appear; create saves the flattened list; edit restores each category's ticks, including for a legacy flat list; deselecting a category's products drops its ticks.
-- **Matching**: ticks for one category do not filter another category's products; an empty selection per category means every level; the "Enhanced ticked, fire product watched" case now matches; the risk-area threshold ignores levels from another category; existing risk-level tests keep passing.
+- **Matching**: ticks for one category do not filter another category's products; an empty selection per category means every level; a rule with only a Fire level ticked now matches a Day 1 outlook stating other levels (the regression this fixes); the risk-area threshold still ignores levels from another category; existing risk-level tests keep passing.
 - **Browser check** (controller, after execution): a throwaway subscriber creating and editing an SPC & WPC alert with the Day 1 outlook and the Fire Weather Outlook; confirm the section order, the per-category lists, the notes, the round trip, and that the Matching mode section is unchanged at the bottom. Delete the throwaway data afterwards.
 
 ## Rules to record
