@@ -40,6 +40,12 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->beforeEach(function () {
+        // A request no test faked fails at once instead of reaching the network and, for an
+        // unreachable host, waiting out the client's timeout (10 s each: the Locations Edit page
+        // tests alone cost minutes). The app treats a failed request as an unreachable service,
+        // so a test that merely renders such a page still passes; one that needs a response must
+        // Http::fake() it.
+        Http::preventStrayRequests();
         app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(fn (string $host): array => ['93.184.216.34']));
         app()->instance(HeartbeatUrlGuard::class, new HeartbeatUrlGuard(fn (string $host): array => ['93.184.216.34']));
     })
