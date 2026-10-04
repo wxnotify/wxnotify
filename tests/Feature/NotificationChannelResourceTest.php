@@ -491,6 +491,68 @@ test('before Reveal the URL is nowhere in the rendered edit form or its snapshot
     expect(json_encode($component->snapshot))->not->toContain('uKey1234567890')->not->toContain('aTok0987654321');
 });
 
+test('the edit modal state holds no secret column: no confirmation code, config or ids', function () {
+    $pending = NotificationChannel::factory()->for($this->user)->unverified()->create([
+        'channel_type' => 'pushover', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+        'confirmation_code' => '918273',
+    ]);
+    $email = NotificationChannel::factory()->for($this->user)->email('hidden-address@example.net')->create(['label' => 'Mail']);
+    $webPush = NotificationChannel::factory()->for($this->user)->webPush()->create();
+
+    foreach ([$pending, $email, $webPush] as $channel) {
+        $component = livewire(ListNotificationChannels::class)
+            ->mountAction(TestAction::make('edit')->table($channel));
+
+        $state = $component->instance()->mountedActions[0]['data'];
+
+        expect($state['label'])->toBe($channel->label)
+            ->and(array_keys(array_intersect_key($state, array_flip(['apprise_url', 'confirmation_code', 'confirmation_code_expires_at', 'config', 'user_id', 'verified_at', 'id']))))->toBe([]);
+    }
+
+    $snapshot = fn (NotificationChannel $channel): string => json_encode(
+        livewire(ListNotificationChannels::class)->mountAction(TestAction::make('edit')->table($channel))->instance()->mountedActions
+    );
+
+    expect($snapshot($pending))->not->toContain('918273')
+        ->and($snapshot($email))->not->toContain('hidden-address@example.net')
+        ->and($snapshot($webPush))->not->toContain(str_repeat('B', 87))->not->toContain(str_repeat('a', 22));
+});
+
+test('after Hide the URL is no longer in the snapshot', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+    ]);
+    $reveal = TestAction::make('revealAppriseUrl')->schemaComponent('apprise_url_preview');
+    $hide = TestAction::make('hideAppriseUrl')->schemaComponent('apprise_url_preview');
+
+    $component = livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->callAction([$reveal]);
+
+    expect(json_encode($component->snapshot))->toContain('uKey1234567890');
+
+    $component->callAction([$hide]);
+
+    expect(json_encode($component->snapshot))->not->toContain('uKey1234567890')->not->toContain('aTok0987654321');
+});
+
+test('reopening the edit modal after a reveal starts hidden', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+    ]);
+    $edit = TestAction::make('edit')->table($channel);
+
+    $component = livewire(ListNotificationChannels::class)
+        ->mountAction($edit)
+        ->callAction([TestAction::make('revealAppriseUrl')->schemaComponent('apprise_url_preview')])
+        ->assertSchemaStateSet(['apprise_url_preview' => 'pover://uKey1234567890@aTok0987654321'])
+        ->unmountAction(true)
+        ->mountAction($edit)
+        ->assertSchemaStateSet(['apprise_url_preview' => null]);
+
+    expect(json_encode($component->snapshot))->not->toContain('uKey1234567890')->not->toContain('aTok0987654321');
+});
+
 test('saving the edit form never changes the stored URL, even if the preview field is submitted', function () {
     $channel = NotificationChannel::factory()->for($this->user)->create([
         'channel_type' => 'pushover', 'label' => 'Old', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',

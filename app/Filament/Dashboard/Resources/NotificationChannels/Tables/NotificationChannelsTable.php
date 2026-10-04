@@ -111,15 +111,15 @@ class NotificationChannelsTable
                             ->send();
                     }),
                 EditAction::make()
-                    // The modal's state is the record's whole attribute array and travels to the browser
-                    // in the Livewire snapshot, so the decrypted Apprise URL must be dropped here: the
-                    // owner gets it only through the Reveal action (RevealChannelUrl), never prefilled.
-                    ->mutateRecordDataUsing(fn (array $data, NotificationChannel $record): array => Arr::except(
-                        $record->channel_type === 'webhook'
-                            ? [...$data, ...WebhookChannelType::formFromConfig($record->config)]
-                            : $data,
-                        ['apprise_url'],
-                    ))
+                    // The modal's state is serialized into the browser's Livewire snapshot, so it is built
+                    // from an allow-list (the label, plus the webhook option fields) instead of the record's
+                    // attributes: no secret column (the Apprise URL, the confirmation code, the decrypted
+                    // config) ever travels. The owner gets the Apprise URL only through the Reveal action
+                    // (RevealChannelUrl). A new editable field must be added here explicitly.
+                    ->mutateRecordDataUsing(fn (NotificationChannel $record): array => [
+                        'label' => $record->label,
+                        ...($record->channel_type === 'webhook' ? WebhookChannelType::formFromConfig($record->config) : []),
+                    ])
                     ->using(self::saveChannel(...)),
                 self::guardedDeleteAction(),
             ])

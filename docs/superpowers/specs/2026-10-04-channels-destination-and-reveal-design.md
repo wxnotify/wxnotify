@@ -38,7 +38,7 @@ Source: owner request — the Channels list "Destination" column is nebulous for
 - **Only for channels that have an Apprise URL**: Pushover, Discord, Slack, Teams, Telegram, ntfy. Email, Web Push and Webhook channels (no `apprise_url`) do not get the field.
 - **No platform secret is exposed**: every Apprise URL is built from values the subscriber entered themselves (their own Pushover user key and application token, their Telegram bot token, their own webhook URLs and ntfy topic), so revealing it to the owner shows only what they supplied.
 - **Owner only**: the server re-checks that the channel belongs to the signed-in user before returning anything.
-- **Impersonation is blocked**: while staff impersonate a subscriber, Reveal is disabled with an explanatory note, and a forced call is refused with a notification and no value returned. Rejected: allowing it (staff could read a subscriber's webhook and bot tokens).
+- **Impersonation is blocked**: while staff impersonate a subscriber, Reveal is disabled with an explanatory note, and Filament refuses a disabled action on the server before its closure runs, so a forced call while impersonating is silently dropped; `RevealChannelUrl` independently refuses (with its fixed messages, returning no value) if it is ever reached. Rejected: allowing it (staff could read a subscriber's webhook and bot tokens).
 - **Audited**: each successful reveal writes an activity-log entry on the channel (who, when, which channel), never the URL. Rejected: no logging.
 - **Never saved**: the field has its own name (not `apprise_url`) and is not dehydrated, so submitting the form can neither overwrite the real URL nor store a revealed value.
 - Not included: editing the Apprise URL, a copy button, showing the Webhook channel's URL or secret (its edit form already has its own fields), re-authenticating before reveal.
@@ -55,7 +55,7 @@ Source: owner request — the Channels list "Destination" column is nebulous for
 
 - In `NotificationChannelForm`, a read-only `TextInput` named `apprise_url_preview`, `->dehydrated(false)`, `->placeholder('••••••••••••••••')`, visible only for a record whose `apprise_url` is filled (use `fn (?NotificationChannel $record): bool => filled($record?->apprise_url)`). It is never filled by `mutateRecordDataUsing`/`fill`, so its initial state is null.
 - Two suffix actions on it: **Reveal** (shown while the field's state is blank) and **Hide** (shown while it is filled). Reveal's closure takes the record and the `Set` utility:
-  - refuses (danger notification, no value set) when `app(ImpersonateManager::class)->isImpersonating()` or when `$record->user_id !== auth()->id()`;
+  - shows a danger notification and sets no value when `RevealChannelUrl` refuses, which it does when `app(ImpersonateManager::class)->isImpersonating()` or when `$record->user_id !== auth()->id()` (while impersonating the button is disabled, so Filament never runs the closure and this refusal is defence in depth);
   - otherwise writes one activity-log entry (`activity()->performedOn($record)->causedBy(auth()->user())->event('revealed')->log('Revealed the channel destination URL')`, with no properties) and sets `apprise_url_preview` to `$record->apprise_url`.
   - Hide sets the state to null.
 - While impersonating, the Reveal action is disabled with a tooltip ("Not available while impersonating a subscriber").
