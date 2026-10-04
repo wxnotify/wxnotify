@@ -1,5 +1,7 @@
 <?php
 
+use App\NativeComponents\AccountScreen;
+use App\NativeComponents\AlertDetail;
 use App\NativeComponents\AlertsScreen;
 use App\NativeComponents\AuthCallback;
 use App\NativeComponents\AuthDenied;
@@ -10,3 +12,5 @@ Route::native('/', AlertsScreen::class);
 Route::native('/sign-in', SignInScreen::class);
 Route::native('/auth/callback/{code}/{state}', AuthCallback::class);
 Route::native('/auth/denied/{state}', AuthDenied::class);
+Route::native('/alerts/{id}', AlertDetail::class);
+Route::native('/account', AccountScreen::class);
