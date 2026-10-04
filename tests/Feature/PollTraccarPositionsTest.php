@@ -198,3 +198,51 @@ test('a failed poll stores the specific reason, and the next success clears it',
 
     expect($server->refresh()->last_poll_error)->toBeNull();
 });
+
+test('a poll stores when Traccar says the device was located, apart from when it was polled', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = Location::factory()->mobile()->create(['traccar_server_id' => $server->id, 'traccar_device_id' => 1]);
+
+    Http::fake(['traccar.example.com/api/positions' => Http::response([
+        ['deviceId' => 1, 'latitude' => 39.0997, 'longitude' => -94.5786, 'fixTime' => '2026-09-14T12:00:31.000+00:00'],
+    ])]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    $location->refresh();
+    expect($location->mobile_position_fixed_at->toIso8601String())->toBe('2026-09-14T12:00:31+00:00')
+        ->and($location->mobile_position_updated_at->isToday())->toBeTrue();
+});
+
+test('a position without a usable fixTime keeps the previously stored fix time', function (?string $fixTime) {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = Location::factory()->mobile()->create([
+        'traccar_server_id' => $server->id,
+        'traccar_device_id' => 1,
+        'mobile_position_fixed_at' => '2026-09-01 08:00:00',
+    ]);
+
+    Http::fake(['traccar.example.com/api/positions' => Http::response([
+        ['deviceId' => 1, 'latitude' => 39.0997, 'longitude' => -94.5786, 'fixTime' => $fixTime],
+    ])]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect($location->refresh()->mobile_position_fixed_at->toDateTimeString())->toBe('2026-09-01 08:00:00')
+        ->and($location->lat)->not->toBeNull();
+})->with(['null' => [null], 'junk' => ['not a date']]);
+
+test('a poll with no position for the device leaves the fix time untouched', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = Location::factory()->mobile()->create([
+        'traccar_server_id' => $server->id,
+        'traccar_device_id' => 1,
+        'mobile_position_fixed_at' => '2026-09-01 08:00:00',
+    ]);
+
+    Http::fake(['traccar.example.com/api/positions' => Http::response([])]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect($location->refresh()->mobile_position_fixed_at->toDateTimeString())->toBe('2026-09-01 08:00:00');
+});

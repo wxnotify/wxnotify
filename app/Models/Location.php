@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\LocationType;
 use App\Enums\MobileSource;
 use App\Models\Concerns\BlockedDuringMaintenance;
+use Carbon\CarbonInterface;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -42,6 +43,7 @@ class Location extends Model
                     'traccar_device_name' => null,
                     'mobile_update_interval_minutes' => null,
                     'mobile_position_updated_at' => null,
+                    'mobile_position_fixed_at' => null,
                 ]);
             }
         });
@@ -51,13 +53,13 @@ class Location extends Model
     {
         // logAll() preserves original behavior for every real field (including
         // lat/lng, whether a stationary pin is repositioned or a mobile fix is
-        // manually corrected). Only mobile_position_updated_at is excluded: it's
-        // a bookkeeping timestamp that ticks every 5-30 minutes forever purely
+        // manually corrected). Only mobile_position_updated_at and mobile_position_fixed_at
+        // are excluded: they're bookkeeping timestamps that tick every 5-30 minutes forever purely
         // from Traccar polling, not user-meaningful data, and would otherwise
         // drown out everything else about this model in noise.
         return LogOptions::defaults()
             ->logAll()
-            ->logExcept(['mobile_position_updated_at'])
+            ->logExcept(['mobile_position_updated_at', 'mobile_position_fixed_at'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -70,6 +72,7 @@ class Location extends Model
             'lng' => 'decimal:7',
             'mobile_source' => MobileSource::class,
             'mobile_position_updated_at' => 'datetime',
+            'mobile_position_fixed_at' => 'datetime',
         ];
     }
 
@@ -92,5 +95,15 @@ class Location extends Model
     public function hasFix(): bool
     {
         return $this->lat !== null && $this->lng !== null;
+    }
+
+    /**
+     * When this location's position was last established: a mobile location's is
+     * the time Traccar says its device was last located (null until the first fix
+     * arrives), a stationary location's is when it was created.
+     */
+    public function positionLocatedAt(): ?CarbonInterface
+    {
+        return $this->type === LocationType::Mobile ? $this->mobile_position_fixed_at : $this->created_at;
     }
 }

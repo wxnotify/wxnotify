@@ -61,3 +61,22 @@ test('saving a mobile location keeps its Traccar link', function () {
         ->and($location->mobile_update_interval_minutes)->toBe(15)
         ->and($location->mobile_position_updated_at)->not->toBeNull();
 });
+
+test('saving a location as stationary clears the stored fix time', function () {
+    $location = Location::factory()->mobile()->withFix(39.0997, -94.5786)->create(['mobile_position_fixed_at' => now()->subHour()]);
+
+    $location->update(['type' => LocationType::Stationary]);
+
+    expect($location->refresh()->mobile_position_fixed_at)->toBeNull();
+});
+
+test('a mobile location\'s position time is its Traccar fix time, a stationary one\'s is its creation date', function () {
+    $fixed = now()->subMinutes(7)->startOfSecond();
+    $mobile = Location::factory()->mobile()->create(['mobile_position_fixed_at' => $fixed, 'mobile_position_updated_at' => now()]);
+    $waiting = Location::factory()->mobile()->create(['mobile_position_fixed_at' => null, 'mobile_position_updated_at' => null]);
+    $stationary = Location::factory()->create();
+
+    expect($mobile->positionLocatedAt()->equalTo($fixed))->toBeTrue()
+        ->and($waiting->positionLocatedAt())->toBeNull()
+        ->and($stationary->positionLocatedAt()->equalTo($stationary->created_at))->toBeTrue();
+});

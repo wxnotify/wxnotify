@@ -24,8 +24,9 @@ class LocationsTable
                     ->weight('medium'),
                 TextColumn::make('type')
                     ->badge(),
-                TextColumn::make('mobile_position_updated_at')
+                TextColumn::make('position_updated')
                     ->label('Position updated')
+                    ->state(fn (Location $record) => $record->positionLocatedAt())
                     ->since()
                     ->placeholder('—')
                     ->toggleable(),

@@ -19,3 +19,6 @@ Found while wiring AlertRule/Location for the Admin Tools audit log — both wer
 
 ## ActiveWwa::forProduct() is is_test-scoped
 scopeForProduct() matches the VTEC key AND is_test, so synthetic (Test Product Generator) events never resolve for real products or vice versa, even when the VTEC key collides. Any new lookup of active_wwas from an IngestedProduct must go through forProduct() rather than re-deriving the VTEC key.
+
+## Location position times: poll time, fix time and creation date are three different things
+`locations.mobile_position_updated_at` is when WxNotify last polled a mobile location successfully: it drives the poll schedule (`traccar:poll-positions` due check) and the Locations map's stale (gray) pin, so it must stay a poll time. `locations.mobile_position_fixed_at` is Traccar's own `fixTime` for the position, stored by the poller only when a position carries a usable one (a missing or unparseable fixTime keeps the old value). The Locations list "Position updated" column shows `Location::positionLocatedAt()`: the fix time for mobile (blank until the first fix), `created_at` for stationary. Both timestamps are excluded from the activity log and cleared when a location is saved as stationary. A mobile location linked to a Traccar device ID that no longer exists on the server (demo servers reset and re-issue IDs) is silently never updated.

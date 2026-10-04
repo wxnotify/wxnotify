@@ -359,3 +359,15 @@ test('switching a mobile location to stationary on the edit page drops its Tracc
         ->and($location->mobile_update_interval_minutes)->toBeNull()
         ->and($location->mobile_position_updated_at)->toBeNull();
 });
+
+test('the Position updated column shows the creation date for stationary and the fix time for mobile locations', function () {
+    $this->travelTo(now()->startOfSecond());
+    $stationary = Location::factory()->for($this->user)->create(['created_at' => now()->subDays(3)]);
+    $located = Location::factory()->mobile()->for($this->user)->create(['mobile_position_fixed_at' => now()->subMinutes(12), 'mobile_position_updated_at' => now()->subMinute()]);
+    $waiting = Location::factory()->mobile()->for($this->user)->create(['mobile_position_fixed_at' => null]);
+
+    livewire(ListLocations::class)
+        ->assertTableColumnFormattedStateSet('position_updated', '3 days ago', $stationary)
+        ->assertTableColumnFormattedStateSet('position_updated', '12 minutes ago', $located)
+        ->assertTableColumnStateSet('position_updated', null, $waiting);
+});

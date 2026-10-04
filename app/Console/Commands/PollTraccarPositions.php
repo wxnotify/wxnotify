@@ -6,6 +6,7 @@ use App\Actions\Traccar\PollTraccarServer;
 use App\Enums\LocationType;
 use App\Models\Location;
 use App\Models\TraccarServer;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 use Throwable;
@@ -106,6 +107,9 @@ class PollTraccarPositions extends Command
                     'lat' => $position['lat'],
                     'lng' => $position['lng'],
                     'mobile_position_updated_at' => now(),
+                    // When Traccar says the device was located, kept as it was when this
+                    // position carries no usable fixTime.
+                    'mobile_position_fixed_at' => $this->fixedAt($position['fixTime']) ?? $location->mobile_position_fixed_at,
                 ])->save();
             } finally {
                 $location->enableLogging();
@@ -115,6 +119,19 @@ class PollTraccarPositions extends Command
         }
 
         return $updated;
+    }
+
+    private function fixedAt(?string $fixTime): ?CarbonImmutable
+    {
+        if (blank($fixTime)) {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($fixTime);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function recordFailure(TraccarServer $server, string $error): void
