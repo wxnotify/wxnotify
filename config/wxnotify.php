@@ -55,4 +55,22 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Mobile app sign-in
+    |--------------------------------------------------------------------------
+    |
+    | callback_uri / denied_uri  The deep links the browser handoff returns to;
+    |                            the code and state are appended as path segments.
+    | code_ttl_seconds           How long a single-use authorization code lives.
+    | token_days                 Sliding lifetime of an app token.
+    |
+    */
+    'app_auth' => [
+        'callback_uri' => 'wxnotify://auth/callback',
+        'denied_uri' => 'wxnotify://auth/denied',
+        'code_ttl_seconds' => 120,
+        'token_days' => 90,
+    ],
+
 ];

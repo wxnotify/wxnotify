@@ -14,3 +14,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Filament/Admin/Pages/** | .ai/rules/pages.md |
 | app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php | .ai/rules/pipeline.md |
 | app/Support/**, app/Support/Integrations.php | .ai/rules/support.md |
+| routes/api.php, app/Http/Controllers/Api/**, app/Http/Resources/** | .ai/rules/api.md |

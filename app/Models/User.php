@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use Marcelodelgado\Announcements\Traits\HasAnnouncements;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -27,7 +28,7 @@ use Spatie\Activitylog\Support\LogOptions;
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasAnnouncements, HasFactory, InteractsWithAppAuthentication, LogsActivity, Notifiable;
+    use HasAnnouncements, HasApiTokens, HasFactory, InteractsWithAppAuthentication, LogsActivity, Notifiable;
 
     public function getActivitylogOptions(): LogOptions
     {

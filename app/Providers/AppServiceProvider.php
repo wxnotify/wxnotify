@@ -21,7 +21,10 @@ use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Filament\Auth\Notifications\ResetPassword;
 use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Support\CauserResolver;
@@ -63,6 +66,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->make(ApplyEmailSettings::class)();
 
         ClientIp::configureProxies();
+
+        RateLimiter::for('app-api', fn (Request $request) => Limit::perMinute(120)
+            ->by('app-api:'.($request->user()?->currentAccessToken()?->id ?? $request->ip())));
+
+        RateLimiter::for('app-auth', fn (Request $request) => Limit::perMinute(10)
+            ->by('app-auth:'.$request->ip()));
 
         // Without this, activity logged while an admin impersonates a
         // subscriber attributes to the subscriber (Auth::user() during
