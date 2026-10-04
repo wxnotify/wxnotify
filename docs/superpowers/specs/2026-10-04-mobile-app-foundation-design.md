@@ -43,14 +43,14 @@ NativePHP's own security guidance recommends tokens that expire in under 48 hour
 - Set `config/sanctum.php` `expiration` to `null`: Sanctum checks that value against `created_at`, which would defeat a sliding window. Expiry is driven only by each token's own `expires_at`.
 - Register the Sanctum `ability` middleware alias in `bootstrap/app.php` and apply `ability:app` to every `/api/v1` route except the code exchange.
 - App tokens are created with `$user->createToken($deviceName, ['app'], now()->addDays(90))`. A middleware on the authenticated API group pushes `expires_at` back to `now()+90 days` when more than a day has passed since the last extension (at most one write per token per day).
-- New settings in `config/wxnotify.php` under `app_auth`: `redirect_uri` (`wxnotify://auth/callback`), `code_ttl_seconds` (120), `token_days` (90).
+- New settings in `config/wxnotify.php` under `app_auth`: `callback_uri` (`wxnotify://auth/callback`), `denied_uri` (`wxnotify://auth/denied`), `code_ttl_seconds` (120), `token_days` (90).
 
 ### Sign-in handoff
 
 All three steps validate their input and answer errors with an explanatory page (web) or a generic `invalid_grant` JSON error (API) that never says which check failed.
 
-1. `GET /app-auth/authorize` (web, `auth` + verified email). Query: `challenge` (base64url SHA-256, 43 characters, `S256` only), `state` (16-128 characters of `[A-Za-z0-9_-]`), `device_name` (1-80 characters, plain text, always rendered escaped), `redirect` (must equal `config('wxnotify.app_auth.redirect_uri')` exactly). A guest is sent to the dashboard login and returned to this URL afterwards. The page asks "Sign the WxNotify app on *{device_name}* in as *{email}*?" with **Allow** and **Cancel**.
-2. `POST /app-auth/authorize` (web, CSRF-protected). **Allow** stores a single-use code and redirects to `wxnotify://auth/callback?code=…&state=…`; **Cancel** redirects with `error=access_denied&state=…`. The code is 64 random characters, held in the cache under its SHA-256 hash for 120 seconds with `{user_id, challenge, device_name}`. The page is throttled (20 per minute per user).
+1. `GET /app-auth/authorize` (web, `auth` + verified email). Query: `challenge` (base64url SHA-256, 43 characters, `S256` only), `state` (16-128 characters of `[A-Za-z0-9_-]`), `device_name` (1-80 characters, plain text, always rendered escaped), `redirect` (must equal `config('wxnotify.app_auth.callback_uri')` exactly). A guest is sent to the dashboard login and returned to this URL afterwards. The page asks "Sign the WxNotify app on *{device_name}* in as *{email}*?" with **Allow** and **Cancel**.
+2. `POST /app-auth/authorize` (web, CSRF-protected). **Allow** stores a single-use code and redirects to `wxnotify://auth/callback/{code}/{state}`; **Cancel** redirects to `wxnotify://auth/denied/{state}`. The code is 64 random characters, held in the cache under its SHA-256 hash for 120 seconds with `{user_id, challenge, device_name}`. The page is throttled (20 per minute per user).
 3. `POST /api/v1/auth/token` (no auth, throttle `app-auth`: 10 per minute per IP). Body: `code`, `code_verifier` (43-128 characters). The server consumes the code first (`Cache::pull`, so any attempt, right or wrong, burns it), verifies `base64url(sha256(code_verifier)) === challenge` with `hash_equals`, re-checks that the user still exists and still has a verified email, then creates the token (named from the *stored* `device_name`, never from the request) and returns `{token, expires_at, user}` with `user` shaped like `/api/v1/me`.
 
 Blocked cases: while a staff member is impersonating a subscriber, both authorize steps refuse ("Not available while impersonating a subscriber.") and no code is issued — the same rule as the channel URL reveal. Each successful exchange writes an activity-log entry (`event('app-signed-in')`, the device name, never the token).
@@ -66,7 +66,7 @@ Blocked cases: while a staff member is impersonating a subscriber, both authoriz
 
 - An **alert** is a group of `delivery_logs` rows for one subscriber with the same `alert_rule_id` and the same non-null `ingested_product_id`. A row with a null product (daily summary, threshold, lightning) is its own alert.
 - Identity: the alert's id is the **lowest** `delivery_logs.id` in the group (stable when a later row joins). Sort key: the **latest** `dispatched_at` in the group. The cursor encodes `(sort key, id)`, so pagination is stable when two alerts share a timestamp.
-- **List entry**: `id`, `subject` (the stored subject, falling back to the rule's `displayName()` for older rows, as the dashboard widget does, then "Alert"), `category`, `dispatched_at` (ISO 8601 UTC), `channels` (each `{type, status}`, one per delivery row), `has_failure` (true if any row failed).
+- **List entry**: `id`, `subject` (the stored subject, falling back to the rule's `displayName()` for older rows, as the dashboard widget does, then "Alert"), `category`, `category_label` (the display label for the category, additive so the app needs no label registry), `dispatched_at` (ISO 8601 UTC), `channels` (each `{type, type_label, status}`, one per delivery row; `type_label` is the channel type's display label, likewise additive), `has_failure` (true if any row failed).
 - **Detail** adds `rule_name` (nullable: the rule may be deleted), each channel's `label` (the subscriber's own channel label, nullable if deleted), and `product_url` (`IngestedProduct::viewUrl()`, null when there is none). Detail never exposes `error_detail`, a destination, or a URL secret — the same rule the My Alerts widgets follow.
 - Every query is scoped to the authenticated user. Implemented with Eloquent API Resources and a Filament-free action in `app/Actions/Alerts`, like the existing alert widgets' actions.
 
@@ -93,7 +93,7 @@ Every screen is a native `NativeComponent` built from EDGE elements and register
 
 1. Generate a PKCE verifier and `state`; keep them in the app until the callback returns.
 2. Call `Browser::auth()` with `{WXNOTIFY_API_URL}/app-auth/authorize?...&redirect=wxnotify://auth/callback` (`NATIVEPHP_DEEPLINK_SCHEME=wxnotify`). The device name comes from the device's own model name.
-3. A native route `/auth/callback` receives the deep link. It checks `state` against the stored value (mismatch: discard and show an error), exchanges `code` + verifier at `POST /api/v1/auth/token`, then stores the token and routes to Alerts. `error=access_denied` returns quietly to Sign in.
+3. A native route `/auth/callback/{code}/{state}` receives the deep link (NativePHP route params come only from the URI path, which is why the code and state travel as path segments). It checks `state` against the stored value (mismatch: discard and show an error), exchanges `code` + verifier at `POST /api/v1/auth/token`, then stores the token and routes to Alerts. `/auth/denied/{state}` returns quietly to Sign in.
 4. The token goes **only** into Secure Storage, with the *after-first-unlock* accessibility setting. The default (when-unlocked) would break the background location uploads planned for sub-project 3. It is never written to SQLite, the session or logs. The custom URL scheme can be claimed by another app; the PKCE verifier, which never leaves the app, is what makes an intercepted code useless.
 
 ### API client
@@ -112,7 +112,7 @@ One `WxNotifyApi` service wraps `Http`. The base URL is `WXNOTIFY_API_URL` (buil
 Pest feature tests (container; the full suite in parallel with 6 processes).
 
 **Backend**
-- Handoff: guest redirected to login and returned; consent page renders the device name escaped; invalid `challenge`/`state`/`device_name`/`redirect` rejected; Cancel returns `access_denied`; Allow redirects with code and state; the exchange succeeds once and returns a token with ability `app` and a 90-day `expires_at`; a replayed code, expired code, wrong verifier (which also burns the code) and tampered `code` all fail with the same generic error; unverified email refused at both steps; impersonation refused and no code issued.
+- Handoff: guest redirected to login and returned; consent page renders the device name escaped; invalid `challenge`/`state`/`device_name`/`redirect` rejected; Cancel returns the denied callback; Allow redirects with code and state; the exchange succeeds once and returns a token with ability `app` and a 90-day `expires_at`; a replayed code, expired code, wrong verifier (which also burns the code) and tampered `code` all fail with the same generic error; unverified email refused at both steps; impersonation refused and no code issued.
 - Tokens: `ability:app` enforced (a token with other abilities is rejected on `/me` and `/alerts`); sliding expiry extends at most once a day; an expired token is rejected; `DELETE /auth/token` revokes only the caller's token; throttles on the exchange and the API.
 - Feed: scoping to the user and 404 for another user's alert; grouping of rows for one rule and product; null-product rows stay separate; entry id, ordering and cursor stability with equal timestamps; `has_failure`; fallbacks for old rows; deleted rule or channel; detail omits `error_detail`; tier does not matter.
 - Signed-in devices: lists only the user's own `app` tokens; Revoke deletes and logs; disabled while impersonating; another user's token cannot be revoked; activity rows never contain the token.
@@ -129,7 +129,7 @@ Pest feature tests (container; the full suite in parallel with 6 processes).
 - **Dev reachability**: the Simulator must reach the dev backend over HTTPS, or an App Transport Security exception is needed for the dev build. Settle in the first task before relying on a login flow.
 - **Native test API and EDGE components**: confirm the exact `Native::test()` calls and which EDGE elements give the bottom bar, list and pull-to-refresh, from the NativePHP docs and the installed package.
 - **Grouped query**: the alert grouping and cursor must be checked against Postgres with a realistic row count (indexes on `delivery_logs(user_id, dispatched_at)`).
-- **Callback delivery**: confirm `Browser::auth()` delivers the `wxnotify://auth/callback` deep link to the native route with its query parameters on both iOS and Android.
+- **Callback delivery**: confirm on both iOS and Android that `Browser::auth()` delivers `wxnotify://auth/callback/{code}/{state}` to the native route with both path parameters.
 
 ## Follow-ups (not part of this spec)
 

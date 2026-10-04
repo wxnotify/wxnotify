@@ -23,6 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'pipeline.webhook' => VerifyPipelineWebhookToken::class,
             'ability' => CheckForAnyAbility::class,
         ]);
+
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->expectsJson() ? null : route('filament.dashboard.auth.login'));
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('shapefile:scan')->daily();

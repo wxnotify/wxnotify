@@ -18,6 +18,10 @@ Route::post('/pipeline/glm-flashes', IngestGlmFlashesController::class)
     ->middleware('pipeline.webhook');
 
 Route::prefix('v1')->group(function (): void {
+    Route::post('/auth/token', [AppTokenController::class, 'store'])
+        ->middleware('throttle:app-auth')
+        ->name('api.v1.auth.token.store');
+
     Route::middleware(['auth:sanctum', ExtendAppTokenExpiry::class, 'ability:app', 'throttle:app-api'])->group(function (): void {
         Route::get('/me', MeController::class)->name('api.v1.me');
         Route::delete('/auth/token', [AppTokenController::class, 'destroy'])->name('api.v1.auth.token.destroy');
