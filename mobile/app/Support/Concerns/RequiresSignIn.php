@@ -1,6 +1,6 @@
 <?php
 
-namespace App\NativeComponents\Concerns;
+namespace App\Support\Concerns;
 
 use App\Support\TokenStore;
 

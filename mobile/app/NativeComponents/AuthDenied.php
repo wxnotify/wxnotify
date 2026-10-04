@@ -3,7 +3,6 @@
 namespace App\NativeComponents;
 
 use App\Services\SignIn;
-use Illuminate\View\View;
 use Native\Mobile\Edge\NativeComponent;
 
 /**
@@ -16,10 +15,5 @@ class AuthDenied extends NativeComponent
         app(SignIn::class)->denied();
 
         $this->replace('/sign-in');
-    }
-
-    public function render(): View
-    {
-        return view('native.auth-denied');
     }
 }

@@ -3,7 +3,6 @@
 namespace App\NativeComponents;
 
 use App\Services\SignIn;
-use Illuminate\View\View;
 use Native\Mobile\Edge\NativeComponent;
 
 class SignInScreen extends NativeComponent
@@ -15,10 +14,5 @@ class SignInScreen extends NativeComponent
         $this->error = app(SignIn::class)->begin()
             ? null
             : 'Could not open the sign-in page. Check your connection and try again.';
-    }
-
-    public function render(): View
-    {
-        return view('native.sign-in-screen');
     }
 }

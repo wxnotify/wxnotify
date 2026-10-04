@@ -5,7 +5,6 @@ namespace App\NativeComponents;
 use App\Exceptions\Api\ApiException;
 use App\Exceptions\InvalidSignIn;
 use App\Services\SignIn;
-use Illuminate\View\View;
 use Native\Mobile\Edge\NativeComponent;
 
 /**
@@ -31,10 +30,5 @@ class AuthCallback extends NativeComponent
     public function tryAgain(): void
     {
         $this->replace('/sign-in');
-    }
-
-    public function render(): View
-    {
-        return view('native.auth-callback');
     }
 }

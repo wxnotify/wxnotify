@@ -5,7 +5,8 @@
     @if ($error)
         <native:text class="text-sm text-red-600 dark:text-red-400 text-center">{{ $error }}</native:text>
     @endif
-    <native:pressable @tap="signIn" class="w-full py-4 items-center justify-center rounded-xl bg-blue-600 dark:bg-blue-400">
+    {{-- Un-prefixed on purpose: native:validate's element list predates pressable and flags the prefixed form; both compile identically. --}}
+    <pressable @tap="signIn" class="w-full py-4 items-center justify-center rounded-xl bg-blue-600 dark:bg-blue-400">
         <native:text class="text-base font-bold text-white dark:text-slate-950">Sign in to WxNotify</native:text>
-    </native:pressable>
+    </pressable>
 </native:column>
