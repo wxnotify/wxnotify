@@ -44,6 +44,7 @@
         "wallacemartinss/filament-onboarding": "^2.1"
     },
     "require-dev": {
+        "brianium/paratest": "^7.24",
         "fakerphp/faker": "^1.23",
         "filament/blueprint": "^2.2",
         "laravel/boost": "^2.7",
