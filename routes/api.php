@@ -23,7 +23,7 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:app-auth')
         ->name('api.v1.auth.token.store');
 
-    Route::middleware(['auth:sanctum', ExtendAppTokenExpiry::class, 'ability:app', 'throttle:app-api'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'ability:app', ExtendAppTokenExpiry::class, 'throttle:app-api'])->group(function (): void {
         Route::get('/me', MeController::class)->name('api.v1.me');
         Route::get('/alerts', [AlertController::class, 'index'])->name('api.v1.alerts.index');
         Route::get('/alerts/{id}', [AlertController::class, 'show'])->whereNumber('id')->name('api.v1.alerts.show');

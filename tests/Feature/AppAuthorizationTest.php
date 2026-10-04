@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Requests\AuthorizeAppRequest;
 use App\Models\User;
+use Illuminate\Support\Facades\Validator;
 use STS\FilamentImpersonate\ImpersonateManager;
 
 beforeEach(function () {
@@ -80,3 +82,38 @@ test('Cancel redirects to the app as denied, with the state, and issues no code'
 test('the decision must be allow or deny', function () {
     $this->actingAs($this->user)->post('/app-auth/authorize', [...$this->query, 'decision' => 'maybe'])->assertStatus(422);
 });
+
+test('the consent page cannot be framed', function () {
+    $this->actingAs($this->user)
+        ->get('/app-auth/authorize?'.http_build_query($this->query))
+        ->assertOk()
+        ->assertHeader('X-Frame-Options', 'DENY')
+        ->assertHeader('Content-Security-Policy', "frame-ancestors 'none'");
+});
+
+test('the refusal and invalid-link pages cannot be framed either', function () {
+    $this->actingAs($this->user)
+        ->get('/app-auth/authorize?'.http_build_query([...$this->query, 'state' => 'short']))
+        ->assertStatus(422)
+        ->assertHeader('X-Frame-Options', 'DENY')
+        ->assertHeader('Content-Security-Policy', "frame-ancestors 'none'");
+
+    $this->mock(ImpersonateManager::class, fn ($mock) => $mock->shouldReceive('isImpersonating')->andReturn(true));
+
+    $this->actingAs($this->user)
+        ->get('/app-auth/authorize?'.http_build_query($this->query))
+        ->assertForbidden()
+        ->assertHeader('X-Frame-Options', 'DENY')
+        ->assertHeader('Content-Security-Policy', "frame-ancestors 'none'");
+});
+
+test('a trailing newline does not slip past the field patterns', function (string $field, string $value) {
+    // TrimStrings strips whitespace from HTTP input, so validate the rules directly.
+    $validator = Validator::make([...$this->query, 'redirect' => 'wxnotify://auth/callback', $field => $value], (new AuthorizeAppRequest)->rules());
+
+    expect($validator->fails())->toBeTrue();
+})->with([
+    'state' => ['state', str_repeat('s', 32)."\n"],
+    'challenge' => ['challenge', str_repeat('c', 43)."\n"],
+    'device name' => ['device_name', "iPhone\n"],
+]);

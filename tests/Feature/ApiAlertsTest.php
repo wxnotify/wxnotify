@@ -5,6 +5,8 @@ use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Support\AppAlertCursor;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->freezeTime();
@@ -93,7 +95,13 @@ test('alerts are newest first and paginate by cursor without gaps or repeats, ev
 
 test('limit is validated and an unreadable cursor is rejected', function (string $query) {
     $this->withToken($this->token)->getJson('/api/v1/alerts?'.$query)->assertStatus(422);
-})->with(['limit 0' => ['limit=0'], 'limit 51' => ['limit=51'], 'bad cursor' => ['before=not-a-cursor']]);
+})->with([
+    'limit 0' => ['limit=0'],
+    'limit 51' => ['limit=51'],
+    'bad cursor' => ['before=not-a-cursor'],
+    'impossible date' => ['before='.AppAlertCursor::encode('2026-02-30 10:00:00', 1)],
+    'relative date' => ['before='.AppAlertCursor::encode('+1 week', 1)],
+]);
 
 test('only the subscriber\'s own alerts are listed', function () {
     ($this->log)();
@@ -149,4 +157,16 @@ test('the tier does not matter', function () {
     ($this->log)();
 
     $this->withToken($this->token)->getJson('/api/v1/alerts')->assertOk()->assertJsonCount(1, 'data');
+});
+
+test('listing the feed does not load the products, whose text column is large', function () {
+    ($this->log)();
+
+    DB::enableQueryLog();
+
+    $this->withToken($this->token)->getJson('/api/v1/alerts')->assertOk()->assertJsonCount(1, 'data');
+
+    $productQueries = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains($query['query'], 'from "ingested_products"'));
+
+    expect($productQueries)->toBeEmpty();
 });

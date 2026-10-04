@@ -71,10 +71,10 @@ class AppServiceProvider extends ServiceProvider
             ->by('app-api:'.($request->user()?->currentAccessToken()?->id ?? $request->ip())));
 
         RateLimiter::for('app-auth', fn (Request $request) => Limit::perMinute(10)
-            ->by('app-auth:'.$request->ip()));
+            ->by('app-auth:'.(ClientIp::for($request) ?? $request->ip())));
 
         RateLimiter::for('app-authorize', fn (Request $request) => Limit::perMinute(20)
-            ->by('app-authorize:'.($request->user()?->id ?? $request->ip())));
+            ->by('app-authorize:'.($request->user()?->id ?? ClientIp::for($request) ?? $request->ip())));
 
         // Without this, activity logged while an admin impersonates a
         // subscriber attributes to the subscriber (Auth::user() during

@@ -6,7 +6,6 @@ use App\Actions\AppAuth\IssueAppAuthorizationCode;
 use App\Http\Requests\AuthorizeAppRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
-use Illuminate\View\View;
 use STS\FilamentImpersonate\ImpersonateManager;
 
 /**
@@ -15,20 +14,20 @@ use STS\FilamentImpersonate\ImpersonateManager;
  */
 class AppAuthorizationController extends Controller
 {
-    public function show(AuthorizeAppRequest $request): View|RedirectResponse|Response
+    public function show(AuthorizeAppRequest $request): RedirectResponse|Response
     {
         if ($refusal = $this->refusal($request)) {
             return $refusal;
         }
 
-        return view('app-auth.page', [
+        return self::unframed(response()->view('app-auth.page', [
             'title' => 'Sign in to the WxNotify app',
             'form' => [
                 'device' => $request->validated('device_name'),
                 'email' => $request->user()->email,
                 'fields' => $request->safe()->only(['challenge', 'state', 'device_name', 'redirect']),
             ],
-        ]);
+        ]));
     }
 
     public function store(AuthorizeAppRequest $request, IssueAppAuthorizationCode $issue): RedirectResponse|Response
@@ -51,10 +50,10 @@ class AppAuthorizationController extends Controller
     private function refusal(AuthorizeAppRequest $request): RedirectResponse|Response|null
     {
         if (app(ImpersonateManager::class)->isImpersonating()) {
-            return response()->view('app-auth.page', [
+            return self::unframed(response()->view('app-auth.page', [
                 'title' => 'Sign-in is unavailable',
                 'message' => 'Not available while impersonating a subscriber.',
-            ], 403);
+            ], 403));
         }
 
         if (! $request->user()->hasVerifiedEmail()) {
@@ -62,5 +61,16 @@ class AppAuthorizationController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * The consent page must never be embedded in another site's frame (clickjacking the Allow button).
+     */
+    public static function unframed(Response $response): Response
+    {
+        $response->headers->set('X-Frame-Options', 'DENY');
+        $response->headers->set('Content-Security-Policy', "frame-ancestors 'none'");
+
+        return $response;
     }
 }

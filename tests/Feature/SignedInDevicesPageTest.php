@@ -2,6 +2,7 @@
 
 use App\Filament\Dashboard\Pages\SignedInDevices;
 use App\Models\User;
+use Filament\Actions\Exceptions\ActionNotResolvableException;
 use Filament\Actions\Testing\TestAction;
 use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Activitylog\Models\Activity;
@@ -39,6 +40,17 @@ test('revoking deletes the token and is logged without it', function () {
     expect($entry->causer_id)->toBe($this->user->id)
         ->and($entry->properties->get('device'))->toBe('iPhone 16')
         ->and(json_encode($entry->toArray()))->not->toContain(explode('|', $new->plainTextToken)[1]);
+});
+
+test('another subscriber\'s token cannot be revoked', function () {
+    $theirs = User::factory()->create()->createToken('Their phone', ['app'])->accessToken;
+
+    // The record is outside the table's query, so Filament cannot even resolve the action for it.
+    expect(fn () => livewire(SignedInDevices::class)->callAction(TestAction::make('revoke')->table($theirs)))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect(PersonalAccessToken::find($theirs->id))->not->toBeNull()
+        ->and(Activity::where('event', 'revoked')->exists())->toBeFalse();
 });
 
 test('revoking is blocked while staff impersonate the subscriber', function () {

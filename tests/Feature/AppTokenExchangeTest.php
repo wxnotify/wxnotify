@@ -2,8 +2,16 @@
 
 use App\Actions\AppAuth\IssueAppAuthorizationCode;
 use App\Models\User;
+use App\Support\ClientIp;
+use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Spatie\Activitylog\Models\Activity;
+
+afterEach(function () {
+    Request::setTrustedProxies([], Request::HEADER_X_FORWARDED_FOR);
+    TrustProxies::flushState();
+});
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -13,6 +21,8 @@ beforeEach(function () {
 });
 
 test('the code and verifier are exchanged once for an app token', function () {
+    $this->freezeTime();
+
     $response = $this->postJson('/api/v1/auth/token', ['code' => $this->code, 'code_verifier' => $this->verifier])
         ->assertOk()
         ->assertJsonStructure(['token', 'expires_at', 'user' => ['id', 'name', 'email', 'tier', 'unit_system', 'timezone']]);
@@ -95,4 +105,20 @@ test('the exchange is limited to 10 requests a minute per IP', function () {
 test('the code is stored only as a hash', function () {
     expect(Cache::get('app-auth-code:'.$this->code))->toBeNull()
         ->and(Cache::get(IssueAppAuthorizationCode::key($this->code)))->toBeArray();
+});
+
+test('the exchange limit is per client address as the project resolves it, not per proxy or spoofable header', function () {
+    config(['wxnotify.client_ip.trusted_proxies' => '*', 'wxnotify.client_ip.header' => 'CF-Connecting-IP']);
+    ClientIp::configureProxies();
+
+    $exchange = fn (string $ip, string $forwardedFor = '198.51.100.9') => $this
+        ->withHeaders(['CF-Connecting-IP' => $ip, 'X-Forwarded-For' => $forwardedFor])
+        ->postJson('/api/v1/auth/token', ['code' => str_repeat('a', 64), 'code_verifier' => str_repeat('v', 43)]);
+
+    foreach (range(1, 10) as $_) {
+        $exchange('203.0.113.1', fake()->ipv4())->assertStatus(422);
+    }
+
+    $exchange('203.0.113.2')->assertStatus(422);
+    $exchange('203.0.113.1')->assertStatus(429);
 });

@@ -31,6 +31,16 @@ test('a token without the app ability is refused', function () {
     $this->withToken($token)->getJson('/api/v1/me')->assertForbidden();
 });
 
+test('a token without the app ability is not extended', function () {
+    $this->freezeTime();
+    $expires = now()->addDays(80)->startOfSecond();
+    $token = $this->user->createToken('My script', ['api'], $expires);
+
+    $this->withToken($token->plainTextToken)->getJson('/api/v1/me')->assertForbidden();
+
+    expect($token->accessToken->fresh()->expires_at->toDateTimeString())->toBe($expires->toDateTimeString());
+});
+
 test('an expired token is refused', function () {
     $token = $this->user->createToken('iPhone', ['app'], now()->subMinute())->plainTextToken;
 
@@ -51,6 +61,8 @@ test('signing out revokes only the calling token', function () {
 });
 
 test('a token last extended over a day ago gets a fresh 90 days', function () {
+    $this->freezeTime();
+
     $token = $this->user->createToken('iPhone', ['app'], now()->addDays(80));
 
     $this->withToken($token->plainTextToken)->getJson('/api/v1/me')->assertOk();
@@ -75,4 +87,11 @@ test('the API is limited to 120 requests a minute per token', function () {
     }
 
     $this->withToken($token)->getJson('/api/v1/me')->assertStatus(429);
+
+    $second = $this->user->createToken('iPad', ['app'])->plainTextToken;
+
+    // The guard caches the first request's user inside one test process; a real request starts clean.
+    $this->app['auth']->forgetGuards();
+
+    $this->withToken($second)->getJson('/api/v1/me')->assertOk();
 });

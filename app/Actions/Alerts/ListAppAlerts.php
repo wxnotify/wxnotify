@@ -65,7 +65,7 @@ class ListAppAlerts
         $byKey = DeliveryLog::query()
             ->where('user_id', $user->id)
             ->where(fn ($query) => $query->whereIn('id', $entryIds)->orWhereIn('ingested_product_id', $productIds))
-            ->with(['alertRule.products', 'alertRule.location', 'notificationChannel', 'ingestedProduct'])
+            ->with(['alertRule.products', 'alertRule.location', 'notificationChannel'])
             ->orderBy('id')
             ->get()
             ->groupBy(fn (DeliveryLog $row) => AppAlert::keyFor($row));
