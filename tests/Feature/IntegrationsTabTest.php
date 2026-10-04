@@ -3,7 +3,10 @@
 use App\Filament\Admin\Pages\AppSettings;
 use App\Models\User;
 use App\Settings\IntegrationSettings;
+use App\Support\Delivery\HeartbeatUrlGuard;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Http;
 use Spatie\Activitylog\Models\Activity;
 
 use function Pest\Livewire\livewire;
@@ -236,4 +239,68 @@ test('turning heartbeat off keeps the stored ping urls', function () {
     expect($settings->heartbeat_enabled)->toBeFalse()
         ->and($settings->heartbeat_nwws_url)->toBe('https://hc.example.test/ping/aaaa')
         ->and($settings->heartbeat_emwin_http_url)->toBe('https://hc.example.test/ping/cccc');
+});
+
+test('each heartbeat ping url field has a test button, enabled once the field has a value', function (string $field) {
+    $action = TestAction::make("testHeartbeat_{$field}")->schemaComponent($field, schema: 'form');
+
+    livewire(AppSettings::class)
+        ->fillForm(['heartbeat_enabled' => true, $field => null])
+        ->assertActionDisabled($action)
+        ->fillForm([$field => 'https://hc.example.test/ping/x'])
+        ->assertActionEnabled($action);
+})->with(['heartbeat_nwws_url', 'heartbeat_emwin_url', 'heartbeat_emwin_http_url']);
+
+test('the other endpoint fields have no test button', function () {
+    livewire(AppSettings::class)
+        ->fillForm(['translation_enabled' => true, 'translation_endpoint' => 'https://t.example.test'])
+        ->assertActionDoesNotExist(TestAction::make('testHeartbeat_translation_endpoint')->schemaComponent('translation_endpoint', schema: 'form'));
+});
+
+test('testing a heartbeat url sends one GET to the typed, unsaved value and reports the status', function () {
+    app()->instance(HeartbeatUrlGuard::class, new HeartbeatUrlGuard(fn (string $host): array => ['203.0.113.10']));
+    Http::fake(['hc.example.test/*' => Http::response('OK', 200)]);
+
+    livewire(AppSettings::class)
+        ->fillForm(['heartbeat_enabled' => true, 'heartbeat_emwin_url' => 'https://hc.example.test/ping/typed-secret'])
+        ->callAction(TestAction::make('testHeartbeat_heartbeat_emwin_url')->schemaComponent('heartbeat_emwin_url', schema: 'form'))
+        ->assertNotified('Test ping sent');
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request) => $request->method() === 'GET' && $request->url() === 'https://hc.example.test/ping/typed-secret');
+    expect(app(IntegrationSettings::class)->heartbeat_emwin_url)->toBeNull();
+});
+
+test('a failed test ping shows a danger notification and never the URL', function () {
+    app()->instance(HeartbeatUrlGuard::class, new HeartbeatUrlGuard(fn (string $host): array => ['203.0.113.10']));
+    Http::fake(['hc.example.test/*' => Http::response('no', 404)]);
+
+    livewire(AppSettings::class)
+        ->fillForm(['heartbeat_enabled' => true, 'heartbeat_nwws_url' => 'https://hc.example.test/ping/typed-secret'])
+        ->callAction(TestAction::make('testHeartbeat_heartbeat_nwws_url')->schemaComponent('heartbeat_nwws_url', schema: 'form'))
+        ->assertNotified('Test ping failed');
+});
+
+test('a test ping notification states the status and never repeats the URL', function () {
+    app()->instance(HeartbeatUrlGuard::class, new HeartbeatUrlGuard(fn (string $host): array => ['203.0.113.10']));
+    Http::fake(['hc.example.test/*' => Http::response('no', 404)]);
+
+    livewire(AppSettings::class)
+        ->fillForm(['heartbeat_enabled' => true, 'heartbeat_nwws_url' => 'https://hc.example.test/ping/typed-secret'])
+        ->callAction(TestAction::make('testHeartbeat_heartbeat_nwws_url')->schemaComponent('heartbeat_nwws_url', schema: 'form'));
+
+    $bodies = sentNotificationBodies();
+
+    expect($bodies)->toContain('HTTP 404')->not->toContain('typed-secret')->not->toContain('hc.example.test');
+});
+
+test('a malformed value is reported without sending anything', function () {
+    Http::fake();
+
+    livewire(AppSettings::class)
+        ->fillForm(['heartbeat_enabled' => true, 'heartbeat_nwws_url' => 'not a url'])
+        ->callAction(TestAction::make('testHeartbeat_heartbeat_nwws_url')->schemaComponent('heartbeat_nwws_url', schema: 'form'))
+        ->assertNotified('Test ping failed');
+
+    Http::assertNothingSent();
 });

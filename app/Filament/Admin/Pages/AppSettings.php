@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Actions\Pipeline\SendTestHeartbeatPing;
 use App\Enums\Secret;
 use App\Settings\FeatureFlagsSettings;
 use App\Settings\GeneralSettings;
@@ -12,6 +13,7 @@ use App\Support\ApplyEmailSettings;
 use App\Support\Secrets;
 use BackedEnum;
 use Closure;
+use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -285,9 +287,9 @@ class AppSettings extends Page implements HasForms
                 ->description('Healthchecks ping URLs. A feed\'s URL is requested each time that feed delivers a product; leave a URL blank to skip that feed.')
                 ->schema([
                     Toggle::make('heartbeat_enabled')->label('Heartbeat enabled')->live(),
-                    $this->endpointField('heartbeat_nwws_url', 'NWWS ping URL', 'heartbeat_enabled', required: false),
-                    $this->endpointField('heartbeat_emwin_url', 'EMWIN Byteblaster ping URL', 'heartbeat_enabled', required: false),
-                    $this->endpointField('heartbeat_emwin_http_url', 'EMWIN HTTP ping URL', 'heartbeat_enabled', required: false),
+                    $this->endpointField('heartbeat_nwws_url', 'NWWS ping URL', 'heartbeat_enabled', required: false, testPing: true),
+                    $this->endpointField('heartbeat_emwin_url', 'EMWIN Byteblaster ping URL', 'heartbeat_enabled', required: false, testPing: true),
+                    $this->endpointField('heartbeat_emwin_http_url', 'EMWIN HTTP ping URL', 'heartbeat_enabled', required: false, testPing: true),
                 ]),
             Section::make('Exception reporting')
                 ->schema([
@@ -347,13 +349,46 @@ class AppSettings extends Page implements HasForms
         ]);
     }
 
-    private function endpointField(string $name, string $label, string $toggle, bool $required = true): TextInput
+    private function endpointField(string $name, string $label, string $toggle, bool $required = true, bool $testPing = false): TextInput
     {
-        return TextInput::make($name)
+        $field = TextInput::make($name)
             ->label($label)
             ->maxLength(255)
             ->rules(['url:http,https'])
             ->required($required ? fn (Get $get): bool => (bool) $get($toggle) : false)
             ->visible(fn (Get $get): bool => (bool) $get($toggle));
+
+        return $testPing ? $field->suffixAction($this->testPingAction($name)) : $field;
+    }
+
+    /**
+     * Sends a real GET to the URL currently typed in the field (saved or not) and
+     * reports the status. Nothing about the URL is ever shown or logged: a
+     * Healthchecks ping URL contains a secret UUID.
+     */
+    private function testPingAction(string $field): Action
+    {
+        return Action::make("testHeartbeat_{$field}")
+            ->label('Send test ping')
+            ->tooltip('Sends a real GET to this URL. Healthchecks counts it as a check-in.')
+            ->icon(Heroicon::Signal)
+            ->disabled(fn (Get $get): bool => blank($get($field)))
+            ->action(function (Get $get) use ($field): void {
+                $url = trim((string) $get($field));
+
+                if (filter_var($url, FILTER_VALIDATE_URL) === false || ! in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+                    Notification::make()->danger()->title('Test ping failed')->body('Enter a full http:// or https:// URL first.')->send();
+
+                    return;
+                }
+
+                $result = app(SendTestHeartbeatPing::class)($url);
+
+                Notification::make()
+                    ->title($result['ok'] ? 'Test ping sent' : 'Test ping failed')
+                    ->body($result['message'])
+                    ->color($result['ok'] ? 'success' : 'danger')
+                    ->send();
+            });
     }
 }

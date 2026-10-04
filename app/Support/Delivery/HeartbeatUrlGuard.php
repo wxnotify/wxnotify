@@ -77,14 +77,23 @@ class HeartbeatUrlGuard
         return PinnedHost::options($host, [$parts['port'] ?? (strtolower($parts['scheme']) === 'https' ? 443 : 80)], $addresses);
     }
 
+    /** Drops the cached verdict for this URL, so the next check looks the host up afresh. */
+    public function forget(string $url): void
+    {
+        Cache::forget($this->cacheKey($url));
+    }
+
     /**
      * @return array{violation: ?string, addresses: list<string>}
      */
     private function inspect(string $url): array
     {
-        $key = 'heartbeat-url-guard:v2:'.sha1($url);
+        return Cache::remember($this->cacheKey($url), now()->addMinutes(self::CACHE_TTL_MINUTES), fn (): array => $this->computeInspection($url));
+    }
 
-        return Cache::remember($key, now()->addMinutes(self::CACHE_TTL_MINUTES), fn (): array => $this->computeInspection($url));
+    private function cacheKey(string $url): string
+    {
+        return 'heartbeat-url-guard:v2:'.sha1($url);
     }
 
     /**
