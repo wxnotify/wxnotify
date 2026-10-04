@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\NotificationChannel;
+use App\Settings\IntegrationSettings;
 use App\Support\Delivery\HeartbeatUrlGuard;
 use App\Support\Delivery\Pauser;
 use App\Support\TraccarUrlGuard;
@@ -407,4 +408,14 @@ function sentNotificationBodies(): string
     return $notifications->notifications
         ->map(fn (Notification $notification): string => (string) $notification->getBody())
         ->implode(' ');
+}
+
+/**
+ * Save one IntegrationSettings property (an integration's toggle or endpoint).
+ */
+function setIntegrationSetting(string $property, mixed $value): void
+{
+    $settings = app(IntegrationSettings::class);
+    $settings->{$property} = $value;
+    $settings->save();
 }

@@ -7,13 +7,6 @@ use App\Support\Integrations;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
-function setIntegrationSetting(string $property, mixed $value): void
-{
-    $settings = app(IntegrationSettings::class);
-    $settings->{$property} = $value;
-    $settings->save();
-}
-
 test('integrations without a backend default to off and email relaying defaults to on', function () {
     $settings = app(IntegrationSettings::class);
 
@@ -24,6 +17,12 @@ test('integrations without a backend default to off and email relaying defaults 
         ->and($settings->archival_enabled)->toBeFalse()
         ->and($settings->status_page_enabled)->toBeFalse()
         ->and($settings->email_relay_enabled)->toBeTrue();
+});
+
+test('reverse geocoding defaults to on with no endpoint override', function () {
+    $settings = app(IntegrationSettings::class);
+
+    expect($settings->reverse_geocoding_enabled)->toBeTrue()->and($settings->reverse_geocoding_endpoint)->toBeNull();
 });
 
 test('endpoints, provider and mail overrides default to null', function () {
@@ -42,11 +41,13 @@ test('endpoints, provider and mail overrides default to null', function () {
 });
 
 test('enabled() follows the saved setting for every integration', function (Integration $integration) {
-    expect(Integrations::enabled($integration))->toBe($integration === Integration::EmailRelay);
+    $onByDefault = in_array($integration, [Integration::EmailRelay, Integration::ReverseGeocoding], true);
 
-    setIntegrationSetting($integration->enabledProperty(), $integration !== Integration::EmailRelay);
+    expect(Integrations::enabled($integration))->toBe($onByDefault);
 
-    expect(Integrations::enabled($integration))->toBe($integration !== Integration::EmailRelay);
+    setIntegrationSetting($integration->enabledProperty(), ! $onByDefault);
+
+    expect(Integrations::enabled($integration))->toBe(! $onByDefault);
 })->with(Integration::cases());
 
 test('each integration maps to its expected properties', function (Integration $integration, string $enabled, ?string $endpoint) {
@@ -55,6 +56,7 @@ test('each integration maps to its expected properties', function (Integration $
 })->with([
     'translation' => [Integration::Translation, 'translation_enabled', 'translation_endpoint'],
     'short urls' => [Integration::ShortUrls, 'short_urls_enabled', 'short_urls_endpoint'],
+    'reverse geocoding' => [Integration::ReverseGeocoding, 'reverse_geocoding_enabled', 'reverse_geocoding_endpoint'],
     'heartbeat' => [Integration::Heartbeat, 'heartbeat_enabled', null],
     'exception reporting' => [Integration::ExceptionReporting, 'exception_reporting_enabled', null],
     'archival' => [Integration::Archival, 'archival_enabled', 'archival_endpoint'],

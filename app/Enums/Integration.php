@@ -6,6 +6,7 @@ enum Integration: string
 {
     case Translation = 'translation';
     case ShortUrls = 'short_urls';
+    case ReverseGeocoding = 'reverse_geocoding';
     case Heartbeat = 'heartbeat';
     case ExceptionReporting = 'exception_reporting';
     case Archival = 'archival';
@@ -28,6 +29,7 @@ enum Integration: string
         return match ($this) {
             self::Translation => 'translation_endpoint',
             self::ShortUrls => 'short_urls_endpoint',
+            self::ReverseGeocoding => 'reverse_geocoding_endpoint',
             self::Archival => 'archival_endpoint',
             self::StatusPage => 'status_page_url',
             self::ExceptionReporting, self::EmailRelay, self::Heartbeat => null,

@@ -164,6 +164,10 @@ class LocationForm
                 ->required($visible)
                 ->visible($visible)
                 ->helperText('Tighter intervals sharpen how current this location is, at the cost of more Traccar/device battery use.'),
+            Placeholder::make('mobile_last_known_address')
+                ->label('Last known address')
+                ->content(fn (?Location $record): string => filled($record?->address) ? (string) $record->address : 'Not looked up yet — it appears after the next position update.')
+                ->visible(fn (Get $get, ?Location $record): bool => $visible($get) && $record !== null),
             Placeholder::make('mobile_quiet_hours_note')
                 ->label('')
                 ->content('Mobile locations don\'t have a fixed timezone, so quiet hours on alert rules tied to this location use the timezone on your Profile page. Until you set one there, they won\'t take effect.')

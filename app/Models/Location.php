@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\LocationType;
 use App\Enums\MobileSource;
 use App\Models\Concerns\BlockedDuringMaintenance;
+use App\Support\Geography\GreatCircle;
 use Carbon\CarbonInterface;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -21,6 +22,9 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class Location extends Model
 {
+    /** How far a mobile location moves before its address is looked up again. */
+    public const ADDRESS_RELOOKUP_METERS = 100;
+
     /** @use HasFactory<LocationFactory> */
     use BlockedDuringMaintenance, HasFactory, LogsActivity;
 
@@ -45,6 +49,8 @@ class Location extends Model
                     'mobile_position_updated_at' => null,
                     'mobile_position_fixed_at' => null,
                     'traccar_device_missing_at' => null,
+                    'address_geocoded_lat' => null,
+                    'address_geocoded_lng' => null,
                 ]);
             }
 
@@ -65,7 +71,7 @@ class Location extends Model
         // drown out everything else about this model in noise.
         return LogOptions::defaults()
             ->logAll()
-            ->logExcept(['mobile_position_updated_at', 'mobile_position_fixed_at', 'traccar_device_missing_at'])
+            ->logExcept(['mobile_position_updated_at', 'mobile_position_fixed_at', 'traccar_device_missing_at', 'address_geocoded_lat', 'address_geocoded_lng'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -80,6 +86,8 @@ class Location extends Model
             'mobile_position_updated_at' => 'datetime',
             'mobile_position_fixed_at' => 'datetime',
             'traccar_device_missing_at' => 'datetime',
+            'address_geocoded_lat' => 'decimal:7',
+            'address_geocoded_lng' => 'decimal:7',
         ];
     }
 
@@ -109,6 +117,24 @@ class Location extends Model
      * the time Traccar says its device was last located (null until the first fix
      * arrives), a stationary location's is when it was created.
      */
+    /**
+     * Whether a mobile location's address should be looked up (again): it has a position
+     * and either was never resolved, or has moved ADDRESS_RELOOKUP_METERS or more from the
+     * position its address was resolved for.
+     */
+    public function needsAddressLookup(): bool
+    {
+        if ($this->type !== LocationType::Mobile || ! $this->hasFix()) {
+            return false;
+        }
+
+        if ($this->address_geocoded_lat === null || $this->address_geocoded_lng === null) {
+            return true;
+        }
+
+        return GreatCircle::meters((float) $this->address_geocoded_lat, (float) $this->address_geocoded_lng, (float) $this->lat, (float) $this->lng) >= self::ADDRESS_RELOOKUP_METERS;
+    }
+
     public function hasMissingDevice(): bool
     {
         return $this->type === LocationType::Mobile && $this->traccar_device_missing_at !== null;

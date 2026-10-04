@@ -51,6 +51,7 @@ class AppSettings extends Page implements HasForms
         'maintenance_message',
         'translation_endpoint',
         'short_urls_endpoint',
+        'reverse_geocoding_endpoint',
         'heartbeat_nwws_url',
         'heartbeat_emwin_url',
         'heartbeat_emwin_http_url',
@@ -282,6 +283,12 @@ class AppSettings extends Page implements HasForms
                 ->schema([
                     Toggle::make('short_urls_enabled')->label('Short URLs enabled')->live(),
                     $this->endpointField('short_urls_endpoint', 'Short URL endpoint', 'short_urls_enabled'),
+                ]),
+            Section::make('Reverse geocoding')
+                ->description('Looks up the nearest street address for mobile locations\' live positions, so lists and maps can show where a vehicle is. Each new position sends its coordinates to the geocoder below, at most once per 100 m of movement and one request per second. Leave the endpoint blank to use the public OpenStreetMap Nominatim; point it at a self-hosted Nominatim for heavy use.')
+                ->schema([
+                    Toggle::make('reverse_geocoding_enabled')->label('Reverse geocoding enabled')->live(),
+                    $this->endpointField('reverse_geocoding_endpoint', 'Nominatim endpoint (optional)', 'reverse_geocoding_enabled', required: false),
                 ]),
             Section::make('Heartbeat')
                 ->description('Healthchecks ping URLs. A feed\'s URL is requested each time that feed delivers a product; leave a URL blank to skip that feed.')

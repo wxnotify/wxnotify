@@ -14,6 +14,10 @@ class IntegrationSettings extends Settings
 
     public ?string $short_urls_endpoint;
 
+    public bool $reverse_geocoding_enabled;
+
+    public ?string $reverse_geocoding_endpoint;
+
     public bool $heartbeat_enabled;
 
     public ?string $heartbeat_nwws_url;

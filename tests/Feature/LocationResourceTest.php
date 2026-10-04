@@ -394,3 +394,18 @@ test('editing a location whose device is gone shows the warning, until another d
     livewire(EditLocation::class, ['record' => $healthy->id])
         ->assertDontSee('no longer exists on the Traccar server');
 });
+
+test('editing a mobile location shows its last known address, or says it is not looked up yet', function () {
+    $server = TraccarServer::factory()->for($this->user)->create();
+    $resolved = Location::factory()->mobile()->for($this->user)->create(['traccar_server_id' => $server->id, 'traccar_device_id' => 1, 'address' => '1 Main St, Broomfield']);
+    $waiting = Location::factory()->mobile()->for($this->user)->create(['traccar_server_id' => $server->id, 'traccar_device_id' => 2, 'address' => null]);
+
+    livewire(EditLocation::class, ['record' => $resolved->id])->assertSee('Last known address')->assertSee('1 Main St, Broomfield');
+    livewire(EditLocation::class, ['record' => $waiting->id])->assertSee('Not looked up yet');
+});
+
+test('a stationary location\'s edit page has no last known address line', function () {
+    $stationary = Location::factory()->for($this->user)->create(['address' => '1 Main St']);
+
+    livewire(EditLocation::class, ['record' => $stationary->id])->assertDontSee('Last known address');
+});

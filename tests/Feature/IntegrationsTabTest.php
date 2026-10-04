@@ -304,3 +304,30 @@ test('a malformed value is reported without sending anything', function () {
 
     Http::assertNothingSent();
 });
+
+test('reverse geocoding is on by default, its endpoint field follows the toggle, and both save', function () {
+    livewire(AppSettings::class)
+        ->assertFormSet(['reverse_geocoding_enabled' => true])
+        ->assertFormFieldVisible('reverse_geocoding_endpoint')
+        ->fillForm(['reverse_geocoding_enabled' => false])
+        ->assertFormFieldHidden('reverse_geocoding_endpoint')
+        ->fillForm(['reverse_geocoding_enabled' => true, 'reverse_geocoding_endpoint' => 'https://geo.example.test'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $settings = app(IntegrationSettings::class);
+    expect($settings->reverse_geocoding_enabled)->toBeTrue()->and($settings->reverse_geocoding_endpoint)->toBe('https://geo.example.test');
+
+    livewire(AppSettings::class)
+        ->fillForm(['reverse_geocoding_endpoint' => ''])
+        ->call('save');
+
+    expect(app(IntegrationSettings::class)->reverse_geocoding_endpoint)->toBeNull();
+});
+
+test('the reverse geocoding endpoint must be an http(s) URL', function () {
+    livewire(AppSettings::class)
+        ->fillForm(['reverse_geocoding_enabled' => true, 'reverse_geocoding_endpoint' => 'not a url'])
+        ->call('save')
+        ->assertHasFormErrors(['reverse_geocoding_endpoint']);
+});

@@ -50,7 +50,7 @@ class GetLocationMap
                 'key' => (string) $location->id,
                 'label' => (string) $location->label,
                 'type' => $location->type->value,
-                'address' => $isMobile ? null : $location->address,
+                'address' => $location->address,
                 'lat' => (float) $location->lat,
                 'lng' => (float) $location->lng,
                 'stale' => $isMobile && ($updatedAt === null || $updatedAt->lt(now()->subMinutes(GetTraccarDeviceMap::STALE_AFTER_MINUTES))),

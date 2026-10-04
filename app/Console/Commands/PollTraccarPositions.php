@@ -4,9 +4,12 @@ namespace App\Console\Commands;
 
 use App\Actions\Traccar\ListTraccarDevices;
 use App\Actions\Traccar\PollTraccarServer;
+use App\Enums\Integration;
 use App\Enums\LocationType;
+use App\Jobs\ReverseGeocodeLocation;
 use App\Models\Location;
 use App\Models\TraccarServer;
+use App\Support\Integrations;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
@@ -120,6 +123,8 @@ class PollTraccarPositions extends Command
                 $location->enableLogging();
             }
 
+            $this->queueAddressLookup($location);
+
             $updated++;
         }
 
@@ -169,6 +174,22 @@ class PollTraccarPositions extends Command
             } finally {
                 $location->enableLogging();
             }
+        }
+    }
+
+    /**
+     * A new position needs a street address when the location was never resolved or has
+     * moved far enough since it was. Queued, so a slow geocoder never slows polling, and
+     * never allowed to fail the poll.
+     */
+    private function queueAddressLookup(Location $location): void
+    {
+        try {
+            if (Integrations::enabled(Integration::ReverseGeocoding) && $location->needsAddressLookup()) {
+                ReverseGeocodeLocation::dispatch($location->id);
+            }
+        } catch (Throwable) {
+            // The next poll tries again.
         }
     }
 

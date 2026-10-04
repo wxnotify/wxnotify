@@ -54,6 +54,10 @@
                     if (location.type === 'mobile') {
                         line('Last position update:', window.wxMapHelpers.formatTimestamp(location.updated_at));
 
+                        if (location.address) {
+                            line('Nearest address:', location.address);
+                        }
+
                         if (location.stale) {
                             const note = document.createElement('div');
                             note.textContent = 'No update for over an hour';

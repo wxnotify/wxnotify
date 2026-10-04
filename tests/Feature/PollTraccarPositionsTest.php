@@ -1,9 +1,13 @@
 <?php
 
+use App\Jobs\ReverseGeocodeLocation;
 use App\Models\Location;
 use App\Models\TraccarServer;
+use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Spatie\Activitylog\Models\Activity;
 
 test('a due mobile location is updated with its server\'s reported position', function () {
@@ -341,4 +345,69 @@ test('only the locations whose device is gone are marked, and marking does not t
     expect($gone->refresh()->traccar_device_missing_at)->not->toBeNull()
         ->and($present->refresh()->traccar_device_missing_at)->toBeNull()
         ->and(Activity::where('subject_type', Location::class)->count())->toBe($before);
+});
+
+test('a new position queues an address lookup only when the location was never resolved or moved 100 m', function (array $attributes, bool $queued) {
+    Queue::fake();
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = dueMobileLocation($server, 1, $attributes);
+    Http::fake(['traccar.example.com/api/positions' => Http::response([
+        ['deviceId' => 1, 'latitude' => 40.0, 'longitude' => -105.0, 'fixTime' => null],
+    ])]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    $queued
+        ? Queue::assertPushed(ReverseGeocodeLocation::class, fn (ReverseGeocodeLocation $job) => $job->locationId === $location->id)
+        : Queue::assertNothingPushed();
+})->with([
+    'never resolved' => [[], true],
+    'resolved at this position' => [['address_geocoded_lat' => 40.0, 'address_geocoded_lng' => -105.0], false],
+    'resolved 55 m away' => [['address_geocoded_lat' => 40.0005, 'address_geocoded_lng' => -105.0], false],
+    'resolved 111 m away' => [['address_geocoded_lat' => 40.0010, 'address_geocoded_lng' => -105.0], true],
+]);
+
+test('no address lookup is queued while reverse geocoding is turned off', function () {
+    Queue::fake();
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = dueMobileLocation($server, 1);
+    Http::fake(['traccar.example.com/api/positions' => Http::response([
+        ['deviceId' => 1, 'latitude' => 40.0, 'longitude' => -105.0, 'fixTime' => null],
+    ])]);
+    setIntegrationSetting('reverse_geocoding_enabled', false);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    Queue::assertNothingPushed();
+    expect((float) $location->refresh()->lat)->toBe(40.0);
+});
+
+test('only locations that got a position are queued for an address lookup', function () {
+    Queue::fake();
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $withPosition = dueMobileLocation($server, 1);
+    dueMobileLocation($server, 2);
+    Http::fake([
+        'traccar.example.com/api/positions' => Http::response([['deviceId' => 1, 'latitude' => 40.0, 'longitude' => -105.0, 'fixTime' => null]]),
+        'traccar.example.com/api/devices' => Http::response([['id' => 2, 'name' => 'x']]),
+    ]);
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    Queue::assertPushedTimes(ReverseGeocodeLocation::class, 1);
+    Queue::assertPushed(ReverseGeocodeLocation::class, fn (ReverseGeocodeLocation $job) => $job->locationId === $withPosition->id);
+});
+
+test('a queue that cannot take the lookup does not fail the poll', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com']);
+    $location = dueMobileLocation($server, 1);
+    Http::fake(['traccar.example.com/api/positions' => Http::response([
+        ['deviceId' => 1, 'latitude' => 40.0, 'longitude' => -105.0, 'fixTime' => null],
+    ])]);
+    Bus::shouldReceive('dispatch')->andThrow(new RuntimeException('queue down'));
+    app()->bind(Dispatcher::class, fn () => throw new RuntimeException('queue down'));
+
+    $this->artisan('traccar:poll-positions')->assertSuccessful();
+
+    expect((float) $location->refresh()->lat)->toBe(40.0);
 });

@@ -91,3 +91,12 @@ test('the payload exposes nothing beyond the documented fields', function () {
 test('an empty list yields an empty result', function () {
     expect((new GetLocationMap)([]))->toBe(['locations' => [], 'unplaced' => 0]);
 });
+
+test('a mobile location\'s resolved address is on the map, a blank one is null', function () {
+    $resolved = Location::factory()->for($this->user)->mobile()->create(['label' => 'A resolved', 'lat' => 40.0, 'lng' => -105.0, 'address' => '1 Main St, Broomfield']);
+    $blank = Location::factory()->for($this->user)->mobile()->create(['label' => 'B blank', 'lat' => 41.0, 'lng' => -106.0, 'address' => null]);
+
+    $result = (new GetLocationMap)([$resolved, $blank]);
+
+    expect(collect($result['locations'])->pluck('address', 'label')->all())->toBe(['A resolved' => '1 Main St, Broomfield', 'B blank' => null]);
+});
