@@ -781,7 +781,7 @@ test('a save that fails validation stays on the edit page', function () {
         ->assertNoRedirect();
 });
 
-test('the SPC & WPC form lists the category sections in order, each with its own risk levels where its products have them', function () {
+test('each SPC & WPC category with risk-level products lists its own risk options', function () {
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
     $fire = Product::where('code', 'SPC.FIRE')->sole();
 
@@ -917,4 +917,32 @@ test('an SPC & WPC rule with no ticks stores an empty list, meaning every level'
         ->assertHasNoFormErrors();
 
     expect(AlertRule::where('user_id', $this->user->id)->sole()->risk_levels)->toBe([]);
+});
+
+test('deselecting every product with risk levels while editing clears the stored levels', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $day2 = Product::where('code', 'DY2')->sole();
+    $rule = AlertRule::factory()->for($this->user)->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'risk_levels' => ['High'],
+    ]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->fillForm(['product_ids' => ['convective_outlooks' => [$day2->id]]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->refresh()->risk_levels)->toBe([]);
+});
+
+test('a product without risk levels selected beside one with them adds no options to the Convective list', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $day2 = Product::where('code', 'DY2')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'spc_wpc', 'product_ids' => ['convective_outlooks' => [$outlook->id, $day2->id]]])
+        ->assertFormFieldVisible('risk_levels.convective_outlooks')
+        ->assertFormFieldExists('risk_levels.convective_outlooks', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['Marginal', 'Slight', 'Enhanced', 'Moderate', 'High']);
 });

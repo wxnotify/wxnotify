@@ -93,8 +93,11 @@ class EditAlertRule extends EditRecord
             $data['alert_template_id'] = null;
         }
 
-        if (array_key_exists('risk_levels', $data)) {
-            $data['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels']);
+        // Every risk checklist is hidden once no selected product offers risk
+        // levels, and Filament then drops the whole `risk_levels` key, which
+        // would leave the old levels stored; so SPC & WPC always writes it.
+        if (($data['category'] ?? null) === AlertCategory::SpcWpc->value) {
+            $data['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels'] ?? []);
         }
 
         return AlertRuleFormUnits::toStorage($data, Units::for(auth()->user()), $this->record);

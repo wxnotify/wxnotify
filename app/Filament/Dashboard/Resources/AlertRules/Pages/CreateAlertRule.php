@@ -2,6 +2,7 @@
 
 namespace App\Filament\Dashboard\Resources\AlertRules\Pages;
 
+use App\Enums\AlertCategory;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
 use App\Support\AlertRuleFormUnits;
@@ -29,8 +30,8 @@ class CreateAlertRule extends CreateRecord
     {
         $data['user_id'] = auth()->id();
 
-        if (array_key_exists('risk_levels', $data)) {
-            $data['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels']);
+        if (($data['category'] ?? null) === AlertCategory::SpcWpc->value) {
+            $data['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels'] ?? []);
         }
 
         return AlertRuleFormUnits::toStorage($data, Units::for(auth()->user()));
