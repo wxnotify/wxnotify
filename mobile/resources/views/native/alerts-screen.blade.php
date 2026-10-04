@@ -8,7 +8,7 @@
 <native:column class="w-full h-full bg-white dark:bg-slate-950">
     @if ($offline)
         <native:row class="w-full p-3 bg-slate-100 dark:bg-slate-800">
-            <native:text class="text-sm text-slate-700 dark:text-slate-300">You're offline. Showing alerts from {{ $this->syncedLabel() }}.</native:text>
+            <native:text class="text-sm text-slate-700 dark:text-slate-300">{{ $syncedAt === null ? "You're offline." : "You're offline. Showing alerts from {$this->syncedLabel()}." }}</native:text>
         </native:row>
     @endif
 

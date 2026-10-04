@@ -96,3 +96,28 @@ test('signing out sends a DELETE and tolerates the empty 204 body', function () 
 
     Http::assertSent(fn (Request $r) => $r->method() === 'DELETE');
 });
+
+test('a successful response that is not JSON is a retryable error, not a crash', function () {
+    Http::fake(['*' => Http::response('<html>portal</html>', 200, ['Content-Type' => 'text/html'])]);
+
+    expect(fn () => $this->api->me())->toThrow(Retryable::class)
+        ->and(fn () => $this->api->alerts())->toThrow(Retryable::class)
+        ->and(fn () => $this->api->alert(1))->toThrow(Retryable::class)
+        ->and(fn () => $this->api->exchangeCode('code', 'verifier'))->toThrow(Retryable::class);
+});
+
+test('JSON missing the expected shape is a retryable error', function () {
+    Http::fake(['*' => Http::response(['unexpected' => true])]);
+
+    expect(fn () => $this->api->me())->toThrow(Retryable::class)
+        ->and(fn () => $this->api->alerts())->toThrow(Retryable::class)
+        ->and(fn () => $this->api->exchangeCode('code', 'verifier'))->toThrow(Retryable::class);
+});
+
+test('an empty success response, such as the sign-out 204, is fine', function () {
+    Http::fake(['*' => Http::response(null, 204)]);
+
+    $this->api->signOut();
+
+    Http::assertSentCount(1);
+});

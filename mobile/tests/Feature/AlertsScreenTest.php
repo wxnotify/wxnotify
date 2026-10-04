@@ -148,3 +148,104 @@ test('the bottom bar has Alerts and Account', function () {
 
     Native::test(AlertsScreen::class)->assertHasTab('Alerts')->assertHasTab('Account');
 });
+
+test('coming back from a detail keeps the pages already loaded and sends no request', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
+        'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response(feedResponse([apiEntry(1)])),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->tap('Load more');
+
+    $this->travel(2)->minutes();
+
+    $screen->call('onResume')
+        ->assertSee('Tornado Warning 2')
+        ->assertSee('Tornado Warning 1')
+        ->assertSet('pagedBeyondFirst', true);
+
+    Http::assertSentCount(2);
+});
+
+test('coming back refreshes only when the feed is more than a minute old', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(2)]))]);
+
+    $screen = Native::test(AlertsScreen::class);
+
+    $this->travel(30)->seconds();
+    $screen->call('onResume');
+    Http::assertSentCount(1);
+
+    $this->travel(2)->minutes();
+    $screen->call('onResume');
+    Http::assertSentCount(2);
+});
+
+test('a successful refresh after paging starts the list over from the first page', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
+        'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response(feedResponse([apiEntry(1)])),
+    ]);
+
+    Native::test(AlertsScreen::class)
+        ->tap('Load more')
+        ->assertSet('pagedBeyondFirst', true)
+        ->call('refresh')
+        ->assertSet('pagedBeyondFirst', false)
+        ->assertDontSee('Tornado Warning 1');
+});
+
+test('going offline after a failed load clears the stale error message', function () {
+    Http::fake(['*' => Http::response([], 500)]);
+
+    $screen = Native::test(AlertsScreen::class)->assertSee('could not load your alerts');
+
+    $this->network->connected = false;
+
+    $screen->call('refresh')->assertSet('offline', true)->assertDontSee('could not load');
+});
+
+test('a server error after being offline clears the offline banner', function () {
+    $this->network->connected = false;
+    Http::fake(['*' => Http::response([], 500)]);
+
+    $screen = Native::test(AlertsScreen::class)->assertSet('offline', true);
+
+    $this->network->connected = true;
+
+    $screen->call('refresh')->assertSet('offline', false)->assertSee('could not load your alerts');
+});
+
+test('offline with an empty cache the banner does not mention a sync time', function () {
+    $this->network->connected = false;
+    Http::fake();
+
+    Native::test(AlertsScreen::class)
+        ->assertSee("You're offline.")
+        ->assertDontSee('Showing alerts from');
+});
+
+test('a successful load more after a failed one clears the error', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
+        'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::sequence()
+            ->push([], 500)
+            ->push(feedResponse([apiEntry(1)])),
+    ]);
+
+    Native::test(AlertsScreen::class)
+        ->tap('Load more')
+        ->assertSee('could not load more alerts')
+        ->tap('Load more')
+        ->assertDontSee('could not load more alerts')
+        ->assertSee('Tornado Warning 1');
+});
+
+test('an HTML page where JSON was expected keeps the cached feed and shows the retry message', function () {
+    (new LocalCache)->replaceFeed([apiEntry(7, ['subject' => 'Cached alert'])]);
+    Http::fake(['*' => Http::response('<html>portal</html>', 200, ['Content-Type' => 'text/html'])]);
+
+    Native::test(AlertsScreen::class)
+        ->assertSee('Cached alert')
+        ->assertSee('could not load your alerts');
+});

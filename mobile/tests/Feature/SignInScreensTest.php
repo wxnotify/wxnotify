@@ -53,3 +53,17 @@ test('a denied callback returns quietly to the sign-in screen', function () {
 
     expect((new TokenStore)->pending())->toBeNull();
 });
+
+test('the sign-in screen steps aside for a subscriber who is already signed in', function () {
+    (new TokenStore)->put('5|abc');
+
+    Native::test(SignInScreen::class)->assertReplacedWith('/');
+});
+
+test('the sign-in screen steps aside when it resumes after sign-in completed on top of it', function () {
+    $screen = Native::test(SignInScreen::class);
+
+    (new TokenStore)->put('5|abc');
+
+    $screen->call('onResume')->assertReplacedWith('/');
+});

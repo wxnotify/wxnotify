@@ -27,10 +27,16 @@ class WxNotifyApi
      */
     public function exchangeCode(string $code, string $verifier): array
     {
-        return $this->send(
+        $body = $this->send(
             fn (PendingRequest $request) => $request->post('/api/v1/auth/token', ['code' => $code, 'code_verifier' => $verifier]),
             authenticated: false,
         );
+
+        if (! is_string($body['token'] ?? null) || ! is_array($body['user'] ?? null)) {
+            throw new Retryable;
+        }
+
+        return $body;
     }
 
     /**
@@ -38,7 +44,7 @@ class WxNotifyApi
      */
     public function me(): array
     {
-        return $this->send(fn (PendingRequest $request) => $request->get('/api/v1/me'))['data'];
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/me')));
     }
 
     /**
@@ -46,10 +52,14 @@ class WxNotifyApi
      */
     public function alerts(?string $before = null, int $limit = 25): array
     {
-        return $this->send(fn (PendingRequest $request) => $request->get('/api/v1/alerts', array_filter(
+        $body = $this->send(fn (PendingRequest $request) => $request->get('/api/v1/alerts', array_filter(
             ['limit' => $limit, 'before' => $before],
             fn ($value) => $value !== null,
         )));
+
+        $this->data($body);
+
+        return $body;
     }
 
     /**
@@ -57,7 +67,7 @@ class WxNotifyApi
      */
     public function alert(int $id): array
     {
-        return $this->send(fn (PendingRequest $request) => $request->get("/api/v1/alerts/{$id}"))['data'];
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get("/api/v1/alerts/{$id}")));
     }
 
     public function signOut(): void
@@ -92,11 +102,45 @@ class WxNotifyApi
         }
 
         return match (true) {
-            $response->successful() => $response->json() ?? [],
+            $response->successful() => $this->decode($response),
             $response->status() === 401 => throw new Unauthenticated,
             $response->status() === 429, $response->serverError() => throw new Retryable,
             default => throw new Rejected,
         };
+    }
+
+    /**
+     * A success with no body (the sign-out 204) is empty; a body that is not JSON (a captive portal's
+     * HTML page, a misconfigured host) is a transient failure, never a half-built array.
+     *
+     * @return array<string, mixed>
+     */
+    private function decode(Response $response): array
+    {
+        if ($response->status() === 204 || trim($response->body()) === '') {
+            return [];
+        }
+
+        $json = $response->json();
+
+        if (! is_array($json)) {
+            throw new Retryable;
+        }
+
+        return $json;
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private function data(array $body): array
+    {
+        if (! is_array($body['data'] ?? null)) {
+            throw new Retryable;
+        }
+
+        return $body['data'];
     }
 
     private function assertOnline(): void

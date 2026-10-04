@@ -37,11 +37,17 @@ test('the device name falls back when the device reports nothing usable, and is 
 
     expect($query['device_name'])->toBe('WxNotify app');
 
-    Native::fakeBridge()->respondTo('Device.GetInfo', ['info' => json_encode(['model' => str_repeat("x\x07", 60)])]);
+    Native::fakeBridge()->respondTo('Device.GetInfo', ['info' => json_encode(['model' => str_repeat('x', 120)])]);
     $this->signIn->begin();
     parse_str((string) parse_url($this->browser->authUrls[1], PHP_URL_QUERY), $second);
 
-    expect(strlen($second['device_name']))->toBeLessThanOrEqual(80)->and($second['device_name'])->not->toContain("\x07");
+    expect($second['device_name'])->toBe(str_repeat('x', 80));
+
+    Native::fakeBridge()->respondTo('Device.GetInfo', ['info' => json_encode(['model' => "iPhone\x07 16"])]);
+    $this->signIn->begin();
+    parse_str((string) parse_url($this->browser->authUrls[2], PHP_URL_QUERY), $third);
+
+    expect($third['device_name'])->not->toContain("\x07");
 });
 
 test('completing trades the code and verifier for a token and clears the pending sign-in', function () {

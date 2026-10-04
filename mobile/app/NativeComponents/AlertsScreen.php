@@ -10,6 +10,7 @@ use App\Services\WxNotifyApi;
 use App\Support\AlertPresenter;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
+use Illuminate\Support\Carbon;
 use Native\Mobile\Edge\NativeComponent;
 
 /**
@@ -19,6 +20,8 @@ use Native\Mobile\Edge\NativeComponent;
 class AlertsScreen extends NativeComponent
 {
     use RequiresSignIn;
+
+    private const RESUME_REFRESH_AFTER_SECONDS = 60;
 
     /** @var array<int, array<string, mixed>> */
     public array $alerts = [];
@@ -30,6 +33,9 @@ class AlertsScreen extends NativeComponent
     public ?string $error = null;
 
     public ?string $syncedAt = null;
+
+    /** True once Load more has appended a page, so coming back to the screen must not reset the list. */
+    public bool $pagedBeyondFirst = false;
 
     public ?string $timezone = null;
 
@@ -48,8 +54,20 @@ class AlertsScreen extends NativeComponent
         $this->refresh();
     }
 
+    /**
+     * NativePHP calls this whenever a pushed screen (an alert's detail) is popped, so it must not
+     * throw away pages the subscriber loaded or refetch a feed that was just fetched.
+     */
     public function onResume(): void
     {
+        if ($this->pagedBeyondFirst) {
+            return;
+        }
+
+        if ($this->syncedAt !== null && Carbon::parse($this->syncedAt)->diffInSeconds(now(), true) < self::RESUME_REFRESH_AFTER_SECONDS) {
+            return;
+        }
+
         $this->refresh();
     }
 
@@ -65,6 +83,7 @@ class AlertsScreen extends NativeComponent
             $this->alerts = $page['data'];
             $this->nextCursor = $page['meta']['next_cursor'] ?? null;
             $this->syncedAt = $cache->syncedAt()?->toIso8601String();
+            $this->pagedBeyondFirst = false;
             $this->offline = false;
             $this->error = null;
         } catch (Unauthenticated) {
@@ -72,7 +91,9 @@ class AlertsScreen extends NativeComponent
             $this->replace('/sign-in');
         } catch (Offline) {
             $this->offline = true;
+            $this->error = null;
         } catch (ApiException) {
+            $this->offline = false;
             $this->error = 'WxNotify could not load your alerts. Pull down to try again.';
         }
     }
@@ -88,7 +109,9 @@ class AlertsScreen extends NativeComponent
 
             $this->alerts = [...$this->alerts, ...$page['data']];
             $this->nextCursor = $page['meta']['next_cursor'] ?? null;
+            $this->pagedBeyondFirst = true;
             $this->offline = false;
+            $this->error = null;
         } catch (Unauthenticated) {
             app(SignOut::class)->clearLocal();
             $this->replace('/sign-in');
