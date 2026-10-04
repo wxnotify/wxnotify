@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\MatchingMode;
+use App\Enums\ProductStatus;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
@@ -945,4 +946,30 @@ test('a product without risk levels selected beside one with them adds no option
         ->fillForm(['category' => 'spc_wpc', 'product_ids' => ['convective_outlooks' => [$outlook->id, $day2->id]]])
         ->assertFormFieldVisible('risk_levels.convective_outlooks')
         ->assertFormFieldExists('risk_levels.convective_outlooks', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['Marginal', 'Slight', 'Enhanced', 'Moderate', 'High']);
+});
+
+test('the Weather Alerts form never offers a risk checklist, even for a product that has risk level options', function () {
+    $tornado = Product::where('code', 'TO.W')->sole();
+    $tornado->update(['risk_level_options' => ['Low', 'High']]);
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'weather_alerts', 'product_ids' => [$tornado->category->value => [$tornado->id]]])
+        ->assertFormFieldDoesNotExist("risk_levels.{$tornado->category->value}");
+});
+
+test('an untouched edit keeps the stored levels when their only risk product is no longer active', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rule = AlertRule::factory()->for($this->user)->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'risk_levels' => ['High'],
+    ]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach($this->channel);
+    $outlook->update(['status' => ProductStatus::Draft]);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->refresh()->risk_levels)->toBe(['High']);
 });

@@ -290,7 +290,7 @@ class AlertRuleForm
         return [
             ...self::productSections(Product::query()
                 ->where('family', 'spc_wpc')
-                ->where('status', 'active')),
+                ->where('status', 'active'), withRiskLevels: true),
             ...self::matchingModeFields(AlertCategory::SpcWpc),
         ];
     }
@@ -319,12 +319,20 @@ class AlertRuleForm
      * Options are the selected products' own `risk_level_options`; the list is hidden unless
      * a selected product in this category offers some.
      *
-     * @param  Collection<int, Product>  $products  the category's products
+     * The candidates are the category's SPC & WPC products of ANY status that offer risk
+     * levels, not just the active ones the toggle list shows: matching, hasRiskLevelProducts()
+     * and SpcWpcRiskLevels::split() do not filter by status either, so a rule still attached to
+     * a since-retired product keeps its checklist (and its stored levels on save).
+     *
      * @return array<CheckboxList>
      */
-    protected static function riskLevelFields(ProductCategory $category, Collection $products): array
+    protected static function riskLevelFields(ProductCategory $category): array
     {
-        $riskProducts = $products->filter(fn (Product $product): bool => filled($product->risk_level_options));
+        $riskProducts = Product::query()
+            ->where('family', 'spc_wpc')
+            ->where('category', $category->value)
+            ->whereNotNull('risk_level_options')
+            ->get(['id', 'risk_level_options']);
 
         if ($riskProducts->isEmpty()) {
             return [];
@@ -382,17 +390,20 @@ class AlertRuleForm
      * commonly used category, so it shouldn't need an extra click on a
      * fresh Create.
      *
+     * Only the SPC & WPC form passes `$withRiskLevels`: it adds each category's own
+     * risk-level checklist (see riskLevelFields()) to the section.
+     *
      * @return array<Section>
      */
-    protected static function productSections(Builder $query): array
+    protected static function productSections(Builder $query, bool $withRiskLevels = false): array
     {
-        $productsByCategory = $query->orderBy('sort_order')->get(['id', 'name', 'description', 'category', 'risk_level_options'])
+        $productsByCategory = $query->orderBy('sort_order')->get(['id', 'name', 'description', 'category'])
             ->groupBy(fn (Product $product): ?string => $product->category?->value);
 
         return collect(ProductCategory::cases())
             ->filter(fn (ProductCategory $category): bool => $productsByCategory->has($category->value))
             ->values()
-            ->map(function (ProductCategory $category, int $index) use ($productsByCategory): Section {
+            ->map(function (ProductCategory $category, int $index) use ($productsByCategory, $withRiskLevels): Section {
                 $fieldName = "product_ids.{$category->value}";
                 $products = $productsByCategory->get($category->value);
 
@@ -424,7 +435,7 @@ class AlertRuleForm
                     ->collapsible()
                     ->collapsed(fn (Get $get): bool => $category !== ProductCategory::TornadoAndSevereThunderstorm
                         && self::selectedProductIds($get, $fieldName) === [])
-                    ->schema([$toggleList, ...self::riskLevelFields($category, $products)]);
+                    ->schema([$toggleList, ...($withRiskLevels ? self::riskLevelFields($category) : [])]);
             })
             ->all();
     }

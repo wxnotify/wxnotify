@@ -907,6 +907,17 @@ test('Convective levels never block the Fire Weather Outlook', function () {
     Queue::assertPushed(DeliverWeatherAlert::class);
 });
 
+test('a Fire-only tick does not block a Day 1 outlook whose extraction found no categorical risk', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    riskRule(['SPC.OUTLOOK', 'SPC.FIRE'], ['Elevated']);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => []]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
 test('levels that belong to none of the rule\'s product options apply no filter', function () {
     $this->seed(ProductCatalogSeeder::class);
     Queue::fake();
