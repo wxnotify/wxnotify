@@ -78,16 +78,18 @@ class GetTraccarDeviceMap
 
         $results = [];
         $pooled = [];
+        $pins = [];
 
         foreach ($servers as $server) {
             if (! $this->isConfigured($server)) {
                 Log::warning('Traccar device map: server misconfigured', ['traccar_server_id' => $server->id]);
                 $results[$server->id] = null;
-            } elseif (app(TraccarUrlGuard::class)->violation((string) $server->base_url) !== null) {
+            } elseif (($pinned = app(TraccarUrlGuard::class)->requestOptions((string) $server->base_url)) === null) {
                 Log::warning('Traccar server URL refused', ['traccar_server_id' => $server->id]);
                 $results[$server->id] = null;
             } else {
                 $pooled[] = $server;
+                $pins[$server->id] = $pinned;
             }
         }
 
@@ -96,7 +98,7 @@ class GetTraccarDeviceMap
         }
 
         try {
-            $responses = Http::pool(function (Pool $pool) use ($pooled): array {
+            $responses = Http::pool(function (Pool $pool) use ($pooled, $pins): array {
                 $requests = [];
 
                 foreach ($pooled as $server) {
@@ -107,7 +109,7 @@ class GetTraccarDeviceMap
                             ->withToken((string) $server->api_token)
                             ->acceptJson()
                             ->timeout(self::TIMEOUT_SECONDS)
-                            ->withOptions(['allow_redirects' => false])
+                            ->withOptions(['allow_redirects' => false, ...$pins[$server->id]])
                             ->get("{$base}/api/{$endpoint}");
                     }
                 }

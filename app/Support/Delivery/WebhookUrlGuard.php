@@ -102,9 +102,13 @@ class WebhookUrlGuard
      * or null when it is safe. Callers turn the reason into their own wording;
      * the classification itself is shared so the IP-range rules exist once.
      * Callers outside this class (TraccarUrlGuard) use it for the shared IP
-     * classification and supply their own wording.
+     * classification and supply their own wording. A caller that must connect
+     * to exactly the addresses it vetted passes them as `$resolved` (from
+     * resolve()) so the host is not looked up a second time here.
+     *
+     * @param  list<string>|null  $resolved  the host's addresses, when already looked up
      */
-    public function hostRisk(string $host): ?string
+    public function hostRisk(string $host, ?array $resolved = null): ?string
     {
         if ($this->privateNetworksAllowed()) {
             return null;
@@ -121,7 +125,7 @@ class WebhookUrlGuard
             }
         }
 
-        $ips = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : $this->resolve($host);
+        $ips = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : ($resolved ?? $this->resolve($host));
 
         if ($ips === []) {
             return 'unresolved';
@@ -143,7 +147,7 @@ class WebhookUrlGuard
     /**
      * @return list<string>
      */
-    private function resolve(string $host): array
+    public function resolve(string $host): array
     {
         if ($this->resolver !== null) {
             return array_values(($this->resolver)($host));

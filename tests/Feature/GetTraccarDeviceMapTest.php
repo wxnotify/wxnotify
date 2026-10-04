@@ -305,3 +305,36 @@ test('a device whose position is flagged invalid or sits at 0,0 is counted as un
     expect(collect($result['devices'])->pluck('name')->all())->toBe(['Placed', 'On the equator'])
         ->and($result['unplaced'])->toBe(2);
 });
+
+test('every request is pinned to the addresses the guard vetted for its own server', function () {
+    app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(fn (string $host): array => $host === 'a.example.com' ? ['93.184.216.34'] : ['203.0.113.9']));
+    $a = mapServer('A', 'a.example.com');
+    $b = mapServer('B', 'b.example.com');
+    $pins = [];
+
+    Http::fake(['*' => function ($request, array $options) use (&$pins) {
+        $pins[$request->url()] = $options['curl'][CURLOPT_RESOLVE] ?? null;
+
+        return Http::response([]);
+    }]);
+
+    (new GetTraccarDeviceMap)([$a, $b]);
+
+    expect($pins)->toBe([
+        'https://a.example.com/api/devices' => ['a.example.com:443:93.184.216.34'],
+        'https://a.example.com/api/positions' => ['a.example.com:443:93.184.216.34'],
+        'https://b.example.com/api/devices' => ['b.example.com:443:203.0.113.9'],
+        'https://b.example.com/api/positions' => ['b.example.com:443:203.0.113.9'],
+    ]);
+});
+
+test('a server whose host does not resolve is unreachable and never requested', function () {
+    config(['wxnotify.mode' => 'selfhost']);
+    app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(fn (string $host): array => []));
+    $server = mapServer('Fleet', 'fleet.example.com');
+
+    Http::fake();
+
+    expect((new GetTraccarDeviceMap)([$server])['unreachable'])->toBe(['Fleet']);
+    Http::assertNothingSent();
+});

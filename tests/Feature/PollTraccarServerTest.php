@@ -162,3 +162,29 @@ test('an out-of-range or non-finite coordinate voids the whole response, as malf
     'longitude above 180' => [39.0, 180.5],
     'non-finite latitude' => ['1e999', -94.0],
 ]);
+
+test('the request is pinned to the addresses the guard vetted', function () {
+    $server = TraccarServer::factory()->create(['base_url' => 'https://traccar.example.com:8443']);
+    $sent = null;
+
+    Http::fake(['traccar.example.com:8443/api/positions' => function ($request, array $options) use (&$sent) {
+        $sent = $options;
+
+        return Http::response([]);
+    }]);
+
+    (new PollTraccarServer)($server);
+
+    expect($sent['curl'][CURLOPT_RESOLVE])->toBe(['traccar.example.com:8443:93.184.216.34']);
+});
+
+test('a host name that does not resolve is refused before any request is sent', function () {
+    app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(fn (string $host): array => []));
+    config(['wxnotify.mode' => 'selfhost']);
+    $server = TraccarServer::factory()->create(['base_url' => 'http://traccar:8082']);
+
+    Http::fake();
+
+    expect((new PollTraccarServer)($server))->toBeNull();
+    Http::assertNothingSent();
+});

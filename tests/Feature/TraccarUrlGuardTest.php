@@ -188,3 +188,79 @@ test('the validation rule passes a safe URL', function () {
 
     expect($validator->passes())->toBeTrue();
 });
+
+test('requestOptions pins the host to the addresses it validated, on the URL\'s port', function (string $url, string $expected) {
+    config(['wxnotify.mode' => 'cloud']);
+
+    $options = traccarGuard(['93.184.216.34', '2606:4700::1111'])->requestOptions($url);
+
+    expect($options)->toBe(['curl' => [CURLOPT_RESOLVE => [$expected]]]);
+})->with([
+    'https default port' => ['https://traccar.example.com', 'traccar.example.com:443:93.184.216.34,[2606:4700::1111]'],
+    'http default port' => ['http://traccar.example.com/traccar', 'traccar.example.com:80:93.184.216.34,[2606:4700::1111]'],
+    'explicit port' => ['http://Traccar.Example.com:8082', 'traccar.example.com:8082:93.184.216.34,[2606:4700::1111]'],
+]);
+
+test('requestOptions pins a trailing-dot host under both spellings', function () {
+    config(['wxnotify.mode' => 'cloud']);
+
+    expect(traccarGuard()->requestOptions('https://traccar.example.com.'))
+        ->toBe(['curl' => [CURLOPT_RESOLVE => [
+            'traccar.example.com.:443:93.184.216.34',
+            'traccar.example.com:443:93.184.216.34',
+        ]]]);
+});
+
+test('requestOptions looks the host up once and pins exactly that answer', function () {
+    config(['wxnotify.mode' => 'cloud']);
+
+    $answers = [['93.184.216.34'], ['10.0.0.5']];
+    $guard = new TraccarUrlGuard(function (string $host) use (&$answers): array {
+        return array_shift($answers) ?? [];
+    });
+
+    expect($guard->requestOptions('https://traccar.example.com'))
+        ->toBe(['curl' => [CURLOPT_RESOLVE => ['traccar.example.com:443:93.184.216.34']]])
+        ->and($answers)->toHaveCount(1);
+});
+
+test('requestOptions needs no pin for an IP-literal host', function (string $url) {
+    config(['wxnotify.mode' => 'cloud']);
+
+    expect(traccarGuard()->requestOptions($url))->toBe([]);
+})->with([
+    'ipv4' => 'http://93.184.216.34:8082',
+    'ipv6' => 'http://[2606:4700::1111]:8082',
+]);
+
+test('requestOptions refuses what violation refuses, and a host with any private answer', function (string $mode, string $url, array $ips) {
+    config(['wxnotify.mode' => $mode]);
+
+    expect(traccarGuard($ips)->requestOptions($url))->toBeNull();
+})->with([
+    'cloud private answer' => ['cloud', 'https://traccar.example.com', ['93.184.216.34', '10.0.0.5']],
+    'cloud private literal' => ['cloud', 'http://10.0.0.5:8082', []],
+    'cloud non-ASCII host' => ['cloud', 'http://ä.example.com', ['93.184.216.34']],
+    'selfhost metadata answer' => ['selfhost', 'https://traccar.example.com', ['10.0.0.5', '169.254.169.254']],
+    'selfhost metadata literal' => ['selfhost', 'http://169.254.169.254', []],
+]);
+
+test('requestOptions refuses a host name that does not resolve, in both modes', function (string $mode) {
+    config(['wxnotify.mode' => $mode]);
+
+    expect(traccarGuard([])->requestOptions('https://traccar.example.com'))->toBeNull();
+})->with(['cloud', 'selfhost']);
+
+test('selfhost pins private and LAN answers', function () {
+    config(['wxnotify.mode' => 'selfhost']);
+
+    expect(traccarGuard(['10.0.0.5', 'fd00::5'])->requestOptions('http://traccar:8082'))
+        ->toBe(['curl' => [CURLOPT_RESOLVE => ['traccar:8082:10.0.0.5,[fd00::5]']]])
+        ->and(traccarGuard()->requestOptions('http://192.168.1.50:8082'))->toBe([]);
+});
+
+test('violation still allows an unresolved name in selfhost mode (save-time leniency)', function () {
+    config(['wxnotify.mode' => 'selfhost']);
+
+    expect(traccarGuard([])->violation('http://traccar:8082'))->toBeNull();
+});

@@ -25,7 +25,9 @@ class PollTraccarServer
      */
     public function __invoke(TraccarServer $server): ?array
     {
-        if (app(TraccarUrlGuard::class)->violation((string) $server->base_url) !== null) {
+        $pinned = app(TraccarUrlGuard::class)->requestOptions((string) $server->base_url);
+
+        if ($pinned === null) {
             Log::warning('Traccar server URL refused', ['traccar_server_id' => $server->id]);
 
             return null;
@@ -35,6 +37,7 @@ class PollTraccarServer
             $response = Http::withToken($server->api_token)
                 ->timeout(10)
                 ->withoutRedirecting()
+                ->withOptions($pinned)
                 ->get(rtrim($server->base_url, '/').'/api/positions');
         } catch (Throwable $e) {
             Log::warning('Failed to reach Traccar server for positions', [
