@@ -4,6 +4,7 @@ namespace App\Filament\Dashboard\Resources\NotificationChannels\Schemas;
 
 use App\Actions\Channels\RevealChannelUrl;
 use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\WebhookChannelType;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
@@ -24,6 +25,16 @@ class NotificationChannelForm
                 TextInput::make('label')
                     ->required()
                     ->maxLength(255),
+                TextInput::make('channel_type')
+                    ->label('Channel Type')
+                    ->disabled()
+                    // Display only: the type is never editable here, and saveChannel() mass-assigns
+                    // whatever the form submits, so it must not be submitted at all.
+                    ->dehydrated(false)
+                    ->formatStateUsing(fn (?string $state): ?string => $state === null
+                        ? null
+                        : (app(ChannelTypeRegistry::class)->find($state)?->label() ?? $state))
+                    ->helperText('The type of channel determines what configuration options are available.'),
                 TextInput::make('apprise_url_preview')
                     ->label('Destination URL')
                     ->readOnly()
@@ -60,7 +71,8 @@ class NotificationChannelForm
                             ->icon(Heroicon::EyeSlash)
                             ->visible(fn (Get $get): bool => filled($get('apprise_url_preview')))
                             ->action(fn (Set $set) => $set('apprise_url_preview', null)),
-                    ]),
+                    ])
+                    ->columnSpanFull(),
                 // The webhook options, flat (`url`, `method`, …) rather than
                 // `config.*`: a dotted field dehydrates to an empty `config`
                 // array whenever one of its leaves is hidden, which would

@@ -616,3 +616,41 @@ test('Reveal refuses with a notice and leaves the field empty when the action re
         ->assertSchemaStateSet(['apprise_url_preview' => null])
         ->assertNotified('Couldn\'t reveal the URL');
 });
+
+test('the edit modal shows the channel type by its readable name, for every type', function (string $channelType, string $expected, string $url) {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['channel_type' => $channelType, 'apprise_url' => $url]);
+
+    livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->assertSchemaStateSet(['channel_type' => $expected]);
+})->with([
+    'pushover' => ['pushover', 'Pushover', 'pover://uKey1234567890@aTok0987654321'],
+    'teams' => ['msteams', 'Microsoft Teams', 'workflows://prod-12.westus.logic.azure.com/0123456789abcdef0123456789abcdef/SIGNATUREabc-_123'],
+    'discord' => ['discord', 'Discord', 'discord://123456789/abcDEF-token_123/'],
+]);
+
+test('the edit modal shows the type of channels that have no Apprise URL too', function () {
+    $email = NotificationChannel::factory()->for($this->user)->email()->create();
+    $webhook = NotificationChannel::factory()->for($this->user)->webhook()->create();
+    $webPush = NotificationChannel::factory()->for($this->user)->webPush()->create();
+
+    foreach ([[$email, 'Email'], [$webhook, 'Custom Webhook'], [$webPush, 'Web Push']] as [$channel, $name]) {
+        livewire(ListNotificationChannels::class)
+            ->mountAction(TestAction::make('edit')->table($channel))
+            ->assertSchemaStateSet(['channel_type' => $name]);
+    }
+});
+
+test('the channel type shown in the edit modal can never be changed through the form', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'label' => 'Old', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+    ]);
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('edit')->table($channel), data: ['label' => 'New', 'channel_type' => 'email'])
+        ->assertHasNoActionErrors();
+
+    $fresh = $channel->fresh();
+
+    expect($fresh->label)->toBe('New')->and($fresh->channel_type)->toBe('pushover');
+});

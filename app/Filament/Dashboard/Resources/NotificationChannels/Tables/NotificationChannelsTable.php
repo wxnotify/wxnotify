@@ -118,6 +118,7 @@ class NotificationChannelsTable
                     // (RevealChannelUrl). A new editable field must be added here explicitly.
                     ->mutateRecordDataUsing(fn (NotificationChannel $record): array => [
                         'label' => $record->label,
+                        'channel_type' => $record->channel_type,
                         ...($record->channel_type === 'webhook' ? WebhookChannelType::formFromConfig($record->config) : []),
                     ])
                     ->using(self::saveChannel(...)),
