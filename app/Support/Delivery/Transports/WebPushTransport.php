@@ -35,9 +35,12 @@ class WebPushTransport implements Transport
             return DeliveryResult::failed('Web Push is not configured on this server (missing VAPID keys).');
         }
 
-        // Re-checked on every send, same as webhooks.
-        if (($violation = $this->guard->violation($config['endpoint'])) !== null) {
-            return DeliveryResult::failed($violation);
+        // Re-checked on every send, same as webhooks. The pin makes the connection go
+        // to exactly the addresses the guard vetted, not to a fresh DNS answer.
+        $pin = $this->guard->requestOptions($config['endpoint']);
+
+        if ($pin === null) {
+            return DeliveryResult::failed($this->guard->violation($config['endpoint']) ?? 'That host name could not be resolved.');
         }
 
         try {
@@ -49,7 +52,7 @@ class WebPushTransport implements Transport
                 ]],
                 // Never follow redirects: a 3xx from the subscriber-chosen endpoint could steer this
                 // request to an address the guard would have refused.
-                'client' => new Client(['allow_redirects' => false, 'timeout' => 10, 'connect_timeout' => 5]),
+                'client' => new Client(['allow_redirects' => false, 'timeout' => 10, 'connect_timeout' => 5, ...$pin]),
             ]);
 
             $report = $webPush->sendOneNotification(

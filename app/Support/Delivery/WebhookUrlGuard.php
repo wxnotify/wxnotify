@@ -30,37 +30,70 @@ class WebhookUrlGuard
      */
     private const ALLOWED_LOW_PROXY_PORTS = [80, 443];
 
+    /** The port curl uses for a proxy URL that names none. */
+    private const DEFAULT_PROXY_PORT = 1080;
+
     public function __construct(private readonly ?Closure $resolver = null) {}
 
     /** A human-readable reason the URL must not be called, or null when it is safe. */
     public function violation(string $url): ?string
     {
+        return $this->inspectTarget($url)['violation'];
+    }
+
+    /**
+     * Guzzle options for calling this URL, or null when it must not be called
+     * (the same refusals as violation(), plus a host name that does not resolve:
+     * curl would then do its own, unvetted, lookup). The host is looked up once
+     * and the connection is pinned to exactly the addresses that passed the
+     * check, so a DNS answer that changes between the check and the connection
+     * cannot redirect the request. An IP-literal host needs no pin.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function requestOptions(string $url): ?array
+    {
+        ['violation' => $violation, 'addresses' => $addresses] = $this->inspectTarget($url);
+
+        if ($violation !== null) {
+            return null;
+        }
+
+        $parts = parse_url($url);
+
+        return $this->pin((string) $parts['host'], [$parts['port'] ?? 443], $addresses);
+    }
+
+    /**
+     * @return array{violation: ?string, addresses: list<string>}
+     */
+    private function inspectTarget(string $url): array
+    {
         $parts = parse_url($url);
 
         if ($parts === false || ! isset($parts['scheme'], $parts['host'])) {
-            return 'Enter a full https:// URL.';
+            return $this->refused('Enter a full https:// URL.');
         }
         if (strtolower($parts['scheme']) !== 'https') {
-            return 'The URL must start with https://.';
+            return $this->refused('The URL must start with https://.');
         }
         if (isset($parts['user']) || isset($parts['pass'])) {
-            return 'The URL must not contain a username or password.';
+            return $this->refused('The URL must not contain a username or password.');
         }
         if (($asciiViolation = PlainAsciiHost::violation($parts['host'])) !== null) {
-            return $asciiViolation;
+            return $this->refused($asciiViolation);
         }
 
         $port = $parts['port'] ?? 443;
         if ($port !== 443 && $port < 1024) {
-            return 'That port is not allowed; use 443 or a port above 1023.';
+            return $this->refused('That port is not allowed; use 443 or a port above 1023.');
         }
 
-        return match ($this->hostRisk($parts['host'])) {
+        return $this->inspectHost($parts['host'], [
             'name' => 'That host name points at a private network address.',
             'unresolved' => 'That host name could not be resolved.',
             'private' => 'That address resolves to a private or reserved network, which is not allowed.',
-            default => null,
-        };
+        ]);
     }
 
     /**
@@ -78,29 +111,118 @@ class WebhookUrlGuard
      */
     public function proxyViolation(string $url): ?string
     {
+        return $this->inspectProxy($url)['violation'];
+    }
+
+    /**
+     * Guzzle options for connecting to this proxy, with the same single-lookup
+     * pinning as requestOptions(). With a proxy, curl connects to the proxy and
+     * the proxy resolves the target, so the proxy host is what is pinned. A proxy
+     * URL without a port gets curl's default (1080), and the scheme's own default
+     * is pinned as well.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function proxyRequestOptions(string $url): ?array
+    {
+        ['violation' => $violation, 'addresses' => $addresses] = $this->inspectProxy($url);
+
+        if ($violation !== null) {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        $ports = isset($parts['port'])
+            ? [$parts['port']]
+            : [self::DEFAULT_PROXY_PORT, strtolower($parts['scheme']) === 'https' ? 443 : 80];
+
+        return $this->pin((string) $parts['host'], $ports, $addresses);
+    }
+
+    /**
+     * @return array{violation: ?string, addresses: list<string>}
+     */
+    private function inspectProxy(string $url): array
+    {
         $parts = parse_url($url);
 
         if ($parts === false || ! isset($parts['scheme'], $parts['host']) || $parts['host'] === '') {
-            return 'Enter a full http:// or https:// proxy URL.';
+            return $this->refused('Enter a full http:// or https:// proxy URL.');
         }
         if (! in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
-            return 'The proxy URL must start with http:// or https://.';
+            return $this->refused('The proxy URL must start with http:// or https://.');
         }
         if (($asciiViolation = PlainAsciiHost::violation($parts['host'])) !== null) {
-            return $asciiViolation;
+            return $this->refused($asciiViolation);
         }
 
         $port = $parts['port'] ?? null;
         if ($port !== null && ($port < 1 || $port > 65535 || ($port < 1024 && ! in_array($port, self::ALLOWED_LOW_PROXY_PORTS, true)))) {
-            return 'That proxy port is not allowed; use 80, 443, or a port above 1023.';
+            return $this->refused('That proxy port is not allowed; use 80, 443, or a port above 1023.');
         }
 
-        return match ($this->hostRisk($parts['host'])) {
+        return $this->inspectHost($parts['host'], [
             'name' => 'That proxy host name points at a private network address.',
             'unresolved' => 'The proxy host name could not be resolved.',
             'private' => 'The proxy address resolves to a private or reserved network, which is not allowed.',
-            default => null,
-        };
+        ]);
+    }
+
+    /**
+     * Looks the host up once (never for an IP literal or a blocked name) and
+     * judges that answer, so the addresses returned are the addresses vetted.
+     *
+     * @param  array{name: string, unresolved: string, private: string}  $messages
+     * @return array{violation: ?string, addresses: list<string>}
+     */
+    private function inspectHost(string $host, array $messages): array
+    {
+        $host = strtolower(trim($host, '[]'));
+        $skipLookup = filter_var($host, FILTER_VALIDATE_IP) !== false
+            || (! $this->privateNetworksAllowed() && $this->isBlockedName($host));
+        $addresses = $skipLookup ? [] : $this->resolve($host);
+
+        return [
+            'violation' => ($risk = $this->hostRisk($host, $addresses)) === null ? null : $messages[$risk],
+            'addresses' => PinnedHost::normalize($addresses),
+        ];
+    }
+
+    /**
+     * @param  list<int>  $ports
+     * @param  list<string>  $addresses
+     * @return array<string, mixed>|null null when a host name has no addresses to pin to
+     */
+    private function pin(string $host, array $ports, array $addresses): ?array
+    {
+        if (filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) !== false) {
+            return [];
+        }
+
+        return $addresses === [] ? null : PinnedHost::options($host, $ports, $addresses);
+    }
+
+    /**
+     * @return array{violation: string, addresses: list<string>}
+     */
+    private function refused(string $message): array
+    {
+        return ['violation' => $message, 'addresses' => []];
+    }
+
+    private function isBlockedName(string $host): bool
+    {
+        if (in_array($host, self::BLOCKED_HOSTS, true)) {
+            return true;
+        }
+
+        foreach (self::BLOCKED_HOST_SUFFIXES as $suffix) {
+            if (str_ends_with($host, $suffix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -122,13 +244,8 @@ class WebhookUrlGuard
 
         $host = strtolower(trim($host, '[]'));
 
-        if (in_array($host, self::BLOCKED_HOSTS, true)) {
+        if ($this->isBlockedName($host)) {
             return 'name';
-        }
-        foreach (self::BLOCKED_HOST_SUFFIXES as $suffix) {
-            if (str_ends_with($host, $suffix)) {
-                return 'name';
-            }
         }
 
         $ips = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : ($resolved ?? $this->resolve($host));

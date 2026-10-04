@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Support\Delivery\HeartbeatUrlGuard;
+use App\Support\Delivery\PinnedHost;
 use App\Support\Delivery\PlainAsciiHost;
 use App\Support\Delivery\WebhookUrlGuard;
 use Closure;
@@ -80,15 +81,8 @@ final class TraccarUrlGuard
         }
 
         $port = $parts['port'] ?? (strtolower($parts['scheme']) === 'https' ? 443 : 80);
-        $targets = implode(',', array_map(
-            fn (string $address): string => str_contains($address, ':') ? "[{$address}]" : $address,
-            $addresses,
-        ));
 
-        // curl matches the entry against the host exactly as written in the URL.
-        $entries = array_unique(["{$host}:{$port}:{$targets}", rtrim($host, '.').":{$port}:{$targets}"]);
-
-        return ['curl' => [CURLOPT_RESOLVE => array_values($entries)]];
+        return PinnedHost::options($host, [$port], $addresses);
     }
 
     /**
@@ -139,7 +133,7 @@ final class TraccarUrlGuard
                 'private' => 'That address resolves to a private or reserved network, which is not allowed.',
                 default => null,
             },
-            'addresses' => $this->normalized($addresses),
+            'addresses' => PinnedHost::normalize($addresses),
         ];
     }
 
@@ -158,7 +152,7 @@ final class TraccarUrlGuard
             return ['violation' => $violation, 'addresses' => []];
         }
 
-        $addresses = $this->normalized($this->webhook->resolve($host));
+        $addresses = PinnedHost::normalize($this->webhook->resolve($host));
 
         foreach ($addresses as $address) {
             $literal = str_contains($address, ':') ? "[{$address}]" : $address;
@@ -178,25 +172,6 @@ final class TraccarUrlGuard
     private function refused(string $message): array
     {
         return ['violation' => $message, 'addresses' => []];
-    }
-
-    /**
-     * @param  list<string>  $addresses
-     * @return list<string>
-     */
-    private function normalized(array $addresses): array
-    {
-        $normalized = [];
-
-        foreach ($addresses as $address) {
-            $packed = @inet_pton($address);
-
-            if ($packed !== false) {
-                $normalized[] = (string) inet_ntop($packed);
-            }
-        }
-
-        return array_values(array_unique($normalized));
     }
 
     private function isNumericShorthandHost(string $host): bool

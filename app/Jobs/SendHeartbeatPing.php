@@ -42,13 +42,17 @@ class SendHeartbeatPing implements ShouldQueue
         }
 
         try {
-            if ($guard->violation($url) !== null) {
+            // Null when the guard refuses the URL or the host does not resolve. Otherwise the
+            // ping is pinned to exactly the addresses the guard vetted, not a fresh DNS answer.
+            $pin = $guard->requestOptions($url);
+
+            if ($pin === null) {
                 $this->warnOnce();
 
                 return;
             }
 
-            $response = $this->pendingRequest()->get($url);
+            $response = $this->pendingRequest()->withOptions($pin)->get($url);
 
             if (! $response->successful()) {
                 $this->warnOnce();

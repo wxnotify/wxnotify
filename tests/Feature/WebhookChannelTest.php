@@ -203,3 +203,36 @@ test('neither the signing secret nor the endpoint path or query reaches the acti
         ->and($activity)->not->toContain('token=abc123')
         ->and($activity)->not->toContain('abc123');
 });
+
+test('the request is pinned to the addresses the guard vetted', function () {
+    $history = chanFakeWebhookEndpoint([new Response(200)]);
+
+    $result = app(ChannelDispatcher::class)->send(chanWebhookChannel(['url' => 'https://hooks.example.com:8443/wx']), 'body', 'title');
+
+    expect($result->success)->toBeTrue()
+        ->and($history[0]['options']['curl'][CURLOPT_RESOLVE])->toBe(['hooks.example.com:8443:93.184.216.34'])
+        ->and($history[0]['options']['allow_redirects'])->toBeFalse();
+});
+
+test('behind a proxy the proxy host is pinned, since the proxy resolves the target', function () {
+    $history = chanFakeWebhookEndpoint([new Response(200)]);
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn (string $host): array => $host === 'proxy.example.com' ? ['203.0.113.7'] : ['93.184.216.34']));
+
+    $channel = chanWebhookChannel(['use_proxy' => true, 'proxy_url' => 'http://proxy.example.com:3128']);
+
+    expect(app(ChannelDispatcher::class)->send($channel, 'body', 'title')->success)->toBeTrue()
+        ->and($history[0]['options']['curl'][CURLOPT_RESOLVE])->toBe(['proxy.example.com:3128:203.0.113.7']);
+});
+
+test('a host that turns private between the send-time check and the connection is not called', function () {
+    $history = chanFakeWebhookEndpoint([new Response(200)]);
+    $answers = [['93.184.216.34'], ['10.0.0.5']];
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(function (string $host) use (&$answers): array {
+        return array_shift($answers) ?? ['10.0.0.5'];
+    }));
+
+    $result = app(ChannelDispatcher::class)->send(chanWebhookChannel(), 'body', 'title');
+
+    expect($result->success)->toBeFalse()
+        ->and($history)->toHaveCount(0);
+});

@@ -221,3 +221,28 @@ test('the setup view replaces a stale subscription and guards a missing public k
         ->toContain('unsubscribe()')
         ->toContain('configured on this server yet');
 });
+
+test('the push client is pinned to the addresses the guard vetted', function () {
+    $clientOptions = [];
+    app()->bind(WebPush::class, function ($app, array $params) use (&$clientOptions) {
+        $clientOptions = $params['client']->getConfig();
+        $stack = HandlerStack::create(new MockHandler([new Response(201)]));
+
+        return new WebPush($params['auth'], [], new Client(['handler' => $stack] + $clientOptions));
+    });
+    $channel = NotificationChannel::factory()->create(['channel_type' => 'webpush', 'apprise_url' => null, 'config' => chanRealPushSubscriptionConfig('https://push.example.com:8443/send/xyz')]);
+
+    app(ChannelDispatcher::class)->send($channel, 'body', 'title');
+
+    expect($clientOptions['curl'][CURLOPT_RESOLVE])->toBe(['push.example.com:8443:93.184.216.34']);
+});
+
+test('an endpoint that does not resolve fails delivery before anything is sent', function () {
+    $sent = chanFakePushService();
+    $channel = NotificationChannel::factory()->webPush()->create();
+    app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn () => []));
+
+    $result = app(ChannelDispatcher::class)->send($channel, 'body');
+
+    expect($result->success)->toBeFalse()->and(count($sent))->toBe(0);
+});

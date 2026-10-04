@@ -41,54 +41,108 @@ class HeartbeatUrlGuard
      */
     public function violation(string $url): ?string
     {
-        $key = 'heartbeat-url-guard:'.sha1($url);
-
-        return Cache::remember($key, now()->addMinutes(self::CACHE_TTL_MINUTES), fn (): array => ['violation' => $this->computeViolation($url)])['violation'];
+        return $this->inspect($url)['violation'];
     }
 
-    private function computeViolation(string $url): ?string
+    /**
+     * Guzzle options for pinging this URL, or null when it must not be called
+     * (the same refusals as violation(), plus a host name that does not resolve:
+     * curl would then do its own, unvetted, lookup — violation() stays lenient
+     * about that, request time does not). A host name is pinned to exactly the
+     * addresses that passed the check, which share violation()'s cache window, so
+     * an address that changed in DNS can fail a ping for up to that long. An
+     * IP-literal host needs no pin.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function requestOptions(string $url): ?array
+    {
+        ['violation' => $violation, 'addresses' => $addresses] = $this->inspect($url);
+
+        if ($violation !== null) {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        $host = (string) $parts['host'];
+
+        if (filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) !== false) {
+            return [];
+        }
+
+        if ($addresses === []) {
+            return null;
+        }
+
+        return PinnedHost::options($host, [$parts['port'] ?? (strtolower($parts['scheme']) === 'https' ? 443 : 80)], $addresses);
+    }
+
+    /**
+     * @return array{violation: ?string, addresses: list<string>}
+     */
+    private function inspect(string $url): array
+    {
+        $key = 'heartbeat-url-guard:v2:'.sha1($url);
+
+        return Cache::remember($key, now()->addMinutes(self::CACHE_TTL_MINUTES), fn (): array => $this->computeInspection($url));
+    }
+
+    /**
+     * @return array{violation: ?string, addresses: list<string>}
+     */
+    private function computeInspection(string $url): array
     {
         $parts = parse_url($url);
 
         if ($parts === false || ! isset($parts['scheme'], $parts['host'])) {
-            return 'Enter a full http:// or https:// URL.';
+            return $this->refused('Enter a full http:// or https:// URL.');
         }
 
         if (! in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
-            return 'The URL must start with http:// or https://.';
+            return $this->refused('The URL must start with http:// or https://.');
         }
 
         if (isset($parts['user']) || isset($parts['pass'])) {
-            return 'The URL must not contain a username or password.';
+            return $this->refused('The URL must not contain a username or password.');
         }
 
         $host = strtolower(trim($parts['host'], '[]'));
         $host = rtrim($host, '.');
 
         if (str_contains($host, '%')) {
-            return 'The URL host must not contain a zone identifier.';
+            return $this->refused('The URL host must not contain a zone identifier.');
         }
 
         if (($asciiViolation = PlainAsciiHost::violation($parts['host'])) !== null) {
-            return $asciiViolation;
+            return $this->refused($asciiViolation);
         }
 
         if ($this->isObfuscatedNumericHost($host)) {
-            return 'The URL host must be a name or a standard IP address, not a numeric shorthand.';
+            return $this->refused('The URL host must be a name or a standard IP address, not a numeric shorthand.');
         }
 
         if (in_array($host, self::BLOCKED_HOSTS, true)) {
-            return 'That host is a cloud metadata service.';
+            return $this->refused('That host is a cloud metadata service.');
         }
 
-        // Our lookup and Guzzle's own are separate resolutions (DNS-rebinding gap accepted: staff-set URL, GET only, no response body used, no redirects).
-        foreach ($this->addressesFor($host) as $address) {
+        // The addresses judged here are the addresses requestOptions() pins the request to.
+        $addresses = $this->addressesFor($host);
+
+        foreach ($addresses as $address) {
             if ($this->isBlockedAddress($address)) {
-                return 'That address is a link-local or cloud metadata address.';
+                return $this->refused('That address is a link-local or cloud metadata address.');
             }
         }
 
-        return null;
+        return ['violation' => null, 'addresses' => PinnedHost::normalize($addresses)];
+    }
+
+    /**
+     * @return array{violation: string, addresses: list<string>}
+     */
+    private function refused(string $message): array
+    {
+        return ['violation' => $message, 'addresses' => []];
     }
 
     /**

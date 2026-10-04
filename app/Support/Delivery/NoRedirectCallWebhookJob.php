@@ -3,6 +3,7 @@
 namespace App\Support\Delivery;
 
 use GuzzleHttp\Psr7\Response;
+use RuntimeException;
 use Spatie\WebhookServer\CallWebhookJob;
 
 /**
@@ -13,6 +14,13 @@ use Spatie\WebhookServer\CallWebhookJob;
  * needed, and the http-only hop bypasses the https-only rule too. Every webhook this
  * app sends goes through this subclass instead (config/webhook-server.php's
  * 'webhook_job'), which turns redirect following off.
+ *
+ * It also pins the connection. The guard's DNS lookup and curl's own are separate, so
+ * a hostile DNS server could answer the guard with a public address and curl with a
+ * private one. The job asks WebhookUrlGuard for a pin immediately before the request,
+ * which looks the host up once and hands curl exactly the addresses it vetted (for a
+ * proxied call, the proxy host: the proxy resolves the target). A host the guard no
+ * longer clears at that moment fails the call without sending anything.
  */
 class NoRedirectCallWebhookJob extends CallWebhookJob
 {
@@ -23,6 +31,18 @@ class NoRedirectCallWebhookJob extends CallWebhookJob
     {
         // The parent array_merges $body into the Guzzle request options, so an extra
         // option smuggled in here lands alongside timeout/verify/headers.
-        return parent::createRequest([...$body, 'allow_redirects' => false]);
+        $guard = app(WebhookUrlGuard::class);
+
+        $pin = match (true) {
+            $this->proxy === null => $guard->requestOptions((string) $this->webhookUrl),
+            is_string($this->proxy) => $guard->proxyRequestOptions($this->proxy),
+            default => null,
+        };
+
+        if ($pin === null) {
+            throw new RuntimeException('Webhook call refused');
+        }
+
+        return parent::createRequest([...$body, ...$pin, 'allow_redirects' => false]);
     }
 }

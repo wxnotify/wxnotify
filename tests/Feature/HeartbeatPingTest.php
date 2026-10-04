@@ -296,3 +296,69 @@ test('the guard still allows punycode and underscore hosts', function (string $u
     'punycode' => 'https://xn--4ca.example.com/ping/x',
     'underscore' => 'http://hc_internal:8000/ping/x',
 ]);
+
+test('requestOptions pins the host to the addresses it validated, on the URL\'s port', function (string $url, string $expected) {
+    $guard = new HeartbeatUrlGuard(fn (string $host): array => ['203.0.113.10', '2606:4700::1111']);
+
+    expect($guard->requestOptions($url))->toBe(['curl' => [CURLOPT_RESOLVE => [$expected]]]);
+})->with([
+    'https default port' => ['https://hc.example.test/ping/x', 'hc.example.test:443:203.0.113.10,[2606:4700::1111]'],
+    'http default port' => ['http://hc.example.test/ping/x', 'hc.example.test:80:203.0.113.10,[2606:4700::1111]'],
+    'explicit port' => ['http://healthchecks.internal:8000/ping/x', 'healthchecks.internal:8000:203.0.113.10,[2606:4700::1111]'],
+]);
+
+test('requestOptions pins private answers (a LAN Healthchecks is the point) and needs no pin for an IP literal', function () {
+    expect((new HeartbeatUrlGuard(fn (string $host): array => ['10.0.0.5']))->requestOptions('http://hc.lan:8000/ping/x'))
+        ->toBe(['curl' => [CURLOPT_RESOLVE => ['hc.lan:8000:10.0.0.5']]])
+        ->and((new HeartbeatUrlGuard(fn (string $host): array => []))->requestOptions('http://10.0.0.5:8000/ping/x'))->toBe([]);
+});
+
+test('requestOptions refuses what violation refuses, and a host name that does not resolve', function (string $url, array $ips) {
+    expect((new HeartbeatUrlGuard(fn (string $host): array => $ips))->requestOptions($url))->toBeNull();
+})->with([
+    'metadata answer' => ['https://hc.example.test/ping/x', ['203.0.113.10', '169.254.169.254']],
+    'metadata literal' => ['http://169.254.169.254/ping/x', []],
+    'non-ASCII host' => ['http://169。254。169。254/ping/x', []],
+    'unresolved' => ['https://hc.example.test/ping/x', []],
+]);
+
+test('requestOptions shares violation\'s single lookup within the cache window', function () {
+    $lookups = 0;
+    $guard = new HeartbeatUrlGuard(function (string $host) use (&$lookups): array {
+        $lookups++;
+
+        return ['203.0.113.10'];
+    });
+
+    $guard->violation('https://hc.example.test/ping/x');
+    $guard->requestOptions('https://hc.example.test/ping/x');
+    $guard->requestOptions('https://hc.example.test/ping/x');
+
+    expect($lookups)->toBe(1);
+});
+
+test('the job pings through the vetted addresses', function () {
+    heartbeatSetup();
+    $sent = null;
+    Http::fake(['hc.example.test/*' => function ($request, array $options) use (&$sent) {
+        $sent = $options;
+
+        return Http::response('OK', 200);
+    }]);
+
+    (new SendHeartbeatPing('nwws'))->handle(new HeartbeatUrlGuard(fn (string $host): array => ['203.0.113.10']));
+
+    expect($sent['curl'][CURLOPT_RESOLVE])->toBe(['hc.example.test:443:203.0.113.10'])
+        ->and($sent['allow_redirects'])->toBeFalse();
+});
+
+test('the job does not ping a host that does not resolve and logs only the feed', function () {
+    heartbeatSetup();
+    Http::fake(['*' => Http::response('OK', 200)]);
+    Log::spy();
+
+    (new SendHeartbeatPing('nwws'))->handle(new HeartbeatUrlGuard(fn (string $host): array => []));
+
+    Http::assertNothingSent();
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message, array $context = []) => $context === ['feed' => 'nwws']);
+});
