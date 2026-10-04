@@ -37,6 +37,12 @@ class NativeServiceProvider extends ServiceProvider
             \Native\Mobile\Providers\GeolocationServiceProvider::class,
             \Native\Mobile\Providers\SecureStorageServiceProvider::class,
             \Native\Mobile\Providers\PushNotificationsServiceProvider::class,
+            \NativePHP\BackgroundTasks\BackgroundTasksServiceProvider::class,
+            \NativePHP\LocalNotifications\LocalNotificationsServiceProvider::class,
+            \Native\Mobile\Providers\NetworkServiceProvider::class,
+        
+        
+        
         
         
         

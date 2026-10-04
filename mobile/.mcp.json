@@ -6,6 +6,10 @@
                 "artisan",
                 "boost:mcp"
             ]
+        },
+        "nativephp-docs": {
+            "type": "http",
+            "url": "https://nativephp.com/api/mcp/message"
         }
     }
 }

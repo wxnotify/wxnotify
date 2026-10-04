@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ce9d0d6c3ec45e1dde9758a18ee30223",
+    "content-hash": "3386149e247c45f445ca747d8325feca",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -2462,6 +2462,338 @@
                 "source": "https://github.com/NativePHP/mobile-air/tree/4.6.0"
             },
             "time": "2026-10-02T23:19:44+00:00"
+        },
+        {
+            "name": "nativephp/mobile-background-tasks",
+            "version": "0.1.0",
+            "dist": {
+                "type": "zip",
+                "url": "https://plugins.nativephp.com/dist/nativephp/mobile-background-tasks/nativephp-mobile-background-tasks-ca73df59087c584fee547af0fcaa00006c7ebf36-zip-8d526a.zip",
+                "reference": "ca73df59087c584fee547af0fcaa00006c7ebf36",
+                "shasum": "85ca0c0cdc770767f2bd1053af376f3115f1e456"
+            },
+            "require": {
+                "nativephp/mobile": "^3.0 || ^4.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^10.0",
+                "pestphp/pest": "^2.7|^3.0|^4.0"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "NativePHP\\BackgroundTasks\\BackgroundTasksServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "NativePHP\\BackgroundTasks\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ]
+            },
+            "license": [
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "NativePHP",
+                    "email": "support@nativephp.com"
+                }
+            ],
+            "description": "Background task scheduling via WorkManager for NativePHP Mobile",
+            "time": "2026-09-20T01:04:33+00:00"
+        },
+        {
+            "name": "nativephp/mobile-firebase",
+            "version": "1.1.1",
+            "dist": {
+                "type": "zip",
+                "url": "https://plugins.nativephp.com/dist/nativephp/mobile-firebase/nativephp-mobile-firebase-6c2329bef0166ed320ff77b826ea462d380fa2c9-zip-574a57.zip",
+                "reference": "6c2329bef0166ed320ff77b826ea462d380fa2c9",
+                "shasum": "d53ed2c499d1469ac386168ad0a4a1b94182a5db"
+            },
+            "require": {
+                "nativephp/mobile": "*",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^10.0",
+                "pestphp/pest": "^2.7|^3.0|^4.0"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Native\\Mobile\\Providers\\PushNotificationsServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Native\\Mobile\\Providers\\": "src/",
+                    "Native\\Mobile\\Events\\PushNotification\\": "src/Events/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ]
+            },
+            "license": [
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "NativePHP",
+                    "email": "info@nativephp.com"
+                }
+            ],
+            "description": "Firebase plugin for NativePHP Mobile (Push notifications via FCM/APNs)",
+            "time": "2026-07-19T02:23:25+00:00"
+        },
+        {
+            "name": "nativephp/mobile-geolocation",
+            "version": "2.1.0",
+            "dist": {
+                "type": "zip",
+                "url": "https://plugins.nativephp.com/dist/nativephp/mobile-geolocation/nativephp-mobile-geolocation-8f1989daa4cf8c876916ef9fcb7fa73765743e80-zip-0c0ae4.zip",
+                "reference": "8f1989daa4cf8c876916ef9fcb7fa73765743e80",
+                "shasum": "893a1255879daabf5b99ebdb71ae5e09873c2ac7"
+            },
+            "require": {
+                "nativephp/mobile": "^4.0",
+                "php": "^8.3"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^10.0",
+                "pestphp/pest": "^2.7|^3.0|^4.0"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Native\\Mobile\\Providers\\GeolocationServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Native\\Mobile\\Providers\\": "src/",
+                    "NativePHP\\Geolocation\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ]
+            },
+            "license": [
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "NativePHP",
+                    "email": "support@nativephp.com"
+                }
+            ],
+            "description": "Geolocation plugin for NativePHP Mobile - GPS location and permission handling",
+            "time": "2026-09-07T02:42:19+00:00"
+        },
+        {
+            "name": "nativephp/mobile-local-notifications",
+            "version": "0.1.0",
+            "dist": {
+                "type": "zip",
+                "url": "https://plugins.nativephp.com/dist/nativephp/mobile-local-notifications/nativephp-mobile-local-notifications-a4a0ca21fe2b14b0d72c0f03f4264931de58a563-zip-21c93d.zip",
+                "reference": "a4a0ca21fe2b14b0d72c0f03f4264931de58a563",
+                "shasum": "c1f48d53e0064010f472b1dbecede9ef11a441d8"
+            },
+            "require": {
+                "nativephp/mobile": "^3.2.1 || ^4.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^10.0",
+                "pestphp/pest": "^2.7|^3.0|^4.0"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "NativePHP\\LocalNotifications\\LocalNotificationsServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "NativePHP\\LocalNotifications\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ]
+            },
+            "license": [
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "NativePHP",
+                    "email": "support@nativephp.com"
+                }
+            ],
+            "description": "Local notifications for NativePHP Mobile with Laravel Notification channel integration",
+            "time": "2026-09-03T18:31:35+00:00"
+        },
+        {
+            "name": "nativephp/mobile-network",
+            "version": "1.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/NativePHP/mobile-network.git",
+                "reference": "ab28f341efa6f2da4c5b9e4b4321c7079fc16f25"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/NativePHP/mobile-network/zipball/ab28f341efa6f2da4c5b9e4b4321c7079fc16f25",
+                "reference": "ab28f341efa6f2da4c5b9e4b4321c7079fc16f25",
+                "shasum": ""
+            },
+            "require": {
+                "nativephp/mobile": "^3.0 || ^4.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^10.0",
+                "pestphp/pest": "^2.7|^3.0|^4.0"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Native\\Mobile\\Providers\\NetworkServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Native\\Mobile\\Providers\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "NativePHP",
+                    "email": "support@nativephp.com"
+                }
+            ],
+            "description": "Network connectivity status plugin for NativePHP Mobile",
+            "support": {
+                "issues": "https://github.com/NativePHP/mobile-network/issues",
+                "source": "https://github.com/NativePHP/mobile-network/tree/1.1.0"
+            },
+            "time": "2026-09-03T18:26:19+00:00"
+        },
+        {
+            "name": "nativephp/mobile-secure-storage",
+            "version": "1.1.0",
+            "dist": {
+                "type": "zip",
+                "url": "https://plugins.nativephp.com/dist/nativephp/mobile-secure-storage/nativephp-mobile-secure-storage-dbb26d77f0290fedb3b115476cf755f63337eef4-zip-feea7b.zip",
+                "reference": "dbb26d77f0290fedb3b115476cf755f63337eef4",
+                "shasum": "0ab9df86a634012b457bcf9de1e184b680fe0370"
+            },
+            "require": {
+                "nativephp/mobile": "^3.0 || ^4.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^10.0",
+                "pestphp/pest": "^2.7|^3.0|^4.0"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Native\\Mobile\\Providers\\SecureStorageServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Native\\Mobile\\Providers\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ]
+            },
+            "license": [
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "NativePHP",
+                    "email": "support@nativephp.com"
+                }
+            ],
+            "description": "Secure storage plugin for NativePHP Mobile (Keychain/EncryptedSharedPreferences)",
+            "time": "2026-09-03T18:26:20+00:00"
         },
         {
             "name": "nesbot/carbon",
