@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use Database\Seeders\ProductCatalogSeeder;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\DB;
@@ -192,7 +193,7 @@ test('creating an spc wpc rule persists the chosen risk levels', function () {
         ->fillForm([
             'category' => 'spc_wpc',
             'product_ids' => [$outlook->category->value => [$outlook->id]],
-            'risk_levels' => ['Enhanced', 'Moderate', 'High'],
+            'risk_levels' => ['convective_outlooks' => ['Enhanced', 'Moderate', 'High']],
             'matching_mode' => 'nationwide',
             'channel_ids' => [$this->channel->id],
         ])
@@ -213,7 +214,7 @@ test('an spc wpc rule for the Convective Outlook can use RiskArea matching mode 
         ->fillForm([
             'category' => 'spc_wpc',
             'product_ids' => [$outlook->category->value => [$outlook->id]],
-            'risk_levels' => ['Moderate'],
+            'risk_levels' => ['convective_outlooks' => ['Moderate']],
             'matching_mode' => 'risk_area',
             'location_ids' => [$location->id],
             'channel_ids' => [$this->channel->id],
@@ -778,4 +779,142 @@ test('a save that fails validation stays on the edit page', function () {
         ->call('save')
         ->assertHasFormErrors(['channel_ids'])
         ->assertNoRedirect();
+});
+
+test('the SPC & WPC form lists the category sections in order, each with its own risk levels where its products have them', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $fire = Product::where('code', 'SPC.FIRE')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'spc_wpc',
+            'product_ids' => ['fire_weather' => [$fire->id], 'convective_outlooks' => [$outlook->id]],
+        ])
+        ->assertFormFieldExists('risk_levels.fire_weather', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['Elevated', 'Critical', 'Extremely Critical', 'Isolated Dry T-Storms', 'Scattered Dry T-Storms'])
+        ->assertFormFieldExists('risk_levels.convective_outlooks', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['Marginal', 'Slight', 'Enhanced', 'Moderate', 'High'])
+        ->assertFormFieldVisible('risk_levels.fire_weather')
+        ->assertFormFieldVisible('risk_levels.convective_outlooks');
+});
+
+test('a category\'s risk levels appear only while a product with risk levels is selected in it', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $day2 = Product::where('code', 'DY2')->sole();
+    $fire = Product::where('code', 'SPC.FIRE')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'spc_wpc', 'product_ids' => ['convective_outlooks' => [$day2->id]]])
+        ->assertFormFieldHidden('risk_levels.convective_outlooks')
+        ->assertFormFieldHidden('risk_levels.fire_weather')
+        ->fillForm(['product_ids' => ['convective_outlooks' => [$outlook->id]]])
+        ->assertFormFieldVisible('risk_levels.convective_outlooks')
+        ->assertFormFieldHidden('risk_levels.fire_weather')
+        ->fillForm(['product_ids' => ['convective_outlooks' => [], 'fire_weather' => [$fire->id]]])
+        ->assertFormFieldHidden('risk_levels.convective_outlooks')
+        ->assertFormFieldVisible('risk_levels.fire_weather');
+});
+
+test('the Fire Weather list says fire levels do not filter yet, the Convective list says it applies to Day 1', function () {
+    $fire = Product::where('code', 'SPC.FIRE')->sole();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'spc_wpc', 'product_ids' => ['fire_weather' => [$fire->id], 'convective_outlooks' => [$outlook->id]]])
+        ->assertSee("Fire risk levels are saved, but they don't filter alerts yet.")
+        ->assertSee('Risk levels apply to the Day 1 Convective Outlook.');
+});
+
+test('categories without risk levels never get a risk list', function () {
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'spc_wpc'])
+        ->assertFormFieldDoesNotExist('risk_levels.flooding_and_hydrological')
+        ->assertFormFieldDoesNotExist('risk_levels.other_discussions_reports_and_outlooks');
+});
+
+test('creating an SPC & WPC rule with ticks in two categories stores one flat list', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $fire = Product::where('code', 'SPC.FIRE')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'spc_wpc',
+            'product_ids' => ['fire_weather' => [$fire->id], 'convective_outlooks' => [$outlook->id]],
+            'risk_levels' => ['fire_weather' => ['Critical'], 'convective_outlooks' => ['Moderate', 'High']],
+            'matching_mode' => 'nationwide',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(AlertRule::where('user_id', $this->user->id)->sole()->risk_levels)->toBe(['Critical', 'Moderate', 'High']);
+});
+
+test('ticks in a category whose products were deselected are not stored', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $fire = Product::where('code', 'SPC.FIRE')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'spc_wpc',
+            'product_ids' => ['fire_weather' => [$fire->id], 'convective_outlooks' => [$outlook->id]],
+            'risk_levels' => ['fire_weather' => ['Critical'], 'convective_outlooks' => ['High']],
+            'matching_mode' => 'nationwide',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->fillForm(['product_ids' => ['fire_weather' => [], 'convective_outlooks' => [$outlook->id]]])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(AlertRule::where('user_id', $this->user->id)->sole()->risk_levels)->toBe(['High']);
+});
+
+test('editing an SPC & WPC rule restores each category\'s ticks from the flat list, and saves them back flat', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $fire = Product::where('code', 'SPC.FIRE')->sole();
+    $rule = AlertRule::factory()->for($this->user)->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'risk_levels' => ['Elevated', 'Moderate'],
+    ]);
+    $rule->products()->attach([$outlook->id, $fire->id]);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet(['risk_levels' => ['fire_weather' => ['Elevated'], 'convective_outlooks' => ['Moderate']]])
+        ->fillForm(['risk_levels' => ['fire_weather' => ['Elevated'], 'convective_outlooks' => ['Moderate', 'High']]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->refresh()->risk_levels)->toBe(['Elevated', 'Moderate', 'High']);
+});
+
+test('a rule saved before this change with only Convective levels edits and saves unchanged', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rule = AlertRule::factory()->for($this->user)->create([
+        'category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'risk_levels' => ['Enhanced', 'High'],
+    ]);
+    $rule->products()->attach($outlook);
+    $rule->notificationChannels()->attach($this->channel);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet(['risk_levels' => ['fire_weather' => [], 'convective_outlooks' => ['Enhanced', 'High']]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->refresh()->risk_levels)->toBe(['Enhanced', 'High']);
+});
+
+test('an SPC & WPC rule with no ticks stores an empty list, meaning every level', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'spc_wpc',
+            'product_ids' => ['convective_outlooks' => [$outlook->id]],
+            'matching_mode' => 'nationwide',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(AlertRule::where('user_id', $this->user->id)->sole()->risk_levels)->toBe([]);
 });

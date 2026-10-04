@@ -7,6 +7,7 @@ use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
 use App\Models\Product;
 use App\Support\AlertRuleFormUnits;
+use App\Support\SpcWpcRiskLevels;
 use App\Support\Units;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -48,6 +49,10 @@ class EditAlertRule extends EditRecord
         $data['channel_ids'] = $this->record->notificationChannels->pluck('id')->all();
         $data['location_ids'] = $this->record->locations->pluck('id')->all();
 
+        if (($data['category'] ?? null) === AlertCategory::SpcWpc->value) {
+            $data['risk_levels'] = SpcWpcRiskLevels::split($data['risk_levels'] ?? []);
+        }
+
         // county_zone_codes is a multi-select over a plain comma-joined
         // string column (not an array/JSON-cast one like product_ids), so
         // Filament's default OptionsArrayStateCast for multiple() selects
@@ -86,6 +91,10 @@ class EditAlertRule extends EditRecord
     {
         if (! in_array($data['category'] ?? null, [AlertCategory::WeatherAlerts->value, AlertCategory::SpcWpc->value], true)) {
             $data['alert_template_id'] = null;
+        }
+
+        if (array_key_exists('risk_levels', $data)) {
+            $data['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels']);
         }
 
         return AlertRuleFormUnits::toStorage($data, Units::for(auth()->user()), $this->record);

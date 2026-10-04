@@ -5,6 +5,7 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Pages;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
 use App\Support\AlertRuleFormUnits;
+use App\Support\SpcWpcRiskLevels;
 use App\Support\Units;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
@@ -27,6 +28,10 @@ class CreateAlertRule extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['user_id'] = auth()->id();
+
+        if (array_key_exists('risk_levels', $data)) {
+            $data['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels']);
+        }
 
         return AlertRuleFormUnits::toStorage($data, Units::for(auth()->user()));
     }

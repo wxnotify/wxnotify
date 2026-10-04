@@ -35,6 +35,7 @@ use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Exists;
 use Jbuitt\FilamentToggleList\ToggleList;
@@ -96,12 +97,18 @@ class AlertRuleForm
      * the checkboxes ever render for the first time, fixes the binding at
      * its source. Guarded on the current value already being `null` so
      * switching categories back and forth never wipes a real selection.
+     * The per-category `risk_levels.{category}` checklists have the same
+     * null-binding problem and are seeded here too.
      */
     protected static function seedProductIdsDefaults(Set $set, Get $get): void
     {
         foreach (ProductCategory::cases() as $category) {
             if ($get("product_ids.{$category->value}") === null) {
                 $set("product_ids.{$category->value}", []);
+            }
+
+            if ($get("risk_levels.{$category->value}") === null) {
+                $set("risk_levels.{$category->value}", []);
             }
         }
     }
@@ -284,27 +291,13 @@ class AlertRuleForm
             ...self::productSections(Product::query()
                 ->where('family', 'spc_wpc')
                 ->where('status', 'active')),
-            CheckboxList::make('risk_levels')
-                ->label('Risk levels')
-                ->columns(2)
-                ->options(fn (Get $get): array => Product::query()
-                    ->whereIn('id', self::selectedProductIds($get))
-                    ->whereNotNull('risk_level_options')
-                    ->get()
-                    ->pluck('risk_level_options')
-                    ->flatten()
-                    ->unique()
-                    ->mapWithKeys(fn (string $level): array => [$level => $level])
-                    ->all())
-                ->helperText('Leave all unchecked to receive every risk level for the products above.')
-                ->visible(fn (Get $get): bool => self::hasRiskLevelProducts($get)),
             ...self::matchingModeFields(AlertCategory::SpcWpc),
         ];
     }
 
     /**
-     * Shared by the risk_levels CheckboxList's own visibility above and
-     * matchingModeFields()'s SPC/WPC option set below, so both stay in
+     * Shared by the per-category risk-level checklists (riskLevelFields())
+     * and matchingModeFields()'s SPC/WPC option set below, so both stay in
      * lockstep: a rule only ever sees the RiskArea matching mode when it
      * would also see the risk-level checkboxes that mode's threshold reads
      * from.
@@ -315,6 +308,55 @@ class AlertRuleForm
             ->whereIn('id', self::selectedProductIds($get))
             ->whereNotNull('risk_level_options')
             ->exists();
+    }
+
+    /**
+     * A category's own "Risk levels" checklist, shown inside that category's section when
+     * any product in it offers risk levels (today: Fire Weather and Convective Outlooks).
+     * State is nested per category, `risk_levels.{category}`, like `product_ids.{category}`,
+     * so each checklist keeps its own state; the Create/Edit pages flatten it into the
+     * stored `risk_levels` column and split it back on edit (see SpcWpcRiskLevels).
+     * Options are the selected products' own `risk_level_options`; the list is hidden unless
+     * a selected product in this category offers some.
+     *
+     * @param  Collection<int, Product>  $products  the category's products
+     * @return array<CheckboxList>
+     */
+    protected static function riskLevelFields(ProductCategory $category, Collection $products): array
+    {
+        $riskProducts = $products->filter(fn (Product $product): bool => filled($product->risk_level_options));
+
+        if ($riskProducts->isEmpty()) {
+            return [];
+        }
+
+        $selectedRiskProducts = fn (Get $get): Collection => $riskProducts
+            ->whereIn('id', self::selectedProductIds($get, "product_ids.{$category->value}"));
+
+        return [
+            CheckboxList::make("risk_levels.{$category->value}")
+                ->label('Risk levels')
+                ->columns(2)
+                ->options(fn (Get $get): array => $selectedRiskProducts($get)
+                    ->pluck('risk_level_options')
+                    ->flatten()
+                    ->unique()
+                    ->mapWithKeys(fn (string $level): array => [$level => $level])
+                    ->all())
+                ->helperText(self::riskLevelsHelperText($category))
+                ->visible(fn (Get $get): bool => $selectedRiskProducts($get)->isNotEmpty()),
+        ];
+    }
+
+    protected static function riskLevelsHelperText(ProductCategory $category): string
+    {
+        $base = 'Leave all unchecked to receive every risk level for the products above.';
+
+        return match ($category) {
+            ProductCategory::FireWeather => "{$base} Fire risk levels are saved, but they don't filter alerts yet.",
+            ProductCategory::ConvectiveOutlooks => "{$base} Risk levels apply to the Day 1 Convective Outlook.",
+            default => $base,
+        };
     }
 
     /**
@@ -344,7 +386,7 @@ class AlertRuleForm
      */
     protected static function productSections(Builder $query): array
     {
-        $productsByCategory = $query->orderBy('sort_order')->get(['id', 'name', 'description', 'category'])
+        $productsByCategory = $query->orderBy('sort_order')->get(['id', 'name', 'description', 'category', 'risk_level_options'])
             ->groupBy(fn (Product $product): ?string => $product->category?->value);
 
         return collect(ProductCategory::cases())
@@ -382,7 +424,7 @@ class AlertRuleForm
                     ->collapsible()
                     ->collapsed(fn (Get $get): bool => $category !== ProductCategory::TornadoAndSevereThunderstorm
                         && self::selectedProductIds($get, $fieldName) === [])
-                    ->schema([$toggleList]);
+                    ->schema([$toggleList, ...self::riskLevelFields($category, $products)]);
             })
             ->all();
     }
