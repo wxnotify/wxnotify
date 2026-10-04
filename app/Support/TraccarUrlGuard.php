@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Support\Delivery\HeartbeatUrlGuard;
+use App\Support\Delivery\PlainAsciiHost;
 use App\Support\Delivery\WebhookUrlGuard;
 use Closure;
 
@@ -110,8 +111,8 @@ final class TraccarUrlGuard
             return $this->refused('The URL must not contain a username or password.');
         }
 
-        if (preg_match('/[^A-Za-z0-9.\-_:\[\]]/', $parts['host']) === 1) {
-            return $this->refused('Enter the server host name in plain ASCII (use the xn-- form for international names).');
+        if (($asciiViolation = PlainAsciiHost::violation($parts['host'])) !== null) {
+            return $this->refused($asciiViolation);
         }
 
         if (isset($parts['query']) || isset($parts['fragment']) || str_contains($url, '?') || str_contains($url, '#')) {

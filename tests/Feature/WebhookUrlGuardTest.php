@@ -81,3 +81,30 @@ test('an over-long host name is rejected instead of throwing from the resolver',
 
     expect((new WebhookUrlGuard)->violation("https://{$host}/wx"))->toBeString();
 });
+
+test('hosts curl would rewrite are refused with a fixed message, before DNS and even when private networks are allowed', function (string $mode, string $host) {
+    config(['wxnotify.mode' => $mode, 'wxnotify.webhooks.allow_private_networks' => true]);
+    $message = 'Enter the server host name in plain ASCII (use the xn-- form for international names).';
+
+    expect(chanGuard()->violation("https://{$host}/wx"))->toBe($message)
+        ->and(chanGuard()->proxyViolation("http://{$host}:3128"))->toBe($message);
+})->with(['cloud', 'selfhost'])->with([
+    'unicode letter' => 'ä-secret.example.com',
+    'fullwidth dots' => '127。0。0。1',
+    'percent-encoded digits' => '%31%32%37.0.0.1',
+    'percent-encoded name' => '%6c%6fcalhost',
+    'space' => 'exa mple.com',
+]);
+
+test('punycode, underscore and IPv6 hosts still pass the host-syntax check', function (string $host) {
+    expect(chanGuard()->violation("https://{$host}/wx"))->toBeNull()
+        ->and(chanGuard()->proxyViolation("http://{$host}:3128"))->toBeNull();
+})->with([
+    'punycode' => 'xn--4ca.example.com',
+    'underscore' => 'my_hooks.example.com',
+    'public ipv6' => '[2606:4700::1111]',
+]);
+
+test('the host-syntax refusal never echoes the host', function () {
+    expect(chanGuard()->violation('https://ä-secret.example.com/wx'))->not->toContain('secret');
+});

@@ -278,3 +278,21 @@ test('the real resolver treats an unresolvable host as having no addresses', fun
 
     expect(fn () => (new SendHeartbeatPing('nwws'))->handle(new HeartbeatUrlGuard))->not->toThrow(Throwable::class);
 });
+
+test('the guard refuses hosts curl would rewrite, so a fullwidth-dot metadata address cannot slip through', function (string $url) {
+    $message = 'Enter the server host name in plain ASCII (use the xn-- form for international names).';
+
+    expect((new HeartbeatUrlGuard(fn (string $host): array => []))->violation($url))->toBe($message);
+})->with([
+    'fullwidth-dot metadata ip' => 'http://169。254。169。254/ping/x',
+    'fullwidth-dot loopback' => 'https://127。0。0。1/ping/x',
+    'unicode letter' => 'https://ä-secret.example.com/ping/x',
+    'space' => 'https://exa mple.com/ping/x',
+]);
+
+test('the guard still allows punycode and underscore hosts', function (string $url) {
+    expect((new HeartbeatUrlGuard(fn (string $host): array => ['203.0.113.10']))->violation($url))->toBeNull();
+})->with([
+    'punycode' => 'https://xn--4ca.example.com/ping/x',
+    'underscore' => 'http://hc_internal:8000/ping/x',
+]);

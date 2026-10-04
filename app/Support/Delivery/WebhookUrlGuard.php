@@ -46,6 +46,9 @@ class WebhookUrlGuard
         if (isset($parts['user']) || isset($parts['pass'])) {
             return 'The URL must not contain a username or password.';
         }
+        if (($asciiViolation = PlainAsciiHost::violation($parts['host'])) !== null) {
+            return $asciiViolation;
+        }
 
         $port = $parts['port'] ?? 443;
         if ($port !== 443 && $port < 1024) {
@@ -82,6 +85,9 @@ class WebhookUrlGuard
         }
         if (! in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
             return 'The proxy URL must start with http:// or https://.';
+        }
+        if (($asciiViolation = PlainAsciiHost::violation($parts['host'])) !== null) {
+            return $asciiViolation;
         }
 
         $port = $parts['port'] ?? null;

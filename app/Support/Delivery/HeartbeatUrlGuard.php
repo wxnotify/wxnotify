@@ -69,6 +69,10 @@ class HeartbeatUrlGuard
             return 'The URL host must not contain a zone identifier.';
         }
 
+        if (($asciiViolation = PlainAsciiHost::violation($parts['host'])) !== null) {
+            return $asciiViolation;
+        }
+
         if ($this->isObfuscatedNumericHost($host)) {
             return 'The URL host must be a name or a standard IP address, not a numeric shorthand.';
         }
