@@ -12,3 +12,6 @@ Routes live under `/api/v1` in `routes/api.php` and return Eloquent API Resource
 
 ## The sign-in handoff code is single-use and consumed before it is verified
 `POST /api/v1/auth/token` pulls the authorization code from the cache first (under a lock), then checks the PKCE verifier, so a wrong verifier still burns the code and a replay always fails. Every failure answers with the same generic `invalid_grant`. The token is named from the device name stored with the code, never from the request. The deep-link callback carries `code` and `state` as URI path segments, because NativePHP route params come only from the path.
+
+## ability:app also admits a token with `*`
+Sanctum treats `*` as granting every ability, and `createToken()` defaults to `['*']`, so a default token passes `ability:app`. Always call `createToken()` with explicit abilities (app tokens: `['app']`), never the default. `ability:app` runs before `ExtendAppTokenExpiry` so a refused token is never extended.
