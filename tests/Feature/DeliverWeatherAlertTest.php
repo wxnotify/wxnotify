@@ -189,7 +189,7 @@ test('a Free-tier owner\'s custom subject and Brief style are ignored at deliver
     Http::assertSent(fn ($request) => $request['title'] === $rule->displayName() && strlen($request['body']) > 280);
 });
 
-test('the default title (no custom template) still reaches Apprise as displayName()', function () {
+test('the default title (no custom template) is the product that fired, and a named rule keeps its own name', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
     $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
@@ -198,12 +198,18 @@ test('the default title (no custom template) still reaches Apprise as displayNam
         'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
         'custom_subject_template' => null,
     ]);
-    $channel = NotificationChannel::factory()->for($rule->user)->create();
+    $named = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'custom_subject_template' => null, 'name' => 'Twister watch',
+    ]);
+    $channel = NotificationChannel::factory()->for($plusUser)->create();
     $ingested = IngestedProduct::factory()->create(['product_id' => $product->id]);
 
     (new DeliverWeatherAlert($rule->id, $channel->id, $ingested->id))->handle(app(ChannelDispatcher::class));
+    (new DeliverWeatherAlert($named->id, $channel->id, $ingested->id))->handle(app(ChannelDispatcher::class));
 
-    Http::assertSent(fn ($request) => $request['title'] === $rule->displayName());
+    Http::assertSent(fn ($request) => $request['title'] === 'Tornado Warning');
+    Http::assertSent(fn ($request) => $request['title'] === 'Twister watch');
 });
 
 test('a CAP-sourced product with no paired text uses its description as the message body', function () {

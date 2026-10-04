@@ -2,6 +2,7 @@
 
 namespace App\Actions\Weather;
 
+use App\Enums\AlertCategory;
 use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\Product;
@@ -33,7 +34,7 @@ class RenderAlertSubject
         $subjectTemplate = filled($templateSubject) ? $templateSubject : $rule->effectiveCustomSubjectTemplate();
 
         if (blank($subjectTemplate)) {
-            return $rule->displayName();
+            return $this->defaultSubject($rule, $product);
         }
 
         $location ??= $rule->location;
@@ -43,5 +44,22 @@ class RenderAlertSubject
             '{location}' => $location?->label ?? ($rule->wfo !== null ? "WFO {$rule->wfo}" : 'your area'),
             '{category}' => $rule->category->label(),
         ]);
+    }
+
+    /**
+     * Without a template, a Weather Alerts / SPC & WPC alert is titled with the
+     * product that actually fired ("SPC Day 4-8 Convective Outlook"), not every product
+     * the rule watches. A name the subscriber gave the rule still wins, and the
+     * scheduled categories (no product) keep displayName().
+     */
+    private function defaultSubject(AlertRule $rule, ?Product $product): string
+    {
+        $isProductAlert = in_array($rule->category, [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc], true);
+
+        if (! $isProductAlert || filled($rule->name) || blank($product?->name)) {
+            return $rule->displayName();
+        }
+
+        return $product->name;
     }
 }

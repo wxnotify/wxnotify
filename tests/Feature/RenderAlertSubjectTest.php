@@ -196,3 +196,35 @@ test('omitting $location falls back to the rule\'s own location(), unchanged fro
 
     expect((new RenderAlertSubject)($rule))->toBe('Near Home');
 });
+
+test('without a template, a product alert is titled with the product that fired, not every product the rule watches', function (string $category) {
+    $day1 = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $d48 = Product::factory()->create(['code' => 'D48', 'name' => 'SPC Day 4-8 Convective Outlook']);
+    $rule = AlertRule::factory()->create(['category' => $category, 'name' => null, 'custom_subject_template' => null]);
+    $rule->products()->attach([$day1->id, $d48->id]);
+
+    expect($rule->displayName())->toBe('SPC Day 1 Convective Outlook, SPC Day 4-8 Convective Outlook')
+        ->and((new RenderAlertSubject)($rule, $d48))->toBe('SPC Day 4-8 Convective Outlook')
+        ->and((new RenderAlertSubject)($rule, $day1))->toBe('SPC Day 1 Convective Outlook');
+})->with(['weather_alerts', 'spc_wpc']);
+
+test('a name the subscriber gave the rule still wins over the fired product', function () {
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'name' => 'Storm outlooks', 'custom_subject_template' => null]);
+
+    expect((new RenderAlertSubject)($rule, Product::factory()->create(['name' => 'SPC Day 2 Convective Outlook'])))->toBe('Storm outlooks');
+});
+
+test('a template still wins over the fired product name', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->for($plusUser)->create(['category' => 'spc_wpc', 'name' => null, 'custom_subject_template' => 'Outlook: {product}']);
+
+    expect((new RenderAlertSubject)($rule, Product::factory()->create(['name' => 'SPC Day 3 Convective Outlook'])))->toBe('Outlook: SPC Day 3 Convective Outlook');
+});
+
+test('scheduled categories and a missing product keep displayName()', function () {
+    $threshold = AlertRule::factory()->create(['category' => 'threshold', 'name' => null, 'custom_subject_template' => null]);
+    $discussion = AlertRule::factory()->create(['category' => 'spc_wpc', 'name' => null, 'custom_subject_template' => null]);
+
+    expect((new RenderAlertSubject)($threshold, Product::factory()->create(['name' => 'SPC Day 4-8 Convective Outlook'])))->toBe($threshold->displayName())
+        ->and((new RenderAlertSubject)($discussion))->toBe($discussion->displayName());
+});

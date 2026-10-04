@@ -1656,7 +1656,7 @@ return [
     ],
     118 => [
         'code' => 'SPC.OUTLOOK',
-        'name' => 'SPC Convective Outlook',
+        'name' => 'SPC Day 1 Convective Outlook',
         'family' => 'spc_wpc',
         'has_polygon' => false,
         'risk_level_options' => '["Marginal","Slight","Enhanced","Moderate","High"]',
