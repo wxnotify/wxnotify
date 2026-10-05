@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\TraccarServer;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * @extends Factory<Location>
@@ -60,6 +61,26 @@ class LocationFactory extends Factory
                 'traccar_device_name' => fake()->word(),
             ];
         });
+    }
+
+    /**
+     * A mobile location kept current by a phone running the app (no Traccar link). Pass the
+     * phone's app token to link it; leave it null for a location whose phone is gone.
+     */
+    public function mobileApp(?PersonalAccessToken $token = null): static
+    {
+        return $this->state(fn () => [
+            'type' => LocationType::Mobile,
+            'address' => null,
+            'lat' => null,
+            'lng' => null,
+            'mobile_source' => MobileSource::App,
+            'mobile_update_interval_minutes' => 5,
+            'traccar_server_id' => null,
+            'traccar_device_id' => null,
+            'traccar_device_name' => null,
+            'app_token_id' => $token?->id,
+        ]);
     }
 
     public function withFix(float $lat, float $lng): static

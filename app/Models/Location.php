@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -45,6 +46,7 @@ class Location extends Model
                     'traccar_server_id' => null,
                     'traccar_device_id' => null,
                     'traccar_device_name' => null,
+                    'app_token_id' => null,
                     'mobile_update_interval_minutes' => null,
                     'mobile_position_updated_at' => null,
                     'mobile_position_fixed_at' => null,
@@ -101,6 +103,11 @@ class Location extends Model
         return $this->belongsTo(TraccarServer::class);
     }
 
+    public function appToken(): BelongsTo
+    {
+        return $this->belongsTo(PersonalAccessToken::class, 'app_token_id');
+    }
+
     /**
      * A mobile location has no coordinates until its first successful
      * Traccar poll. Every call site that dereferences lat/lng for matching
@@ -135,9 +142,20 @@ class Location extends Model
         return GreatCircle::meters((float) $this->address_geocoded_lat, (float) $this->address_geocoded_lng, (float) $this->lat, (float) $this->lng) >= self::ADDRESS_RELOOKUP_METERS;
     }
 
+    /**
+     * Whether this mobile location has lost the device that keeps it current: a Traccar
+     * device deleted from the server, or an app location whose phone signed out, was
+     * revoked or stopped sharing. Its last position is kept either way.
+     */
     public function hasMissingDevice(): bool
     {
-        return $this->type === LocationType::Mobile && $this->traccar_device_missing_at !== null;
+        if ($this->type !== LocationType::Mobile) {
+            return false;
+        }
+
+        return $this->mobile_source === MobileSource::App
+            ? $this->app_token_id === null
+            : $this->traccar_device_missing_at !== null;
     }
 
     public function positionLocatedAt(): ?CarbonInterface
