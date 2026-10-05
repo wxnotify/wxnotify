@@ -10,13 +10,13 @@
 
 <native:column class="w-full h-full bg-theme-background">
     @if ($offline)
-        <native:row class="w-full p-3 bg-theme-surface-variant">
+        <native:row class="w-full p-3 bg-theme-surface">
             <native:text class="text-sm text-theme-on-surface-variant">{{ $syncedAt === null ? "You're offline." : "You're offline. Showing alerts from {$this->syncedLabel()}." }}</native:text>
         </native:row>
     @endif
 
     @if ($error)
-        <native:row class="w-full p-3 bg-theme-surface-variant">
+        <native:row class="w-full p-3 bg-theme-surface">
             <native:text class="text-sm text-theme-destructive">{{ $error }}</native:text>
         </native:row>
     @endif

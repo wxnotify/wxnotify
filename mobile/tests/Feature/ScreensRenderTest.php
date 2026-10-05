@@ -6,9 +6,11 @@ use App\NativeComponents\AlertsScreen;
 use App\NativeComponents\AuthCallback;
 use App\NativeComponents\AuthDenied;
 use App\NativeComponents\SignInScreen;
+use App\Providers\NativeServiceProvider;
 use App\Support\TokenStore;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\Testing\Native;
+use Native\Mobile\UI\NativeUIServiceProvider;
 
 /*
  * The element-tree assertions in the other screen tests pass whether or not the native side can draw
@@ -51,6 +53,7 @@ test('the callback screen renders a spinner while signing in and a retry button 
     (new TokenStore)->begin('v', 'state-2');
     Http::fake(['*' => Http::response(['token' => '5|abc', 'expires_at' => '2027-01-01T00:00:00+00:00', 'user' => ['id' => 5]])]);
 
+    // A successful sign-in redirects before the first frame, so re-render with the error cleared to reach the spinner.
     Native::test(AuthCallback::class, ['code' => 'c', 'state' => 'state-2'])
         ->set('error', null)
         ->assertElement('activity_indicator')
@@ -62,7 +65,8 @@ test('the denied-callback screen renders an empty root while it redirects', func
     (new TokenStore)->begin('v', 'state-1');
 
     Native::test(AuthDenied::class, ['state' => 'state-1'])
-        ->assertReplacedWith('/sign-in');
+        ->assertReplacedWith('/sign-in')
+        ->assertElement('column');
 });
 
 test('the alerts screen renders its title, tabs, tappable rows and a load-more button', function () {
@@ -103,4 +107,8 @@ test('the account screen renders its title, tabs, the profile and a sign-out but
         ->assertHasTab('Alerts')
         ->assertElement('text')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Sign out');
+});
+
+test('the native UI plugin is enabled for the native build', function () {
+    expect((new NativeServiceProvider(app()))->plugins())->toContain(NativeUIServiceProvider::class);
 });
