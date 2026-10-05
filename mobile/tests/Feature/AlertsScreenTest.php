@@ -22,6 +22,21 @@ function apiEntry(int $id, array $overrides = []): array
     ];
 }
 
+/**
+ * @param  array<string, mixed>  $node
+ * @return array<int, array<string, mixed>>
+ */
+function findRows(array $node): array
+{
+    $rows = ($node['type'] ?? null) === 'list_item' ? [$node] : [];
+
+    foreach ($node['children'] ?? [] as $child) {
+        $rows = [...$rows, ...findRows($child)];
+    }
+
+    return $rows;
+}
+
 function feedResponse(array $entries, ?string $next = null): array
 {
     return ['data' => $entries, 'meta' => ['next_cursor' => $next]];
@@ -49,14 +64,18 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
         ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh'], $list['props']['on_end_reached'])
             && $list['props']['end_reached_buffer'] === 5
             && $list['props']['separator'] === true
-            && count($list['children']) === 2)
+            && $list['style']['bg_color'] === '#F8FAFC'
+            && $list['props']['dark_bg_color'] === '#0F172A'
+            && count($list['children']) === 2
+            && count(array_filter($list['children'], fn (array $row) => array_key_exists('trailing_badges_json', $row['props']))) === 1)
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 1'
             && $item['props']['overline'] === 'Weather Alerts · 5 minutes ago'
             && $item['props']['supporting'] === 'Sent via Discord'
-            && ! isset($item['props']['supporting_color'], $item['props']['trailing_badges_json']))
+            && ! array_key_exists('supporting_color', $item['props'])
+            && ! array_key_exists('trailing_badges_json', $item['props']))
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 2'
             && str_contains($item['props']['supporting'], 'Delivery problem')
-            && ! isset($item['props']['supporting_color'])
+            && ! array_key_exists('supporting_color', $item['props'])
             && json_decode($item['props']['trailing_badges_json'], true)[0]['color'] === '#EF4444'
             && count(json_decode($item['props']['trailing_badges_json'], true)) === 1)
         ->assertSet('offline', false);
@@ -146,7 +165,7 @@ test('load more appends the next page with the cursor and stops when there is no
     Http::assertSent(fn (Request $r) => str_contains($r->url(), 'before=CURSOR1'));
 });
 
-test('load more sends nothing without a next cursor and ignores repeated end-reached events', function () {
+test('load more sends nothing without a next cursor', function () {
     Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(1)]))]);
 
     Native::test(AlertsScreen::class)
@@ -157,7 +176,7 @@ test('load more sends nothing without a next cursor and ignores repeated end-rea
     Http::assertSentCount(1);
 });
 
-test('a load more while one is already in flight sends no extra request', function () {
+test('a load more while one is already running sends no extra request', function () {
     Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1'))]);
 
     Native::test(AlertsScreen::class)
@@ -169,24 +188,31 @@ test('a load more while one is already in flight sends no extra request', functi
     Http::assertSentCount(1);
 });
 
-test('a finished load more releases the guard so the next page can load', function () {
+test('a load more straight after a page loaded is ignored, and works again a moment later', function () {
     Http::fake([
         'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(3)], 'CURSOR2')),
         'wx.test/api/v1/alerts?limit=25&before=CURSOR2' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
         'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response(feedResponse([apiEntry(1)])),
     ]);
 
-    Native::test(AlertsScreen::class)
+    $screen = Native::test(AlertsScreen::class)
         ->call('loadMore')
         ->assertSet('loadingMore', false)
+        ->assertSet('nextCursor', 'CURSOR1')
         ->call('loadMore')
-        ->assertSee('Tornado Warning 1')
-        ->assertSet('nextCursor', null);
+        ->assertDontSee('Tornado Warning 1')
+        ->assertSet('nextCursor', 'CURSOR1');
+
+    Http::assertSentCount(2);
+
+    $this->travel(2)->seconds();
+
+    $screen->call('loadMore')->assertSee('Tornado Warning 1')->assertSet('nextCursor', null);
 
     Http::assertSentCount(3);
 });
 
-test('a failed load more releases the guard so a later one can retry', function () {
+test('a failed load more releases the guard and leaves the cursor so a later one can retry', function () {
     Http::fake([
         'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
         'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response([], 500),
@@ -195,7 +221,27 @@ test('a failed load more releases the guard so a later one can retry', function 
     Native::test(AlertsScreen::class)
         ->call('loadMore')
         ->assertSet('loadingMore', false)
+        ->assertSet('lastPageLoadedAt', null)
         ->assertSet('nextCursor', 'CURSOR1');
+});
+
+test('the rows keep their node ids when a refresh prepends an alert', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::sequence()
+        ->push(feedResponse([apiEntry(2), apiEntry(1)]))
+        ->push(feedResponse([apiEntry(3), apiEntry(2), apiEntry(1)])),
+    ]);
+
+    $rowIds = fn (array $tree): array => collect(findRows($tree))->mapWithKeys(fn (array $row) => [$row['props']['headline'] => $row['id']])->all();
+
+    $screen = Native::test(AlertsScreen::class);
+    $before = $rowIds($screen->tree());
+
+    $after = $rowIds($screen->call('refresh')->tree());
+
+    expect($after)->toHaveCount(3)
+        ->and($after['Tornado Warning 2'])->toBe($before['Tornado Warning 2'])
+        ->and($after['Tornado Warning 1'])->toBe($before['Tornado Warning 1'])
+        ->and(array_unique($after))->toHaveCount(3);
 });
 
 test('load more is unavailable offline', function () {
@@ -203,7 +249,7 @@ test('load more is unavailable offline', function () {
 
     $screen = Native::test(AlertsScreen::class);
     $this->network->connected = false;
-    $screen->call('loadMore')->assertSet('offline', true);
+    $screen->call('loadMore')->assertSet('offline', true)->assertSet('loadingMore', false);
 
     Http::assertSentCount(1);
 });

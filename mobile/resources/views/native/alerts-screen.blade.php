@@ -21,11 +21,11 @@
         </native:row>
     @endif
 
-    {{-- Un-prefixed on purpose: native:validate's element list predates list and list-item (<native:list> renders the same tree). --}}
-    <list separator on-refresh="refresh" on-end-reached="loadMore" :end-reached-buffer="5" class="w-full flex-1">
+    {{-- Un-prefixed on purpose: native:validate's element list does not know list or list-item (<native:list> renders the same tree). --}}
+    <list separator on-refresh="refresh" on-end-reached="loadMore" :end-reached-buffer="5" class="w-full flex-1 bg-theme-background">
         @forelse ($alerts as $alert)
             <list-item
-                key="alert-{{ $alert['id'] }}"
+                native:key="alert-{{ $alert['id'] }}"
                 headline="{{ $alert['subject'] }}"
                 overline="{{ $this->subtitle($alert) }}"
                 :supporting="$this->supporting($alert)"

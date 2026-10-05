@@ -25,6 +25,8 @@ class AlertsScreen extends NativeComponent
 
     private const RESUME_REFRESH_AFTER_SECONDS = 60;
 
+    private const LOAD_MORE_DEBOUNCE_SECONDS = 1;
+
     /** @var array<int, array<string, mixed>> */
     public array $alerts = [];
 
@@ -39,8 +41,11 @@ class AlertsScreen extends NativeComponent
     /** True once a further page has been appended, so coming back to the screen must not reset the list. */
     public bool $pagedBeyondFirst = false;
 
-    /** Guards loadMore(): the list fires end-reached for every row that appears near the bottom. */
+    /** Re-entrancy guard for loadMore(); it cannot stop a burst of queued end-reached events on its own. */
     public bool $loadingMore = false;
+
+    /** When the last further page finished loading, so loadMore() can ignore calls that follow straight after. */
+    public ?string $lastPageLoadedAt = null;
 
     public ?string $timezone = null;
 
@@ -104,12 +109,14 @@ class AlertsScreen extends NativeComponent
     }
 
     /**
-     * The list's end-reached handler. It fires repeatedly while the last rows are on screen, so it
-     * does nothing without a next cursor, while a page is already loading, or when the feed is offline.
+     * The list's end-reached handler. The list fires it for every row that appears near the bottom, and
+     * the events are queued and handled one after another, so a burst would otherwise load several pages
+     * back to back. It does nothing without a next cursor or while a load is running, and ignores calls
+     * made within a second of the previous page finishing (scrolling through a new page takes longer).
      */
     public function loadMore(): void
     {
-        if ($this->nextCursor === null || $this->loadingMore) {
+        if ($this->nextCursor === null || $this->loadingMore || $this->loadedAPageJustNow()) {
             return;
         }
 
@@ -121,6 +128,7 @@ class AlertsScreen extends NativeComponent
             $this->alerts = [...$this->alerts, ...$page['data']];
             $this->nextCursor = $page['meta']['next_cursor'] ?? null;
             $this->pagedBeyondFirst = true;
+            $this->lastPageLoadedAt = now()->toIso8601String();
             $this->offline = false;
             $this->error = null;
         } catch (Unauthenticated) {
@@ -133,6 +141,12 @@ class AlertsScreen extends NativeComponent
         } finally {
             $this->loadingMore = false;
         }
+    }
+
+    private function loadedAPageJustNow(): bool
+    {
+        return $this->lastPageLoadedAt !== null
+            && Carbon::parse($this->lastPageLoadedAt)->diffInSeconds(now(), true) < self::LOAD_MORE_DEBOUNCE_SECONDS;
     }
 
     public function open(int $id): void
