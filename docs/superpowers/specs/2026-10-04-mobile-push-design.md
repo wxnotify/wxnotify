@@ -20,9 +20,9 @@ A subscriber who signs in to the mobile app can turn on push, pick that phone in
 ### Channel type and transport
 
 - New channel type `mobile_push` (`App\Support\ChannelTypes\MobilePushChannelType`), registered through a `channel_types` migration AND a `ChannelTypeSeeder::SHIPPED` entry in matching sort order (per `.ai/rules/delivery.md`). `label()` "Mobile app"; `destinationLabel()` a fixed caption ("Mobile device"); `displaySummary()` returns only the platform ("Android device" / "iPhone"), never the token.
-- Mobile channels are **not creatable by hand**: hidden from the "Add channel" picker (the type contract gains whatever small method the picker needs, for example `isUserCreatable(): bool`, true for every existing type), editable by renaming, deletable.
+- Mobile channels are **not creatable by hand**: hidden from the "Add channel" picker through `isAvailable()` returning false (no new contract method), editable by renaming, deletable. They are created verified, and `countsTowardFreeSlot()` is false so they do not use Free's no-cost channel slot.
 - New `ChannelTransport::MobilePush`, wired in `ChannelDispatcher::transportFor()` to `MobilePushTransport`.
-- `notification_channels` gains nullable `personal_access_token_id` (FK to `personal_access_tokens`, `cascadeOnDelete`). Sign-out, the "Signed-in devices" revoke action and `sanctum:prune-expired` therefore remove the channel and its rule links. `config` (already `encrypted:array`) holds `{fcm_token, platform}`. `NotificationChannel`'s activity-log options already exclude `config`.
+- `notification_channels` gains nullable `personal_access_token_id` (FK to `personal_access_tokens`, `cascadeOnDelete`). Sign-out, the "Signed-in devices" revoke action and `sanctum:prune-expired` therefore remove the channel and its rule links. `config` (already `encrypted:array`) holds `{fcm_token, platform}`; `device_token_hash` (SHA-256 of the token) is stored beside it so a token held by another channel can be found with a query. `NotificationChannel`'s activity-log options already exclude `config`.
 
 ### Registration API (`/api/v1`, ability `app`, same middleware stack as the existing app routes)
 
@@ -34,15 +34,15 @@ A subscriber who signs in to the mobile app can turn on push, pick that phone in
 
 - Credentials: `config('services.firebase.service_account')` (env `FIREBASE_SERVICE_ACCOUNT`) is the path to the service-account JSON. Missing or unreadable → failure "Push is not configured"; nothing else in the pipeline is affected.
 - `App\Support\Delivery\FcmClient`: builds an RS256 JWT, exchanges it at Google's token endpoint, caches the access token ~55 minutes, POSTs to `https://fcm.googleapis.com/v1/projects/{project_id}/messages:send`. Hosts are fixed (no subscriber-controlled URL, so no `WebhookUrlGuard`), redirects off, 10 s timeout, one attempt (the outcome is the delivery-log row, per the existing delivery design).
-- `MobilePushTransport` sends one message per channel: `notification{title = alert subject, body = message truncated to ~200 chars}`, `data{url: "/"}`, Android `priority: high` on a "Weather alerts" notification channel, iOS default sound. Plain text only (`supportsRichContent()` false).
+- `MobilePushTransport` sends one message per channel: `notification{title = alert subject, body = message truncated to ~200 chars}`, `data{url: "/"}`, Android `priority: high` on the plugin's own notification channel (no `channel_id` is sent), iOS default sound. Plain text only (`supportsRichContent()` false).
 - Results use fixed strings plus the numeric HTTP status, never a response body, token or credential in a `DeliveryResult`:
   - 200 → success.
-  - FCM "token no longer valid" (`UNREGISTERED`, or `INVALID_ARGUMENT` naming the token) → failure with a fixed message, plus a queued job that deletes the channel after the delivery-log row is written. (Check the `delivery_logs.notification_channel_id` foreign-key behaviour while planning; the job must not fail on a log that references the channel.)
+  - FCM "token no longer valid" (`UNREGISTERED`, or `INVALID_ARGUMENT` naming the token) → failure with a fixed message, plus a queued `PruneMobilePushChannel` job, delayed 60 s so the delivery-log row is written first, that deletes the channel only if it still holds the failed token (it carries a hash of that token), so a phone that re-registered in the meantime keeps its channel.
   - Any other non-2xx or timeout → plain failure.
 
 ## App (`mobile/`)
 
-- **Permission prompt**: after the first successful sign-in, if the OS permission is `not_determined` and the user has not chosen "Not now", show a short explainer screen (Enable / Not now). Enable calls `PushNotifications::enroll()`. Not now is stored on the device and the app never prompts on its own again.
+- **Permission prompt**: after the first successful sign-in, if the OS permission is `not_determined`, `granted` or `provisional` and the user has not chosen "Not now" and push is not already on, show a short explainer screen (Enable / Not now). Enable calls `PushNotifications::enroll()`. Not now is stored on the device and the app never prompts on its own again.
 - **Token registration**: a plain Laravel listener on the plugin's `TokenGenerated` event calls `PUT /api/v1/push-token` through `WxNotifyApi` (so a rotated token is picked up even with no push screen open). While push is on, the app also re-registers once a day on launch, which recreates a pruned channel. How events reach a NativePHP v4 native component versus a plain listener is verified on the emulator, not assumed.
 - **Account screen**: a "Push notifications" row — On, Off, or "Blocked in system settings". On enrolls; Off calls `DELETE /push-token` and remembers the choice; Blocked explains where to change it. Underneath: "Choose which alerts go to this phone in your alert rules at wxnotify.com."
 - **Sign-out**: already revokes the token server-side (which now removes the channel); the app also clears its local push flags.
