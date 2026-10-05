@@ -24,8 +24,8 @@
     {{-- Un-prefixed on purpose: native:validate's element list does not know list or list-item (<native:list> renders the same tree). --}}
     <list separator on-refresh="refresh" on-end-reached="loadMore" :end-reached-buffer="5" class="w-full flex-1 bg-theme-background">
         @forelse ($alerts as $alert)
+            {{-- Rows must NOT be keyed (no native:key): Android's LazyColumn keeps the previously first keyed row anchored when items are inserted above it, hiding newly arrived alerts after a refresh. refresh() replaces the whole list and the rows hold no state. --}}
             <list-item
-                native:key="alert-{{ $alert['id'] }}"
                 headline="{{ $alert['subject'] }}"
                 overline="{{ $this->subtitle($alert) }}"
                 :supporting="$this->supporting($alert)"

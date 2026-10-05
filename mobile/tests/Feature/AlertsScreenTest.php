@@ -241,23 +241,27 @@ test('a failed load more releases the guard and leaves the cursor so a later one
         ->assertSet('nextCursor', 'CURSOR1');
 });
 
-test('the rows keep their node ids when a refresh prepends an alert', function () {
+test('a refresh that prepends an alert puts it first and the rows are not keyed', function () {
     Http::fake(['wx.test/api/v1/alerts*' => Http::sequence()
         ->push(feedResponse([apiEntry(2), apiEntry(1)]))
         ->push(feedResponse([apiEntry(3), apiEntry(2), apiEntry(1)])),
     ]);
 
-    $rowIds = fn (array $tree): array => collect(findRows($tree))->mapWithKeys(fn (array $row) => [$row['props']['headline'] => $row['id']])->all();
+    $rows = fn (array $tree): array => array_values(findRows($tree));
 
     $screen = Native::test(AlertsScreen::class);
-    $before = $rowIds($screen->tree());
+    $before = $rows($screen->tree());
+    $after = $rows($screen->call('refresh')->tree());
 
-    $after = $rowIds($screen->call('refresh')->tree());
+    $ids = array_column($after, 'id');
 
-    expect($after)->toHaveCount(3)
-        ->and($after['Tornado Warning 2'])->toBe($before['Tornado Warning 2'])
-        ->and($after['Tornado Warning 1'])->toBe($before['Tornado Warning 1'])
-        ->and(array_unique($after))->toHaveCount(3);
+    expect($after[0]['props']['headline'])->toBe('Tornado Warning 3')
+        ->and(array_column(array_column($after, 'props'), 'headline'))->toBe(['Tornado Warning 3', 'Tornado Warning 2', 'Tornado Warning 1'])
+        // Un-keyed rows get positional ids (consecutive, and the top row keeps its id whichever alert it shows).
+        // A native:key would give each row a hashed id that follows its alert instead, and Android's
+        // LazyColumn would then keep the old first row anchored and hide the new alert above the viewport.
+        ->and($ids)->toBe([$ids[0], $ids[0] + 1, $ids[0] + 2])
+        ->and($ids[0])->toBe($before[0]['id']);
 });
 
 test('load more is unavailable offline', function () {
