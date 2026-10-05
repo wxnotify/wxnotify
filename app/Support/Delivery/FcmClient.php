@@ -77,15 +77,17 @@ class FcmClient
 
     /**
      * Reads the error body only to classify it; nothing from it is ever echoed.
+     * SENDER_ID_MISMATCH (HTTP 403) means the token belongs to another Firebase project, so
+     * it can never work here; PERMISSION_DENIED and THIRD_PARTY_AUTH_ERROR stay plain failures.
      */
     private function tokenIsInvalid(Response $response): bool
     {
-        if (! in_array($response->status(), [400, 404], true)) {
+        if (! in_array($response->status(), [400, 403, 404], true)) {
             return false;
         }
 
         foreach ((array) $response->json('error.details', []) as $detail) {
-            if (is_array($detail) && ($detail['errorCode'] ?? null) === 'UNREGISTERED') {
+            if (is_array($detail) && in_array($detail['errorCode'] ?? null, ['UNREGISTERED', 'SENDER_ID_MISMATCH'], true)) {
                 return true;
             }
         }
@@ -101,7 +103,7 @@ class FcmClient
     {
         $path = config('services.firebase.service_account');
 
-        if (blank($path) || ! is_readable($path)) {
+        if (blank($path) || ! is_file($path)) {
             return null;
         }
 

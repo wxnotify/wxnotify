@@ -54,7 +54,7 @@ class SignedInDevices extends Page implements HasTable
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalHeading('Sign this device out?')
-                    ->modalDescription('The app on this device is signed out the next time it contacts WxNotify.')
+                    ->modalDescription('The app on this device is signed out the next time it contacts WxNotify. The phone also stops receiving alerts and is removed from the alert rules that use it.')
                     ->disabled(fn (): bool => app(ImpersonateManager::class)->isImpersonating())
                     ->tooltip(fn (): ?string => app(ImpersonateManager::class)->isImpersonating()
                         ? 'Not available while impersonating a subscriber'

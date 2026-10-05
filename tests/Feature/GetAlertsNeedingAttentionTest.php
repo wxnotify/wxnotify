@@ -6,6 +6,7 @@ use App\Models\DeliveryLog;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -40,6 +41,15 @@ function attentionAlert(User $user, array $channels = [], array $attributes = []
 {
     $alert = AlertRule::factory()->dailySummary()->for($user)->for(Location::factory()->for($user)->create())->create($attributes);
     $alert->notificationChannels()->attach(collect($channels)->pluck('id'));
+
+    return $alert;
+}
+
+/** An active mobile-location alert that has a channel, so only its location problem shows. */
+function channeledAlert(User $user, Location $location, Factory $factory, array $attributes = []): AlertRule
+{
+    $alert = $factory->for($user)->for($location)->create($attributes);
+    $alert->notificationChannels()->attach(NotificationChannel::factory()->for($user)->create()->id);
 
     return $alert;
 }
@@ -125,7 +135,7 @@ test('a channel that is both failing and unverified appears once, as failing', f
 test('an active scheduled alert on a mobile location with no position is reported', function () {
     $truck = Location::factory()->mobile()->for($this->user)->create(['label' => 'Truck']);
     foreach (['daily' => AlertRule::factory()->dailySummary(), 'lightning' => AlertRule::factory()->lightning(), 'threshold' => AlertRule::factory()] as $name => $factory) {
-        $factory->for($this->user)->for($truck)->create(['name' => "{$name} alert"]);
+        channeledAlert($this->user, $truck, $factory, ['name' => "{$name} alert"]);
     }
 
     $rows = attentionRows($this->user);
@@ -138,9 +148,9 @@ test('an active scheduled alert on a mobile location whose device is gone is a d
     $gone = Location::factory()->mobile()->withFix(40.0, -105.0)->for($this->user)->create(['label' => 'Truck', 'traccar_device_missing_at' => now()->subDay()]);
     $goneNoFix = Location::factory()->mobile()->for($this->user)->create(['label' => 'Van', 'traccar_device_missing_at' => now()->subDay()]);
     $waiting = Location::factory()->mobile()->for($this->user)->create(['label' => 'Bike']);
-    $a = AlertRule::factory()->dailySummary()->for($this->user)->for($gone)->create(['name' => 'Truck summary']);
-    AlertRule::factory()->dailySummary()->for($this->user)->for($goneNoFix)->create(['name' => 'Van summary']);
-    AlertRule::factory()->dailySummary()->for($this->user)->for($waiting)->create(['name' => 'Bike summary']);
+    channeledAlert($this->user, $gone, AlertRule::factory()->dailySummary(), ['name' => 'Truck summary']);
+    channeledAlert($this->user, $goneNoFix, AlertRule::factory()->dailySummary(), ['name' => 'Van summary']);
+    channeledAlert($this->user, $waiting, AlertRule::factory()->dailySummary(), ['name' => 'Bike summary']);
 
     $rows = attentionRows($this->user);
 
@@ -165,8 +175,8 @@ test('a missing device on an inactive alert or a stationary location is not repo
 test('a mobile location with a position, a stationary location, or an inactive alert is not a position problem', function () {
     $withFix = Location::factory()->mobile()->withFix(40.0, -105.0)->for($this->user)->create();
     $noFix = Location::factory()->mobile()->for($this->user)->create();
-    AlertRule::factory()->dailySummary()->for($this->user)->for($withFix)->create();
-    AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->for($this->user)->create())->create();
+    channeledAlert($this->user, $withFix, AlertRule::factory()->dailySummary());
+    channeledAlert($this->user, Location::factory()->for($this->user)->create(), AlertRule::factory()->dailySummary());
     AlertRule::factory()->dailySummary()->for($this->user)->for($noFix)->create(['is_active' => false, 'name' => 'Paused']);
 
     expect(attentionSummary($this->user))->toBe(['alert_inactive: Paused']);
@@ -182,18 +192,66 @@ test('an inactive alert is reported once, as inactive', function () {
         ->and($rows[0]['target']['type'])->toBe('alert');
 });
 
-test('rows are ordered failing, unverified, no position, inactive and then by name', function () {
+test('an active alert with no notification channel is reported as unable to deliver', function () {
+    $alert = attentionAlert($this->user, [], ['name' => 'Storm warnings']);
+
+    $rows = attentionRows($this->user);
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0])->toMatchArray([
+            'kind' => 'alert_no_channel',
+            'severity' => 'danger',
+            'subject' => 'Storm warnings',
+            'detail' => "has no notification channel, so it can't deliver — add a channel to it",
+            'target' => ['type' => 'alert', 'id' => $alert->id],
+        ]);
+});
+
+test('an active alert with a channel is not reported as channel-less', function () {
+    attentionAlert($this->user, [NotificationChannel::factory()->for($this->user)->create()]);
+
+    expect(attentionRows($this->user))->toBe([]);
+});
+
+test('an inactive alert with no channel is reported only as inactive', function () {
+    attentionAlert($this->user, [], ['is_active' => false, 'name' => 'Paused']);
+
+    expect(attentionSummary($this->user))->toBe(['alert_inactive: Paused']);
+});
+
+test('another subscriber\'s channel-less alert is not reported', function () {
+    attentionAlert(User::factory()->create(), [], ['name' => 'Their alert']);
+
+    expect(attentionRows($this->user))->toBe([]);
+});
+
+test('an alert that lost its only device channel is reported as channel-less', function () {
+    $device = NotificationChannel::factory()->for($this->user)->create();
+    $alert = attentionAlert($this->user, [$device], ['name' => 'Phone only']);
+    expect(attentionRows($this->user))->toBe([]);
+
+    $device->delete();
+
+    expect(attentionSummary($this->user))->toBe(['alert_no_channel: Phone only'])
+        ->and($alert->fresh()->notificationChannels)->toHaveCount(0);
+});
+
+test('rows are ordered failing, unverified, no channel, no position, inactive and then by name', function () {
     $failing = NotificationChannel::factory()->for($this->user)->create(['label' => 'Zed channel']);
     channelAttempt($this->user, $failing, 'failure', now()->subHour());
     $unverified = NotificationChannel::factory()->for($this->user)->create(['label' => 'Alpha email', 'verified_at' => null]);
     attentionAlert($this->user, [$unverified], ['name' => 'Uses alpha']);
-    AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->mobile()->for($this->user)->create(['label' => 'Truck']))->create(['name' => 'Truck summary']);
+    channeledAlert($this->user, Location::factory()->mobile()->for($this->user)->create(['label' => 'Truck']), AlertRule::factory()->dailySummary(), ['name' => 'Truck summary']);
+    attentionAlert($this->user, [], ['name' => 'Zulu no channel']);
+    attentionAlert($this->user, [], ['name' => 'Bravo no channel']);
     attentionAlert($this->user, [], ['is_active' => false, 'name' => 'Beta off']);
     attentionAlert($this->user, [], ['is_active' => false, 'name' => 'Alpha off']);
 
     expect(attentionSummary($this->user))->toBe([
         'channel_failing: Zed channel',
         'channel_unverified: Alpha email',
+        'alert_no_channel: Bravo no channel',
+        'alert_no_channel: Zulu no channel',
         'location_no_position: Truck summary',
         'alert_inactive: Alpha off',
         'alert_inactive: Beta off',
@@ -232,6 +290,7 @@ test('the number of queries does not grow with the number of problems', function
             attentionAlert($this->user, [$channel], ['is_active' => $i % 2 === 0]);
             channelAttempt($this->user, NotificationChannel::factory()->for($this->user)->create(), 'failure', now()->subHour());
             AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->mobile()->for($this->user)->create())->create(['name' => null]);
+            attentionAlert($this->user, [], ['name' => "No channel {$i}"]);
         }
         DB::flushQueryLog();
         DB::enableQueryLog();

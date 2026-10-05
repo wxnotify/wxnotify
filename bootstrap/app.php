@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('alerts:dispatch-scheduled')->everyFifteenMinutes()->withoutOverlapping(30);
         $schedule->command('traccar:poll-positions')->everyFiveMinutes()->withoutOverlapping();
         $schedule->command('pipeline:prune-deliveries')->hourly();
+        $schedule->command('sanctum:prune-expired --hours=24')->daily();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

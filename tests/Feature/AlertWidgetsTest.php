@@ -127,9 +127,20 @@ test('Needs attention lists each problem with a link to the fix', function () {
         ->assertSeeHtml(route('filament.dashboard.resources.notification-channels.index'));
 });
 
+test('Needs attention flags an active alert with no channel and links it to its edit page', function () {
+    $alert = AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->for($this->user)->create())->create(['name' => 'Phone only']);
+
+    livewire(NeedsAttentionWidget::class)
+        ->assertSee('Phone only')
+        ->assertSee("has no notification channel, so it can't deliver — add a channel to it")
+        ->assertSeeHtml('text-danger-600')
+        ->assertSeeHtml(route('filament.dashboard.resources.alert-rules.edit', ['record' => $alert->id]));
+});
+
 test('Needs attention links a mobile alert with no position to its location', function () {
     $truck = Location::factory()->mobile()->for($this->user)->create(['label' => 'Truck']);
-    AlertRule::factory()->dailySummary()->for($this->user)->for($truck)->create(['name' => 'Truck summary']);
+    AlertRule::factory()->dailySummary()->for($this->user)->for($truck)->create(['name' => 'Truck summary'])
+        ->notificationChannels()->attach(NotificationChannel::factory()->for($this->user)->create()->id);
 
     livewire(NeedsAttentionWidget::class)
         ->assertSee('Truck summary')
@@ -306,6 +317,7 @@ test('deleting an alert, singly or in bulk, tells the page\'s widgets to refresh
 
 test('Needs attention and the stats strip pick up changes when the page announces them', function () {
     $alert = AlertRule::factory()->dailySummary()->for($this->user)->for(Location::factory()->for($this->user)->create())->create(['name' => 'Storm warnings', 'is_active' => true]);
+    $alert->notificationChannels()->attach(NotificationChannel::factory()->for($this->user)->create()->id);
 
     $needsAttention = livewire(NeedsAttentionWidget::class)->assertDontSee('Storm warnings');
     $stats = livewire(AlertStatsWidget::class);

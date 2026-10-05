@@ -16,11 +16,11 @@ use Illuminate\Support\Collection;
  * Database only, scoped to the given user. Rows hold plain text (the view
  * escapes it) and never an error detail, destination, URL or token.
  *
- * Order: failing channels, unverified channels, mobile locations whose device is
- * gone, mobile locations with no position, inactive alerts -- each group by name.
- * A channel appears once
+ * Order: failing channels, unverified channels, active alerts with no channel,
+ * mobile locations whose device is gone, mobile locations with no position,
+ * inactive alerts -- each group by name. A channel appears once
  * (failing wins over unverified); an inactive alert appears only as inactive,
- * and the position/verification checks look at active alerts only.
+ * and the channel/position/verification checks look at active alerts only.
  */
 class GetAlertsNeedingAttention
 {
@@ -38,6 +38,7 @@ class GetAlertsNeedingAttention
         return [
             ...$failing->values()->all(),
             ...$this->unverifiedChannels($user, $failing->keys()->all()),
+            ...$this->activeAlertsWithoutChannel($user),
             ...$this->mobileLocationsWithMissingDevice($user),
             ...$this->mobileLocationsWithoutPosition($user),
             ...$this->inactiveAlerts($user),
@@ -139,6 +140,33 @@ class GetAlertsNeedingAttention
                     'target' => ['type' => 'channels', 'id' => null],
                 ];
             })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Active alerts that have no notification channel at all, so they can never
+     * deliver. Typically a rule whose only channel was a phone that signed out,
+     * was revoked or was pruned: the database cascade removes that link silently.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function activeAlertsWithoutChannel(User $user): array
+    {
+        return AlertRule::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->whereDoesntHave('notificationChannels')
+            ->with(['location', 'products', 'user'])
+            ->get()
+            ->sortBy(fn (AlertRule $alert): string => mb_strtolower($alert->displayName()))
+            ->map(fn (AlertRule $alert): array => [
+                'kind' => 'alert_no_channel',
+                'severity' => 'danger',
+                'subject' => $alert->displayName(),
+                'detail' => "has no notification channel, so it can't deliver — add a channel to it",
+                'target' => ['type' => 'alert', 'id' => $alert->id],
+            ])
             ->values()
             ->all();
     }

@@ -87,6 +87,17 @@ test('the request is validated', function (array $body) {
     'token too long' => [['token' => str_repeat('a', 4097), 'platform' => 'ios']],
     'no platform' => [['token' => 'x']],
     'unknown platform' => [['token' => 'x', 'platform' => 'windows']],
+    'an APNs hex token' => [['token' => str_repeat('ab12', 16), 'platform' => 'ios']],
+    'an uppercase APNs hex token' => [['token' => strtoupper(str_repeat('ab12', 20)), 'platform' => 'ios']],
+]);
+
+test('an FCM-shaped token is accepted', function (string $token) {
+    pushRegister($this, ['token' => $token])->assertNoContent();
+
+    expect(NotificationChannel::query()->where('channel_type', 'mobile_push')->sole()->config['fcm_token'])->toBe($token);
+})->with([
+    'a short token' => ['fcm-token-1'],
+    'a colon-separated token' => ['dXyz123abc:APA91bHun4MxP5egoKMwt2KZFBaFUH-1RYqx_example-token'],
 ]);
 
 test('unregistering removes the calling token\'s channel and is repeatable', function () {

@@ -32,6 +32,16 @@ test('a message goes to the FCM v1 API with a bearer token and the alert as a no
         && ! isset($request['message']['android']['notification']['channel_id']));
 });
 
+test('an alert with no extra data sends data as an empty JSON object, not a list', function () {
+    fcmFakeGoogle();
+
+    app(FcmClient::class)->send('t', 'a', 'b');
+
+    [$request] = Http::recorded(fn (Request $request) => str_contains($request->url(), 'fcm.googleapis.com'))->first();
+
+    expect($request->body())->toContain('"data":{}');
+});
+
 test('the access token is requested with a JWT signed by the service account key', function () {
     fcmFakeGoogle();
 
@@ -66,6 +76,7 @@ test('without usable credentials nothing is sent and the failure says push is no
     $path = $this->credentials['path'];
     match ($break) {
         'no setting' => config(['services.firebase.service_account' => null]),
+        'a directory' => config(['services.firebase.service_account' => dirname($path)]),
         'missing file' => config(['services.firebase.service_account' => $path.'.missing']),
         'not json' => file_put_contents($path, 'nope'),
         'no private key' => file_put_contents($path, json_encode(['project_id' => 'x', 'client_email' => 'a@b.c'])),
@@ -76,7 +87,7 @@ test('without usable credentials nothing is sent and the failure says push is no
 
     expect($result->success)->toBeFalse()->and($result->error)->toBe('Push is not configured on this server.');
     Http::assertNothingSent();
-})->with(['no setting', 'missing file', 'not json', 'no private key']);
+})->with(['no setting', 'a directory', 'missing file', 'not json', 'no private key']);
 
 test('FCM errors are classified and the failure text is fixed', function (int $status, array $body, bool $tokenInvalid, string $error) {
     fcmFakeGoogle(Http::response($body, $status));
@@ -90,6 +101,9 @@ test('FCM errors are classified and the failure text is fixed', function (int $s
 })->with([
     'unregistered' => [404, ['error' => ['code' => 404, 'status' => 'NOT_FOUND', 'message' => 'Requested entity was not found. super-secret-device-token', 'details' => [['@type' => 'type.googleapis.com/google.firebase.fcm.v1.FcmError', 'errorCode' => 'UNREGISTERED']]]], true, 'This device is no longer registered for push.'],
     'invalid token' => [400, ['error' => ['status' => 'INVALID_ARGUMENT', 'message' => 'The registration token is not a valid FCM registration token']], true, 'This device is no longer registered for push.'],
+    'a token from another Firebase project' => [403, ['error' => ['code' => 403, 'status' => 'PERMISSION_DENIED', 'message' => 'SenderId mismatch', 'details' => [['@type' => 'type.googleapis.com/google.firebase.fcm.v1.FcmError', 'errorCode' => 'SENDER_ID_MISMATCH']]]], true, 'This device is no longer registered for push.'],
+    'permission denied' => [403, ['error' => ['code' => 403, 'status' => 'PERMISSION_DENIED', 'message' => 'Permission denied']], false, 'Firebase rejected the message (HTTP 403).'],
+    'a third-party auth error' => [403, ['error' => ['status' => 'UNAUTHENTICATED', 'details' => [['errorCode' => 'THIRD_PARTY_AUTH_ERROR']]]], false, 'Firebase rejected the message (HTTP 403).'],
     'another invalid argument' => [400, ['error' => ['status' => 'INVALID_ARGUMENT', 'message' => 'Request contains an invalid argument.']], false, 'Firebase rejected the message (HTTP 400).'],
     'a 404 that is not the token' => [404, ['error' => ['status' => 'NOT_FOUND', 'message' => 'Project not found']], false, 'Firebase rejected the message (HTTP 404).'],
     'quota' => [429, ['error' => ['status' => 'RESOURCE_EXHAUSTED']], false, 'Firebase rejected the message (HTTP 429).'],
