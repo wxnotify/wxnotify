@@ -23,6 +23,7 @@ class ChannelTypeSeeder extends Seeder
         ['slug' => 'msteams', 'min_tier' => 'free', 'sort_order' => 7, 'enabled' => true],
         ['slug' => 'webhook', 'min_tier' => 'free', 'sort_order' => 8, 'enabled' => true],
         ['slug' => 'webpush', 'min_tier' => 'free', 'sort_order' => 9, 'enabled' => true],
+        ['slug' => 'mobile_push', 'min_tier' => 'free', 'sort_order' => 10, 'enabled' => true],
     ];
 
     public function run(): void

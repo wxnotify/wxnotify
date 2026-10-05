@@ -21,6 +21,7 @@ class ChannelTypeRegistry
         'msteams' => TeamsChannelType::class,
         'webhook' => WebhookChannelType::class,
         'webpush' => WebPushChannelType::class,
+        'mobile_push' => MobilePushChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType

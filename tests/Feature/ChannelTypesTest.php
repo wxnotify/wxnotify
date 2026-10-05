@@ -215,6 +215,7 @@ test('every channel type captions its destination value with a fixed, secret-fre
     expect($captions)->toEqual([
         'discord' => 'Discord webhook',
         'email' => 'Email address',
+        'mobile_push' => 'Mobile device',
         'msteams' => 'Teams workflow',
         'ntfy' => 'ntfy server and topic',
         'pushover' => 'Pushover user key',

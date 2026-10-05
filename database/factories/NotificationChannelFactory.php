@@ -46,6 +46,19 @@ class NotificationChannelFactory extends Factory
         ]]);
     }
 
+    public function mobilePush(?string $token = null, string $platform = 'android'): static
+    {
+        $token ??= 'fcm-token-'.fake()->unique()->uuid();
+
+        return $this->state(fn () => [
+            'channel_type' => 'mobile_push',
+            'label' => 'Pixel 9',
+            'apprise_url' => null,
+            'config' => ['fcm_token' => $token, 'platform' => $platform],
+            'device_token_hash' => hash('sha256', $token),
+        ]);
+    }
+
     public function email(string $to = 'subscriber@example.com'): static
     {
         return $this->state(fn () => ['channel_type' => 'email', 'apprise_url' => null, 'config' => ['to' => $to]]);
