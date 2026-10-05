@@ -5,6 +5,7 @@ use App\NativeComponents\AlertDetail;
 use App\NativeComponents\AlertsScreen;
 use App\NativeComponents\AuthCallback;
 use App\NativeComponents\AuthDenied;
+use App\NativeComponents\LocationPrompt;
 use App\NativeComponents\PushPrompt;
 use App\NativeComponents\SignInScreen;
 use App\Providers\NativeServiceProvider;
@@ -68,6 +69,15 @@ test('the push prompt renders its copy and both choices', function () {
     Native::test(PushPrompt::class)
         ->assertElement('text')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Enable notifications')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Not now');
+});
+
+test('the location prompt renders its copy and both choices', function () {
+    (new TokenStore)->put('9|secret');
+
+    Native::test(LocationPrompt::class)
+        ->assertElement('text')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Share my location')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Not now');
 });
 

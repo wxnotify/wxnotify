@@ -2,6 +2,7 @@
 
 use App\NativeComponents\AlertsScreen;
 use App\Support\LocalCache;
+use App\Support\LocationSharingState;
 use App\Support\PushState;
 use App\Support\TokenStore;
 use Illuminate\Http\Client\ConnectionException;
@@ -409,4 +410,27 @@ test('an HTML page where JSON was expected keeps the cached feed and shows the r
     Native::test(AlertsScreen::class)
         ->assertSee('Cached alert')
         ->assertSee('could not load your alerts');
+});
+
+test('opening the feed while location sharing is wanted checks it with the server once', function () {
+    (new LocationSharingState)->markWanted();
+    Http::fake([
+        'wx.test/api/v1/alerts*' => Http::response(feedResponse([])),
+        'wx.test/api/v1/location-sharing' => Http::response(['data' => ['linked' => true, 'location_id' => 7, 'interval_seconds' => 300]]),
+    ]);
+    $this->geolocation->status = ['shareActive' => true, 'shareIntervalMs' => 300000, 'authorization' => 'always'];
+    (new TokenStore)->putBeaconToken('12|b', 'https://wx.test/api/v1/location');
+
+    Native::test(AlertsScreen::class);
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r->url() === 'https://wx.test/api/v1/location-sharing');
+});
+
+test('opening the feed while location sharing is off sends nothing about it', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class);
+
+    Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'location-sharing'));
 });

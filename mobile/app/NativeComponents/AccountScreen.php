@@ -4,6 +4,7 @@ namespace App\NativeComponents;
 
 use App\Exceptions\Api\ApiException;
 use App\Exceptions\Api\Unauthenticated;
+use App\Services\LocationSharing;
 use App\Services\PushRegistration;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
@@ -11,8 +12,10 @@ use App\Support\Concerns\HandlesPushToken;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use App\Support\PushState;
+use Illuminate\Support\Carbon;
 use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Facades\System;
+use Throwable;
 
 /**
  * Who is signed in, their plan and the app version, plus sign out.
@@ -26,6 +29,8 @@ class AccountScreen extends NativeComponent
     public ?array $profile = null;
 
     public ?string $pushMessage = null;
+
+    public ?string $locationMessage = null;
 
     public function mount(): void
     {
@@ -107,6 +112,66 @@ class AccountScreen extends NativeComponent
     {
         System::appSettings();
     }
+
+    /**
+     * @return array{status: 'off'|'on'|'waiting', interval_minutes: ?int, last_shared_at: ?string, while_using_only: bool}
+     */
+    public function locationState(): array
+    {
+        return app(LocationSharing::class)->state();
+    }
+
+    /**
+     * @param  array{status: 'off'|'on'|'waiting', interval_minutes: ?int, last_shared_at: ?string, while_using_only: bool}  $state  the state the view is drawing, so the label and the buttons agree
+     */
+    public function locationStatusLabel(array $state): string
+    {
+        return match ($state['status']) {
+            'on' => 'On — about every '.($state['interval_minutes'] ?? 5).' minutes'.$this->lastSharedSuffix($state['last_shared_at']),
+            'waiting' => 'Waiting for location permission',
+            default => 'Off',
+        };
+    }
+
+    private function lastSharedSuffix(?string $lastSharedAt): string
+    {
+        if ($lastSharedAt === null) {
+            return '';
+        }
+
+        try {
+            return ' · last shared '.Carbon::parse($lastSharedAt)
+                ->setTimezone($this->profile['timezone'] ?? config('app.timezone'))
+                ->format('g:i a');
+        } catch (Throwable) {
+            return '';
+        }
+    }
+
+    public function shareLocation(): void
+    {
+        $this->locationMessage = null;
+
+        $this->navigate('/share-location');
+    }
+
+    public function stopSharingLocation(): void
+    {
+        $this->locationMessage = app(LocationSharing::class)->disable()
+            ? null
+            : 'Couldn\'t stop sharing. Check your connection and try again.';
+    }
+
+    public function openLocationSettings(): void
+    {
+        System::appSettings();
+    }
+
+    /**
+     * Back from the system settings or the explainer: the native watch may have changed, and the
+     * row reads it fresh on every render, so there is nothing to refetch.
+     */
+    public function onResume(): void {}
 
     public function appVersion(): string
     {

@@ -3,6 +3,7 @@
 use App\Models\CachedAlert;
 use App\NativeComponents\AccountScreen;
 use App\Support\LocalCache;
+use App\Support\LocationSharingState;
 use App\Support\PushState;
 use App\Support\TokenStore;
 use Illuminate\Http\Client\Request;
@@ -173,4 +174,125 @@ test('Turn off after the session expired signs the subscriber out', function () 
     Native::test(AccountScreen::class)->tap('Turn off')->assertReplacedWith('/sign-in');
 
     expect((new TokenStore)->token())->toBeNull();
+});
+
+function stubPushOff(): void
+{
+    PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined');
+}
+
+function sharingStatus(array $overrides = []): array
+{
+    return $overrides + ['shareActive' => true, 'shareIntervalMs' => 300000, 'lastShareAt' => '2026-10-05T18:30:00+00:00', 'authorization' => 'always'];
+}
+
+test('the location row says Off with a Share location button that opens the explainer', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+
+    Native::test(AccountScreen::class)
+        ->assertSee('Share this phone\'s location')
+        ->assertSee('Share location')
+        ->assertDontSee('Stop sharing')
+        ->tap('Share location')
+        ->assertNavigatedTo('/share-location');
+});
+
+test('the location row shows the interval, the last shared time and Stop sharing while the native watch is running', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+    $this->geolocation->status = sharingStatus();
+
+    Native::test(AccountScreen::class)
+        ->assertSee('On')
+        ->assertSee('about every 5 minutes')
+        ->assertSee('last shared 1:30 pm')
+        ->assertSee('Stop sharing')
+        ->assertDontSee('Share location')
+        ->assertDontSee('Stops when you close the app');
+});
+
+test('a malformed last shared time is left out instead of breaking the screen', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    $this->geolocation->status = sharingStatus(['lastShareAt' => 'not a time']);
+
+    Native::test(AccountScreen::class)
+        ->assertSee('about every 5 minutes')
+        ->assertDontSee('last shared');
+});
+
+test('a running watch with no last shared time shows only the interval', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    $this->geolocation->status = sharingStatus(['lastShareAt' => null]);
+
+    Native::test(AccountScreen::class)->assertSee('about every 5 minutes')->assertDontSee('last shared');
+});
+
+test('wanted with no running watch says it is waiting for permission and offers the system settings', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+    System::shouldReceive('appSettings')->once();
+
+    Native::test(AccountScreen::class)
+        ->assertSee('Waiting for location permission')
+        ->assertSee('Stop sharing')
+        ->assertDontSee('Share location')
+        ->tap('Open settings');
+});
+
+test('while-using authorization warns that sharing stops when the app closes', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+    $this->geolocation->status = sharingStatus(['authorization' => 'whenInUse']);
+
+    Native::test(AccountScreen::class)
+        ->assertSee('Stops when you close the app')
+        ->assertSee('Open settings')
+        ->assertSee('Stop sharing');
+});
+
+test('Stop sharing tells the server, stops the watch and flips the row to Off', function () use ($profile) {
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/location-sharing' => Http::response(null, 204),
+    ]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+    $this->geolocation->status = sharingStatus();
+
+    Native::test(AccountScreen::class)->tap('Stop sharing')->assertSee('Share location')->assertDontSee('Stop sharing');
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'DELETE' && $r->url() === 'https://wx.test/api/v1/location-sharing');
+    expect((new LocationSharingState)->wanted())->toBeFalse()->and($this->geolocation->stopped)->not->toBeEmpty();
+});
+
+test('Stop sharing that cannot reach the server says so and stays On', function () use ($profile) {
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/location-sharing' => Http::response([], 503),
+    ]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+    $this->geolocation->status = sharingStatus();
+
+    Native::test(AccountScreen::class)->tap('Stop sharing')->assertSee('Couldn\'t stop sharing')->assertSee('Stop sharing');
+
+    expect((new LocationSharingState)->wanted())->toBeTrue()->and($this->geolocation->stopped)->toBeEmpty();
+});
+
+test('coming back to the screen re-renders from the current native status', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+
+    $screen = Native::test(AccountScreen::class)->assertSee('Waiting for location permission');
+
+    $this->geolocation->status = sharingStatus();
+
+    $screen->call('onResume')->assertSee('about every 5 minutes')->assertDontSee('Waiting for location permission');
 });
