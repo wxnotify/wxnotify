@@ -1,1 +1,1 @@
-<native:column class="w-full h-full bg-white dark:bg-slate-950"></native:column>
+<native:column class="w-full h-full bg-theme-background"></native:column>

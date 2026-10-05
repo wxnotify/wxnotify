@@ -1,11 +1,9 @@
-<native:column class="w-full h-full items-center justify-center p-6 gap-4 bg-white dark:bg-slate-950">
+<native:column class="w-full h-full items-center justify-center p-6 gap-4 bg-theme-background">
     @if ($error)
-        <native:text class="text-base text-slate-900 dark:text-slate-50 text-center">{{ $error }}</native:text>
-        {{-- Un-prefixed on purpose: native:validate's element list predates pressable and flags the prefixed form; both compile identically. --}}
-        <pressable @tap="tryAgain" class="w-full py-4 items-center justify-center rounded-xl bg-blue-600 dark:bg-blue-400">
-            <native:text class="text-base font-bold text-white dark:text-slate-950">Try again</native:text>
-        </pressable>
+        <native:text class="text-base text-theme-on-background text-center">{{ $error }}</native:text>
+        <native:button label="Try again" @tap="tryAgain" class="w-full" />
     @else
-        <native:text class="text-base text-slate-700 dark:text-slate-300">Signing you in…</native:text>
+        <native:activity-indicator size="lg" />
+        <native:text class="text-base text-theme-on-surface-variant">Signing you in…</native:text>
     @endif
 </native:column>
