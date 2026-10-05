@@ -2,6 +2,7 @@
 
 use App\Enums\LocationType;
 use App\Enums\MobileSource;
+use App\Filament\Dashboard\Pages\SignedInDevices;
 use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\User;
@@ -9,6 +10,8 @@ use App\Settings\TierThresholdSettings;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Activitylog\Models\Activity;
+
+use function Pest\Livewire\livewire;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -70,7 +73,8 @@ test('signing in again on the same phone re-links its unlinked location instead 
     // The alert rule factory makes a location of its own for another user, so count this user's.
     expect($this->user->locations()->count())->toBe(1)
         ->and($old->fresh()->app_token_id)->toBe($this->phone->accessToken->id)
-        ->and((float) $old->fresh()->lat)->toBe(35.2);
+        ->and((float) $old->fresh()->lat)->toBe(35.2)
+        ->and($rule->locations()->count())->toBe(1);
 });
 
 test('an unlinked location with another name is left alone and a new one is created', function () {
@@ -163,9 +167,34 @@ test('the beacon token is never written to the activity log and the creation is 
 });
 
 test('beacon tokens do not appear on the Signed-in devices page', function () {
+    $beacon = PersonalAccessToken::query()->findOrFail(
+        (int) explode('|', sharingCall($this, 'PUT')->assertOk()->json('data.beacon_token'))[0],
+    );
+
+    app('auth')->forgetGuards();
+    $this->flushHeaders();
+    $this->actingAs($this->user);
+
+    livewire(SignedInDevices::class)
+        ->assertSuccessful()
+        ->assertCanSeeTableRecords([$this->phone->accessToken])
+        ->assertCanNotSeeTableRecords([$beacon])
+        ->assertSee('Pixel 9')
+        ->assertDontSee('Location beacon');
+});
+
+test('a refused PUT leaves the phone\'s existing beacon token in place', function () {
     sharingCall($this, 'PUT')->assertOk();
+    $beacon = PersonalAccessToken::query()->where('abilities', json_encode(['location']))->sole();
 
-    $listed = $this->user->tokens()->getQuery()->where('abilities', json_encode(['app']))->pluck('name')->all();
+    // Lose the linked location and fill the plan, so the next PUT would need a new one and is refused.
+    Location::query()->delete();
+    Location::factory()->for($this->user)->create();
+    $limits = app(TierThresholdSettings::class);
+    $limits->free_locations = 1;
+    $limits->save();
 
-    expect($listed)->toBe(['Pixel 9']);
+    sharingCall($this, 'PUT')->assertUnprocessable()->assertJsonPath('error', 'location_limit');
+
+    expect(PersonalAccessToken::find($beacon->id))->not->toBeNull();
 });
