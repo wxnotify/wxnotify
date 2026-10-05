@@ -42,6 +42,17 @@ test('an alert with no extra data sends data as an empty JSON object, not a list
     expect($request->body())->toContain('"data":{}');
 });
 
+test('a message expires after one hour on both platforms so a phone that was off never gets stale warnings', function () {
+    $this->freezeTime();
+    fcmFakeGoogle();
+
+    app(FcmClient::class)->send('device-token-1', 'a', 'b');
+
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['android']['ttl'] === '3600s'
+        && $request['message']['apns']['headers']['apns-expiration'] === (string) (now()->timestamp + 3600));
+});
+
 test('the access token is requested with a JWT signed by the service account key', function () {
     fcmFakeGoogle();
 

@@ -19,6 +19,9 @@ class FcmClient
 {
     public const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
+    /** A weather alert that could not be delivered within an hour is stale: FCM drops it (default 4 weeks). */
+    private const TTL_SECONDS = 3600;
+
     private const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
     /**
@@ -45,8 +48,11 @@ class FcmClient
                     'token' => $deviceToken,
                     'notification' => ['title' => $title, 'body' => $body],
                     'data' => (object) $data,
-                    'android' => ['priority' => 'HIGH'],
-                    'apns' => ['payload' => ['aps' => ['sound' => 'default']]],
+                    'android' => ['priority' => 'HIGH', 'ttl' => self::TTL_SECONDS.'s'],
+                    'apns' => [
+                        'headers' => ['apns-expiration' => (string) (now()->timestamp + self::TTL_SECONDS)],
+                        'payload' => ['aps' => ['sound' => 'default']],
+                    ],
                 ]],
             );
         } catch (ConnectionException) {
