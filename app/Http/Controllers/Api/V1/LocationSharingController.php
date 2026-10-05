@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Locations\DisableLocationSharing;
 use App\Actions\Locations\EnableLocationSharing;
+use App\Enums\LocationType;
+use App\Enums\MobileSource;
 use App\Exceptions\LocationLimitReached;
 use App\Http\Controllers\Controller;
 use App\Models\Location;
@@ -41,6 +43,8 @@ class LocationSharingController extends Controller
         $location = Location::query()
             ->where('user_id', $request->user()->id)
             ->where('app_token_id', $this->appToken($request)->id)
+            ->where('type', LocationType::Mobile->value)
+            ->where('mobile_source', MobileSource::App->value)
             ->first();
 
         return response()->json(['data' => [

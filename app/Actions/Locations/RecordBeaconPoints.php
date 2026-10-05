@@ -10,7 +10,8 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Applies a beacon's batch: the newest point moves the location linked to the beacon token's
- * parent app token. Returns null when no location is linked (the phone was unlinked), which the
+ * parent app token. Point times are converted to UTC first, because Eloquent stores a date's
+ * wall time without converting it. Returns null when no location is linked (the phone was unlinked), which the
  * controller answers with a 404. The location must belong to the token's own account. A beacon
  * with no parent app token reaches nothing: it is refused before the query, because a null
  * `where` value would otherwise match an unlinked location (whose `app_token_id` is null).
@@ -41,7 +42,7 @@ class RecordBeaconPoints
         }
 
         $newest = collect($points)
-            ->map(fn (array $point): array => [...$point, 'at' => CarbonImmutable::parse($point['timestamp'])])
+            ->map(fn (array $point): array => [...$point, 'at' => CarbonImmutable::parse($point['timestamp'])->utc()])
             ->sortByDesc('at')
             ->first();
 

@@ -6,7 +6,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * The body the geolocation plugin's beacon sends: {"points": [{latitude, longitude, accuracy?,
- * speed?, heading?, altitude?, timestamp}]}. Only the newest valid point is used.
+ * speed?, heading?, altitude?, timestamp}]}. The whole batch is rejected (422) when any point is
+ * invalid. The plugin sends one point per request; the action applies the newest if several come.
  */
 class StoreLocationPointsRequest extends FormRequest
 {

@@ -3,6 +3,7 @@
 use App\Jobs\ReverseGeocodeLocation;
 use App\Models\Location;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Activitylog\Models\Activity;
 
@@ -40,6 +41,16 @@ test('the newest point of a batch moves the linked location', function () {
         ->and((float) $fresh->lng)->toBe(-97.4)
         ->and($fresh->mobile_position_fixed_at->equalTo(now()->subMinute()))->toBeTrue()
         ->and($fresh->mobile_position_updated_at->equalTo(now()))->toBeTrue();
+});
+
+test('the fix time is stored in UTC whatever offset the beacon sends', function () {
+    $this->travelTo(now()->startOfSecond());
+    beaconPost($this, [beaconPoint(['timestamp' => now()->utc()->subMinute()->setTimezone('+02:00')->toIso8601String()])])->assertNoContent();
+
+    $expected = now()->utc()->subMinute();
+    expect($this->location->fresh()->mobile_position_fixed_at->utc()->equalTo($expected))->toBeTrue()
+        ->and(DB::table('locations')->where('id', $this->location->id)->value('mobile_position_fixed_at'))
+        ->toStartWith($expected->format('Y-m-d H:i:s'));
 });
 
 test('a point older than the stored fix is accepted and ignored', function () {

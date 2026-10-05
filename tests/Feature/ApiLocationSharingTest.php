@@ -108,6 +108,66 @@ test('at the plan\'s location limit a new location is refused but an existing on
     sharingCall($this, 'PUT')->assertOk()->assertJsonPath('data.location_id', $existing->id);
 });
 
+test('at the plan\'s limit the one unlinked phone location is re-linked even when it was renamed', function () {
+    $limits = app(TierThresholdSettings::class);
+    $limits->free_locations = 1;
+    $limits->save();
+    $renamed = Location::factory()->for($this->user)->mobileApp()->create(['label' => 'Jim\'s phone', 'lat' => 35.2, 'lng' => -97.4]);
+    $rule = AlertRule::factory()->for($this->user)->create();
+    $rule->locations()->attach($renamed->id);
+
+    sharingCall($this, 'PUT')->assertOk()->assertJsonPath('data.location_id', $renamed->id);
+
+    expect($this->user->locations()->count())->toBe(1)
+        ->and($renamed->fresh()->app_token_id)->toBe($this->phone->accessToken->id)
+        ->and((float) $renamed->fresh()->lat)->toBe(35.2)
+        ->and($rule->locations()->count())->toBe(1);
+});
+
+test('at the plan\'s limit two unlinked phone locations of other names are ambiguous and refused', function () {
+    $limits = app(TierThresholdSettings::class);
+    $limits->free_locations = 2;
+    $limits->save();
+    Location::factory()->for($this->user)->mobileApp()->create(['label' => 'iPad']);
+    Location::factory()->for($this->user)->mobileApp()->create(['label' => 'Old phone']);
+
+    sharingCall($this, 'PUT')->assertUnprocessable()->assertJsonPath('error', 'location_limit');
+
+    expect(Location::query()->whereNotNull('app_token_id')->count())->toBe(0)
+        ->and(PersonalAccessToken::query()->where('abilities', json_encode(['location']))->count())->toBe(0);
+});
+
+test('below the plan\'s limit an unlinked location of another name is not taken over', function () {
+    $other = Location::factory()->for($this->user)->mobileApp()->create(['label' => 'iPad']);
+
+    sharingCall($this, 'PUT')->assertOk();
+
+    expect($this->user->locations()->count())->toBe(2)
+        ->and($other->fresh()->app_token_id)->toBeNull();
+});
+
+test('at the plan\'s limit another account\'s unlinked phone location is never taken', function () {
+    $limits = app(TierThresholdSettings::class);
+    $limits->free_locations = 1;
+    $limits->save();
+    Location::factory()->for($this->user)->create();
+    $foreign = Location::factory()->for(User::factory())->mobileApp()->create(['label' => 'Jim\'s phone']);
+
+    sharingCall($this, 'PUT')->assertUnprocessable()->assertJsonPath('error', 'location_limit');
+
+    expect($foreign->fresh()->app_token_id)->toBeNull();
+});
+
+test('GET does not report a location linked by token but no longer an app location', function (?MobileSource $source) {
+    Location::factory()->for($this->user)->mobileApp($this->phone->accessToken)->create(['mobile_source' => $source]);
+
+    sharingCall($this, 'GET')->assertOk()
+        ->assertExactJson(['data' => ['linked' => false, 'location_id' => null, 'interval_seconds' => null]]);
+})->with([
+    'traccar' => MobileSource::Traccar,
+    'none' => null,
+]);
+
 test('GET says whether the phone is linked and never returns a token', function () {
     sharingCall($this, 'GET')->assertOk()
         ->assertExactJson(['data' => ['linked' => false, 'location_id' => null, 'interval_seconds' => null]]);
