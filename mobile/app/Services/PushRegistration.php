@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\Api\ApiException;
+use App\Exceptions\Api\Unauthenticated;
 use App\Support\PushState;
 use Native\Mobile\Facades\PushNotifications;
 use Native\Mobile\Facades\System;
@@ -14,7 +15,7 @@ use Native\Mobile\Facades\System;
  */
 class PushRegistration
 {
-    /** Re-send the token on launch when the last send is older than this (hours). */
+    /** Enroll again on launch when the last registration is older than this (hours). */
     private const REFRESH_AFTER_HOURS = 20;
 
     public function __construct(private WxNotifyApi $api, private PushState $state) {}
@@ -48,11 +49,15 @@ class PushRegistration
 
     /**
      * @return bool false when the server could not be told, in which case push stays on
+     *
+     * @throws Unauthenticated when the server no longer accepts this sign-in; the caller signs out
      */
     public function disable(): bool
     {
         try {
             $this->api->unregisterPushToken();
+        } catch (Unauthenticated $e) {
+            throw $e;
         } catch (ApiException) {
             return false;
         }
@@ -64,7 +69,7 @@ class PushRegistration
 
     public function register(string $token): void
     {
-        if (! $this->state->wantsPush()) {
+        if (! $this->state->wantsPush() || $this->permission() === 'denied') {
             return;
         }
 
@@ -78,8 +83,11 @@ class PushRegistration
     }
 
     /**
-     * On launch while push is on: send the token again if it has not been sent today, which also
-     * recreates a channel the server pruned.
+     * On launch while push is on and the OS allows notifications: when the server has not been sent
+     * a token today, ask the OS to enroll again. That shows no dialog (permission is already given),
+     * fetches the live FCM token and fires TokenGenerated, which the RegisterPushToken listener sends
+     * to the server (recreating a channel it pruned). The plugin's cached getToken() value is never
+     * sent: it is not kept current, and on iOS it can hold the APNs token.
      */
     public function refreshIfDue(): void
     {
@@ -87,10 +95,8 @@ class PushRegistration
             return;
         }
 
-        $token = PushNotifications::getToken();
-
-        if ($token !== null) {
-            $this->register($token);
+        if (in_array($this->permission(), ['granted', 'provisional'], true)) {
+            PushNotifications::enroll();
         }
     }
 }

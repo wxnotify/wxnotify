@@ -132,7 +132,7 @@ test('Turn off that cannot reach the server says so and stays on', function () u
     expect((new PushState)->wantsPush())->toBeTrue();
 });
 
-test('when the OS refused notifications the row points at the system settings', function () use ($profile) {
+test('when the OS refused notifications and push is off the row points only at the system settings', function () use ($profile) {
     Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
     PushNotifications::shouldReceive('checkPermission')->andReturn('denied');
     System::shouldReceive('appSettings')->once();
@@ -140,5 +140,37 @@ test('when the OS refused notifications the row points at the system settings', 
     Native::test(AccountScreen::class)
         ->assertSee('Blocked in system settings')
         ->assertDontSee('Turn on')
+        ->assertDontSee('Turn off')
         ->tap('Open system settings');
+});
+
+test('when the OS refused notifications but push is still on, the subscriber can also turn it off in the app', function () use ($profile) {
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/push-token' => Http::response(null, 204),
+    ]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('denied');
+    (new PushState)->markEnabled();
+
+    Native::test(AccountScreen::class)
+        ->assertSee('Blocked in system settings')
+        ->assertSee('Open system settings')
+        ->assertSee('Turn off')
+        ->tap('Turn off');
+
+    expect((new PushState)->wantsPush())->toBeFalse();
+    Http::assertSent(fn (Request $r) => $r->method() === 'DELETE' && $r->url() === 'https://wx.test/api/v1/push-token');
+});
+
+test('Turn off after the session expired signs the subscriber out', function () use ($profile) {
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/push-token' => Http::response([], 401),
+    ]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    (new PushState)->markEnabled();
+
+    Native::test(AccountScreen::class)->tap('Turn off')->assertReplacedWith('/sign-in');
+
+    expect((new TokenStore)->token())->toBeNull();
 });

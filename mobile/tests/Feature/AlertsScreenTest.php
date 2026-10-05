@@ -8,7 +8,6 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\Facades\PushNotifications;
-use Native\Mobile\Facades\System;
 use Native\Mobile\Testing\Native;
 
 function apiEntry(int $id, array $overrides = []): array
@@ -55,18 +54,26 @@ test('a signed-out visitor is sent to sign in', function () {
     Native::test(AlertsScreen::class)->assertReplacedWith('/sign-in');
 });
 
-test('opening the feed while push is on re-registers the token once a day', function () {
+test('opening the feed while push is on asks the OS to enroll and sends no token itself', function () {
     (new PushState)->markEnabled();
-    PushNotifications::shouldReceive('getToken')->andReturn('fcm-1');
-    System::shouldReceive('isIos')->andReturn(false);
-    Http::fake([
-        'wx.test/api/v1/alerts*' => Http::response(feedResponse([])),
-        'wx.test/api/v1/push-token' => Http::response(null, 204),
-    ]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    PushNotifications::shouldReceive('getToken')->never();
+    PushNotifications::shouldReceive('enroll')->once();
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
 
     Native::test(AlertsScreen::class);
 
-    Http::assertSent(fn (Request $r) => $r->method() === 'PUT' && $r->url() === 'https://wx.test/api/v1/push-token');
+    Http::assertNotSent(fn (Request $r) => $r->method() === 'PUT');
+});
+
+test('opening the feed while push is off enrolls nothing', function () {
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    PushNotifications::shouldReceive('enroll')->never();
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class);
+
+    Http::assertNotSent(fn (Request $r) => $r->method() === 'PUT');
 });
 
 test('the feed loads from the server, shows each alert, and refreshes the cache', function () {

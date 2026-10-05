@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\Api\Unauthenticated;
 use App\Services\PushRegistration;
 use App\Services\SignOut;
 use App\Support\PushState;
@@ -9,6 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Native\Mobile\Events\PushNotification\TokenGenerated;
 use Native\Mobile\Facades\PushNotifications;
 use Native\Mobile\Facades\System;
+use Native\Mobile\PendingPushNotificationEnrollment;
 
 beforeEach(function () {
     (new TokenStore)->put('9|secret');
@@ -107,27 +109,70 @@ test('push stays on when the server could not be told it is off', function () {
     expect(app(PushRegistration::class)->disable())->toBeFalse()->and((new PushState)->wantsPush())->toBeTrue();
 });
 
-test('the token is re-registered on launch once a day while push is on', function () {
+test('on launch, once a day while push is on, the app asks the OS to enroll rather than sending a cached token', function (string $permission) {
     Http::fake(['wx.test/api/v1/push-token' => Http::response(null, 204)]);
-    PushNotifications::shouldReceive('getToken')->andReturn('fcm-1');
+    PushNotifications::shouldReceive('checkPermission')->andReturn($permission);
+    PushNotifications::shouldReceive('getToken')->never();
+    PushNotifications::shouldReceive('enroll')->once()->andReturnUsing(function () {
+        event(new TokenGenerated('fcm-live'));
+
+        return Mockery::mock(PendingPushNotificationEnrollment::class)->shouldIgnoreMissing();
+    });
     (new PushState)->markEnabled();
 
     app(PushRegistration::class)->refreshIfDue();
     app(PushRegistration::class)->refreshIfDue();
 
     Http::assertSentCount(1);
-    Http::assertSent(pushRegistered('fcm-1'));
-});
+    Http::assertSent(pushRegistered('fcm-live'));
+})->with(['granted', 'provisional']);
 
-test('nothing is re-registered while push is off or there is no token yet', function () {
-    Http::fake();
-    PushNotifications::shouldReceive('getToken')->andReturn(null);
+test('launch enrolls again when the last registration is more than a day old', function () {
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    PushNotifications::shouldReceive('enroll')->once();
+    (new PushState)->markEnabled();
 
     app(PushRegistration::class)->refreshIfDue();
-    (new PushState)->markEnabled();
+});
+
+test('nothing is enrolled on launch while push is off', function () {
+    Http::fake();
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    PushNotifications::shouldReceive('enroll')->never();
+
     app(PushRegistration::class)->refreshIfDue();
 
     Http::assertNothingSent();
+});
+
+test('nothing is enrolled on launch unless the OS allows notifications', function (?string $permission) {
+    Http::fake();
+    PushNotifications::shouldReceive('checkPermission')->andReturn($permission);
+    PushNotifications::shouldReceive('enroll')->never();
+    (new PushState)->markEnabled();
+
+    app(PushRegistration::class)->refreshIfDue();
+
+    Http::assertNothingSent();
+})->with(['denied', 'not_determined', 'ephemeral', null]);
+
+test('a token handed over while the OS has notifications blocked is not registered', function () {
+    Http::fake();
+    PushNotifications::shouldReceive('checkPermission')->andReturn('denied');
+    (new PushState)->markEnabled();
+
+    event(new TokenGenerated('fcm-1'));
+
+    Http::assertNothingSent();
+    expect((new PushState)->registeredWithin(1))->toBeFalse();
+});
+
+test('turning push off while the session has expired signs the caller out instead of failing quietly', function () {
+    Http::fake(['wx.test/api/v1/push-token' => Http::response([], 401)]);
+    (new PushState)->markEnabled();
+
+    expect(fn () => app(PushRegistration::class)->disable())->toThrow(Unauthenticated::class);
+    expect((new PushState)->wantsPush())->toBeTrue();
 });
 
 test('signing out forgets every push flag', function () {

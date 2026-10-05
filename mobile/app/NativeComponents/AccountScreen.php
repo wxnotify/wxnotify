@@ -53,7 +53,7 @@ class AccountScreen extends NativeComponent
     }
 
     /**
-     * 'on', 'off' or 'blocked' (the OS refused notifications, so only the system settings can change it).
+     * 'on', 'off' or 'blocked' (the OS refused notifications, so only the system settings can allow them again).
      */
     public function pushStatus(): string
     {
@@ -61,12 +61,21 @@ class AccountScreen extends NativeComponent
             return 'blocked';
         }
 
-        return app(PushState::class)->wantsPush() ? 'on' : 'off';
+        return $this->pushWanted() ? 'on' : 'off';
     }
 
-    public function pushStatusLabel(): string
+    /**
+     * Whether the subscriber still has push turned on, whatever the OS permission is; a blocked
+     * phone that is still wanted has a server channel that "Turn off" removes.
+     */
+    public function pushWanted(): bool
     {
-        return match ($this->pushStatus()) {
+        return app(PushState::class)->wantsPush();
+    }
+
+    public function pushStatusLabel(string $status): string
+    {
+        return match ($status) {
             'on' => 'On',
             'blocked' => 'Blocked in system settings',
             default => 'Off',
@@ -82,9 +91,14 @@ class AccountScreen extends NativeComponent
 
     public function disablePush(): void
     {
-        $this->pushMessage = app(PushRegistration::class)->disable()
-            ? null
-            : 'Couldn\'t turn push off. Check your connection and try again.';
+        try {
+            $this->pushMessage = app(PushRegistration::class)->disable()
+                ? null
+                : 'Couldn\'t turn push off. Check your connection and try again.';
+        } catch (Unauthenticated) {
+            app(SignOut::class)->clearLocal();
+            $this->replace('/sign-in');
+        }
     }
 
     public function openSystemSettings(): void

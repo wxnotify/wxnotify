@@ -19,12 +19,16 @@
 
     <native:column class="w-full gap-2">
         <native:text class="text-base font-bold text-theme-on-background">Push notifications</native:text>
-        <native:text class="text-base text-theme-on-surface-variant">{{ $this->pushStatusLabel() }}</native:text>
+        @php($status = $this->pushStatus())
+        <native:text class="text-base text-theme-on-surface-variant">{{ $this->pushStatusLabel($status) }}</native:text>
 
-        @if ($this->pushStatus() === 'on')
+        @if ($status === 'on')
             <native:button label="Turn off" variant="secondary" @tap="disablePush" class="w-full" />
-        @elseif ($this->pushStatus() === 'blocked')
+        @elseif ($status === 'blocked')
             <native:button label="Open system settings" variant="secondary" @tap="openSystemSettings" class="w-full" />
+            @if ($this->pushWanted())
+                <native:button label="Turn off" variant="secondary" @tap="disablePush" class="w-full" />
+            @endif
         @else
             <native:button label="Turn on" variant="secondary" @tap="enablePush" class="w-full" />
         @endif
