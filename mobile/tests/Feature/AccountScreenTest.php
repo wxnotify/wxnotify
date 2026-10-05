@@ -3,9 +3,12 @@
 use App\Models\CachedAlert;
 use App\NativeComponents\AccountScreen;
 use App\Support\LocalCache;
+use App\Support\PushState;
 use App\Support\TokenStore;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Native\Mobile\Facades\PushNotifications;
+use Native\Mobile\Facades\System;
 use Native\Mobile\Testing\Native;
 
 $profile = ['id' => 5, 'name' => 'Pat Smith', 'email' => 'pat@example.com', 'tier' => ['value' => 'plus', 'label' => 'Plus'], 'unit_system' => 'imperial', 'timezone' => 'America/Chicago'];
@@ -71,4 +74,71 @@ test('a signed-out visitor is sent to sign in', function () {
     (new TokenStore)->forget();
 
     Native::test(AccountScreen::class)->assertReplacedWith('/sign-in');
+});
+
+test('the push row says Off with a Turn on button until push is enabled', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined');
+
+    Native::test(AccountScreen::class)
+        ->assertSee('Push notifications')
+        ->assertSee('Off')
+        ->assertSee('Turn on')
+        ->assertDontSee('Turn off')
+        ->assertSee('Choose which alerts go to this phone in your alert rules at wxnotify.com.');
+});
+
+test('the push row says On with a Turn off button while push is on and allowed', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    (new PushState)->markEnabled();
+
+    Native::test(AccountScreen::class)->assertSee('On')->assertSee('Turn off')->assertDontSee('Turn on');
+});
+
+test('Turn on enrolls the device', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined');
+    PushNotifications::shouldReceive('enroll')->once();
+
+    Native::test(AccountScreen::class)->tap('Turn on');
+
+    expect((new PushState)->wantsPush())->toBeTrue();
+});
+
+test('Turn off removes the phone from the server and flips the row', function () use ($profile) {
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/push-token' => Http::response(null, 204),
+    ]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    (new PushState)->markEnabled();
+
+    Native::test(AccountScreen::class)->tap('Turn off')->assertSee('Turn on');
+
+    expect((new PushState)->wantsPush())->toBeFalse();
+});
+
+test('Turn off that cannot reach the server says so and stays on', function () use ($profile) {
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/push-token' => Http::response([], 503),
+    ]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    (new PushState)->markEnabled();
+
+    Native::test(AccountScreen::class)->tap('Turn off')->assertSee('Couldn\'t turn push off')->assertSee('Turn off');
+
+    expect((new PushState)->wantsPush())->toBeTrue();
+});
+
+test('when the OS refused notifications the row points at the system settings', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('denied');
+    System::shouldReceive('appSettings')->once();
+
+    Native::test(AccountScreen::class)
+        ->assertSee('Blocked in system settings')
+        ->assertDontSee('Turn on')
+        ->tap('Open system settings');
 });

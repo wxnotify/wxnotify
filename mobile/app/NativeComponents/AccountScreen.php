@@ -4,11 +4,14 @@ namespace App\NativeComponents;
 
 use App\Exceptions\Api\ApiException;
 use App\Exceptions\Api\Unauthenticated;
+use App\Services\PushRegistration;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
+use App\Support\PushState;
 use Native\Mobile\Edge\NativeComponent;
+use Native\Mobile\Facades\System;
 
 /**
  * Who is signed in, their plan and the app version, plus sign out.
@@ -19,6 +22,8 @@ class AccountScreen extends NativeComponent
 
     /** @var array<string, mixed>|null */
     public ?array $profile = null;
+
+    public ?string $pushMessage = null;
 
     public function mount(): void
     {
@@ -45,6 +50,46 @@ class AccountScreen extends NativeComponent
         app(SignOut::class)();
 
         $this->replace('/sign-in');
+    }
+
+    /**
+     * 'on', 'off' or 'blocked' (the OS refused notifications, so only the system settings can change it).
+     */
+    public function pushStatus(): string
+    {
+        if (app(PushRegistration::class)->permission() === 'denied') {
+            return 'blocked';
+        }
+
+        return app(PushState::class)->wantsPush() ? 'on' : 'off';
+    }
+
+    public function pushStatusLabel(): string
+    {
+        return match ($this->pushStatus()) {
+            'on' => 'On',
+            'blocked' => 'Blocked in system settings',
+            default => 'Off',
+        };
+    }
+
+    public function enablePush(): void
+    {
+        $this->pushMessage = null;
+
+        app(PushRegistration::class)->enable();
+    }
+
+    public function disablePush(): void
+    {
+        $this->pushMessage = app(PushRegistration::class)->disable()
+            ? null
+            : 'Couldn\'t turn push off. Check your connection and try again.';
+    }
+
+    public function openSystemSettings(): void
+    {
+        System::appSettings();
     }
 
     public function appVersion(): string
