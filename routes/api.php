@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\AppTokenController;
 use App\Http\Controllers\Api\V1\LocationController;
+use App\Http\Controllers\Api\V1\LocationSharingController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\PushTokenController;
 use App\Http\Controllers\IngestEmwinProductController;
@@ -31,6 +32,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/alerts/{id}', [AlertController::class, 'show'])->whereNumber('id')->name('api.v1.alerts.show');
         Route::put('/push-token', [PushTokenController::class, 'update'])->name('api.v1.push-token.update');
         Route::delete('/push-token', [PushTokenController::class, 'destroy'])->name('api.v1.push-token.destroy');
+        Route::put('/location-sharing', [LocationSharingController::class, 'update'])->name('api.v1.location-sharing.update');
+        Route::get('/location-sharing', [LocationSharingController::class, 'show'])->name('api.v1.location-sharing.show');
+        Route::delete('/location-sharing', [LocationSharingController::class, 'destroy'])->name('api.v1.location-sharing.destroy');
         Route::delete('/auth/token', [AppTokenController::class, 'destroy'])->name('api.v1.auth.token.destroy');
     });
 

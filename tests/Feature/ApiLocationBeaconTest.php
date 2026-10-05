@@ -113,6 +113,8 @@ test('the two token abilities do not cross', function () {
     $this->withToken($this->beacon->plainTextToken)->putJson('/api/v1/push-token', ['token' => 'x', 'platform' => 'ios'])->assertForbidden();
     app('auth')->forgetGuards();
     $this->withToken($this->beacon->plainTextToken)->deleteJson('/api/v1/auth/token')->assertForbidden();
+    app('auth')->forgetGuards();
+    $this->withToken($this->beacon->plainTextToken)->getJson('/api/v1/location-sharing')->assertForbidden();
 });
 
 test('a request without a token is refused', function () {
