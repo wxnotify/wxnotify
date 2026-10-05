@@ -188,25 +188,31 @@ test('a load more while one is already running sends no extra request', function
     Http::assertSentCount(1);
 });
 
-test('a load more straight after a page loaded is ignored, and works again a moment later', function () {
+test('a load more within a second of a page loading is ignored, and works again after it', function () {
     Http::fake([
         'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(3)], 'CURSOR2')),
         'wx.test/api/v1/alerts?limit=25&before=CURSOR2' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
         'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response(feedResponse([apiEntry(1)])),
     ]);
 
+    $this->freezeTime();
+    $loadedAt = now();
+
     $screen = Native::test(AlertsScreen::class)
         ->call('loadMore')
         ->assertSet('loadingMore', false)
         ->assertSet('nextCursor', 'CURSOR1')
         ->call('loadMore')
-        ->assertDontSee('Tornado Warning 1')
         ->assertSet('nextCursor', 'CURSOR1');
 
     Http::assertSentCount(2);
 
-    $this->travel(2)->seconds();
+    $this->travelTo($loadedAt->copy()->addMilliseconds(999));
+    $screen->call('loadMore')->assertDontSee('Tornado Warning 1')->assertSet('nextCursor', 'CURSOR1');
 
+    Http::assertSentCount(2);
+
+    $this->travelTo($loadedAt->copy()->addMilliseconds(1001));
     $screen->call('loadMore')->assertSee('Tornado Warning 1')->assertSet('nextCursor', null);
 
     Http::assertSentCount(3);

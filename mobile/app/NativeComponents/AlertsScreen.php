@@ -128,7 +128,7 @@ class AlertsScreen extends NativeComponent
             $this->alerts = [...$this->alerts, ...$page['data']];
             $this->nextCursor = $page['meta']['next_cursor'] ?? null;
             $this->pagedBeyondFirst = true;
-            $this->lastPageLoadedAt = now()->toIso8601String();
+            $this->lastPageLoadedAt = now()->toRfc3339String(true);
             $this->offline = false;
             $this->error = null;
         } catch (Unauthenticated) {
@@ -146,7 +146,7 @@ class AlertsScreen extends NativeComponent
     private function loadedAPageJustNow(): bool
     {
         return $this->lastPageLoadedAt !== null
-            && Carbon::parse($this->lastPageLoadedAt)->diffInSeconds(now(), true) < self::LOAD_MORE_DEBOUNCE_SECONDS;
+            && Carbon::parse($this->lastPageLoadedAt)->diffInMilliseconds(now(), true) < self::LOAD_MORE_DEBOUNCE_SECONDS * 1000;
     }
 
     public function open(int $id): void
