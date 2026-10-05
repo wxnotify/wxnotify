@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Native\Mobile\Providers\BrowserServiceProvider;
 use Native\Mobile\Providers\GeolocationServiceProvider;
 use Native\Mobile\Providers\NetworkServiceProvider;
 use Native\Mobile\Providers\PushNotificationsServiceProvider;
@@ -48,6 +49,7 @@ class NativeServiceProvider extends ServiceProvider
             LocalNotificationsServiceProvider::class,
             NetworkServiceProvider::class,
             NativeUIServiceProvider::class,
+            BrowserServiceProvider::class,
 
         ];
     }
