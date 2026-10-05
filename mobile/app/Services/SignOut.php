@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\Api\ApiException;
 use App\Support\LocalCache;
+use App\Support\PushState;
 use App\Support\TokenStore;
 
 /**
@@ -16,6 +17,7 @@ class SignOut
         private TokenStore $tokens,
         private WxNotifyApi $api,
         private LocalCache $cache,
+        private PushState $push,
     ) {}
 
     public function __invoke(): void
@@ -34,5 +36,6 @@ class SignOut
         $this->tokens->forget();
         $this->tokens->clearPending();
         $this->cache->wipe();
+        $this->push->clear();
     }
 }

@@ -75,6 +75,16 @@ class WxNotifyApi
         $this->send(fn (PendingRequest $request) => $request->delete('/api/v1/auth/token'));
     }
 
+    public function registerPushToken(string $token, string $platform): void
+    {
+        $this->send(fn (PendingRequest $request) => $request->put('/api/v1/push-token', ['token' => $token, 'platform' => $platform]));
+    }
+
+    public function unregisterPushToken(): void
+    {
+        $this->send(fn (PendingRequest $request) => $request->delete('/api/v1/push-token'));
+    }
+
     /**
      * @param  Closure(PendingRequest): Response  $call
      * @return array<string, mixed>
