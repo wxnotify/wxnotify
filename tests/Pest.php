@@ -260,6 +260,42 @@ function chanFakePushService(bool $success = true, int $status = 201, bool $expi
 }
 
 /**
+ * Writes a throwaway service-account file, points the app at it and returns the file path and
+ * the public key to verify signed JWTs with. Remove the file in afterEach.
+ *
+ * @return array{path: string, public: string}
+ */
+function fcmUseCredentials(): array
+{
+    $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+    openssl_pkey_export($key, $privatePem);
+
+    $path = tempnam(sys_get_temp_dir(), 'fcm');
+    file_put_contents($path, json_encode([
+        'type' => 'service_account',
+        'project_id' => 'wx-test',
+        'client_email' => 'push@wx-test.iam.gserviceaccount.com',
+        'private_key' => $privatePem,
+    ]));
+
+    config(['services.firebase.service_account' => $path]);
+
+    return ['path' => $path, 'public' => openssl_pkey_get_details($key)['key']];
+}
+
+/**
+ * Fakes Google's token endpoint and the FCM send endpoint. Pass an Http::response() to change
+ * what the send endpoint answers.
+ */
+function fcmFakeGoogle(mixed $sendResponse = null): void
+{
+    Http::fake([
+        'oauth2.googleapis.com/token' => Http::response(['access_token' => 'ya29.test-access-token', 'expires_in' => 3600]),
+        'fcm.googleapis.com/*' => $sendResponse ?? Http::response(['name' => 'projects/wx-test/messages/1']),
+    ]);
+}
+
+/**
  * Http::fake() calls STACK -- the first matching stub wins, so faking the same
  * URL a second time in one test is silently ignored. Any test that re-fakes
  * (e.g. to try a second scenario after Cache::flush()) must start from a fresh
