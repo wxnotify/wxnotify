@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3386149e247c45f445ca747d8325feca",
+    "content-hash": "d32532447a765a666a26d652d3901538",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -2794,6 +2794,68 @@
             ],
             "description": "Secure storage plugin for NativePHP Mobile (Keychain/EncryptedSharedPreferences)",
             "time": "2026-09-03T18:26:20+00:00"
+        },
+        {
+            "name": "nativephp/mobile-ui",
+            "version": "0.7.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/NativePHP/mobile-ui.git",
+                "reference": "59b5c8a38f8359900cc336169c58b8dc28c7fe42"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/NativePHP/mobile-ui/zipball/59b5c8a38f8359900cc336169c58b8dc28c7fe42",
+                "reference": "59b5c8a38f8359900cc336169c58b8dc28c7fe42",
+                "shasum": ""
+            },
+            "require": {
+                "nativephp/mobile": "^4.5",
+                "php": "^8.3"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.24",
+                "orchestra/testbench": "^10.0",
+                "pestphp/pest": "^3.0"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Native\\Mobile\\UI\\NativeUIServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Native\\Mobile\\UI\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "NativePHP",
+                    "email": "support@nativephp.com"
+                }
+            ],
+            "description": "Native SwiftUI and Jetpack Composer components for NativePHP",
+            "support": {
+                "issues": "https://github.com/NativePHP/mobile-ui/issues",
+                "source": "https://github.com/NativePHP/mobile-ui/tree/0.7.0"
+            },
+            "funding": [
+                {
+                    "url": "https://nativephp.com/sponsor",
+                    "type": "other"
+                }
+            ],
+            "time": "2026-09-29T14:38:47+00:00"
         },
         {
             "name": "nesbot/carbon",

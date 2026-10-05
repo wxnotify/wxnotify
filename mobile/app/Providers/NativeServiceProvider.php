@@ -3,6 +3,13 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Native\Mobile\Providers\GeolocationServiceProvider;
+use Native\Mobile\Providers\NetworkServiceProvider;
+use Native\Mobile\Providers\PushNotificationsServiceProvider;
+use Native\Mobile\Providers\SecureStorageServiceProvider;
+use Native\Mobile\UI\NativeUIServiceProvider;
+use NativePHP\BackgroundTasks\BackgroundTasksServiceProvider;
+use NativePHP\LocalNotifications\LocalNotificationsServiceProvider;
 
 class NativeServiceProvider extends ServiceProvider
 {
@@ -29,23 +36,19 @@ class NativeServiceProvider extends ServiceProvider
      * This is a security measure to prevent transitive dependencies from
      * automatically registering plugins without your explicit consent.
      *
-     * @return array<int, class-string<\Illuminate\Support\ServiceProvider>>
+     * @return array<int, class-string<ServiceProvider>>
      */
     public function plugins(): array
     {
         return [
-            \Native\Mobile\Providers\GeolocationServiceProvider::class,
-            \Native\Mobile\Providers\SecureStorageServiceProvider::class,
-            \Native\Mobile\Providers\PushNotificationsServiceProvider::class,
-            \NativePHP\BackgroundTasks\BackgroundTasksServiceProvider::class,
-            \NativePHP\LocalNotifications\LocalNotificationsServiceProvider::class,
-            \Native\Mobile\Providers\NetworkServiceProvider::class,
-        
-        
-        
-        
-        
-        
+            GeolocationServiceProvider::class,
+            SecureStorageServiceProvider::class,
+            PushNotificationsServiceProvider::class,
+            BackgroundTasksServiceProvider::class,
+            LocalNotificationsServiceProvider::class,
+            NetworkServiceProvider::class,
+            NativeUIServiceProvider::class,
+
         ];
     }
 }
