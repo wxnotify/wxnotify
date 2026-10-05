@@ -85,6 +85,17 @@ test('an unlinked phone gets a 404 and nothing is written', function () {
     expect($this->location->fresh()->lat)->toBeNull();
 });
 
+test('a beacon token with no parent app token never reaches an unlinked location', function () {
+    $unlinked = Location::factory()->for($this->user)->mobileApp()->create(['label' => 'Signed out phone']);
+    $orphan = $this->user->createToken('Location beacon - orphan', ['location'], now()->addDays(90));
+
+    beaconPost($this, [beaconPoint()], $orphan->plainTextToken)->assertNotFound();
+
+    $fresh = $unlinked->fresh();
+    expect($fresh->lat)->toBeNull()
+        ->and($fresh->lng)->toBeNull();
+});
+
 test('a location that belongs to another account is never written', function () {
     $this->location->forceFill(['user_id' => User::factory()->create()->id])->save();
 
