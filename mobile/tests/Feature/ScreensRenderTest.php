@@ -69,7 +69,7 @@ test('the denied-callback screen renders an empty root while it redirects', func
         ->assertElement('column');
 });
 
-test('the alerts screen renders its title, tabs, tappable rows and a load-more button', function () {
+test('the alerts screen renders its title, tabs and a native list with tappable rows', function () {
     (new TokenStore)->put('9|secret');
     Http::fake(['wx.test/api/v1/alerts*' => Http::response(['data' => [renderableAlert()], 'meta' => ['next_cursor' => 'abc']])]);
 
@@ -78,10 +78,11 @@ test('the alerts screen renders its title, tabs, tappable rows and a load-more b
         ->assertHasTabBar()
         ->assertTabActive('Alerts')
         ->assertHasTab('Account')
-        ->assertElement('refreshable')
-        ->assertElement('pressable')
-        ->assertElement('text')
-        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Load more');
+        ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh'], $list['props']['on_end_reached']))
+        ->assertElement('list_item', fn (array $item) => isset($item['on_press']) && $item['props']['headline'] === 'Tornado Warning')
+        ->assertMissingElement('refreshable')
+        ->assertMissingElement('pressable')
+        ->assertMissingElement('button');
 });
 
 test('the alert detail renders its text and a product button', function () {

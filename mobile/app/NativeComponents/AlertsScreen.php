@@ -34,8 +34,11 @@ class AlertsScreen extends NativeComponent
 
     public ?string $syncedAt = null;
 
-    /** True once Load more has appended a page, so coming back to the screen must not reset the list. */
+    /** True once a further page has been appended, so coming back to the screen must not reset the list. */
     public bool $pagedBeyondFirst = false;
+
+    /** Guards loadMore(): the list fires end-reached for every row that appears near the bottom. */
+    public bool $loadingMore = false;
 
     public ?string $timezone = null;
 
@@ -98,11 +101,17 @@ class AlertsScreen extends NativeComponent
         }
     }
 
+    /**
+     * The list's end-reached handler. It fires repeatedly while the last rows are on screen, so it
+     * does nothing without a next cursor, while a page is already loading, or when the feed is offline.
+     */
     public function loadMore(): void
     {
-        if ($this->nextCursor === null) {
+        if ($this->nextCursor === null || $this->loadingMore) {
             return;
         }
+
+        $this->loadingMore = true;
 
         try {
             $page = app(WxNotifyApi::class)->alerts($this->nextCursor);
@@ -119,6 +128,8 @@ class AlertsScreen extends NativeComponent
             $this->offline = true;
         } catch (ApiException) {
             $this->error = 'WxNotify could not load more alerts. Try again.';
+        } finally {
+            $this->loadingMore = false;
         }
     }
 
@@ -141,6 +152,18 @@ class AlertsScreen extends NativeComponent
     public function channels(array $alert): string
     {
         return AlertPresenter::channels($alert);
+    }
+
+    /**
+     * The row's supporting text: the channels line, then a "Delivery problem" line when any send failed.
+     *
+     * @param  array<string, mixed>  $alert
+     */
+    public function supporting(array $alert): string
+    {
+        return $alert['has_failure']
+            ? $this->channels($alert)."\nDelivery problem"
+            : $this->channels($alert);
     }
 
     public function syncedLabel(): string

@@ -46,7 +46,17 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
         ->assertSee('Sent via Discord')
         ->assertSee('Tornado Warning 2')
         ->assertSee('Delivery problem')
-        ->assertElement('refreshable')
+        ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh'], $list['props']['on_end_reached'])
+            && $list['props']['end_reached_buffer'] === 5
+            && $list['props']['separator'] === true
+            && count($list['children']) === 2)
+        ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 1'
+            && $item['props']['overline'] === 'Weather Alerts · 5 minutes ago'
+            && $item['props']['supporting'] === 'Sent via Discord'
+            && ! isset($item['props']['supporting_color']))
+        ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 2'
+            && $item['props']['supporting'] === "Sent via Discord\nDelivery problem"
+            && $item['props']['supporting_color'] === '#B91C1C')
         ->assertSet('offline', false);
 
     expect(array_column((new LocalCache)->feed(), 'id'))->toBe([2, 1]);
@@ -108,7 +118,11 @@ test('a server error shows a retry message and keeps the cached feed', function 
 test('an empty feed says there are no alerts yet', function () {
     Http::fake(['*' => Http::response(feedResponse([]))]);
 
-    Native::test(AlertsScreen::class)->assertSee('No alerts yet');
+    Native::test(AlertsScreen::class)
+        ->assertSee('No alerts yet')
+        ->assertSee('Alerts you receive show up here')
+        ->assertMissingElement('list_item')
+        ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh']));
 });
 
 test('load more appends the next page with the cursor and stops when there is none', function () {
@@ -118,13 +132,68 @@ test('load more appends the next page with the cursor and stops when there is no
     ]);
 
     Native::test(AlertsScreen::class)
-        ->assertSee('Load more')
-        ->tap('Load more')
+        ->assertDontSee('Tornado Warning 1')
+        ->assertSet('nextCursor', 'CURSOR1')
+        ->call('loadMore')
         ->assertSee('Tornado Warning 1')
-        ->assertDontSee('Load more')
-        ->assertSet('nextCursor', null);
+        ->assertSet('nextCursor', null)
+        ->assertSet('pagedBeyondFirst', true)
+        ->assertMissingElement('button')
+        ->assertElement('list', fn (array $list) => count($list['children']) === 2);
 
     Http::assertSent(fn (Request $r) => str_contains($r->url(), 'before=CURSOR1'));
+});
+
+test('load more sends nothing without a next cursor and ignores repeated end-reached events', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(1)]))]);
+
+    Native::test(AlertsScreen::class)
+        ->call('loadMore')
+        ->call('loadMore')
+        ->assertSet('pagedBeyondFirst', false);
+
+    Http::assertSentCount(1);
+});
+
+test('a load more while one is already in flight sends no extra request', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1'))]);
+
+    Native::test(AlertsScreen::class)
+        ->set('loadingMore', true)
+        ->call('loadMore')
+        ->assertSet('pagedBeyondFirst', false)
+        ->assertSet('loadingMore', true);
+
+    Http::assertSentCount(1);
+});
+
+test('a finished load more releases the guard so the next page can load', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(3)], 'CURSOR2')),
+        'wx.test/api/v1/alerts?limit=25&before=CURSOR2' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
+        'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response(feedResponse([apiEntry(1)])),
+    ]);
+
+    Native::test(AlertsScreen::class)
+        ->call('loadMore')
+        ->assertSet('loadingMore', false)
+        ->call('loadMore')
+        ->assertSee('Tornado Warning 1')
+        ->assertSet('nextCursor', null);
+
+    Http::assertSentCount(3);
+});
+
+test('a failed load more releases the guard so a later one can retry', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
+        'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response([], 500),
+    ]);
+
+    Native::test(AlertsScreen::class)
+        ->call('loadMore')
+        ->assertSet('loadingMore', false)
+        ->assertSet('nextCursor', 'CURSOR1');
 });
 
 test('load more is unavailable offline', function () {
@@ -132,7 +201,7 @@ test('load more is unavailable offline', function () {
 
     $screen = Native::test(AlertsScreen::class);
     $this->network->connected = false;
-    $screen->tap('Load more')->assertSet('offline', true);
+    $screen->call('loadMore')->assertSet('offline', true);
 
     Http::assertSentCount(1);
 });
@@ -155,7 +224,7 @@ test('coming back from a detail keeps the pages already loaded and sends no requ
         'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response(feedResponse([apiEntry(1)])),
     ]);
 
-    $screen = Native::test(AlertsScreen::class)->tap('Load more');
+    $screen = Native::test(AlertsScreen::class)->call('loadMore');
 
     $this->travel(2)->minutes();
 
@@ -188,7 +257,7 @@ test('a successful refresh after paging starts the list over from the first page
     ]);
 
     Native::test(AlertsScreen::class)
-        ->tap('Load more')
+        ->call('loadMore')
         ->assertSet('pagedBeyondFirst', true)
         ->call('refresh')
         ->assertSet('pagedBeyondFirst', false)
@@ -234,9 +303,9 @@ test('a successful load more after a failed one clears the error', function () {
     ]);
 
     Native::test(AlertsScreen::class)
-        ->tap('Load more')
+        ->call('loadMore')
         ->assertSee('could not load more alerts')
-        ->tap('Load more')
+        ->call('loadMore')
         ->assertDontSee('could not load more alerts')
         ->assertSee('Tornado Warning 1');
 });

@@ -21,29 +21,22 @@
         </native:row>
     @endif
 
-    {{-- Un-prefixed on purpose: native:validate's element list predates refreshable and pressable. --}}
-    <refreshable @refresh="refresh">
+    {{-- Un-prefixed on purpose: native:validate's element list predates list and list-item (<native:list> renders the same tree). --}}
+    <list separator on-refresh="refresh" on-end-reached="loadMore" :end-reached-buffer="5" class="w-full flex-1">
         @forelse ($alerts as $alert)
-            <pressable @tap="open({{ $alert['id'] }})" key="alert-{{ $alert['id'] }}" class="w-full">
-                <native:column class="w-full p-4 gap-1">
-                    <native:text class="text-base font-semibold text-theme-on-background">{{ $alert['subject'] }}</native:text>
-                    <native:text class="text-sm text-theme-on-surface-variant">{{ $this->subtitle($alert) }}</native:text>
-                    <native:text class="text-sm text-theme-on-surface-variant">{{ $this->channels($alert) }}</native:text>
-                    @if ($alert['has_failure'])
-                        <native:text class="text-sm text-theme-destructive">Delivery problem</native:text>
-                    @endif
-                </native:column>
-            </pressable>
-            <native:divider></native:divider>
+            <list-item
+                key="alert-{{ $alert['id'] }}"
+                headline="{{ $alert['subject'] }}"
+                overline="{{ $this->subtitle($alert) }}"
+                :supporting="$this->supporting($alert)"
+                :supportingColor="$alert['has_failure'] ? theme('destructive') : null"
+                @tap="open({{ $alert['id'] }})"
+            ></list-item>
         @empty
             <native:column class="w-full p-6 items-center gap-2">
                 <native:text class="text-lg font-semibold text-theme-on-background">No alerts yet</native:text>
                 <native:text class="text-sm text-theme-on-surface-variant text-center">Alerts you receive show up here once one of your rules matches.</native:text>
             </native:column>
         @endforelse
-
-        @if ($nextCursor !== null)
-            <native:button label="Load more" variant="secondary" @tap="loadMore" class="m-4" />
-        @endif
-    </refreshable>
+    </list>
 </native:column>
