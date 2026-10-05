@@ -183,7 +183,7 @@ function stubPushOff(): void
 
 function sharingStatus(array $overrides = []): array
 {
-    return $overrides + ['shareActive' => true, 'shareIntervalMs' => 300000, 'lastShareAt' => '2026-10-05T18:30:00+00:00', 'authorization' => 'always'];
+    return $overrides + ['id' => 'wxnotify-location', 'shareActive' => true, 'shareIntervalMs' => 300000, 'lastShareAt' => '2026-10-05T18:30:00+00:00', 'lastShareStatus' => 204, 'authorization' => 'always'];
 }
 
 test('the location row says Off with a Share location button that opens the explainer', function () use ($profile) {
@@ -211,6 +211,14 @@ test('the location row shows the interval, the last shared time and Stop sharing
         ->assertSee('Stop sharing')
         ->assertDontSee('Share location')
         ->assertDontSee('Stops when you close the app');
+});
+
+test('a rejected share does not show a last shared time', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    $this->geolocation->status = sharingStatus(['lastShareStatus' => 401]);
+
+    Native::test(AccountScreen::class)->assertSee('about every 5 minutes')->assertDontSee('last shared');
 });
 
 test('a malformed last shared time is left out instead of breaking the screen', function () use ($profile) {

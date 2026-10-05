@@ -5,6 +5,7 @@ namespace Tests\Fakes;
 use DateTimeInterface;
 use NativePHP\Geolocation\Geolocation;
 use NativePHP\Geolocation\PendingSharedLocationWatch;
+use Throwable;
 
 /**
  * Records what the app asks the native location layer to do. The builders it returns are real
@@ -18,8 +19,25 @@ class RecordingGeolocation extends Geolocation
     /** @var list<array{id: string, clearBuffer: bool}> */
     public array $stopped = [];
 
+    /** @var list<array{id: string, intervalMs: int, minDistance: float|int}> */
+    public array $started = [];
+
+    /** @var list<array{id: string, upTo: int}> */
+    public array $trimmed = [];
+
     /** @var array<string, mixed>|null */
     public ?array $status = null;
+
+    /** Thrown by sharePosition(), to simulate a native failure while starting the beacon. */
+    public ?Throwable $throwOnStart = null;
+
+    /** Thrown by stopBackgroundWatch(), to simulate a native failure while stopping it. */
+    public ?Throwable $throwOnStop = null;
+
+    public function watchPosition(bool $fineAccuracy = false): PendingSharedLocationWatch
+    {
+        return (new RecordingSharedWatch($this))->fineAccuracy($fineAccuracy);
+    }
 
     public function sharePosition(
         string $url,
@@ -29,6 +47,10 @@ class RecordingGeolocation extends Geolocation
         bool $stopWatchOnExpiry = false,
         bool $fineAccuracy = true,
     ): PendingSharedLocationWatch {
+        if ($this->throwOnStart !== null) {
+            throw $this->throwOnStart;
+        }
+
         $this->shared[] = compact('url', 'token', 'interval', 'expiresAt', 'fineAccuracy');
 
         return parent::sharePosition($url, $token, $interval, $expiresAt, $stopWatchOnExpiry, $fineAccuracy);
@@ -36,8 +58,17 @@ class RecordingGeolocation extends Geolocation
 
     public function stopBackgroundWatch(string $id, bool $clearBuffer = false): void
     {
+        if ($this->throwOnStop !== null) {
+            throw $this->throwOnStop;
+        }
+
         $this->stopped[] = ['id' => $id, 'clearBuffer' => $clearBuffer];
         $this->status = null;
+    }
+
+    public function trimWatch(string $id, int $upTo): void
+    {
+        $this->trimmed[] = ['id' => $id, 'upTo' => $upTo];
     }
 
     public function backgroundWatchStatus(): ?array

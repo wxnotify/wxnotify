@@ -13,6 +13,12 @@ beforeEach(function () {
 test('the explainer says what is shared and offers Share and Not now', function () {
     Native::test(LocationPrompt::class)
         ->assertSee('Share this phone\'s location')
+        ->assertSee('only the latest position every few minutes')
+        ->assertSee('no history')
+        ->assertSee('choose "Always" or "Allow all the time" if your phone offers it')
+        ->assertSee('sharing may stop when you close the app')
+        ->assertSee('Android shows a notification while sharing is on')
+        ->assertDontSee('about every 5 minutes')
         ->assertSee('Share my location')
         ->assertSee('Not now');
 });

@@ -418,7 +418,7 @@ test('opening the feed while location sharing is wanted checks it with the serve
         'wx.test/api/v1/alerts*' => Http::response(feedResponse([])),
         'wx.test/api/v1/location-sharing' => Http::response(['data' => ['linked' => true, 'location_id' => 7, 'interval_seconds' => 300]]),
     ]);
-    $this->geolocation->status = ['shareActive' => true, 'shareIntervalMs' => 300000, 'authorization' => 'always'];
+    $this->geolocation->status = ['id' => 'wxnotify-location', 'shareActive' => true, 'shareIntervalMs' => 300000, 'lastShareStatus' => 204, 'authorization' => 'always'];
     (new TokenStore)->putBeaconToken('12|b', 'https://wx.test/api/v1/location');
 
     Native::test(AlertsScreen::class);
