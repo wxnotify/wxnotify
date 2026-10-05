@@ -165,6 +165,33 @@ test('an active scheduled alert on a mobile location whose device is gone is a d
     ]);
 });
 
+test('an unlinked app location is a device problem reported once, while a linked one without a position is a position problem', function () {
+    $token = $this->user->createToken('Pixel 9', ['app'])->accessToken;
+    $unlinked = Location::factory()->mobileApp()->for($this->user)->create(['label' => 'Phone']);
+    $linked = Location::factory()->mobileApp($token)->for($this->user)->create(['label' => 'Pixel']);
+    channeledAlert($this->user, $unlinked, AlertRule::factory()->dailySummary(), ['name' => 'Phone summary']);
+    channeledAlert($this->user, $linked, AlertRule::factory()->dailySummary(), ['name' => 'Pixel summary']);
+
+    $rows = attentionRows($this->user);
+
+    expect(array_map(fn (array $row): string => "{$row['kind']}: {$row['subject']}", $rows))->toBe([
+        'location_device_missing: Phone summary',
+        'location_no_position: Pixel summary',
+    ])->and($rows[0])->toMatchArray([
+        'severity' => 'warning',
+        'detail' => "can't follow Phone: no phone is sharing its location any more",
+        'target' => ['type' => 'location', 'id' => $unlinked->id],
+    ])->and($rows[1]['detail'])->toBe('is waiting for Pixel to report a position');
+});
+
+test('a linked app location with a position raises no row', function () {
+    $token = $this->user->createToken('Pixel 9', ['app'])->accessToken;
+    $linked = Location::factory()->mobileApp($token)->withFix(40.0, -105.0)->for($this->user)->create();
+    channeledAlert($this->user, $linked, AlertRule::factory()->dailySummary());
+
+    expect(attentionRows($this->user))->toBe([]);
+});
+
 test('a missing device on an inactive alert or a stationary location is not reported as a device problem', function () {
     $gone = Location::factory()->mobile()->for($this->user)->create(['traccar_device_missing_at' => now()]);
     AlertRule::factory()->dailySummary()->for($this->user)->for($gone)->create(['is_active' => false, 'name' => 'Paused']);

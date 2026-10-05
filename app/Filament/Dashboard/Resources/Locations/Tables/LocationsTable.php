@@ -2,6 +2,7 @@
 
 namespace App\Filament\Dashboard\Resources\Locations\Tables;
 
+use App\Enums\MobileSource;
 use App\Models\Location;
 use App\Support\LocationDeletionGuard;
 use Carbon\CarbonInterface;
@@ -28,13 +29,17 @@ class LocationsTable
                     ->badge(),
                 TextColumn::make('position_updated')
                     ->label('Position updated')
-                    ->state(fn (Location $record): CarbonInterface|string|null => $record->hasMissingDevice() ? 'Device not found on server' : $record->positionLocatedAt())
+                    ->state(fn (Location $record): CarbonInterface|string|null => $record->hasMissingDevice()
+                        ? ($record->mobile_source === MobileSource::App ? 'No phone is sharing' : 'Device not found on server')
+                        : $record->positionLocatedAt())
                     ->formatStateUsing(fn (CarbonInterface|string|null $state): ?string => $state instanceof CarbonInterface ? $state->diffForHumans() : $state)
                     ->icon(fn (Location $record): ?Heroicon => $record->hasMissingDevice() ? Heroicon::OutlinedExclamationTriangle : null)
                     ->color(fn (Location $record): ?string => $record->hasMissingDevice() ? 'danger' : null)
-                    ->tooltip(fn (Location $record): ?string => $record->hasMissingDevice()
-                        ? 'This device no longer exists on the Traccar server. Edit this location and pick its device again.'
-                        : null)
+                    ->tooltip(fn (Location $record): ?string => match (true) {
+                        ! $record->hasMissingDevice() => null,
+                        $record->mobile_source === MobileSource::App => 'No phone is sharing this location any more (it signed out or stopped sharing). Turn on location sharing in the app to link a phone again.',
+                        default => 'This device no longer exists on the Traccar server. Edit this location and pick its device again.',
+                    })
                     ->placeholder('—')
                     ->toggleable(),
                 TextColumn::make('address')

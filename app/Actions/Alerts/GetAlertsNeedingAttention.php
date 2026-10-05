@@ -4,6 +4,7 @@ namespace App\Actions\Alerts;
 
 use App\Enums\AlertCategory;
 use App\Enums\LocationType;
+use App\Enums\MobileSource;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
@@ -172,9 +173,11 @@ class GetAlertsNeedingAttention
     }
 
     /**
-     * Active scheduled alerts on a mobile location whose Traccar device no longer
-     * exists on the server (see PollTraccarPositions): it is never updated again until
-     * the subscriber picks its device again, whether or not it ever had a position.
+     * Active scheduled alerts on a mobile location that lost its source: its Traccar
+     * device no longer exists on the server (see PollTraccarPositions), or its app
+     * location has no phone linked any more. It is never updated again until the
+     * subscriber picks its device again or a phone shares it, whether or not it ever
+     * had a position.
      *
      * @return list<array<string, mixed>>
      */
@@ -184,7 +187,9 @@ class GetAlertsNeedingAttention
             ->where('user_id', $user->id)
             ->where('is_active', true)
             ->whereIn('category', array_map(fn (AlertCategory $category): string => $category->value, self::SCHEDULED))
-            ->whereHas('location', fn ($query) => $query->where('type', LocationType::Mobile->value)->whereNotNull('traccar_device_missing_at'))
+            ->whereHas('location', fn ($query) => $query->where('type', LocationType::Mobile->value)->where(fn ($q) => $q
+                ->whereNotNull('traccar_device_missing_at')
+                ->orWhere(fn ($app) => $app->where('mobile_source', MobileSource::App->value)->whereNull('app_token_id'))))
             ->with(['location', 'products', 'user'])
             ->get()
             ->sortBy(fn (AlertRule $alert): string => mb_strtolower($alert->displayName()))
@@ -192,7 +197,9 @@ class GetAlertsNeedingAttention
                 'kind' => 'location_device_missing',
                 'severity' => 'warning',
                 'subject' => $alert->displayName(),
-                'detail' => "can't follow ".$alert->location->label.': its Traccar device no longer exists on the server',
+                'detail' => "can't follow ".$alert->location->label.($alert->location->mobile_source === MobileSource::App
+                    ? ': no phone is sharing its location any more'
+                    : ': its Traccar device no longer exists on the server'),
                 'target' => ['type' => 'location', 'id' => $alert->location->id],
             ])
             ->values()
@@ -208,7 +215,9 @@ class GetAlertsNeedingAttention
             ->where('user_id', $user->id)
             ->where('is_active', true)
             ->whereIn('category', array_map(fn (AlertCategory $category): string => $category->value, self::SCHEDULED))
-            ->whereHas('location', fn ($query) => $query->where('type', LocationType::Mobile->value)->whereNull('traccar_device_missing_at')->where(fn ($q) => $q->whereNull('lat')->orWhereNull('lng')))
+            ->whereHas('location', fn ($query) => $query->where('type', LocationType::Mobile->value)->whereNull('traccar_device_missing_at')
+                ->where(fn ($q) => $q->whereNull('mobile_source')->orWhere('mobile_source', '!=', MobileSource::App->value)->orWhereNotNull('app_token_id'))
+                ->where(fn ($q) => $q->whereNull('lat')->orWhereNull('lng')))
             ->with(['location', 'products', 'user'])
             ->get()
             ->sortBy(fn (AlertRule $alert): string => mb_strtolower($alert->displayName()))

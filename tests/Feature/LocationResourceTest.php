@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\MobileSource;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\Locations\LocationResource;
 use App\Filament\Dashboard\Resources\Locations\Pages\CreateLocation;
@@ -408,4 +409,76 @@ test('a stationary location\'s edit page has no last known address line', functi
     $stationary = Location::factory()->for($this->user)->create(['address' => '1 Main St']);
 
     livewire(EditLocation::class, ['record' => $stationary->id])->assertDontSee('Last known address');
+});
+
+test('editing an app location saves its label and interval with no Traccar fields, and keeps its source and phone', function () {
+    $token = $this->user->createToken('Pixel 9', ['app'])->accessToken;
+    $location = Location::factory()->mobileApp($token)->for($this->user)->create(['label' => 'My phone']);
+
+    livewire(EditLocation::class, ['record' => $location->id])
+        ->assertFormSet(['mobile_source' => 'app'])
+        ->fillForm(['label' => 'Pixel 9', 'mobile_update_interval_minutes' => 10])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $location->refresh();
+    expect($location->label)->toBe('Pixel 9')
+        ->and($location->mobile_update_interval_minutes)->toBe(10)
+        ->and($location->mobile_source)->toBe(MobileSource::App)
+        ->and($location->app_token_id)->toBe($token->id)
+        ->and($location->traccar_server_id)->toBeNull()
+        ->and($location->traccar_device_id)->toBeNull();
+});
+
+test('editing an unlinked app location keeps it app-sourced and unlinked', function () {
+    $location = Location::factory()->mobileApp()->for($this->user)->create();
+
+    livewire(EditLocation::class, ['record' => $location->id])
+        ->fillForm(['mobile_update_interval_minutes' => 30])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($location->refresh())
+        ->mobile_source->toBe(MobileSource::App)
+        ->app_token_id->toBeNull()
+        ->mobile_update_interval_minutes->toBe(30);
+});
+
+test('the Traccar server and device fields are absent for an app location and present for a Traccar one', function () {
+    $app = Location::factory()->mobileApp()->for($this->user)->create();
+    $traccar = Location::factory()->mobile()->for($this->user)->create();
+
+    livewire(EditLocation::class, ['record' => $app->id])
+        ->assertFormFieldIsHidden('traccar_server_id')
+        ->assertFormFieldIsHidden('traccar_device_id')
+        ->assertSee('WxNotify app — not linked to a phone');
+
+    livewire(EditLocation::class, ['record' => $traccar->id])
+        ->assertFormFieldIsVisible('traccar_server_id')
+        ->assertFormFieldIsVisible('traccar_device_id')
+        ->assertDontSee('WxNotify app');
+});
+
+test('an app location names its phone as the source, or says it is not linked to one', function () {
+    $token = $this->user->createToken('Pixel 9', ['app'])->accessToken;
+    $linked = Location::factory()->mobileApp($token)->for($this->user)->create();
+    $unlinked = Location::factory()->mobileApp()->for($this->user)->create();
+
+    livewire(EditLocation::class, ['record' => $linked->id])
+        ->assertSee('WxNotify app — Pixel 9')
+        ->assertSee('The app re-reads this each time it opens');
+
+    livewire(EditLocation::class, ['record' => $unlinked->id])
+        ->assertSee('WxNotify app — not linked to a phone');
+});
+
+test('the Position updated column says no phone is sharing for an unlinked app location and shows the fix time for a linked one', function () {
+    $this->travelTo(now()->startOfSecond());
+    $token = $this->user->createToken('Pixel 9', ['app'])->accessToken;
+    $unlinked = Location::factory()->mobileApp()->for($this->user)->create();
+    $linked = Location::factory()->mobileApp($token)->for($this->user)->create(['mobile_position_fixed_at' => now()->subMinutes(7)]);
+
+    livewire(ListLocations::class)
+        ->assertTableColumnFormattedStateSet('position_updated', 'No phone is sharing', $unlinked)
+        ->assertTableColumnFormattedStateSet('position_updated', '7 minutes ago', $linked);
 });

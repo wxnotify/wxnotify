@@ -107,6 +107,9 @@ class LocationForm
     private static function mobileFields(): array
     {
         $visible = fn (Get $get): bool => $get('type') === LocationType::Mobile->value;
+        $isApp = fn (Get $get): bool => $get('mobile_source') === MobileSource::App->value;
+        $traccarVisible = fn (Get $get): bool => $visible($get) && ! $isApp($get);
+        $appVisible = fn (Get $get): bool => $visible($get) && $isApp($get);
 
         return [
             Hidden::make('mobile_source')
@@ -116,10 +119,10 @@ class LocationForm
                 ->label('Traccar server')
                 ->options(fn (): array => auth()->user()->traccarServers()->pluck('label', 'id')->all())
                 ->exists('traccar_servers', 'id', fn (Exists $rule): Exists => $rule->where('user_id', auth()->id()))
-                ->required($visible)
+                ->required($traccarVisible)
                 ->live()
                 ->afterStateUpdated(fn (Set $set) => $set('traccar_device_id', null))
-                ->visible($visible)
+                ->visible($traccarVisible)
                 ->helperText(fn (): ?string => auth()->user()->traccarServers()->exists()
                     ? null
                     : 'No Traccar servers yet — add one under Tools → Traccar Servers first.'),
@@ -130,7 +133,7 @@ class LocationForm
                 ->description(fn (?Location $record): string => 'The device linked here no longer exists on the Traccar server'
                     .($record?->traccar_device_missing_at !== null ? ' (first noticed '.$record->traccar_device_missing_at->diffForHumans().')' : '')
                     .', so this location is not being updated. Pick its device again below.')
-                ->visible(fn (?Location $record, Get $get): bool => $visible($get)
+                ->visible(fn (?Location $record, Get $get): bool => $traccarVisible($get)
                     && $record?->hasMissingDevice() === true
                     && (int) $get('traccar_device_id') === (int) $record->traccar_device_id
                     && (int) $get('traccar_server_id') === (int) $record->traccar_server_id)
@@ -138,18 +141,24 @@ class LocationForm
             Select::make('traccar_device_id')
                 ->label('Device')
                 ->options(fn (Get $get): array => self::deviceOptions($get('traccar_server_id')))
-                ->required($visible)
+                ->required($traccarVisible)
                 ->live()
                 ->afterStateUpdated(function (Set $set, Get $get): void {
                     $devices = self::deviceOptions($get('traccar_server_id'));
                     $set('traccar_device_name', $devices[$get('traccar_device_id')] ?? null);
                 })
-                ->visible($visible)
+                ->visible($traccarVisible)
                 ->helperText(fn (Get $get): ?string => $get('traccar_server_id') !== null && self::deviceOptions($get('traccar_server_id')) === []
                     ? 'Couldn\'t reach this server, or it has no devices — check its URL and token under Tools → Traccar Servers.'
                     : null),
             Hidden::make('traccar_device_name')
-                ->visible($visible),
+                ->visible($traccarVisible),
+            Placeholder::make('mobile_app_source')
+                ->label('Source')
+                ->content(fn (?Location $record): string => $record?->appToken !== null
+                    ? 'WxNotify app — '.$record->appToken->name
+                    : 'WxNotify app — not linked to a phone. Turn on location sharing in the app to link a phone again.')
+                ->visible($appVisible),
             Select::make('mobile_update_interval_minutes')
                 ->label('Update every')
                 ->options([
@@ -163,7 +172,9 @@ class LocationForm
                 ->default(15)
                 ->required($visible)
                 ->visible($visible)
-                ->helperText('Tighter intervals sharpen how current this location is, at the cost of more Traccar/device battery use.'),
+                ->helperText(fn (Get $get): string => $isApp($get)
+                    ? 'The app re-reads this each time it opens; tighter intervals sharpen how current this location is at the cost of the phone\'s battery.'
+                    : 'Tighter intervals sharpen how current this location is, at the cost of more Traccar/device battery use.'),
             Placeholder::make('mobile_last_known_address')
                 ->label('Last known address')
                 ->content(fn (?Location $record): string => filled($record?->address) ? (string) $record->address : 'Not looked up yet — it appears after the next position update.')
