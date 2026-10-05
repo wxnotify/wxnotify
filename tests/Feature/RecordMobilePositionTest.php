@@ -27,18 +27,30 @@ test('a fix sets the position, the fix time and the receipt time', function () {
 });
 
 test('a fix older than the stored one is ignored', function () {
-    $this->location->forceFill(['lat' => 35.2, 'lng' => -97.4, 'mobile_position_fixed_at' => now()])->save();
+    $this->travelTo(now()->startOfSecond());
+    $storedFixAt = now();
+    $this->location->forceFill(['lat' => 35.2, 'lng' => -97.4, 'mobile_position_fixed_at' => $storedFixAt])->save();
 
     $applied = app(RecordMobilePosition::class)($this->location, 10.0, 10.0, now()->subHour());
 
-    expect($applied)->toBeFalse()->and((float) $this->location->fresh()->lat)->toBe(35.2);
+    $fresh = $this->location->fresh();
+    expect($applied)->toBeFalse()
+        ->and((float) $fresh->lat)->toBe(35.2)
+        ->and((float) $fresh->lng)->toBe(-97.4)
+        ->and($fresh->mobile_position_fixed_at->equalTo($storedFixAt))->toBeTrue();
 });
 
 test('a fix with the same time as the stored one is applied again', function () {
-    $this->freezeTime();
+    // Whole seconds, so the stored fix time and the incoming one are exactly equal.
+    $this->travelTo(now()->startOfSecond());
     $this->location->forceFill(['lat' => 35.2, 'lng' => -97.4, 'mobile_position_fixed_at' => now()])->save();
 
-    expect(app(RecordMobilePosition::class)($this->location, 35.3, -97.5, now()))->toBeTrue();
+    $applied = app(RecordMobilePosition::class)($this->location, 35.3, -97.5, now());
+
+    $fresh = $this->location->fresh();
+    expect($applied)->toBeTrue()
+        ->and((float) $fresh->lat)->toBe(35.3)
+        ->and((float) $fresh->lng)->toBe(-97.5);
 });
 
 test('recording a position writes no activity row', function () {
