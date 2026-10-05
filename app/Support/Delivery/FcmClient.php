@@ -22,6 +22,13 @@ class FcmClient
     /** A weather alert that could not be delivered within an hour is stale: FCM drops it (default 4 weeks). */
     private const TTL_SECONDS = 3600;
 
+    /**
+     * The high-importance channel the nativephp firebase plugin creates in its service. Without it
+     * Android shows a background push in the SDK's fallback "Miscellaneous" channel (default
+     * importance, no heads-up banner), which is wrong for a weather alert.
+     */
+    private const ANDROID_CHANNEL = 'fcm_default_channel';
+
     private const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
     /**
@@ -48,7 +55,11 @@ class FcmClient
                     'token' => $deviceToken,
                     'notification' => ['title' => $title, 'body' => $body],
                     'data' => (object) $data,
-                    'android' => ['priority' => 'HIGH', 'ttl' => self::TTL_SECONDS.'s'],
+                    'android' => [
+                        'priority' => 'HIGH',
+                        'ttl' => self::TTL_SECONDS.'s',
+                        'notification' => ['channel_id' => self::ANDROID_CHANNEL],
+                    ],
                     'apns' => [
                         'headers' => ['apns-expiration' => (string) (now()->timestamp + self::TTL_SECONDS)],
                         'payload' => ['aps' => ['sound' => 'default']],

@@ -29,7 +29,7 @@ test('a message goes to the FCM v1 API with a bearer token and the alert as a no
         && (array) $request['message']['data'] === ['url' => '/']
         && $request['message']['android']['priority'] === 'HIGH'
         && $request['message']['apns']['payload']['aps']['sound'] === 'default'
-        && ! isset($request['message']['android']['notification']['channel_id']));
+        && $request['message']['android']['notification']['channel_id'] === 'fcm_default_channel');
 });
 
 test('an alert with no extra data sends data as an empty JSON object, not a list', function () {
