@@ -5,6 +5,7 @@ use App\NativeComponents\AlertDetail;
 use App\NativeComponents\AlertsScreen;
 use App\NativeComponents\AuthCallback;
 use App\NativeComponents\AuthDenied;
+use App\NativeComponents\PushPrompt;
 use App\NativeComponents\SignInScreen;
 use App\Providers\NativeServiceProvider;
 use App\Support\TokenStore;
@@ -59,6 +60,15 @@ test('the callback screen renders a spinner while signing in and a retry button 
         ->assertElement('activity_indicator')
         ->assertElement('text')
         ->assertMissingElement('button');
+});
+
+test('the push prompt renders its copy and both choices', function () {
+    (new TokenStore)->put('9|secret');
+
+    Native::test(PushPrompt::class)
+        ->assertElement('text')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Enable notifications')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Not now');
 });
 
 test('the denied-callback screen renders an empty root while it redirects', function () {

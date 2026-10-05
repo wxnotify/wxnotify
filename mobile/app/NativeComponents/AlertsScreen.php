@@ -7,6 +7,7 @@ use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Unauthenticated;
 use App\Icons\Android;
 use App\Icons\Ios;
+use App\Services\PushRegistration;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\AlertPresenter;
@@ -62,6 +63,8 @@ class AlertsScreen extends NativeComponent
         $this->syncedAt = $cache->syncedAt()?->toIso8601String();
 
         $this->refresh();
+
+        app(PushRegistration::class)->refreshIfDue();
     }
 
     /**

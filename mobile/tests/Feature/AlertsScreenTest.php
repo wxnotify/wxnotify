@@ -2,10 +2,13 @@
 
 use App\NativeComponents\AlertsScreen;
 use App\Support\LocalCache;
+use App\Support\PushState;
 use App\Support\TokenStore;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Native\Mobile\Facades\PushNotifications;
+use Native\Mobile\Facades\System;
 use Native\Mobile\Testing\Native;
 
 function apiEntry(int $id, array $overrides = []): array
@@ -50,6 +53,20 @@ test('a signed-out visitor is sent to sign in', function () {
     (new TokenStore)->forget();
 
     Native::test(AlertsScreen::class)->assertReplacedWith('/sign-in');
+});
+
+test('opening the feed while push is on re-registers the token once a day', function () {
+    (new PushState)->markEnabled();
+    PushNotifications::shouldReceive('getToken')->andReturn('fcm-1');
+    System::shouldReceive('isIos')->andReturn(false);
+    Http::fake([
+        'wx.test/api/v1/alerts*' => Http::response(feedResponse([])),
+        'wx.test/api/v1/push-token' => Http::response(null, 204),
+    ]);
+
+    Native::test(AlertsScreen::class);
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'PUT' && $r->url() === 'https://wx.test/api/v1/push-token');
 });
 
 test('the feed loads from the server, shows each alert, and refreshes the cache', function () {

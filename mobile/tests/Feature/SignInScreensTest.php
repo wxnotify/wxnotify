@@ -5,6 +5,7 @@ use App\NativeComponents\AuthDenied;
 use App\NativeComponents\SignInScreen;
 use App\Support\TokenStore;
 use Illuminate\Support\Facades\Http;
+use Native\Mobile\Facades\PushNotifications;
 use Native\Mobile\Testing\Native;
 
 test('the sign-in screen offers one sign-in button that opens the browser handoff', function () {
@@ -31,6 +32,14 @@ test('a valid callback signs the subscriber in and replaces the screen with the 
     Native::test(AuthCallback::class, ['code' => 'c', 'state' => 'state-1'])->assertReplacedWith('/');
 
     expect((new TokenStore)->token())->toBe('5|abc');
+});
+
+test('a valid callback goes to the push prompt while the subscriber has not decided', function () {
+    (new TokenStore)->begin('v', 'state-1');
+    Http::fake(['*' => Http::response(['token' => '5|abc', 'expires_at' => '2027-01-01T00:00:00+00:00', 'user' => ['id' => 5]])]);
+    PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined');
+
+    Native::test(AuthCallback::class, ['code' => 'c', 'state' => 'state-1'])->assertReplacedWith('/enable-push');
 });
 
 test('a callback that cannot complete shows an error with a way back', function () {
