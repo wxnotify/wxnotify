@@ -2,6 +2,7 @@
 
 use App\Providers\NativeServiceProvider;
 use Native\Mobile\Providers\BrowserServiceProvider;
+use Native\Mobile\Providers\GeolocationServiceProvider;
 use Native\Mobile\Providers\NetworkServiceProvider;
 use Native\Mobile\Providers\PushNotificationsServiceProvider;
 use Native\Mobile\Providers\SecureStorageServiceProvider;
@@ -16,6 +17,7 @@ test('every native capability the app calls has its plugin registered for the na
     expect((new NativeServiceProvider(app()))->plugins())->toContain($provider);
 })->with([
     'Browser::auth() and Browser::inApp() (sign-in handoff, View full product)' => BrowserServiceProvider::class,
+    'Geolocation::sharePosition() and backgroundWatchStatus() (the location beacon)' => GeolocationServiceProvider::class,
     'Network::status() (offline detection)' => NetworkServiceProvider::class,
     'PushNotifications (permission, enrollment and the FCM token)' => PushNotificationsServiceProvider::class,
     'SecureStorage (the API token)' => SecureStorageServiceProvider::class,

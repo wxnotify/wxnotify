@@ -18,6 +18,7 @@ class SignOut
         private WxNotifyApi $api,
         private LocalCache $cache,
         private PushState $push,
+        private LocationSharing $location,
     ) {}
 
     public function __invoke(): void
@@ -33,6 +34,7 @@ class SignOut
 
     public function clearLocal(): void
     {
+        $this->location->stopLocal();
         $this->tokens->forget();
         $this->tokens->clearPending();
         $this->cache->wipe();

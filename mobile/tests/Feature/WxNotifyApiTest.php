@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\Api\LocationLimitReached;
 use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\Retryable;
@@ -120,4 +121,30 @@ test('an empty success response, such as the sign-out 204, is fine', function ()
     $this->api->signOut();
 
     Http::assertSentCount(1);
+});
+
+test('turning location sharing on returns the beacon details', function () {
+    $data = ['location_id' => 7, 'beacon_token' => '12|beacon', 'url' => 'https://wx.test/api/v1/location', 'interval_seconds' => 300];
+    Http::fake(['wx.test/api/v1/location-sharing' => Http::response(['data' => $data])]);
+
+    expect($this->api->enableLocationSharing())->toBe($data);
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'PUT' && $r->hasHeader('Authorization', 'Bearer 9|secret'));
+});
+
+test('a plan at its location limit is a LocationLimitReached, any other 422 is Rejected', function () {
+    Http::fake(['wx.test/api/v1/location-sharing' => Http::sequence()
+        ->push(['error' => 'location_limit'], 422)
+        ->push(['error' => 'something_else'], 422)]);
+
+    expect(fn () => $this->api->enableLocationSharing())->toThrow(LocationLimitReached::class)
+        ->and(fn () => $this->api->enableLocationSharing())->toThrow(Rejected::class);
+});
+
+test('turning location sharing off accepts the empty 204', function () {
+    Http::fake(['wx.test/api/v1/location-sharing' => Http::response(null, 204)]);
+
+    $this->api->disableLocationSharing();
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'DELETE');
 });

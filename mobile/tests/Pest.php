@@ -3,11 +3,13 @@
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\Browser;
+use Native\Mobile\Geolocation;
 use Native\Mobile\Network;
 use Native\Mobile\SecureStorage;
 use Tests\Fakes\FakeNetwork;
 use Tests\Fakes\InMemorySecureStorage;
 use Tests\Fakes\RecordingBrowser;
+use Tests\Fakes\RecordingGeolocation;
 use Tests\TestCase;
 
 /*
@@ -29,10 +31,12 @@ pest()->extend(TestCase::class)
         $this->secureStorage = new InMemorySecureStorage;
         $this->browser = new RecordingBrowser;
         $this->network = new FakeNetwork;
+        $this->geolocation = new RecordingGeolocation;
 
         app()->instance(SecureStorage::class, $this->secureStorage);
         app()->instance(Browser::class, $this->browser);
         app()->instance(Network::class, $this->network);
+        app()->instance(Geolocation::class, $this->geolocation);
 
         config(['wxnotify.api_url' => 'https://wx.test']);
         Http::preventStrayRequests();

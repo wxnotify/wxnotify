@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\Api\LocationLimitReached;
 use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\Retryable;
@@ -86,6 +87,35 @@ class WxNotifyApi
     }
 
     /**
+     * @return array{location_id: int, beacon_token: string, url: string, interval_seconds: int}
+     *
+     * @throws LocationLimitReached when the plan has no room for another location
+     */
+    public function enableLocationSharing(): array
+    {
+        $data = $this->data($this->send(fn (PendingRequest $request) => $request->put('/api/v1/location-sharing')));
+
+        if (! is_string($data['beacon_token'] ?? null) || ! is_string($data['url'] ?? null) || ! is_int($data['interval_seconds'] ?? null)) {
+            throw new Retryable;
+        }
+
+        return $data;
+    }
+
+    /**
+     * @return array{linked: bool, location_id: ?int, interval_seconds: ?int}
+     */
+    public function locationSharing(): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/location-sharing')));
+    }
+
+    public function disableLocationSharing(): void
+    {
+        $this->send(fn (PendingRequest $request) => $request->delete('/api/v1/location-sharing'));
+    }
+
+    /**
      * @param  Closure(PendingRequest): Response  $call
      * @return array<string, mixed>
      */
@@ -115,6 +145,7 @@ class WxNotifyApi
             $response->successful() => $this->decode($response),
             $response->status() === 401 => throw new Unauthenticated,
             $response->status() === 429, $response->serverError() => throw new Retryable,
+            $response->status() === 422 && $response->json('error') === 'location_limit' => throw new LocationLimitReached,
             default => throw new Rejected,
         };
     }
