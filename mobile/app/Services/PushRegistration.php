@@ -67,9 +67,14 @@ class PushRegistration
         return true;
     }
 
+    /**
+     * Sends the token while push is on. It deliberately ignores the OS permission: Android 13+ fires
+     * the token event before the dialog answer is recorded, so checkPermission() still reads
+     * "denied" for the very registration that should be made.
+     */
     public function register(string $token): void
     {
-        if (! $this->state->wantsPush() || $this->permission() === 'denied') {
+        if (! $this->state->wantsPush()) {
             return;
         }
 
@@ -85,7 +90,7 @@ class PushRegistration
     /**
      * On launch while push is on and the OS allows notifications: when the server has not been sent
      * a token today, ask the OS to enroll again. That shows no dialog (permission is already given),
-     * fetches the live FCM token and fires TokenGenerated, which the RegisterPushToken listener sends
+     * fetches the live FCM token and fires TokenGenerated, which the mounted screen's handler (HandlesPushToken) sends
      * to the server (recreating a channel it pruned). The plugin's cached getToken() value is never
      * sent: it is not kept current, and on iOS it can hold the APNs token.
      */

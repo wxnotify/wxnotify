@@ -156,15 +156,15 @@ test('nothing is enrolled on launch unless the OS allows notifications', functio
     Http::assertNothingSent();
 })->with(['denied', 'not_determined', 'ephemeral', null]);
 
-test('a token handed over while the OS has notifications blocked is not registered', function () {
-    Http::fake();
+test('a token that arrives while the OS still reads denied is registered (Android answers the dialog after the token event)', function () {
+    Http::fake(['wx.test/api/v1/push-token' => Http::response(null, 204)]);
     PushNotifications::shouldReceive('checkPermission')->andReturn('denied');
     (new PushState)->markEnabled();
 
     event(new TokenGenerated('fcm-1'));
 
-    Http::assertNothingSent();
-    expect((new PushState)->registeredWithin(1))->toBeFalse();
+    Http::assertSent(pushRegistered('fcm-1'));
+    expect((new PushState)->registeredWithin(1))->toBeTrue();
 });
 
 test('turning push off while the session has expired signs the caller out instead of failing quietly', function () {

@@ -3,6 +3,7 @@
 namespace App\NativeComponents;
 
 use App\Services\PushRegistration;
+use App\Support\Concerns\HandlesPushToken;
 use App\Support\Concerns\RequiresSignIn;
 use Native\Mobile\Edge\NativeComponent;
 
@@ -13,6 +14,7 @@ use Native\Mobile\Edge\NativeComponent;
  */
 class PushPrompt extends NativeComponent
 {
+    use HandlesPushToken;
     use RequiresSignIn;
 
     public function mount(): void

@@ -7,6 +7,7 @@ use App\Exceptions\Api\Unauthenticated;
 use App\Services\PushRegistration;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
+use App\Support\Concerns\HandlesPushToken;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use App\Support\PushState;
@@ -18,6 +19,7 @@ use Native\Mobile\Facades\System;
  */
 class AccountScreen extends NativeComponent
 {
+    use HandlesPushToken;
     use RequiresSignIn;
 
     /** @var array<string, mixed>|null */
