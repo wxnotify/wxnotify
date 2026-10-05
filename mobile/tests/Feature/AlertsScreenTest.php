@@ -53,10 +53,12 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 1'
             && $item['props']['overline'] === 'Weather Alerts · 5 minutes ago'
             && $item['props']['supporting'] === 'Sent via Discord'
-            && ! isset($item['props']['supporting_color']))
+            && ! isset($item['props']['supporting_color'], $item['props']['trailing_badges_json']))
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 2'
-            && $item['props']['supporting'] === "Sent via Discord\nDelivery problem"
-            && $item['props']['supporting_color'] === '#B91C1C')
+            && str_contains($item['props']['supporting'], 'Delivery problem')
+            && ! isset($item['props']['supporting_color'])
+            && json_decode($item['props']['trailing_badges_json'], true)[0]['color'] === '#EF4444'
+            && count(json_decode($item['props']['trailing_badges_json'], true)) === 1)
         ->assertSet('offline', false);
 
     expect(array_column((new LocalCache)->feed(), 'id'))->toBe([2, 1]);

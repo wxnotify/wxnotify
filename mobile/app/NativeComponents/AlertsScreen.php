@@ -5,6 +5,8 @@ namespace App\NativeComponents;
 use App\Exceptions\Api\ApiException;
 use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Unauthenticated;
+use App\Icons\Android;
+use App\Icons\Ios;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\AlertPresenter;
@@ -164,6 +166,22 @@ class AlertsScreen extends NativeComponent
         return $alert['has_failure']
             ? $this->channels($alert)."\nDelivery problem"
             : $this->channels($alert);
+    }
+
+    /**
+     * A warning-triangle badge on rows with a failed send. The words "Delivery problem" are in the
+     * supporting text, so failure is never conveyed by the badge colour alone.
+     *
+     * @param  array<string, mixed>  $alert
+     * @return array<int, array{icon: string, ios: Ios, android: Android, color: string}>
+     */
+    public function failureBadges(array $alert): array
+    {
+        if (! $alert['has_failure']) {
+            return [];
+        }
+
+        return [['icon' => 'warning', 'ios' => Ios::ExclamationmarkTriangleFill, 'android' => Android::Warning, 'color' => '#EF4444']];
     }
 
     public function syncedLabel(): string

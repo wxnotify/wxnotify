@@ -29,7 +29,7 @@
                 headline="{{ $alert['subject'] }}"
                 overline="{{ $this->subtitle($alert) }}"
                 :supporting="$this->supporting($alert)"
-                :supportingColor="$alert['has_failure'] ? theme('destructive') : null"
+                :trailing-badges="$this->failureBadges($alert)"
                 @tap="open({{ $alert['id'] }})"
             ></list-item>
         @empty
