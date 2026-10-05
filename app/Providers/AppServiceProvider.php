@@ -70,6 +70,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('app-api', fn (Request $request) => Limit::perMinute(120)
             ->by('app-api:'.($request->user()?->currentAccessToken()?->id ?? $request->ip())));
 
+        // One request per few seconds per beacon token is normal (the plugin clamps its interval to
+        // 5 s at best); more than this is a runaway client.
+        RateLimiter::for('app-location', fn (Request $request) => Limit::perMinute(30)
+            ->by('app-location:'.($request->user()?->currentAccessToken()?->id ?? $request->ip())));
+
         RateLimiter::for('app-auth', fn (Request $request) => Limit::perMinute(10)
             ->by('app-auth:'.(ClientIp::for($request) ?? $request->ip())));
 

@@ -8,9 +8,10 @@ use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Keeps an app token alive for as long as it is used: each authenticated request pushes
- * its expiry back to the full lifetime, but only once a day (at most one write per token
- * per day), so an unused phone's token still lapses after `token_days`.
+ * Keeps an app token or a location beacon token alive for as long as it is used: each
+ * authenticated request pushes its expiry back to the full lifetime, but only once a day
+ * (at most one write per token per day), so an unused phone's token still lapses after
+ * `token_days`.
  */
 class ExtendAppTokenExpiry
 {

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\AppTokenController;
+use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\PushTokenController;
 use App\Http\Controllers\IngestEmwinProductController;
@@ -31,5 +32,9 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/push-token', [PushTokenController::class, 'update'])->name('api.v1.push-token.update');
         Route::delete('/push-token', [PushTokenController::class, 'destroy'])->name('api.v1.push-token.destroy');
         Route::delete('/auth/token', [AppTokenController::class, 'destroy'])->name('api.v1.auth.token.destroy');
+    });
+
+    Route::middleware(['auth:sanctum', 'ability:location', ExtendAppTokenExpiry::class, 'throttle:app-location'])->group(function (): void {
+        Route::post('/location', [LocationController::class, 'store'])->name('api.v1.location.store');
     });
 });
