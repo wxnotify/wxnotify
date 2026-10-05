@@ -10,7 +10,7 @@
             <native:text class="text-base text-theme-on-background">{{ $message }}</native:text>
         @else
             <native:text class="text-xl font-bold text-theme-on-background">{{ $alert['subject'] }}</native:text>
-            <native:text class="text-sm text-theme-on-surface-variant">{{ $alert['category_label'] }} · {{ $this->sentAt() }}</native:text>
+            <native:text class="text-sm text-theme-on-surface-variant">{{ $this->categoryAndSentAt() }}</native:text>
 
             @if (filled($alert['rule_name'] ?? null))
                 <native:text class="text-sm text-theme-on-surface-variant">Rule: {{ $alert['rule_name'] }}</native:text>

@@ -44,6 +44,14 @@ test('the detail shows the subject, rule, and each channel with its status', fun
     expect((new LocalCache)->detail(4)['rule_name'])->toBe('Storm warnings');
 });
 
+test('a delivery with no category shows only the time under the subject', function () {
+    Http::fake(['wx.test/api/v1/alerts/4' => Http::response(['data' => detailPayload(['category' => null, 'category_label' => null])])]);
+
+    Native::test(AlertDetail::class, ['id' => 4])
+        ->assertElement('text', fn (array $text) => ($text['props']['text'] ?? null) === '5 minutes ago')
+        ->assertDontSee('· ');
+});
+
 test('View full product opens the public page in the in-app browser', function () {
     Http::fake(['*' => Http::response(['data' => detailPayload()])]);
 

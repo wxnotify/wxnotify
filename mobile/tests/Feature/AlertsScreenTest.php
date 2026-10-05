@@ -83,6 +83,16 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
     expect(array_column((new LocalCache)->feed(), 'id'))->toBe([2, 1]);
 });
 
+test('a delivery with no category shows only the time in the overline', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([
+        apiEntry(1, ['category' => null, 'category_label' => null, 'subject' => 'Alert']),
+    ]))]);
+
+    Native::test(AlertsScreen::class)
+        ->assertElement('list_item', fn (array $item) => $item['props']['overline'] === '5 minutes ago')
+        ->assertDontSee('· ');
+});
+
 test('the cached feed paints first, then the refresh replaces it', function () {
     (new LocalCache)->replaceFeed([apiEntry(7, ['subject' => 'Cached alert'])]);
     Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(8, ['subject' => 'Fresh alert'])]))]);

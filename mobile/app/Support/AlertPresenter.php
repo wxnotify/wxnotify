@@ -27,7 +27,19 @@ class AlertPresenter
      */
     public static function subtitle(array $alert): string
     {
-        return $alert['category_label'].' · '.self::when($alert['dispatched_at']);
+        return self::withCategory($alert, self::when($alert['dispatched_at']));
+    }
+
+    /**
+     * "Category · time", or just the time for legacy deliveries that have no category.
+     *
+     * @param  array<string, mixed>  $alert
+     */
+    public static function withCategory(array $alert, string $time): string
+    {
+        $category = trim((string) ($alert['category_label'] ?? ''));
+
+        return $category === '' ? $time : $category.' · '.$time;
     }
 
     /**

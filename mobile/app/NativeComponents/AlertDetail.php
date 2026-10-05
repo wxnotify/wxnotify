@@ -79,6 +79,11 @@ class AlertDetail extends NativeComponent
         };
     }
 
+    public function categoryAndSentAt(): string
+    {
+        return AlertPresenter::withCategory($this->alert, $this->sentAt());
+    }
+
     public function sentAt(): string
     {
         $iso = $this->alert['dispatched_at'];
