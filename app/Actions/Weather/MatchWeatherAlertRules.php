@@ -155,8 +155,8 @@ class MatchWeatherAlertRules
             MatchingMode::Nationwide => GeographyMatch::matched(),
             MatchingMode::Wfo => $this->matchesWfo($rule->wfo, $product->cccc) ? GeographyMatch::matched() : GeographyMatch::notMatched(),
             MatchingMode::CountyZone => $this->matchesCountyZone($rule, $product) ? GeographyMatch::matched() : GeographyMatch::notMatched(),
-            MatchingMode::Location => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesLocationZones($location, $product)),
-            MatchingMode::Polygon => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesPolygon($location, $product) ?? $this->matchesLocationZones($location, $product)),
+            MatchingMode::Location => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesLocationZones($location, $product) || $this->matchesLocationOffice($rule, $location, $product)),
+            MatchingMode::Polygon => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesPolygon($location, $product) ?? ($this->matchesLocationZones($location, $product) || $this->matchesLocationOffice($rule, $location, $product))),
             MatchingMode::RiskArea => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesRiskArea($rule, $location, $product) ?? $this->matchesLocationZones($location, $product)),
             null => GeographyMatch::notMatched(),
         };
@@ -391,6 +391,63 @@ class MatchWeatherAlertRules
         $zones = array_filter([$location->forecast_zone_ugc, $location->county_ugc]);
 
         return array_intersect($zones, $product->ugc_codes) !== [];
+    }
+
+    /**
+     * Office-wide Weather Alerts products (Area Forecast Discussion and its kind) carry no UGC codes
+     * and no polygon, so a location has nothing to be inside of. They are issued for one NWS office's
+     * whole area instead: the product matches a location when its issuing office is the one that
+     * covers the location's forecast zone (or county). Applies only to a Weather Alerts rule, only to a
+     * product the catalog says has neither UGC codes nor a polygon, and only when this bulletin lists
+     * no UGC codes of its own (a bulletin that does is matched by them, never by office). SPC and WPC
+     * products come from national centres, so no local office covers a location for them.
+     */
+    private function matchesLocationOffice(AlertRule $rule, Location $location, IngestedProduct $product): bool
+    {
+        $catalog = $product->product;
+
+        if ($rule->category !== AlertCategory::WeatherAlerts
+            || $catalog === null
+            || $catalog->has_ugc
+            || $catalog->has_polygon
+            || $product->ugc_codes !== null
+            || $product->cccc === null
+            || ! $location->hasFix()) {
+            return false;
+        }
+
+        $office = $this->officeCovering($this->ensureZonesResolved($location));
+
+        return $office !== null && $this->matchesWfo($office, $product->cccc);
+    }
+
+    /**
+     * The NWS office (CWA) that covers a location, read from its cached forecast zone, else its county.
+     * The zone and county codes are real UGC codes ("COZ040", "COC014"); the tables store the state
+     * and the zone number or FIPS separately.
+     */
+    private function officeCovering(Location $location): ?string
+    {
+        $zone = $location->forecast_zone_ugc;
+
+        if (is_string($zone) && strlen($zone) === 6) {
+            $office = DB::table('public_zones')->where('state_zone', substr($zone, 0, 2).substr($zone, 3))->value('cwa');
+
+            if ($office !== null) {
+                return $office;
+            }
+        }
+
+        $county = $location->county_ugc;
+
+        if (is_string($county) && strlen($county) === 6) {
+            return DB::table('counties')
+                ->whereRaw('upper(state) = ?', [substr($county, 0, 2)])
+                ->whereRaw('right(fips, 3) = ?', [substr($county, 3)])
+                ->value('cwa');
+        }
+
+        return null;
     }
 
     private function matchesCountyZone(AlertRule $rule, IngestedProduct $product): bool

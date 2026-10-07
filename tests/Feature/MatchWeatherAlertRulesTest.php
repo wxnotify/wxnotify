@@ -949,3 +949,150 @@ test('the risk-area threshold ignores a ticked level from another category', fun
 
     Queue::assertPushed(DeliverWeatherAlert::class);
 });
+
+/**
+ * A forecast zone (or county) row, so the matcher can tell which NWS office covers a location.
+ * The location's cached UGC code is set separately on the Location.
+ */
+function coverZoneByOffice(string $table, array $row): void
+{
+    DB::table($table)->insert([
+        'cwa' => 'BOU', 'lon' => -105.0, 'lat' => 40.0,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-105.1 39.9, -104.9 39.9, -104.9 40.1, -105.1 40.1, -105.1 39.9))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+        ...$row,
+    ]);
+}
+
+function locationInBoulderZone(array $attributes = []): Location
+{
+    coverZoneByOffice('public_zones', ['state' => 'CO', 'zone' => '040', 'name' => 'Denver area', 'state_zone' => 'CO040']);
+
+    return Location::factory()->create(['forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014', ...$attributes]);
+}
+
+function locationRuleWithAfd(Location $location, string $mode = 'location'): AlertRule
+{
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => $mode, 'location_id' => null]);
+    $rule->locations()->attach($location);
+    $rule->products()->attach(Product::where('code', 'AFD')->sole());
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+
+    return $rule;
+}
+
+test('a Location-mode rule with AFD attached matches the AFD issued by the office that covers the location', function () {
+    Queue::fake();
+    $location = locationInBoulderZone();
+    $rule = locationRuleWithAfd($location);
+    $ingested = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'AFD')->sole()->id, 'cccc' => 'KBOU', 'ugc_codes' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->ruleId === $rule->id && $job->locationId === $location->id);
+});
+
+test('a Location-mode rule with AFD attached never matches an AFD from a different office', function () {
+    Queue::fake();
+    locationRuleWithAfd(locationInBoulderZone());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'AFD')->sole()->id, 'cccc' => 'KOKX', 'ugc_codes' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('a Polygon-mode rule falls back to the issuing office for a product that has no polygon and no UGC codes', function () {
+    Queue::fake();
+    $rule = locationRuleWithAfd(locationInBoulderZone(), 'polygon');
+    $ingested = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'AFD')->sole()->id, 'cccc' => 'KBOU', 'ugc_codes' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->ruleId === $rule->id);
+});
+
+test('the office comes from the county when the location has no forecast zone', function () {
+    Queue::fake();
+    coverZoneByOffice('counties', ['state' => 'CO', 'countyname' => 'Broomfield', 'fips' => '08014']);
+    $rule = locationRuleWithAfd(Location::factory()->create(['forecast_zone_ugc' => null, 'county_ugc' => 'COC014']));
+    $ingested = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'AFD')->sole()->id, 'cccc' => 'KBOU', 'ugc_codes' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->ruleId === $rule->id);
+});
+
+test('a location whose zone is unknown to the office table never matches an AFD', function () {
+    Queue::fake();
+    locationRuleWithAfd(Location::factory()->create(['forecast_zone_ugc' => 'COZ999', 'county_ugc' => 'COC999']));
+    $ingested = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'AFD')->sole()->id, 'cccc' => 'KBOU', 'ugc_codes' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('a mobile location with no position yet never matches an AFD by office', function () {
+    Queue::fake();
+    coverZoneByOffice('public_zones', ['state' => 'CO', 'zone' => '040', 'name' => 'Denver area', 'state_zone' => 'CO040']);
+    locationRuleWithAfd(Location::factory()->mobile()->create(['forecast_zone_ugc' => 'COZ040']));
+    $ingested = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'AFD')->sole()->id, 'cccc' => 'KBOU', 'ugc_codes' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('a product that lists its own UGC codes is matched by them, never by office', function () {
+    Queue::fake();
+    locationRuleWithAfd(locationInBoulderZone());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'AFD')->sole()->id, 'cccc' => 'KBOU', 'ugc_codes' => ['NYZ999']]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('a catalog product that normally carries UGC codes is not matched by office when a bulletin lacks them', function () {
+    Queue::fake();
+    $location = locationInBoulderZone();
+    $tornado = Product::where('code', 'TO.W')->sole();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => null]);
+    $rule->locations()->attach($location);
+    $rule->products()->attach($tornado);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $tornado->id, 'cccc' => 'KBOU', 'ugc_codes' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('an SPC and WPC rule never matches by office', function () {
+    Queue::fake();
+    $location = locationInBoulderZone();
+    $product = Product::factory()->create(['family' => 'spc_wpc', 'has_ugc' => false, 'has_polygon' => false]);
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'polygon', 'location_id' => null]);
+    $rule->locations()->attach($location);
+    $rule->products()->attach($product);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => $product->id, 'cccc' => 'KBOU', 'ugc_codes' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+test('a County/Zone-mode rule with AFD attached still never matches, since it asks for explicit codes', function () {
+    Queue::fake();
+    locationInBoulderZone();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'county_zone', 'county_zone_codes' => 'COZ040', 'location_id' => null]);
+    $rule->products()->attach(Product::where('code', 'AFD')->sole());
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $ingested = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'AFD')->sole()->id, 'cccc' => 'KBOU', 'ugc_codes' => null]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});

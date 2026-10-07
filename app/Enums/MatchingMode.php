@@ -42,7 +42,7 @@ enum MatchingMode: string
     {
         return match ($this) {
             self::Nationwide => 'Every issuance reaches you, no matter where it applies. Built for chasers tracking weather nationally.',
-            self::Location => 'Fires when a saved location falls inside the product\'s affected area.',
+            self::Location => 'Fires when a saved location falls inside the product\'s affected area. Office-wide products such as the Area Forecast Discussion fire when the NWS office that covers a saved location issues them.',
             self::Wfo => 'Follow everything a specific NWS office issues, independent of your own location.',
             self::CountyZone => 'Classic zone-based matching against NWS county/forecast-zone (UGC) codes.',
             self::Polygon => 'Point-in-polygon matching against the warning\'s actual geometry, for the highest precision available.',
