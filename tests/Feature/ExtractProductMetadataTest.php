@@ -2,6 +2,7 @@
 
 use App\Actions\Pipeline\ExtractProductMetadata;
 use App\Models\Product;
+use Database\Seeders\ProductCatalogSeeder;
 use Illuminate\Support\Carbon;
 
 afterEach(function () {
@@ -295,15 +296,30 @@ test('PTSDY1 resolves to the same SPC.OUTLOOK product as SWODY1, and populates r
         ->toBe(['lat' => 32.95, 'lon' => -99.19]);
 });
 
+test('the SPC fire weather outlooks resolve to their catalog products by their real AWIPS ids', function (string $awipsid, string $example, string $code) {
+    // FD2 and F38 come from the catalog seeder, not the products migration.
+    $this->seed(ProductCatalogSeeder::class);
+    $text = file_get_contents(base_path("database/product_examples/{$example}.txt"));
+
+    $metadata = (new ExtractProductMetadata)($text, $awipsid);
+
+    expect($metadata['product_id'])->toBe(Product::where('code', $code)->sole()->id);
+})->with([
+    'Day 1 outlook (FWDDY1)' => ['fwddy1', 'FD1', 'SPC.FIRE'],
+    'Day 2 outlook (FWDDY2)' => ['fwddy2', 'FD2', 'FD2'],
+    'Day 3-8 outlook (FWDD38)' => ['fwdd38', 'F38', 'F38'],
+]);
+
 test('a product other than the Day 1 Convective Outlook never attempts risk-level extraction', function () {
     // The Fire Weather Outlook (SPC.FIRE) also has risk_level_options in the
     // catalog, but its text format isn't a confirmed fixed sentence, so
     // extraction is deliberately not attempted for it -- null, not [].
     $text = 'THERE IS A MODERATE RISK OF SEVERE THUNDERSTORMS mentioned incidentally';
 
-    $metadata = (new ExtractProductMetadata)($text, 'fwdy1');
+    $metadata = (new ExtractProductMetadata)($text, 'fwddy1');
 
-    expect($metadata['risk_levels'])->toBeNull();
+    expect($metadata['product_id'])->toBe(Product::where('code', 'SPC.FIRE')->sole()->id)
+        ->and($metadata['risk_levels'])->toBeNull();
 });
 
 test('a VTEC-tagged product also populates the shared vtec_* fields', function () {

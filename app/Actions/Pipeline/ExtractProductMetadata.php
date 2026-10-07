@@ -22,15 +22,16 @@ use Illuminate\Support\Carbon;
  * Non-VTEC AWIPS-ID matching covers AFD (per-office prefix) plus a set of
  * SPC/WPC products confirmed against real live NWWS traffic and NOAA
  * service-change documentation: SWODY1/2/3 + SWOD48 (convective outlooks),
- * SWOMCD (mesoscale discussion), FWDY1/2 (fire weather outlooks), and
- * FFGMPD (WPC mesoscale precipitation discussion). Three catalog codes —
- * SPC Day 3-8 Fire Weather Outlook Discussion (F38), SPC Public Severe
- * Weather Outlook (PWO), and SPC Tornado/Severe Thunderstorm Reports (STA)
- * — could not be confirmed against a real awipsid (PWO/STA in particular
+ * SWOMCD (mesoscale discussion), FWDDY1/FWDDY2/FWDD38 (the Day 1, Day 2
+ * and Day 3-8 fire weather outlooks; note the doubled D, the ids below were
+ * once written FWDY1/2 and silently matched nothing) and FFGMPD (WPC
+ * mesoscale precipitation discussion). Two catalog codes — SPC Public
+ * Severe Weather Outlook (PWO) and SPC Tornado/Severe Thunderstorm
+ * Reports (STA) — could not be confirmed against a real awipsid (they
  * look like they may be issued with a per-office or per-state suffix, not
  * a single fixed id) and are deliberately left out rather than guessed —
  * matching this file's existing treatment of unconfirmed prefixes. Rules
- * for these three can still be created; they just won't resolve a
+ * for these two can still be created; they just won't resolve a
  * product_id or match until a confirmed id is added here.
  */
 class ExtractProductMetadata
@@ -50,8 +51,9 @@ class ExtractProductMetadata
         'swody3' => 'DY3',
         'swod48' => 'D48',
         'swomcd' => 'SPC.MD',
-        'fwdy1' => 'SPC.FIRE',
-        'fwdy2' => 'FD2',
+        'fwddy1' => 'SPC.FIRE',
+        'fwddy2' => 'FD2',
+        'fwdd38' => 'F38',
         'ffgmpd' => 'WPC.MPD',
     ];
 
