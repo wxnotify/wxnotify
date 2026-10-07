@@ -109,8 +109,8 @@ class GetActiveNowAtMyLocations
 
         return [
             'key' => $wwa->id,
-            'event' => $wwa->product?->name ?? 'Weather alert',
-            'family' => $wwa->product?->family?->value,
+            'event' => $wwa->eventName(),
+            'family' => $wwa->eventFamily(),
             'locations' => $locations->pluck('label')->map(fn ($label): string => (string) $label)->all(),
             'expires' => $wwa->expires?->copy()->setTimezone($timezone)->toIso8601String(),
             'status' => $status,

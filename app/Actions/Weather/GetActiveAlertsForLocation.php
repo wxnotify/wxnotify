@@ -39,10 +39,10 @@ class GetActiveAlertsForLocation
 
         return $this->activeFor($location, $includeTest)
             ->map(fn (ActiveWwa $wwa): array => [
-                'event' => $wwa->product?->name ?? 'Weather alert',
+                'event' => $wwa->eventName(),
                 'headline' => $wwa->headline,
                 'expires' => $wwa->expires?->copy()->setTimezone($timezone)->toIso8601String(),
-                'family' => $wwa->product?->family?->value,
+                'family' => $wwa->eventFamily(),
             ])
             ->values()
             ->all();
@@ -112,6 +112,6 @@ class GetActiveAlertsForLocation
 
     private static function rankOf(ActiveWwa $wwa): int
     {
-        return self::FAMILY_RANK[$wwa->product?->family?->value] ?? 99;
+        return self::FAMILY_RANK[$wwa->eventFamily()] ?? 99;
     }
 }

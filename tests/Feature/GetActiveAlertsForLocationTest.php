@@ -125,3 +125,16 @@ test('alerts with the same family and expiry come out in id order', function () 
         ->and($first->id)->toBeLessThan($second->id)
         ->and($second->id)->toBeLessThan($third->id);
 });
+
+test('an alert the product catalog does not know is named from its VTEC codes and sorted by the family their significance gives', function () {
+    alertFor('Wind Advisory', 'advisory', ['ugc_codes' => ['COZ040'], 'expires' => now()->addHour()]);
+    ActiveWwa::factory()->create([
+        'product_id' => null, 'ugc_codes' => ['COZ040'], 'expires' => now()->addHour(),
+        'vtec_phenomenon' => 'GL', 'vtec_significance' => 'W',
+    ]);
+
+    $alerts = (new GetActiveAlertsForLocation)($this->location);
+
+    expect(array_column($alerts, 'event'))->toBe(['Gale Warning', 'Wind Advisory'])
+        ->and(array_column($alerts, 'family'))->toBe(['warning', 'advisory']);
+});

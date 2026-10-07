@@ -266,3 +266,31 @@ test('resolving a location\'s zones while reading is quiet: it works in maintena
     livewire(ActiveNowWidget::class)->assertSee('Tornado Warning');
     expect($resolving->fresh()->forecast_zone_ugc)->toBe('COZ040')->and(Activity::query()->count())->toBe(0);
 });
+
+test('an active event the product catalog does not know is named from its VTEC codes, with the family their significance gives', function () {
+    activeNowWarning('Tornado Warning');
+    ActiveWwa::factory()->create([
+        'product_id' => null, 'ugc_codes' => ['COZ040'], 'expires' => now()->addHours(2),
+        'vtec_office' => 'KMOB', 'vtec_phenomenon' => 'SS', 'vtec_significance' => 'A', 'vtec_year' => 2026,
+    ]);
+    ActiveWwa::factory()->create([
+        'product_id' => null, 'ugc_codes' => ['COZ040'], 'expires' => now()->addHours(3),
+        'vtec_office' => 'KMOB', 'vtec_phenomenon' => 'RP', 'vtec_significance' => 'S', 'vtec_year' => 2026,
+    ]);
+
+    $events = (new GetActiveNowAtMyLocations)($this->user)['events'];
+
+    expect(array_column($events, 'event'))->toBe(['Tornado Warning', 'Storm Surge Watch', 'Rip Current Statement'])
+        ->and(array_column($events, 'family'))->toBe(['warning', 'watch', 'statement']);
+});
+
+test('an active event whose codes are unknown still reads Weather alert', function () {
+    ActiveWwa::factory()->create([
+        'product_id' => null, 'ugc_codes' => ['COZ040'], 'expires' => now()->addHour(),
+        'vtec_office' => 'KBOU', 'vtec_phenomenon' => 'ZZ', 'vtec_significance' => 'Q', 'vtec_year' => 2026,
+    ]);
+
+    $event = (new GetActiveNowAtMyLocations)($this->user)['events'][0];
+
+    expect($event['event'])->toBe('Weather alert')->and($event['family'])->toBeNull();
+});

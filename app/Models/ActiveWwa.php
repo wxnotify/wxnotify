@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\VtecEvent;
 use Database\Factories\ActiveWwaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,6 +42,27 @@ class ActiveWwa extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * What to call this event: its catalog product's name, else the NWS name its VTEC codes give
+     * (the catalog is a curated subset, so Storm Surge, Rip Current, Gale and others have no row),
+     * else a generic label.
+     */
+    public function eventName(): string
+    {
+        return $this->product?->name
+            ?? VtecEvent::name((string) $this->vtec_phenomenon, (string) $this->vtec_significance)
+            ?? 'Weather alert';
+    }
+
+    /**
+     * The family (warning, watch, advisory, statement...) the dashboard colours and sorts by: the
+     * catalog product's, else the one its VTEC significance letter gives.
+     */
+    public function eventFamily(): ?string
+    {
+        return $this->product?->family?->value ?? VtecEvent::family((string) $this->vtec_significance);
     }
 
     public function latestIngestedProduct(): BelongsTo
