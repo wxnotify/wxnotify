@@ -5,10 +5,12 @@ namespace App\Models;
 use App\Actions\Pipeline\GenerateViewSlug;
 use Database\Factories\IngestedProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -70,6 +72,77 @@ class IngestedProduct extends Model
     public function replays(): HasMany
     {
         return $this->hasMany(self::class, 'replay_of_id');
+    }
+
+    /**
+     * The bulletin's events, one per (section x VTEC line), in bulletin order. Empty for a
+     * non-VTEC product and for a bulletin stored before segments existed.
+     *
+     * @return HasMany<IngestedProductSegment, $this>
+     */
+    public function segments(): HasMany
+    {
+        return $this->hasMany(IngestedProductSegment::class)->orderBy('position');
+    }
+
+    /**
+     * An unsaved, in-memory copy of this bulletin that carries one segment's identity: its catalog
+     * product, zones, polygon and VTEC fields. The geography matchers read those from an
+     * IngestedProduct, so matching a segment is matching this copy. Never save it.
+     */
+    public function asSegment(IngestedProductSegment $segment): static
+    {
+        $view = new static;
+        $view->setRawAttributes($this->getAttributes());
+        $view->forceFill([
+            'product_id' => $segment->product_id,
+            'ugc_codes' => $segment->ugc_codes,
+            'polygon' => $segment->polygon,
+            'vtec_office' => $segment->vtec_office,
+            'vtec_phenomenon' => $segment->vtec_phenomenon,
+            'vtec_significance' => $segment->vtec_significance,
+            'vtec_event_number' => $segment->vtec_event_number,
+            'vtec_year' => $segment->vtec_year,
+            'vtec_action' => $segment->vtec_action,
+            'vtec_begin' => $segment->vtec_begin,
+            'vtec_end' => $segment->vtec_end,
+        ]);
+
+        return $view;
+    }
+
+    /**
+     * The listed segments of this bulletin that still exist, in bulletin order, with their catalog
+     * product loaded. An id that is gone (a rebuild replaced the segments) is ignored.
+     *
+     * @param  list<int>  $segmentIds
+     * @return EloquentCollection<int, IngestedProductSegment>
+     */
+    public function matchedSegments(array $segmentIds): EloquentCollection
+    {
+        if ($segmentIds === []) {
+            return new EloquentCollection;
+        }
+
+        return $this->segments()->with('product')->whereKey($segmentIds)->get();
+    }
+
+    /**
+     * What a notification calls this bulletin's matched events: each distinct event name once, in
+     * bulletin order. With no segments it is the bulletin's own catalog product, as before.
+     *
+     * @param  Collection<int, IngestedProductSegment>  $segments  any collection of segments (an Eloquent one or a plain one)
+     * @return list<string>
+     */
+    public function eventNamesFor(Collection $segments): array
+    {
+        if ($segments->isEmpty()) {
+            $name = $this->product?->name;
+
+            return filled($name) ? [$name] : [];
+        }
+
+        return $segments->map(fn (IngestedProductSegment $segment): string => $segment->eventName())->unique()->values()->all();
     }
 
     public function scenario(): BelongsTo

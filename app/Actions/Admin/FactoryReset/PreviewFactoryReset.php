@@ -21,6 +21,7 @@ class PreviewFactoryReset
         if ($toggles['pipeline'] ?? false) {
             $preview['pipeline'] = [
                 'ingested_products' => DB::table('ingested_products')->count(),
+                'ingested_product_segments' => DB::table('ingested_product_segments')->count(),
                 'active_wwas' => DB::table('active_wwas')->count(),
                 'delivery_logs' => DB::table('delivery_logs')->count(),
             ];

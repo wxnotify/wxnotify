@@ -82,11 +82,21 @@ class ActiveWwa extends Model
     }
 
     /**
-     * The VTEC composite key of an IngestedProduct or an ActiveWwa row (both carry the five vtec_* columns).
+     * Scopes to the event a segment names (its VTEC key), within the is_test flag of the segment's
+     * bulletin, exactly as scopeForProduct() does for a bulletin: a synthetic event never resolves
+     * for a real segment or the reverse.
+     */
+    public function scopeForSegment(Builder $query, IngestedProductSegment $segment): Builder
+    {
+        return $query->where(static::vtecKeyFor($segment))->where('is_test', (bool) $segment->ingestedProduct->is_test);
+    }
+
+    /**
+     * The VTEC composite key of an IngestedProduct, an IngestedProductSegment or an ActiveWwa row (all carry the five vtec_* columns).
      *
      * @return array{vtec_office: ?string, vtec_phenomenon: ?string, vtec_significance: ?string, vtec_event_number: ?string, vtec_year: ?int}
      */
-    public static function vtecKeyFor(IngestedProduct|self $product): array
+    public static function vtecKeyFor(IngestedProduct|IngestedProductSegment|self $product): array
     {
         return [
             'vtec_office' => $product->vtec_office,

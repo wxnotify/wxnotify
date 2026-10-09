@@ -11,6 +11,7 @@ use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
@@ -35,8 +36,9 @@ test('the default pipeline stack cannot stop services and refuses to pretend it 
 function frSeedPipelineData(): void
 {
     $ingested = IngestedProduct::factory()->count(3)->create();
+    $segment = IngestedProductSegment::factory()->for($ingested->first())->create();
     ActiveWwa::factory()->create(['latest_ingested_product_id' => $ingested->first()->id]);
-    DeliveryLog::factory()->count(2)->create();
+    DeliveryLog::factory()->count(2)->create()->first()->segments()->attach($segment);
     TestProductScenario::factory()->create();
 }
 
@@ -47,8 +49,10 @@ test('wiping pipeline data empties exactly its tables, restarts ids, and keeps s
 
     $counts = app(WipePipelineData::class)();
 
-    expect($counts)->toBe(['ingested_products' => 3, 'active_wwas' => 1, 'delivery_logs' => 2])
+    expect($counts)->toBe(['ingested_products' => 3, 'ingested_product_segments' => 1, 'active_wwas' => 1, 'delivery_logs' => 2])
         ->and(IngestedProduct::count())->toBe(0)
+        ->and(IngestedProductSegment::count())->toBe(0)
+        ->and(DB::table('delivery_log_segment')->count())->toBe(0)
         ->and(ActiveWwa::count())->toBe(0)
         ->and(DeliveryLog::count())->toBe(0)
         ->and(TestProductScenario::count())->toBe(1)
@@ -125,7 +129,7 @@ test('the preview counts exactly what each selected toggle would delete and writ
     $expectedCustom = Product::whereNotIn('code', $shippedCodes)->count();
     $preview = app(PreviewFactoryReset::class)(['pipeline' => true, 'catalogs' => true, 'subscribers' => true]);
 
-    expect($preview['pipeline'])->toBe(['ingested_products' => 3, 'active_wwas' => 1, 'delivery_logs' => 2])
+    expect($preview['pipeline'])->toBe(['ingested_products' => 3, 'ingested_product_segments' => 1, 'active_wwas' => 1, 'delivery_logs' => 2])
         ->and($preview['catalogs'])->toBe(['custom_products' => $expectedCustom, 'alert_rules_affected' => 1, 'custom_channel_types' => 0])
         ->and($preview['subscribers']['users'])->toBe($expectedUsers)
         ->and($preview['subscribers']['locations'])->toBe($expectedLocations)

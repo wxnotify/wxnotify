@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[Fillable(['alert_rule_id', 'notification_channel_id', 'user_id', 'channel_type', 'status', 'category', 'error_detail', 'subject', 'ingested_product_id', 'dispatched_at'])]
 class DeliveryLog extends Model
@@ -44,5 +45,14 @@ class DeliveryLog extends Model
     public function ingestedProduct(): BelongsTo
     {
         return $this->belongsTo(IngestedProduct::class);
+    }
+
+    /**
+     * The events of the bulletin this delivery covered (empty for deliveries logged before
+     * segments existed and for non-VTEC products).
+     */
+    public function segments(): BelongsToMany
+    {
+        return $this->belongsToMany(IngestedProductSegment::class, 'delivery_log_segment');
     }
 }
