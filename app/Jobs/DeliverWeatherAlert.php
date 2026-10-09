@@ -9,12 +9,14 @@ use App\Enums\MessageBodyStyle;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -52,16 +54,22 @@ use Illuminate\Support\Str;
  * Str::limit's word-preserving mode collapses every line break to a
  * space, which is fine for a short chat message but destroys a formatted
  * product in an inbox.
+ *
+ * The matched segment ids (see IngestedProductSegment) name the events this delivery is about: the subject lists each once, the templated body describes the first, and delivery_log_segment records them on the log row, including a skipped one. An id whose segment is gone by the time the job runs is ignored. An empty list (a non-VTEC product, a job queued before segments existed) keeps the bulletin's own product.
  */
 class DeliverWeatherAlert implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * @param  list<int>  $segmentIds  the matched IngestedProductSegment ids, in bulletin order
+     */
     public function __construct(
         public readonly int $ruleId,
         public readonly int $channelId,
         public readonly int $ingestedProductId,
         public readonly ?int $locationId = null,
+        public readonly array $segmentIds = [],
     ) {}
 
     public function handle(ChannelDispatcher $dispatcher): void
@@ -108,13 +116,16 @@ class DeliverWeatherAlert implements ShouldQueue
         $locationId = $this->locationId ?? null;
         $location = $locationId !== null ? Location::find($locationId) : null;
 
+        $segments = $product->matchedSegments($this->segmentIds ?? []);
+        $eventNames = $product->eventNamesFor($segments);
+
         if (! $rule->is_active) {
-            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $product->product, $location));
+            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $eventNames, $location), $segments);
 
             return;
         }
 
-        $templatedBody = app(ComposeTemplatedAlertBody::class)($rule, $product);
+        $templatedBody = app(ComposeTemplatedAlertBody::class)($rule, $product, $segments->first());
         $bodySource = $templatedBody ?? ($product->format === 'cap' ? ($product->description ?? $product->text) : $product->text);
 
         // Str::limit's word-preserving mode collapses every line break to a space (it exists for
@@ -124,16 +135,16 @@ class DeliverWeatherAlert implements ShouldQueue
         $maxLength = $templatedBody === null && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500;
         $body = $isEmailChannel ? $bodySource : Str::limit($bodySource, $maxLength, preserveWords: true);
 
-        $subject = app(RenderAlertSubject::class)($rule, $product->product, $location);
+        $subject = app(RenderAlertSubject::class)($rule, $eventNames, $location);
 
         $result = $dispatcher->send($channel, $body, $subject, [
             'type' => 'alert',
             'rule' => $rule->name,
-            'product' => $product->product?->name,
+            'product' => $eventNames === [] ? null : implode(' + ', $eventNames),
             'url' => $product->viewUrl(),
         ]);
 
-        DeliveryLog::create([
+        $log = DeliveryLog::create([
             'alert_rule_id' => $rule->id,
             'notification_channel_id' => $channel->id,
             'user_id' => $rule->user_id,
@@ -145,6 +156,8 @@ class DeliverWeatherAlert implements ShouldQueue
             'ingested_product_id' => $product->id,
             'dispatched_at' => now(),
         ]);
+
+        $this->linkSegments($log, $segments);
     }
 
     /**
@@ -153,9 +166,9 @@ class DeliverWeatherAlert implements ShouldQueue
      * gone" paths have nothing to render a subject from, so both stay null
      * there, and ingested_product_id (nullable) is simply omitted.
      */
-    private function logSkipped(AlertRule $rule, NotificationChannel $channel, string $reason, ?IngestedProduct $product = null, ?string $subject = null): void
+    private function logSkipped(AlertRule $rule, NotificationChannel $channel, string $reason, ?IngestedProduct $product = null, ?string $subject = null, ?Collection $segments = null): void
     {
-        DeliveryLog::create([
+        $log = DeliveryLog::create([
             'alert_rule_id' => $rule->id,
             'notification_channel_id' => $channel->id,
             'user_id' => $rule->user_id,
@@ -167,5 +180,17 @@ class DeliverWeatherAlert implements ShouldQueue
             'ingested_product_id' => $product?->id,
             'dispatched_at' => now(),
         ]);
+
+        $this->linkSegments($log, $segments ?? new Collection);
+    }
+
+    /**
+     * @param  Collection<int, IngestedProductSegment>  $segments
+     */
+    private function linkSegments(DeliveryLog $log, Collection $segments): void
+    {
+        if ($segments->isNotEmpty()) {
+            $log->segments()->attach($segments->modelKeys());
+        }
     }
 }

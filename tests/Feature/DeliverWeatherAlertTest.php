@@ -7,11 +7,13 @@ use App\Models\AlertRule;
 use App\Models\AlertTemplate;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
+use App\Support\Delivery\DeliveryResult;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -443,4 +445,126 @@ test('a job queued before locationId existed unserializes without it and still d
     $log = DeliveryLog::sole();
     expect($log->status)->toBe('success')
         ->and($log->subject)->toBe($rule->displayName());
+});
+
+/** A weather alerts rule with one apprise channel, ready to deliver; $ruleAttributes override the defaults. */
+function segmentDeliveryRule(array $ruleAttributes = [], ?User $owner = null): array
+{
+    $rule = AlertRule::factory()->for($owner ?? User::factory()->create())->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null, 'name' => null, ...$ruleAttributes,
+    ]);
+    $channel = NotificationChannel::factory()->for($rule->user)->create(['apprise_url' => 'discord://token/id']);
+
+    return [$rule, $channel];
+}
+
+/** A bulletin with a Hurricane Watch segment and a Rip Current Statement one (the catalog has no RP.S). */
+function segmentDeliveryBulletin(): array
+{
+    $bulletin = IngestedProduct::factory()->createQuietly(['text' => 'Hurricane Local Statement...']);
+    $watch = IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('HU.A')->create(['position' => 0]);
+    $statement = IngestedProductSegment::factory()->for($bulletin)->create(['position' => 1, 'vtec_phenomenon' => 'RP', 'vtec_significance' => 'S', 'vtec_event_number' => '0032', 'product_id' => null]);
+
+    return [$bulletin, $watch, $statement];
+}
+
+test('a delivery for several matched events is titled with all of them and records which events it covered', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    [$rule, $channel] = segmentDeliveryRule();
+    [$bulletin, $watch, $statement] = segmentDeliveryBulletin();
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id, null, [$watch->id, $statement->id]))->handle(app(ChannelDispatcher::class));
+
+    $log = DeliveryLog::sole();
+    expect($log->status)->toBe('success')
+        ->and($log->subject)->toBe('Hurricane Watch + Rip Current Statement')
+        ->and($log->segments()->pluck('ingested_product_segments.id')->sort()->values()->all())->toBe([$watch->id, $statement->id]);
+});
+
+test('an event named twice in one bulletin appears once in the subject', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    [$rule, $channel] = segmentDeliveryRule();
+    $bulletin = IngestedProduct::factory()->createQuietly();
+    $one = IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('HU.A')->create(['position' => 0, 'ugc_codes' => ['FLZ206']]);
+    $two = IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('HU.A')->create(['position' => 1, 'ugc_codes' => ['FLZ203']]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id, null, [$one->id, $two->id]))->handle(app(ChannelDispatcher::class));
+
+    $log = DeliveryLog::sole();
+    expect($log->subject)->toBe('Hurricane Watch')
+        ->and($log->segments()->count())->toBe(2);
+});
+
+test('a rule the subscriber named keeps its name as the subject and still records the events', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    [$rule, $channel] = segmentDeliveryRule(['name' => 'Gulf watch']);
+    [$bulletin, $watch, $statement] = segmentDeliveryBulletin();
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id, null, [$watch->id, $statement->id]))->handle(app(ChannelDispatcher::class));
+
+    $log = DeliveryLog::sole();
+    expect($log->subject)->toBe('Gulf watch')
+        ->and($log->segments()->count())->toBe(2);
+});
+
+test('{product} in a custom subject becomes the joined list of matched events', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    [$rule, $channel] = segmentDeliveryRule(['custom_subject_template' => '{product} - {location}'], User::factory()->create(['tier_override' => Tier::Plus]));
+    [$bulletin, $watch, $statement] = segmentDeliveryBulletin();
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id, null, [$watch->id, $statement->id]))->handle(app(ChannelDispatcher::class));
+
+    expect(DeliveryLog::sole()->subject)->toBe('Hurricane Watch + Rip Current Statement - your area');
+});
+
+test('a segment that no longer exists is ignored, and only the ones that do are linked', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    [$rule, $channel] = segmentDeliveryRule();
+    [$bulletin, $watch] = segmentDeliveryBulletin();
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id, null, [$watch->id, 999999]))->handle(app(ChannelDispatcher::class));
+
+    $log = DeliveryLog::sole();
+    expect($log->subject)->toBe('Hurricane Watch')
+        ->and($log->segments()->pluck('ingested_product_segments.id')->all())->toBe([$watch->id]);
+});
+
+test('a delivery with no segment ids is titled with the bulletin\'s own product and links nothing, as before', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    [$rule, $channel] = segmentDeliveryRule();
+    $bulletin = IngestedProduct::factory()->createQuietly(['product_id' => Product::where('code', 'TO.W')->sole()->id]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id))->handle(app(ChannelDispatcher::class));
+
+    $log = DeliveryLog::sole();
+    expect($log->subject)->toBe('Tornado Warning')
+        ->and($log->segments()->count())->toBe(0);
+});
+
+test('the dispatcher is told the joined event names as the product', function () {
+    [$rule, $channel] = segmentDeliveryRule();
+    [$bulletin, $watch, $statement] = segmentDeliveryBulletin();
+    $dispatcher = Mockery::mock(ChannelDispatcher::class);
+    $dispatcher->shouldReceive('send')
+        ->once()
+        ->withArgs(fn ($sentChannel, $body, $subject, $meta) => $subject === 'Hurricane Watch + Rip Current Statement' && $meta['product'] === 'Hurricane Watch + Rip Current Statement')
+        ->andReturn(DeliveryResult::delivered());
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id, null, [$watch->id, $statement->id]))->handle($dispatcher);
+
+    expect(DeliveryLog::sole()->status)->toBe('success');
+});
+
+test('a delivery skipped because the rule was switched off still names and records its events', function () {
+    Http::fake();
+    [$rule, $channel] = segmentDeliveryRule(['is_active' => false]);
+    [$bulletin, $watch, $statement] = segmentDeliveryBulletin();
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id, null, [$watch->id, $statement->id]))->handle(app(ChannelDispatcher::class));
+
+    Http::assertNothingSent();
+    $log = DeliveryLog::sole();
+    expect($log->status)->toBe('skipped')
+        ->and($log->subject)->toBe('Hurricane Watch + Rip Current Statement')
+        ->and($log->segments()->count())->toBe(2);
 });

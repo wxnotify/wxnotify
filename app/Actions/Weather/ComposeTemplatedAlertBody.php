@@ -8,6 +8,7 @@ use App\Enums\UnitSystem;
 use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Support\Units;
 
 /**
@@ -21,10 +22,12 @@ use App\Support\Units;
  * checked, or every checked section coming back null for this event) --
  * DeliverWeatherAlert treats null as "fall back to today's existing
  * message_body_style/raw-text behavior", never as an error.
+ *
+ * Expiration and Motion describe the matched segment's event when one is given (the first one a delivery matched), else the bulletin's first VTEC event; every other section is the bulletin's own narrative.
  */
 class ComposeTemplatedAlertBody
 {
-    public function __invoke(AlertRule $rule, IngestedProduct $product): ?string
+    public function __invoke(AlertRule $rule, IngestedProduct $product, ?IngestedProductSegment $segment = null): ?string
     {
         $template = $rule->effectiveAlertTemplate();
 
@@ -41,7 +44,7 @@ class ComposeTemplatedAlertBody
             return null;
         }
 
-        $activeWwa = $this->findActiveWwa($product);
+        $activeWwa = $this->findActiveWwa($product, $segment);
         $units = Units::forRule($rule)->system;
 
         $lines = collect(AlertTemplateSection::cases())
@@ -69,12 +72,17 @@ class ComposeTemplatedAlertBody
     }
 
     /**
-     * Correlates an IngestedProduct to its current-state ActiveWwa row via
-     * ActiveWwa::scopeForProduct() -- the same VTEC composite-key lookup
-     * MatchWeatherAlertRules::matchesActiveWwaPolygon() uses.
+     * Correlates the event this delivery is about to its current-state ActiveWwa row via the VTEC
+     * composite key: the matched segment's event when one is given (ActiveWwa::scopeForSegment()),
+     * else the bulletin's first VTEC event (ActiveWwa::scopeForProduct(), the same lookup
+     * MatchWeatherAlertRules::matchesActiveWwaPolygon() uses).
      */
-    private function findActiveWwa(IngestedProduct $product): ?ActiveWwa
+    private function findActiveWwa(IngestedProduct $product, ?IngestedProductSegment $segment): ?ActiveWwa
     {
+        if ($segment !== null) {
+            return ActiveWwa::query()->forSegment($segment)->first();
+        }
+
         if ($product->vtec_office === null) {
             return null;
         }

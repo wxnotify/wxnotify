@@ -231,3 +231,38 @@ test('scheduled categories and a missing product keep displayName()', function (
     expect((new RenderAlertSubject)($threshold, Product::factory()->create(['name' => 'SPC Day 4-8 Convective Outlook'])))->toBe($threshold->displayName())
         ->and((new RenderAlertSubject)($discussion))->toBe($discussion->displayName());
 });
+
+test('a list of event names fills {product} joined with a plus', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'custom_subject_template' => '{product} for {location}',
+    ]);
+
+    expect((new RenderAlertSubject)($rule, ['Hurricane Watch', 'Small Craft Advisory']))->toBe('Hurricane Watch + Small Craft Advisory for your area');
+});
+
+test('without a template, several fired events title the alert, joined with a plus', function () {
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null, 'name' => null]);
+
+    expect((new RenderAlertSubject)($rule, ['Hurricane Watch', 'Small Craft Advisory']))->toBe('Hurricane Watch + Small Craft Advisory')
+        ->and((new RenderAlertSubject)($rule, ['Hurricane Watch']))->toBe('Hurricane Watch');
+});
+
+test('a name the subscriber gave the rule still wins over the fired event names', function () {
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null, 'name' => 'Gulf watch']);
+
+    expect((new RenderAlertSubject)($rule, ['Hurricane Watch', 'Small Craft Advisory']))->toBe('Gulf watch');
+});
+
+test('an empty list of event names keeps displayName() and the category label for {product}', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $unnamed = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null, 'name' => null]);
+    $templated = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'custom_subject_template' => '{product}',
+    ]);
+
+    expect((new RenderAlertSubject)($unnamed, []))->toBe($unnamed->displayName())
+        ->and((new RenderAlertSubject)($templated, []))->toBe('Weather Alerts');
+});

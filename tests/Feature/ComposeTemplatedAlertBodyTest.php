@@ -7,6 +7,7 @@ use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\AlertTemplate;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 
@@ -165,4 +166,20 @@ test('renders a real Motion line for a text-sourced product ingested through the
     $result = (new ComposeTemplatedAlertBody)($rule, $product);
 
     expect($result)->toBe('Motion: Moving W at 17 mph');
+});
+
+test('reads the expiration of the matched segment\'s event, not of the bulletin\'s first VTEC line', function () {
+    Carbon::setTestNow('2026-09-15 12:00:00');
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $template = AlertTemplate::factory()->for($plusUser)->create(['sections' => [AlertTemplateSection::Expiration->value]]);
+    $rule = AlertRule::factory()->for($plusUser)->create(['category' => 'weather_alerts', 'alert_template_id' => $template->id]);
+    $firstEvent = [...vtecKeyFor(), 'vtec_event_number' => '1009', 'vtec_phenomenon' => 'HU', 'vtec_significance' => 'A'];
+    $secondEvent = [...vtecKeyFor(), 'vtec_event_number' => '0031', 'vtec_phenomenon' => 'SC', 'vtec_significance' => 'Y'];
+    ActiveWwa::factory()->create([...$firstEvent, 'expires' => now()->addHour()]);
+    ActiveWwa::factory()->create([...$secondEvent, 'expires' => now()->addHours(6)]);
+    $bulletin = IngestedProduct::factory()->createQuietly($firstEvent);
+    $segment = IngestedProductSegment::factory()->for($bulletin)->create($secondEvent);
+
+    expect((new ComposeTemplatedAlertBody)($rule, $bulletin, $segment))->toBe('Expiration: 6 hours from now')
+        ->and((new ComposeTemplatedAlertBody)($rule, $bulletin))->toBe('Expiration: 1 hour from now');
 });
