@@ -28,7 +28,7 @@
 2. **The options payload lists all the user's channels with a `verified` flag** (the dashboard lists unverified ones too, labelled "(unverified)"). Showing verified-only would hide a channel an existing rule already uses and trap the edit. The app marks unverified ones.
 3. **Retired or draft products an existing rule still uses** pass validation (family only, like the dashboard, which does not validate products at all) and the app keeps those ids in the draft even though it only lists active products.
 4. **`SaveAlertRule` clears columns that do not belong to the saved category** (and category-irrelevant product/location pivots). The dashboard today leaves stale values behind after a category change on Edit; both front ends now behave the same. Pivots are otherwise synced as given, which keeps the dashboard's existing behaviour.
-5. The API names the lightning radius field `radius` (in the user's distance unit, with a `unit` in the resource); `SaveAlertRuleRequest::ruleData()` maps it to the `radius_miles` key the action and the form use.
+5. The API names the lightning radius field `radius` (a whole number in the user's distance unit, with a `unit` in the resource; the stored `radius_miles` column is an integer, so the request refuses a fraction and the app sends an integer); `SaveAlertRuleRequest::ruleData()` maps it to the `radius_miles` key the action and the form use.
 6. `GET /locations` carries `meta: {can_create, limit}` so the app can explain the tier limit before the "+" fails.
 7. The `native:select` and `native:radio-group` elements take **labels only** (no ids), so the app keeps an id-by-label map for id-valued pickers and disambiguates duplicate labels; see Task 10.
 
@@ -48,7 +48,7 @@ Backend (create unless noted):
 
 App (`mobile/`), create unless noted:
 - `app/Exceptions/Api/{ValidationFailed,Conflict,Maintenance}.php`
-- Modify: `app/Services/WxNotifyApi.php`, `app/Support/LocalCache.php`, `routes/mobile.php`, the four existing tab screens and their views (shared tab bar)
+- Modify: `app/Services/WxNotifyApi.php`, `app/Support/LocalCache.php`, `routes/mobile.php`, the two existing tab screens (Alerts, Account) and their views (shared tab bar)
 - `app/Support/RuleFormPresenter.php`
 - `app/NativeComponents/{RulesScreen,RuleEditor,LocationsScreen,LocationEditor}.php`
 - `resources/views/native/{rules-screen,rule-editor,locations-screen,location-editor}.blade.php`, `resources/views/native/partials/tabs.blade.php`
@@ -63,7 +63,7 @@ App (`mobile/`), create unless noted:
 
 **Why first:** the spec requires confirming that the EDGE element vocabulary has the inputs the editors need (switch, text, number, time, multi-select, search field) before anything is built on it. The answer decides how Tasks 8, 10, 11 and 12 write their views.
 
-**Files (all throwaway, deleted in Step 3):** `app/NativeComponents/FormProbe.php`, `resources/views/native/form-probe.blade.php`, `tests/Feature/FormProbeTest.php` (under `mobile/`).
+**Files (all throwaway, deleted in Step 3):** `app/NativeComponents/FormProbe.php`, `resources/views/native/form-probe.blade.php`, `resources/views/native/form-probe-part.blade.php`, `tests/Feature/FormProbeTest.php` (under `mobile/`).
 
 **Interfaces:** produces a short findings report, no code: the element type names, the handler-argument convention (**Convention C**, below) and any rulings.
 
@@ -122,7 +122,8 @@ class FormProbe extends NativeComponent
         <native:outlined-text-input label="Value" native:model="draft.value" keyboard="decimal" ref="probe-value" />
         <native:toggle :value="true" label="Active" @change="flip(5)" ref="probe-toggle" />
         <native:checkbox :value="in_array(2, $draft['ids'])" label="Tornado Warning" @change="mark(2)" ref="probe-check" />
-        <native:select label="Units" :options="['Imperial', 'Metric']" :value="$draft['units']" @change="pick" ref="probe-select" />
+        <native:select label="Units" :options="['Imperial', 'Metric']" :value="$draft['units']" @change="pick('units')" ref="probe-select" />
+        <native:pressable @tap="pick('p')" ref="probe-press"><native:text>Press</native:text></native:pressable>
         <native:date-picker mode="time" label="Time" :value="$draft['time']" @change="clock" ref="probe-time" />
         <native:accordion :expanded="false" ref="probe-accordion">
             <native:accordion-header><native:text>Section</native:text></native:accordion-header>
@@ -130,8 +131,22 @@ class FormProbe extends NativeComponent
         </native:accordion>
         <native:radio-group :value="$draft['units']" @change="pick" ref="probe-radio"></native:radio-group>
         <native:chip label="Chip" ref="probe-chip" />
+        @include('native.form-probe-part', ['label' => 'Included'])
+        @switch($draft['units'])
+            @case('Metric')
+                <native:text>Switch: metric</native:text>
+                @break
+            @default
+                <native:text>Switch: imperial</native:text>
+        @endswitch
     </native:column>
 </native:scroll-view>
+```
+
+`resources/views/native/form-probe-part.blade.php`:
+
+```blade
+<native:text>{{ $label }}</native:text>
 ```
 
 `tests/Feature/FormProbeTest.php`:
@@ -159,9 +174,12 @@ test('probe: which element types the form views compile to', function () {
     $screen->check('probe-check', true);
     fwrite(STDERR, 'PROBE check -> '.$screen->get('last')."\n");
     $screen->select('probe-select', 'Metric');
-    fwrite(STDERR, 'PROBE select -> '.$screen->get('last')."\n");
-    $screen->fireEvent('probe-time', 0, ['text' => '07:15']);
+    fwrite(STDERR, 'PROBE select (static argument) -> '.$screen->get('last')."\n");
+    $screen->tap('probe-press');
+    fwrite(STDERR, 'PROBE pressable -> '.$screen->get('last')."\n");
+    $screen->pickTime('probe-time', '07:15');
     fwrite(STDERR, 'PROBE time -> '.$screen->get('last')."\n");
+    $screen->assertSee('Included')->assertSee('Switch: metric');
 
     expect(true)->toBeTrue();
 });
@@ -170,7 +188,7 @@ test('probe: which element types the form views compile to', function () {
 - [ ] **Step 2: Run the probe and record what it shows**
 
 Run: `cd mobile && vendor/bin/pest --compact tests/Feature/FormProbeTest.php`, and `cd mobile && php artisan native:validate`.
-Record in the report: (a) the printed type list (confirm `text_input`, `toggle`, `checkbox`, `select`, `date_picker`, `accordion`, `radio_group`, `chip` or their actual names); (b) whether `input()` updates a dotted `native:model` path; (c) the argument shape each handler received: expected **Convention C: `@change="method(a)"` calls `method(a, $value)` for toggle/checkbox, and `@change="method"` calls `method($value)` for select/date-picker**, where `$value` is the bool, the selected label string, or the `H:i` time string; (d) whether `native:validate` accepts every tag used. The date-picker line fires a generic event because the harness has no `time()` helper; if it does not reach `clock`, find the right event type for `date_picker` in `vendor/nativephp/mobile/src/Testing/TestableComponent.php` (the EVENT_* constants and `$eventProps` map) and use it.
+Record in the report: (a) the printed type list (confirm `outlined_text_input`, `toggle`, `checkbox`, `select`, `date_picker`, `accordion`, `radio_group`, `chip`, `pressable` or their actual names); (b) whether `input()` updates a dotted `native:model` path; (c) the argument shape each handler received: expected **Convention C: `@change="method(a)"` calls `method(a, $value)` for toggle/checkbox, and `@change="method"` calls `method($value)` for select/date-picker**, where `$value` is the bool, the selected label string, or the `H:i` time string; also that a select with a static argument (`@change="pick('units')"`) calls `pick('units', $value)` and a pressable (`@tap="pick('p')"`) calls `pick('p')`; (d) whether `native:validate` accepts every tag used, including the `@include` partial and the `@switch` block (the render assertions `assertSee('Included')` and `assertSee('Switch: metric')` prove both compile). The date-picker line uses the harness's `pickTime()` macro from mobile-ui (`DatePickerMacros`), which sends the `H:i` value as a select-change event; if it does not reach `clock`, read `vendor/nativephp/mobile-ui/src/Testing/DatePickerMacros.php` and report what it sends.
 
 Rulings for a missing or different element (decide, do not stop; later tasks assume the first option of each):
 - `accordion` missing or invalid → collapsible sections built from a `native:pressable` header toggling a local `expanded` list in the component, content rendered with `@if`.
@@ -181,7 +199,7 @@ Rulings for a missing or different element (decide, do not stop; later tasks ass
 - [ ] **Step 3: Delete the probe**
 
 ```bash
-rm mobile/app/NativeComponents/FormProbe.php mobile/resources/views/native/form-probe.blade.php mobile/tests/Feature/FormProbeTest.php
+rm mobile/app/NativeComponents/FormProbe.php mobile/resources/views/native/form-probe.blade.php mobile/resources/views/native/form-probe-part.blade.php mobile/tests/Feature/FormProbeTest.php
 ```
 
 Nothing from the probe is committed. Put its findings (types, argument convention, rulings) at the top of your task report; the controller carries them into the Task 8, 10, 11 and 12 dispatches.
@@ -570,7 +588,7 @@ class SaveAlertRule
 
 - [ ] **Step 4: Run the tests and fix until they pass**
 
-Run the same command as Step 2. Expected: PASS (9 tests).
+Run the same command as Step 2. Expected: PASS (10 tests).
 
 - [ ] **Step 5: Delegate the Filament pages to the action**
 
@@ -613,7 +631,7 @@ In `app/Filament/Dashboard/Resources/AlertRules/Pages/CreateAlertRule.php`, repl
     }
 ```
 
-(add the `use`, remove the now-unused imports: `AlertCategory`, `AlertRuleFormUnits`, `SpcWpcRiskLevels`, `Units` stay only if `mutateFormDataBeforeFill()` still uses them: it does use `AlertCategory`, `SpcWpcRiskLevels`, `Units`, `AlertRuleFormUnits` and `Product`, so keep exactly those it uses).
+(add the `use` for `SaveAlertRule`; keep `AlertCategory`, `AlertRuleFormUnits`, `SpcWpcRiskLevels`, `Units` and `Product` in `EditAlertRule`, because `mutateFormDataBeforeFill()` still uses all five; remove only the imports that became unused in `CreateAlertRule`.)
 
 - [ ] **Step 6: Run the dashboard's rule tests**
 
@@ -979,8 +997,8 @@ beforeEach(function () {
     $boundary = DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)");
 
     DB::table('cwa_boundaries')->insert([
-        ['cwa' => 'OKX', 'citystate' => 'New York, NY', 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()],
-        ['cwa' => 'ABQ', 'citystate' => 'Albuquerque, NM', 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()],
+        ['wfo' => 'OKX', 'cwa' => 'OKX', 'citystate' => 'New York, NY', 'lon' => -72.5, 'lat' => 40.9, 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()],
+        ['wfo' => 'ABQ', 'cwa' => 'ABQ', 'citystate' => 'Albuquerque, NM', 'lon' => -72.5, 'lat' => 40.9, 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()],
     ]);
 
     foreach ([['NY', '36103', 'Suffolk'], ['NY', '36059', 'Nassau'], ['NJ', '34003', 'Bergen']] as [$state, $fips, $name]) {
@@ -1063,7 +1081,7 @@ test('the lookups need an app token', function () {
 });
 ```
 
-(If `cwa_boundaries` has columns beyond `cwa`, `citystate`, `boundary` and the timestamps that are NOT NULL, read `database/migrations/2026_09_07_100012_create_cwa_boundaries_table.php` and add them; the rest of the insert shape is copied from the existing dashboard test.)
+(The `cwa_boundaries` fixture rows must carry the NOT NULL columns `wfo`, `lon` and `lat` as well as `cwa`, `citystate`, `boundary` and the timestamps (migration `2026_09_07_100012_create_cwa_boundaries_table.php`); the insert shape is copied from `tests/Feature/TestProductScenarioWizardStep2Test.php`. Task 3's two test files seed the same rows the same way.)
 
 - [ ] **Step 6: Write the lookups**
 
@@ -1284,7 +1302,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
  timeframe, radius: int|null, radius_unit, delivery_time: "HH:MM"|null, quiet_hours_start, quiet_hours_end,
  message_body_style, custom_subject_template, alert_template_id, channel_ids}
 ```
-- Request body for `POST`/`PUT`: `category`, `name`, `channel_ids`, `quiet_hours_start`, `quiet_hours_end`, `message_body_style`, `custom_subject_template`, `alert_template_id` (paid tiers) and the category fields: Weather Alerts / SPC & WPC: `product_ids` (flat), `matching_mode`, `location_ids`, `wfo`, `county_zone_codes` (array), `risk_levels` (flat, SPC only); Threshold: `variable`, `direction`, `threshold_value`, `timeframe`, `location_id`, `delivery_time`; Daily Summary: `location_id`, `delivery_time`; Lightning: `location_id`, `radius`. `PATCH` body: `is_active` (boolean).
+- Request body for `POST`/`PUT`: `category`, `name`, `channel_ids`, `quiet_hours_start`, `quiet_hours_end`, `message_body_style`, `custom_subject_template`, `alert_template_id` (paid tiers) and the category fields: Weather Alerts / SPC & WPC: `product_ids` (flat), `matching_mode`, `location_ids`, `wfo`, `county_zone_codes` (array), `risk_levels` (flat, SPC only); Threshold: `variable`, `direction`, `threshold_value`, `timeframe`, `location_id`, `delivery_time`; Daily Summary: `location_id`, `delivery_time`; Lightning: `location_id`, `radius` (a whole number in the subscriber's distance unit; the column is an integer, so a fraction is refused with 422). `PATCH` body: `is_active` (boolean).
 
 - [ ] **Step 1: Write the failing endpoint tests**
 
@@ -1317,7 +1335,7 @@ beforeEach(function () {
     $limits->save();
 
     $boundary = DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)");
-    DB::table('cwa_boundaries')->insert(['cwa' => 'OKX', 'citystate' => 'New York, NY', 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('cwa_boundaries')->insert(['wfo' => 'OKX', 'cwa' => 'OKX', 'citystate' => 'New York, NY', 'lon' => -72.5, 'lat' => 40.9, 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('counties')->insert(['state' => 'NY', 'cwa' => 'OKX', 'countyname' => 'Suffolk', 'fips' => '36103', 'lon' => -72.5, 'lat' => 40.9, 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('public_zones')->insert(['state' => 'NY', 'cwa' => 'OKX', 'zone' => '072', 'name' => 'Suffolk', 'state_zone' => 'NY072', 'lon' => -72.5, 'lat' => 40.9, 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()]);
 
@@ -1448,6 +1466,7 @@ test('a refused request names the field and writes nothing', function (string $c
         'a daily summary without a delivery time' => Arr::except(validRule($this, 'daily summary'), 'delivery_time'),
         'a lightning radius below the minimum' => [...validRule($this, 'lightning'), 'radius' => 9],
         'a lightning radius above 50 miles' => [...validRule($this, 'lightning'), 'radius' => 51],
+        'a lightning radius that is not a whole number' => [...validRule($this, 'lightning'), 'radius' => 24.5],
         'weather alerts without products' => [...validRule($this, 'weather nationwide'), 'product_ids' => []],
         'a product from the wrong family' => [...validRule($this, 'weather nationwide'), 'product_ids' => [$this->riskProduct->id]],
         'risk area on a weather alert' => [...validRule($this, 'weather nationwide'), 'matching_mode' => 'risk_area'],
@@ -1474,6 +1493,7 @@ test('a refused request names the field and writes nothing', function (string $c
     'a daily summary without a delivery time' => ['a daily summary without a delivery time', 'delivery_time'],
     'a lightning radius below the minimum' => ['a lightning radius below the minimum', 'radius'],
     'a lightning radius above 50 miles' => ['a lightning radius above 50 miles', 'radius'],
+    'a lightning radius that is not a whole number' => ['a lightning radius that is not a whole number', 'radius'],
     'weather alerts without products' => ['weather alerts without products', 'product_ids'],
     'a product from the wrong family' => ['a product from the wrong family', 'product_ids.0'],
     'risk area on a weather alert' => ['risk area on a weather alert', 'matching_mode'],
@@ -1587,7 +1607,7 @@ test('during maintenance a write answers 503 with the maintenance message as pla
 });
 ```
 
-(If the maintenance test shows no 503, `MaintenanceModeGuard::isBlocking()` returned false because `auth()->user()` is null under the sanctum guard in this request; in that case make the API write paths call `Auth::shouldUse('sanctum')` is already done by `auth:sanctum`, so investigate before changing anything: report it rather than weakening the test.)
+(If the maintenance test shows no 503, check that `auth:sanctum` made sanctum the default guard for the request, so that `MaintenanceModeGuard::isBlocking()` sees the user through `auth()->user()`; report the finding rather than weakening the test.)
 
 - [ ] **Step 2: Run to verify they fail**
 
@@ -1831,7 +1851,7 @@ class SaveAlertRuleRequest extends FormRequest
         return [
             'location_id' => ['required', 'integer', Rule::exists('locations', 'id')->where('user_id', $this->user()->id)],
             'radius' => [
-                'required', 'numeric',
+                'required', 'integer',
                 'min:'.$units->minDistanceDisplay(app(TierThresholdSettings::class)->lightning_min_radius_miles),
                 'max:'.$units->maxDistanceDisplay(50),
             ],
@@ -2074,7 +2094,7 @@ beforeEach(function () {
     $limits->save();
 
     $boundary = DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)");
-    DB::table('cwa_boundaries')->insert(['cwa' => 'OKX', 'citystate' => 'New York, NY', 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('cwa_boundaries')->insert(['wfo' => 'OKX', 'cwa' => 'OKX', 'citystate' => 'New York, NY', 'lon' => -72.5, 'lat' => 40.9, 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('counties')->insert(['state' => 'NY', 'cwa' => 'OKX', 'countyname' => 'Suffolk', 'fips' => '36103', 'lon' => -72.5, 'lat' => 40.9, 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('public_zones')->insert(['state' => 'NY', 'cwa' => 'OKX', 'zone' => '072', 'name' => 'Suffolk', 'state_zone' => 'NY072', 'lon' => -72.5, 'lat' => 40.9, 'boundary' => $boundary, 'created_at' => now(), 'updated_at' => now()]);
 
@@ -3884,7 +3904,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `WxNotifyApi::alertRules()`, `setAlertRuleActive()`, `LocalCache::rules()/rememberRules()`, exceptions from Task 7, the rule JSON from Task 3, and Task 0's findings.
-- Produces: routes `/rules` (list), `/rules/new` and `/rules/{id}` (the editor, Task 10), `/locations` (list) and `/locations/new` and `/locations/{id}` (Task 11); the `native.partials.tabs` partial taking `$active` (`alerts`, `rules`, `locations` or `account`); `RulesScreen` with public `array $rules`, `bool $offline`, `bool $loaded`, `?string $error`, `?string $message` and methods `refresh()`, `setActive(int $id, bool $value)`, `create()`, `open(int $id)`.
+- Produces: the route `/rules` (list; the editor routes come with Task 10 and the Locations routes with Task 11); the `native.partials.tabs` partial taking `$active` (`alerts`, `rules`, `locations` or `account`); `RulesScreen` with public `array $rules`, `bool $offline`, `bool $loaded`, `?string $error`, `?string $message` and methods `refresh()`, `setActive(int $id, bool $value)`, `create()`, `open(int $id)`.
 - Row refs used by tests: `rule-{id}` (the row's tap target), `active-{id}` (its toggle), `add-rule` (the add button).
 
 - [ ] **Step 1: Write the failing tests**
@@ -4120,7 +4140,7 @@ class RulesScreen extends NativeComponent
         } catch (Offline) {
             $this->offline = true;
         } catch (ApiException) {
-            $this->error = 'WxNotify could not load your alert rules. Pull down to try again.';
+            $this->error = 'WxNotify could not load your alert rules. Try again in a moment.';
         } finally {
             $this->loaded = true;
         }
@@ -4245,14 +4265,13 @@ Create `resources/views/native/rules-screen.blade.php` (rows are pressables so t
 
 (The "Convention C" argument shape from Task 0's probe decides the `@change` and `@tap` forms: with `setActive(int $id, bool $value)` the toggle handler receives the static id first and the switch value last. Use whatever shape the probe proved; the tests drive the `active-1` ref and assert behaviour, not the argument shape.)
 
-In `routes/mobile.php` add (editors come in Tasks 10 and 11; register all routes now so the tab bar links resolve, pointing the editor routes at their classes once they exist; until then add only the two list routes):
+In `routes/mobile.php` register only the Rules list now (`LocationsScreen` and the editors do not exist yet):
 
 ```php
 Route::native('/rules', RulesScreen::class);
-Route::native('/locations', LocationsScreen::class);
 ```
 
-For this task register `/rules` only; Task 11 adds `/locations`, and Tasks 10 and 11 add the editor routes (`/rules/new` before `/rules/{id}`, `/locations/new` before `/locations/{id}`).
+Task 10 adds the rule editor routes (`/rules/new` before `/rules/{id}`); Task 11 adds `/locations`, `/locations/new` before `/locations/{id}`.
 
 - [ ] **Step 4: Run the tests and fix until they pass, format, commit**
 
@@ -4487,9 +4506,9 @@ test('the payload carries only what the category and mode use', function () {
         'product_ids' => [10, 99], 'matching_mode' => 'wfo', 'wfo' => 'OKX',
     ]);
 
-    $lightning = $presenter->payload(draftWith($presenter, 'lightning', ['location_id' => 7, 'radius' => '24.5', 'channel_ids' => [5]]));
+    $lightning = $presenter->payload(draftWith($presenter, 'lightning', ['location_id' => 7, 'radius' => '24', 'channel_ids' => [5]]));
 
-    expect($lightning)->toMatchArray(['category' => 'lightning', 'location_id' => 7, 'radius' => 24.5])
+    expect($lightning)->toMatchArray(['category' => 'lightning', 'location_id' => 7, 'radius' => 24])
         ->and($lightning)->not->toHaveKey('alert_template_id')
         ->and($lightning)->not->toHaveKey('product_ids');
 
@@ -4522,6 +4541,7 @@ test('validation mirrors the server\'s required fields', function (string $categ
     'a daily summary with nothing' => ['daily_summary', ['channel_ids' => [5]], ['location_id', 'delivery_time']],
     'a lightning radius below the minimum' => ['lightning', ['location_id' => 7, 'radius' => '9', 'channel_ids' => [5]], ['radius']],
     'a lightning radius above the maximum' => ['lightning', ['location_id' => 7, 'radius' => '51', 'channel_ids' => [5]], ['radius']],
+    'a lightning radius that is not a whole number' => ['lightning', ['location_id' => 7, 'radius' => '24.5', 'channel_ids' => [5]], ['radius']],
     'a complete lightning rule' => ['lightning', ['location_id' => 7, 'radius' => '15', 'channel_ids' => [5]], []],
 ]);
 
@@ -4819,7 +4839,7 @@ final class RuleFormPresenter
                 'delivery_time' => $draft['delivery_time'],
             ],
             'daily_summary' => ['location_id' => $draft['location_id'], 'delivery_time' => $draft['delivery_time']],
-            'lightning' => ['location_id' => $draft['location_id'], 'radius' => (float) $draft['radius']],
+            'lightning' => ['location_id' => $draft['location_id'], 'radius' => (int) $draft['radius']],
             default => [],
         }];
     }
@@ -4884,8 +4904,10 @@ final class RuleFormPresenter
                 $errors['location_id'] = 'Choose a location.';
             }
 
-            if (! is_numeric($draft['radius']) || (float) $draft['radius'] < $bounds['min'] || (float) $draft['radius'] > $bounds['max']) {
-                $errors['radius'] = "Enter a radius from {$bounds['min']} to {$bounds['max']} {$this->radiusUnit()}.";
+            $radius = filter_var(trim((string) $draft['radius']), FILTER_VALIDATE_INT);
+
+            if ($radius === false || $radius < $bounds['min'] || $radius > $bounds['max']) {
+                $errors['radius'] = "Enter a whole-number radius from {$bounds['min']} to {$bounds['max']} {$this->radiusUnit()}.";
             }
         }
 
@@ -5069,7 +5091,7 @@ test('a threshold rule is built from the form and saved', function () {
         ->input('field-threshold_value', '32')
         ->select('field-timeframe', 'Overnight')
         ->select('field-location', 'Home')
-        ->call('setTime', 'delivery_time', '06:30')
+        ->pickTime('field-delivery_time', '06:30')
         ->check('channel-5', true)
         ->tap('Save rule')
         ->assertWentBack();
@@ -5255,11 +5277,17 @@ test('an unverified channel is marked as such', function () {
     Native::test(RuleEditor::class)->assertSee('Team Discord')->assertSee('(unverified)');
 });
 
-test('message length, subject and template appear for a paid subscriber only', function () {
+test('message length, subject and template are hidden from a Free subscriber', function () {
     editorFakes([], ['tier' => ['can_customize_messages' => false]]);
-    Native::test(RuleEditor::class)->assertDontSee('Message length');
 
-    Http::fake(['wx.test/api/v1/alert-rule-options' => Http::response(['data' => ruleFormOptions(['tier' => ['can_customize_messages' => true], 'templates' => ['weather_alerts' => [['id' => 3, 'name' => 'Brief']], 'spc_wpc' => []]])])]);
+    Native::test(RuleEditor::class)
+        ->tap('category-weather_alerts')
+        ->assertDontSee('Message length')
+        ->assertDontSee('Message template');
+});
+
+test('message length, subject and template appear for a paid subscriber', function () {
+    editorFakes([], ['tier' => ['can_customize_messages' => true], 'templates' => ['weather_alerts' => [['id' => 3, 'name' => 'Brief']], 'spc_wpc' => []]]);
 
     Native::test(RuleEditor::class)
         ->tap('category-weather_alerts')
@@ -6069,7 +6097,7 @@ Create `resources/views/native/rule-editor.blade.php`. It follows the dashboard 
                             @break
 
                         @case('radius')
-                            <native:outlined-text-input label="Alert radius ({{ $presenter->radiusUnit() }})" native:model="draft.radius" keyboard="decimal" ref="field-radius" />
+                            <native:outlined-text-input label="Alert radius ({{ $presenter->radiusUnit() }})" native:model="draft.radius" keyboard="number" ref="field-radius" />
                             <native:text class="text-sm text-theme-on-surface-variant">From {{ $presenter->radiusBounds()['min'] }} to {{ $presenter->radiusBounds()['max'] }} {{ $presenter->radiusUnit() }}.</native:text>
                             @break
                     @endswitch
@@ -6700,7 +6728,7 @@ class LocationsScreen extends NativeComponent
         } catch (Offline) {
             $this->offline = true;
         } catch (ApiException) {
-            $this->error = 'WxNotify could not load your locations. Pull down to try again.';
+            $this->error = 'WxNotify could not load your locations. Try again in a moment.';
         } finally {
             $this->loaded = true;
         }
@@ -7498,10 +7526,10 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 12: Wrap-up: guard rows, render tests, sign-out wipe, spec amendment and the full suites
+### Task 12: Wrap-up: guard rows, render tests, sign-out wipe and the full suites
 
 **Files:**
-- Modify: `tests/Feature/NativePluginsTest.php`, `tests/Feature/ScreensRenderTest.php`, `tests/Feature/AccountScreenTest.php`, `docs/superpowers/specs/2026-10-05-mobile-parity-management-design.md`
+- Modify: `tests/Feature/NativePluginsTest.php`, `tests/Feature/ScreensRenderTest.php`, `tests/Feature/AccountScreenTest.php`
 
 - [ ] **Step 1: List the one-shot position calls in the plugin guard**
 
@@ -7541,7 +7569,7 @@ test('the rule editor renders its sections, inputs and save button', function ()
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Save rule')
         ->tap('category-threshold')
         ->assertElement('select')
-        ->assertElement('text_input')
+        ->assertElement('outlined_text_input')
         ->assertElement('date_picker')
         ->tap('category-weather_alerts')
         ->assertElement('checkbox');
@@ -7557,13 +7585,13 @@ test('the locations screen renders its title, tabs and add button', function () 
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Add location');
 });
 
-test('the location editor renders a stationary form and a mobile form', function () {
+test('the location editor renders the stationary form', function () {
     (new TokenStore)->put('9|secret');
     Http::fake(['wx.test/api/v1/locations' => Http::response(['data' => [], 'meta' => []])]);
 
     Native::test(LocationEditor::class)
         ->assertNavTitle('New location')
-        ->assertElement('text_input')
+        ->assertElement('outlined_text_input')
         ->assertElement('select')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Use my current position')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Save location');
@@ -7593,20 +7621,9 @@ test('signing out also forgets the cached rules, locations and form options', fu
 });
 ```
 
-- [ ] **Step 4: Amend the spec with the plan's decisions**
+- [ ] **Step 4: Verify the spec amendment (already applied before Task 1)**
 
-Append to `docs/superpowers/specs/2026-10-05-mobile-parity-management-design.md`, before "## Rules to record", a section:
-
-```markdown
-## Clarifications settled while planning
-
-- `GET /places/reverse?lat=&lng=` is added to the places endpoints: the dashboard fills a stationary location's address from the browser map, so the app (no map yet) asks the server for the address of its current position before saving. `POST /locations` takes the `address` the app resolved (at most 255 characters) and resolves only the timezone itself when none is sent.
-- The options payload lists all of the user's channels with a `verified` flag, like the dashboard (which labels unverified ones "(unverified)"); the rule form marks them the same way. Hiding them would make a channel an existing rule already uses unselectable.
-- A retired or draft product an existing rule still uses passes validation (the dashboard does not validate products at all, only that one is chosen) and the app keeps its id in the draft although it lists active products only.
-- `SaveAlertRule` clears the columns and pivots that belong to another category, so a category change leaves nothing stale; the dashboard's Edit page now does the same.
-- `select` and `radio-group` elements take labels only, so the app keeps a label-to-id map for id-valued pickers and numbers duplicate names ("Home", "Home (2)").
-- The stationary location's timezone is chosen from the US zones (or left automatic, resolved from the position by the server).
-```
+The "Clarifications settled while planning" section was appended to `docs/superpowers/specs/2026-10-05-mobile-parity-management-design.md` (before "## Rules to record") in the commit that applied the pre-flight scan rulings, before Task 1, so every task's reviewer held its work to a spec that already carried decisions 1-4 and 7, the US-only timezone list, the rule that fields not applying to the category, matching mode or tier are ignored rather than refused, and the whole-number lightning radius. Verify it only: `grep -n "Clarifications settled while planning" docs/superpowers/specs/2026-10-05-mobile-parity-management-design.md` finds one heading, and each of those clarifications still matches what was built. If a later ruling changed one, correct that bullet in the spec; otherwise change nothing.
 
 - [ ] **Step 5: Run both full suites and `native:validate`**
 
@@ -7616,8 +7633,8 @@ Run: `cd mobile && vendor/bin/pest --compact` and `cd mobile && php artisan nati
 
 ```bash
 cd mobile && vendor/bin/pint --dirty --format agent
-cd .. && git add mobile docs
-git commit -m "App: guard row, render and sign-out tests for rules and locations; record the planning clarifications
+cd .. && git add mobile
+git commit -m "App: guard row, render and sign-out tests for rules and locations
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
