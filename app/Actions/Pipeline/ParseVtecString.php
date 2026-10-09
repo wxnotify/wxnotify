@@ -28,10 +28,31 @@ class ParseVtecString
      */
     public function __invoke(string $text): ?array
     {
-        if (! preg_match(self::PATTERN, $text, $matches)) {
-            return null;
+        return $this->all($text)[0] ?? null;
+    }
+
+    /**
+     * Every P-VTEC string in the text, in the order they appear. A product section can carry
+     * several (one per event it covers, e.g. a Hurricane Watch and a Small Craft Advisory over the
+     * same waters), and a bulletin several sections.
+     *
+     * @return list<array{office: string, phenomenon: string, significance: string, event_number: string, year: int, action: string, begin: ?Carbon, end: ?Carbon}>
+     */
+    public function all(string $text): array
+    {
+        if (! preg_match_all(self::PATTERN, $text, $matches, PREG_SET_ORDER)) {
+            return [];
         }
 
+        return array_map($this->parts(...), $matches);
+    }
+
+    /**
+     * @param  array<int, string>  $matches
+     * @return array{office: string, phenomenon: string, significance: string, event_number: string, year: int, action: string, begin: ?Carbon, end: ?Carbon}
+     */
+    private function parts(array $matches): array
+    {
         [, $action, $office, $phenomenon, $significance, $eventNumber, $beginRaw, $endRaw] = $matches;
 
         return [

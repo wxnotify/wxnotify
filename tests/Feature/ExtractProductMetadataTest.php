@@ -406,3 +406,21 @@ test('a product with no narrative sections leaves all five fields null', functio
         ->and($metadata['locations_impacted'])->toBeNull()
         ->and($metadata['call_to_action'])->toBeNull();
 });
+
+test('a UGC range that starts on a full code expands, so the real bulletins that yielded no zones now do', function (string $example, int $count, string $first) {
+    $text = file_get_contents(base_path("database/product_examples/bulletins/{$example}.txt"));
+
+    $metadata = (new ExtractProductMetadata)($text, null);
+
+    expect($metadata['ugc_codes'])->toHaveCount($count)
+        ->and($metadata['ugc_codes'][0])->toBe($first);
+})->with([
+    'a Non-Precipitation Weather bulletin (AZZ004>018-037>040)' => ['NPW_FGZ', 19, 'AZZ004'],
+    'a Marine Weather Message (first section)' => ['MWW_MOB', 4, 'GMZ650'],
+]);
+
+test('a full-code range in the first zone line of a text product reaches ugc_codes', function () {
+    $metadata = (new ExtractProductMetadata)("GMZ630>636-080000-\n/O.NEW.KMOB.HU.A.1009.261007T1538Z-000000T0000Z/\n", null);
+
+    expect($metadata['ugc_codes'])->toBe(['GMZ630', 'GMZ631', 'GMZ632', 'GMZ633', 'GMZ634', 'GMZ635', 'GMZ636']);
+});

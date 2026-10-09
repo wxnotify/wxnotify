@@ -78,3 +78,29 @@ test('a text with two VTEC strings resolves the first (leftmost) one', function 
         ->and($result['event_number'])->toBe('0042')
         ->and($result['action'])->toBe('NEW');
 });
+
+test('all() returns every VTEC string in the text, in order', function () {
+    Carbon::setTestNow('2026-10-07T12:00:00Z');
+    $text = "GMZ650-655-080000-\n/O.NEW.KMOB.HU.A.1009.261007T1538Z-000000T0000Z/\n/O.CON.KMOB.SC.Y.0031.000000T0000Z-261009T0800Z/\n";
+
+    $all = (new ParseVtecString)->all($text);
+
+    expect($all)->toHaveCount(2)
+        ->and($all[0]['phenomenon'])->toBe('HU')
+        ->and($all[0]['action'])->toBe('NEW')
+        ->and($all[0]['begin'])->toEqual(Carbon::parse('2026-10-07T15:38:00Z'))
+        ->and($all[0]['end'])->toBeNull()
+        ->and($all[1]['phenomenon'])->toBe('SC')
+        ->and($all[1]['significance'])->toBe('Y')
+        ->and($all[1]['event_number'])->toBe('0031')
+        ->and($all[1]['begin'])->toBeNull()
+        ->and($all[1]['end'])->toEqual(Carbon::parse('2026-10-09T08:00:00Z'));
+});
+
+test('all() is empty without a VTEC string, and the first one is still what __invoke returns', function () {
+    $text = "/O.NEW.KMOB.HU.A.1009.261007T1538Z-000000T0000Z/\n/O.CON.KMOB.SC.Y.0031.000000T0000Z-261009T0800Z/\n";
+
+    expect((new ParseVtecString)->all('No VTEC here.'))->toBe([])
+        ->and((new ParseVtecString)($text)['phenomenon'])->toBe('HU')
+        ->and((new ParseVtecString)('No VTEC here.'))->toBeNull();
+});
