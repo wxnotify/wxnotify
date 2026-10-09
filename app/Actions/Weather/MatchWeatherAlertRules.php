@@ -337,13 +337,13 @@ class MatchWeatherAlertRules
     }
 
     /**
-     * A VTEC-class product's persisted active_wwas polygon takes priority
-     * over the triggering row's own (possibly null on a continuation
-     * statement like SVS/FFS) polygon -- see SyncActiveWwa, which is what
-     * keeps that polygon current across an event's whole lifetime. Returns
-     * null (not false) both when the product isn't VTEC-class at all and
-     * when no active_wwas row with a polygon exists yet, so the caller falls
-     * back to the row's own polygon field either way.
+     * A VTEC-class product's persisted zone polygons take priority over the triggering row's own
+     * (possibly null on a continuation statement like SVS/FFS) polygon -- see
+     * ApplySegmentToCoverage, which is what keeps them current across an event's whole lifetime.
+     * The location is covered if any zone row's polygon contains it. Returns null (not false) both
+     * when the product isn't VTEC-class at all and when the event has no polygon, so the caller
+     * falls back to the row's own polygon field either way. An event with no zone rows at all
+     * (a row from before they existed) is read from its own polygon column.
      */
     private function matchesActiveWwaPolygon(IngestedProduct $product, float $lng, float $lat): ?bool
     {
@@ -353,19 +353,27 @@ class MatchWeatherAlertRules
 
         $activeWwa = ActiveWwa::query()
             ->forProduct($product)
-            ->whereNotNull('polygon')
             ->first();
 
         if ($activeWwa === null) {
             return null;
         }
 
-        $result = DB::selectOne(
-            'SELECT ST_Contains(polygon, ST_SetSRID(ST_MakePoint(?, ?), 4269)) AS contains FROM active_wwas WHERE id = ?',
+        $areas = DB::selectOne(
+            'SELECT count(*) AS zones, count(polygon) AS polygons, coalesce(bool_or(ST_Contains(polygon, ST_SetSRID(ST_MakePoint(?, ?), 4269))), false) AS contains FROM active_wwa_areas WHERE active_wwa_id = ?',
             [$lng, $lat, $activeWwa->id],
         );
 
-        return $this->resultIsTrue($result);
+        if ((int) $areas->zones > 0) {
+            return (int) $areas->polygons > 0 ? $this->resultIsTrue($areas) : null;
+        }
+
+        $own = DB::selectOne(
+            'SELECT ST_Contains(polygon, ST_SetSRID(ST_MakePoint(?, ?), 4269)) AS contains FROM active_wwas WHERE id = ? AND polygon IS NOT NULL',
+            [$lng, $lat, $activeWwa->id],
+        );
+
+        return $own === null ? null : $this->resultIsTrue($own);
     }
 
     /**
