@@ -1,0 +1,85 @@
+
+215
+WHUS74 KMOB 071538
+MWWMOB
+
+URGENT - MARINE WEATHER MESSAGE
+National Weather Service Mobile AL
+1038 AM CDT Wed Oct 7 2026
+
+GMZ650-655-670-675-080000-
+/O.NEW.KMOB.HU.A.1009.261007T1538Z-000000T0000Z/
+/O.CON.KMOB.SC.Y.0031.000000T0000Z-261009T0800Z/
+Coastal waters from Pensacola FL to Pascagoula MS out 20 NM-
+Coastal waters from Okaloosa Walton County Line FL to Pensacola
+FL out 20 NM-
+Waters from Pensacola FL to Pascagoula MS from 20 to 60 NM-
+Waters from Okaloosa Walton County Line FL to Pensacola FL from
+20 to 60 NM-
+1038 AM CDT Wed Oct 7 2026
+
+...HURRICANE WATCH IN EFFECT...
+...SMALL CRAFT ADVISORY REMAINS IN EFFECT UNTIL 3 AM CDT FRIDAY...
+
+* WHAT...For the Hurricane Watch, winds 50 to 70 kt with gusts up
+  to 100 kt and seas 28 to 33 ft. For the Small Craft Advisory, 
+  northeast winds 25 to 35 kt and seas 4 to 7 ft.
+
+* WHERE...Coastal waters from Pensacola FL to Pascagoula MS out 
+  20 NM, Coastal waters from Okaloosa Walton County Line FL to 
+  Pensacola FL out 20 NM, Waters from Pensacola FL to Pascagoula 
+  MS from 20 to 60 NM and Waters from Okaloosa Walton County 
+  Line FL to Pensacola FL from 20 to 60 NM.
+
+* WHEN...For the Hurricane Watch, Tropical Storm force winds 
+  possible from early Friday morning until early Saturday 
+  morning. Hurricane force winds possible from Friday afternoon 
+  until early Saturday morning. For the Small Craft Advisory, 
+  until 3 AM CDT Friday.
+
+* IMPACTS...Hurricane force winds and hazardous seas can capsize 
+  or damage vessels and severely reduce visibility.
+
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Mariners should remain in port, alter course, and/or secure the
+vessel for extreme conditions before conditions deteriorate
+further.
+
+&&
+
+$$
+
+GMZ630>636-080000-
+/O.NEW.KMOB.HU.A.1009.261007T1538Z-000000T0000Z/
+Northern Mobile Bay-Southern Mobile Bay-Mississippi Sound-
+Perdido Bay-Pensacola Bay System-Western Choctawhatchee Bay-
+Eastern Choctawhatchee Bay-
+1038 AM CDT Wed Oct 7 2026
+
+...HURRICANE WATCH IN EFFECT...
+
+* WHAT...Northeast winds 50 to 70 kt with gusts up to 95 kt and 
+  seas 3 to 7 ft.
+
+* WHERE...Portions of the coastal waters of Alabama and 
+  northwest Florida. 
+
+* WHEN...Tropical Storm force winds possible from early Friday 
+  morning until early Saturday morning. Hurricane force winds 
+  possible from Friday afternoon until early Saturday morning.
+
+* IMPACTS...Hurricane force winds and hazardous seas can capsize 
+  or damage vessels and severely reduce visibility.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Mariners should remain in port, alter course, and/or secure the
+vessel for extreme conditions before conditions deteriorate
+further.
+
+&&
+
+$$
+

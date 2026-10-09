@@ -1,0 +1,135 @@
+
+498
+WHUS42 KJAX 091842
+CFWJAX
+
+Coastal Hazard Message
+National Weather Service Jacksonville FL
+242 PM EDT Fri Oct 9 2026
+
+FLZ125-100930-
+/O.EXT.KJAX.CF.Y.0003.000000T0000Z-261011T2000Z/
+/O.CON.KJAX.RP.S.0032.000000T0000Z-261011T1000Z/
+Coastal Duval-
+242 PM EDT Fri Oct 9 2026
+
+...COASTAL FLOOD ADVISORY NOW IN EFFECT UNTIL 4 PM EDT SUNDAY...
+...HIGH RIP CURRENT RISK REMAINS IN EFFECT THROUGH LATE SATURDAY
+NIGHT...
+
+* WHAT...For the Coastal Flood Advisory, minor coastal flooding.
+  For the High Rip Current Risk, dangerous rip currents and rough
+  surf.
+
+* WHERE...Coastal Duval County.
+
+* WHEN...For the Coastal Flood Advisory, until 4 PM EDT Sunday. 
+  For the High Rip Current Risk, through late Saturday night.
+
+* IMPACTS...Flooding of lots, parks, and roads with only 
+  isolated road closures expected. Rip currents can sweep even 
+  the best swimmers away from shore into deeper water.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+If travel is required, allow extra time as some roads may be
+closed. Do not drive around barricades or through water of
+unknown depth. Take the necessary actions to protect flood-prone
+property.
+
+Swim near a lifeguard. If caught in a rip current, relax and
+float. Don't swim against the current. If able, swim in a
+direction following the shoreline. If unable to escape, face the
+shore and call or wave for help.
+
+&&
+
+$$
+
+FLZ132-137-325-633-100930-
+/O.EXT.KJAX.CF.Y.0004.000000T0000Z-261011T2000Z/
+Eastern Clay-Eastern Putnam-South Central Duval-Western St. Johns-
+242 PM EDT Fri Oct 9 2026
+
+...COASTAL FLOOD ADVISORY NOW IN EFFECT UNTIL 4 PM EDT SUNDAY...
+
+* WHAT...Minor coastal flooding.
+
+* WHERE...St Johns River Basin.
+
+* WHEN...Until 4 PM EDT Sunday.
+
+* IMPACTS...Flooding of lots, parks, and roads with only 
+  isolated road closures expected.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Take the necessary actions to protect flood-prone property. If
+travel is required, do not drive around barricades or through
+water of unknown depth.
+
+&&
+
+$$
+
+FLZ225-100930-
+/O.EXT.KJAX.CF.Y.0003.000000T0000Z-261011T2000Z/
+Trout River-
+242 PM EDT Fri Oct 9 2026
+
+...COASTAL FLOOD ADVISORY NOW IN EFFECT UNTIL 4 PM EDT SUNDAY...
+
+* WHAT...Minor coastal flooding.
+
+* WHERE...Trout River County.
+
+* WHEN...Until 4 PM EDT Sunday.
+
+* IMPACTS...Flooding of lots, parks, and roads with only 
+  isolated road closures expected.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+If travel is required, allow extra time as some roads may be
+closed. Do not drive around barricades or through water of
+unknown depth. Take the necessary actions to protect flood-prone
+property.
+
+&&
+
+$$
+
+FLZ124-138-233-333-GAZ154-166-100930-
+/O.CON.KJAX.RP.S.0032.000000T0000Z-261011T1000Z/
+Coastal Nassau-Coastal Flagler-Northeast Coastal St. Johns-
+Southeast Coastal St. Johns-Coastal Glynn-Coastal Camden-
+242 PM EDT Fri Oct 9 2026
+
+...HIGH RIP CURRENT RISK REMAINS IN EFFECT THROUGH LATE SATURDAY
+NIGHT...
+
+* WHAT...Dangerous rip currents and rough surf.
+
+* WHERE...Southeast Georgia Beaches.
+
+* WHEN...Through late Saturday night.
+
+* IMPACTS...Rip currents can sweep even the best swimmers away 
+  from shore into deeper water.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+If travel is required, allow extra time as some roads may be
+closed. Do not drive around barricades or through water of
+unknown depth. Take the necessary actions to protect flood-prone
+property.
+
+Swim near a lifeguard. If caught in a rip current, relax and
+float. Don't swim against the current. If able, swim in a
+direction following the shoreline. If unable to escape, face the
+shore and call or wave for help.
+
+&&
+
+$$
+
