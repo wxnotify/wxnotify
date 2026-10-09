@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Pipeline\BackfillOutlookRiskAreas;
+use App\Actions\Pipeline\BuildBulletinSegments;
 use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
 use App\Models\IngestedProduct;
@@ -11,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 /**
  * Dispatched once per IngestedProduct created, by App\Observers\IngestedProductObserver.
@@ -33,6 +35,11 @@ use Illuminate\Queue\SerializesModels;
  * comes next, before the general vtec_office branch, since PTSDY1 is neither a
  * replay nor VTEC-tagged but still needs to skip both of those paths — see
  * App\Actions\Pipeline\BackfillOutlookRiskAreas.
+ *
+ * Before any of that branching, a VTEC bulletin's segments (one per section x VTEC line) are
+ * built, for replays too: matching reads them instead of the bulletin's first zone block and first
+ * VTEC line, so they must exist first. It is built here and not in IngestProductText because the
+ * observer queues this job from the model's created event, before the ingest action returns.
  */
 class ProcessIngestedProduct implements ShouldQueue
 {
@@ -53,6 +60,8 @@ class ProcessIngestedProduct implements ShouldQueue
 
             return;
         }
+
+        $this->buildSegments($product);
 
         if ($product->replay_of_id !== null) {
             // A replay only exercises alert delivery, so it must not write active_wwas.
@@ -77,5 +86,26 @@ class ProcessIngestedProduct implements ShouldQueue
         }
 
         app(MatchWeatherAlertRules::class)($product);
+    }
+
+    /**
+     * A failure is logged, never thrown: a bulletin whose sections cannot be split is still
+     * processed, the old way, with no segments (BuildBulletinSegments parses before it deletes, so
+     * a failure leaves the previous segments, if any, in place).
+     */
+    private function buildSegments(IngestedProduct $product): void
+    {
+        if ($product->vtec_office === null) {
+            return;
+        }
+
+        try {
+            app(BuildBulletinSegments::class)($product);
+        } catch (Throwable $e) {
+            logger()->error('ProcessIngestedProduct: failed to build the segments of a bulletin', [
+                'ingested_product_id' => $product->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 }

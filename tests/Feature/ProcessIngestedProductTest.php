@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Pipeline\BackfillOutlookRiskAreas;
+use App\Actions\Pipeline\BuildBulletinSegments;
 use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
 use App\Jobs\ProcessIngestedProduct;
@@ -63,4 +64,72 @@ test('a PTSDY1 product is routed to BackfillOutlookRiskAreas, not matched or syn
     $backfillSpy->shouldHaveReceived('__invoke')->once();
     $matchSpy->shouldNotHaveReceived('__invoke');
     $syncSpy->shouldNotHaveReceived('__invoke');
+});
+
+test('the segments are built before a replay is matched', function () {
+    $segmentCount = null;
+    $matchMock = Mockery::mock(MatchWeatherAlertRules::class);
+    $matchMock->shouldReceive('__invoke')->once()->andReturnUsing(function (IngestedProduct $bulletin) use (&$segmentCount): void {
+        $segmentCount = $bulletin->segments()->count();
+    });
+    app()->instance(MatchWeatherAlertRules::class, $matchMock);
+    [$original, $replay] = IngestedProduct::withoutEvents(function () {
+        $original = IngestedProduct::factory()->create(['vtec_office' => 'KMOB']);
+
+        return [$original, IngestedProduct::factory()->create([
+            'replay_of_id' => $original->id, 'vtec_office' => 'KMOB', 'format' => 'text',
+            'text' => file_get_contents(base_path('database/product_examples/bulletins/MWW_MOB.txt')),
+        ])];
+    });
+
+    (new ProcessIngestedProduct($replay->id))->handle();
+
+    expect($segmentCount)->toBe(3);
+});
+
+test('the segments are built before the active event is synced', function () {
+    $segmentCount = null;
+    $syncMock = Mockery::mock(SyncActiveWwa::class);
+    $syncMock->shouldReceive('__invoke')->once()->andReturnUsing(function (IngestedProduct $bulletin) use (&$segmentCount): void {
+        $segmentCount = $bulletin->segments()->count();
+    });
+    app()->instance(SyncActiveWwa::class, $syncMock);
+    $bulletin = IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create([
+        'vtec_office' => 'KMOB', 'format' => 'text',
+        'text' => file_get_contents(base_path('database/product_examples/bulletins/MWW_MOB.txt')),
+    ]));
+
+    (new ProcessIngestedProduct($bulletin->id))->handle();
+
+    expect($segmentCount)->toBe(3);
+});
+
+test('a failure building the segments is logged and the bulletin is still processed', function () {
+    Log::spy();
+    $failing = Mockery::mock(BuildBulletinSegments::class);
+    $failing->shouldReceive('__invoke')->once()->andThrow(new RuntimeException('boom'));
+    app()->instance(BuildBulletinSegments::class, $failing);
+    $syncSpy = Mockery::spy(SyncActiveWwa::class);
+    app()->instance(SyncActiveWwa::class, $syncSpy);
+    $bulletin = IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create(['vtec_office' => 'KMOB']));
+
+    (new ProcessIngestedProduct($bulletin->id))->handle();
+
+    $syncSpy->shouldHaveReceived('__invoke')->once();
+    Log::shouldHaveReceived('error')
+        ->once()
+        ->withArgs(fn ($message, $context) => $context['ingested_product_id'] === $bulletin->id && $context['exception'] === 'boom');
+});
+
+test('a product without a VTEC office builds no segments', function () {
+    $build = Mockery::mock(BuildBulletinSegments::class);
+    $build->shouldNotReceive('__invoke');
+    app()->instance(BuildBulletinSegments::class, $build);
+    $matchSpy = Mockery::spy(MatchWeatherAlertRules::class);
+    app()->instance(MatchWeatherAlertRules::class, $matchSpy);
+    $afd = IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create(['vtec_office' => null]));
+
+    (new ProcessIngestedProduct($afd->id))->handle();
+
+    $matchSpy->shouldHaveReceived('__invoke')->once();
 });
