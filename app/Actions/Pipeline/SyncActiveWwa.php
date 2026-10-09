@@ -3,27 +3,32 @@
 namespace App\Actions\Pipeline;
 
 use App\Actions\Weather\MatchWeatherAlertRules;
-use App\Models\ActiveWwa;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
- * Upserts the "current state" active_wwas row for a VTEC-class IngestedProduct
- * and decides whether this ingestion should trigger a fresh match-and-dispatch
- * pass. Text rows always dispatch -- this is what preserves today's behavior
- * of notifying on every issuance including continuations (SVS/FFS/etc, which
- * resolve to the same product_id as their parent warning). CAP rows only
- * dispatch when their paired text row can't be found, since the normal case
- * is CAP arriving a few seconds after text already dispatched.
+ * Updates the "current state" active_wwas rows for a VTEC-class IngestedProduct -- one event per
+ * VTEC line of every section of the bulletin, each applied through ApplySegmentToCoverage so
+ * its zones accumulate and end one by one -- and decides whether this ingestion should trigger
+ * a fresh match-and-dispatch pass. Text rows always dispatch -- this is what preserves today's
+ * behavior of notifying on every issuance including continuations (SVS/FFS/etc, which resolve to
+ * the same product_id as their parent warning). CAP rows only dispatch when their paired text row
+ * can't be found, since the normal case is CAP arriving a few seconds after text already dispatched.
  *
- * Both syncFromText() and syncFromCap() write motion_* fields when their
- * respective source carries one (a text row's own TIME...MOT...LOC line, or
- * CAP's eventMotionDescription parameter) -- text is what actually populates
- * it in the common case, since dispatch (and therefore anything consuming
- * these columns, e.g. the Custom Alert Templates Motion section) usually
- * fires off the text row before CAP has a chance to arrive at all.
+ * A bulletin without stored segments (a factory row, or one BuildBulletinSegments failed on) is
+ * applied through one unsaved segment built from its own columns, which is what every bulletin
+ * was before segments existed.
+ *
+ * Both syncFromText() and syncFromCap() write motion_* fields when their respective source
+ * carries one (a text row's own TIME...MOT...LOC line, or CAP's eventMotionDescription
+ * parameter), onto the bulletin's FIRST event only -- text is what actually populates it in the
+ * common case, since dispatch (and therefore anything consuming these columns, e.g. the Custom
+ * Alert Templates Motion section) usually fires off the text row before CAP has a chance to
+ * arrive at all.
  */
 class SyncActiveWwa
 {
@@ -42,26 +47,14 @@ class SyncActiveWwa
     {
         try {
             DB::transaction(function () use ($product): void {
-                $wwa = ActiveWwa::updateOrCreate(
-                    ActiveWwa::vtecKeyFor($product),
-                    [
-                        'product_id' => $product->product_id,
-                        'status' => $this->resolveStatus($product->vtec_action),
-                        'is_test' => $this->isTest($product),
-                        'latest_ingested_product_id' => $product->id,
+                $motion = app(ParseTextMotionDescription::class)($product->text, $product->received_at);
+
+                foreach ($this->segmentsOf($product) as $index => $segment) {
+                    app(ApplySegmentToCoverage::class)($product, $segment, [
                         'source' => 'text',
-                        ...($product->ugc_codes !== null ? ['ugc_codes' => $product->ugc_codes] : []),
-                        ...($product->vtec_begin !== null ? ['effective' => $product->vtec_begin] : []),
-                        ...($product->vtec_end !== null ? ['expires' => $product->vtec_end] : []),
-                        ...app(ParseTextMotionDescription::class)($product->text, $product->received_at),
-                    ],
-                );
-
-                $this->expireIfPast($wwa);
-
-                if ($product->polygon !== null) {
-                    $wkt = $this->polygonToWkt($product->polygon);
-                    DB::statement('UPDATE active_wwas SET polygon = ST_SetSRID(ST_GeomFromText(?), 4269) WHERE id = ?', [$wkt, $wwa->id]);
+                        'latest_ingested_product_id' => $product->id,
+                        ...($index === 0 ? $motion : []),
+                    ]);
                 }
             });
         } catch (Throwable $e) {
@@ -83,27 +76,15 @@ class SyncActiveWwa
             $pairedText = $this->findPairedTextProduct($product);
 
             DB::transaction(function () use ($product, $pairedText): void {
-                $wwa = ActiveWwa::updateOrCreate(
-                    ActiveWwa::vtecKeyFor($product),
-                    [
-                        'product_id' => $product->product_id,
-                        'status' => $this->resolveStatus($product->vtec_action),
-                        'is_test' => $this->isTest($product),
+                $motion = $this->parseMotion($product->event_motion_description);
+
+                foreach ($this->segmentsOf($product) as $index => $segment) {
+                    app(ApplySegmentToCoverage::class)($product, $segment, [
                         'headline' => $product->headline,
                         'source' => 'cap',
                         'latest_ingested_product_id' => $pairedText?->id ?? $product->id,
-                        ...($product->ugc_codes !== null ? ['ugc_codes' => $product->ugc_codes] : []),
-                        ...($product->vtec_begin !== null ? ['effective' => $product->vtec_begin] : []),
-                        ...($product->vtec_end !== null ? ['expires' => $product->vtec_end] : []),
-                        ...$this->parseMotion($product->event_motion_description),
-                    ],
-                );
-
-                $this->expireIfPast($wwa);
-
-                if ($product->polygon !== null) {
-                    $wkt = $this->polygonToWkt($product->polygon);
-                    DB::statement('UPDATE active_wwas SET polygon = ST_SetSRID(ST_GeomFromText(?), 4269) WHERE id = ?', [$wkt, $wwa->id]);
+                        ...($index === 0 ? $motion : []),
+                    ]);
                 }
             });
         } catch (Throwable $e) {
@@ -120,45 +101,33 @@ class SyncActiveWwa
     }
 
     /**
-     * A freshly-created (not `->fresh()`'d) IngestedProduct instance has
-     * `is_test === null` in memory -- Eloquent doesn't reload the row after
-     * insert, so the `is_test` column's `false` database default never
-     * makes it into the in-memory attribute, even though every real row
-     * does end up `false` in the database. Coalescing here prevents an
-     * explicit NULL write against active_wwas.is_test, which is NOT NULL --
-     * that insert would throw, and since it happens inside this action's
-     * try/catch, the exception would be silently logged and swallowed,
-     * dropping the whole active_wwas row for every real (non-test) product.
+     * The bulletin's stored segments in bulletin order, or -- for a bulletin that has none -- one
+     * unsaved segment carrying its own columns.
+     *
+     * @return Collection<int, IngestedProductSegment>
      */
-    private function isTest(IngestedProduct $product): bool
+    private function segmentsOf(IngestedProduct $product): Collection
     {
-        return $product->is_test ?? false;
-    }
+        $segments = $product->segments()->get();
 
-    private function resolveStatus(?string $vtecAction): string
-    {
-        return match ($vtecAction) {
-            'CAN' => 'Cancelled',
-            'EXP' => 'Expired',
-            default => 'Active',
-        };
-    }
-
-    /**
-     * Demotes an already-Active row to Expired once its currently-recorded
-     * expires timestamp has passed -- covers the common case where NWS lets
-     * a warning lapse with no explicit EXP product ever issued. Only ever
-     * fires against whatever expires value is currently on record (which
-     * might have been set by an EARLIER issuance, not necessarily this
-     * one), since a later touch to the row (e.g. a CAP enrichment, or a
-     * continuation that doesn't itself carry a fresh end time) is exactly
-     * the moment this check should re-run.
-     */
-    private function expireIfPast(ActiveWwa $wwa): void
-    {
-        if ($wwa->status === 'Active' && $wwa->expires !== null && $wwa->expires->isPast()) {
-            $wwa->update(['status' => 'Expired']);
+        if ($segments->isNotEmpty()) {
+            return $segments;
         }
+
+        return collect([new IngestedProductSegment([
+            'position' => 0,
+            'vtec_office' => $product->vtec_office,
+            'vtec_phenomenon' => $product->vtec_phenomenon,
+            'vtec_significance' => $product->vtec_significance,
+            'vtec_event_number' => $product->vtec_event_number,
+            'vtec_year' => $product->vtec_year,
+            'vtec_action' => $product->vtec_action,
+            'vtec_begin' => $product->vtec_begin,
+            'vtec_end' => $product->vtec_end,
+            'product_id' => $product->product_id,
+            'ugc_codes' => $product->ugc_codes,
+            'polygon' => $product->polygon,
+        ])]);
     }
 
     /**
@@ -190,32 +159,6 @@ class SyncActiveWwa
             ->where('received_at', '<=', $capProduct->received_at)
             ->latest('received_at')
             ->first();
-    }
-
-    /**
-     * A PostGIS POLYGON ring needs at least 4 coordinate pairs with the
-     * first repeated as the last. Real LAT...LON/CAP polygons always carry
-     * well more than that, but degenerate input (as low as a single point)
-     * is padded by repeating the last point rather than rejected -- this
-     * mirrors ST_GeomFromText's own tolerance for a zero-area ring (a ring
-     * of identical points is accepted), confirmed directly against this
-     * database.
-     *
-     * @param  array<int, array{lat: float, lon: float}>  $points
-     */
-    private function polygonToWkt(array $points): string
-    {
-        $coords = collect($points)->map(fn (array $p): string => "{$p['lon']} {$p['lat']}");
-
-        if ($coords->first() !== $coords->last()) {
-            $coords->push($coords->first());
-        }
-
-        while ($coords->count() < 4) {
-            $coords->push($coords->last());
-        }
-
-        return 'POLYGON(('.$coords->join(', ').'))';
     }
 
     /**
