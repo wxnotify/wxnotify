@@ -9,12 +9,14 @@ use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Support\Geography\GeographyMatch;
 use App\Support\Timezones;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -27,6 +29,16 @@ use Throwable;
  * AlertCategory::SpcWpc shares WeatherAlerts' product-based matching and
  * geography rules (see matchesGeography()); it additionally filters on
  * risk_levels (see matchesRiskLevel()), which WeatherAlerts doesn't have.
+ *
+ * A VTEC bulletin is a list of sections, each with its own zones, polygon and one or more VTEC
+ * events, stored as IngestedProductSegment rows (see BuildBulletinSegments). A bulletin that has
+ * segments is matched segment by segment, in bulletin order, through IngestedProduct::asSegment():
+ * a segment matches a rule when its own catalog product is one the rule watches and its own zones
+ * and polygon satisfy the rule's matching mode, so every geography method below keeps taking an
+ * IngestedProduct and none of them knows the difference. A rule with any matching segment gets ONE
+ * delivery per channel, carrying every matching segment id; its matched location is the matching
+ * location with the lowest id. A bulletin without segments (non-VTEC products, factory rows) is
+ * matched on its own columns, exactly as before.
  */
 class MatchWeatherAlertRules
 {
@@ -34,7 +46,13 @@ class MatchWeatherAlertRules
 
     public function __invoke(IngestedProduct $product): void
     {
-        if ($product->product_id === null) {
+        $segments = $product->segments()->get();
+
+        $productIds = $segments->isEmpty()
+            ? array_values(array_filter([$product->product_id]))
+            : $segments->pluck('product_id')->filter()->unique()->values()->all();
+
+        if ($productIds === []) {
             return;
         }
 
@@ -42,7 +60,8 @@ class MatchWeatherAlertRules
             $rules = AlertRule::query()
                 ->where('is_active', true)
                 ->whereIn('category', self::PRODUCT_MATCHED_CATEGORIES)
-                ->whereHas('products', fn (Builder $q) => $q->whereKey($product->product_id))
+                ->whereHas('products', fn (Builder $q) => $q->whereKey($productIds))
+                ->when($segments->isNotEmpty(), fn (Builder $query) => $query->with('products'))
                 ->when($product->is_test, fn (Builder $query) => $query->whereHas('user', fn (Builder $q) => $q->where('is_test_account', true)))
                 ->get();
         } catch (Throwable $e) {
@@ -54,13 +73,60 @@ class MatchWeatherAlertRules
             return;
         }
 
-        $rules->each(function (AlertRule $rule) use ($product): void {
-            $match = $this->matchesGeographySafely($rule, $product);
+        $rules->each(function (AlertRule $rule) use ($product, $segments): void {
+            if ($segments->isEmpty()) {
+                $match = $this->matchesGeographySafely($rule, $product);
 
-            if ($match->matched && $this->matchesRiskLevel($rule, $product)) {
-                $this->dispatchOrSuppress($rule, $product, $match->location);
+                if ($match->matched && $this->matchesRiskLevel($rule, $product)) {
+                    $this->dispatchOrSuppress($rule, $product, $match->location);
+                }
+
+                return;
+            }
+
+            [$segmentIds, $location] = $this->matchingSegments($rule, $product, $segments);
+
+            if ($segmentIds !== []) {
+                $this->dispatchOrSuppress($rule, $product, $location, $segmentIds);
             }
         });
+    }
+
+    /**
+     * The segments of this bulletin a rule matches, in bulletin order, and the matching location
+     * with the lowest id among them (null for a rule with no locations to check). A segment counts
+     * when its own catalog product is one the rule watches and its own geography passes the rule's
+     * mode and risk-level filter; each is checked through asSegment()'s copy of the bulletin.
+     *
+     * @param  Collection<int, IngestedProductSegment>  $segments
+     * @return array{0: list<int>, 1: ?Location}
+     */
+    private function matchingSegments(AlertRule $rule, IngestedProduct $product, Collection $segments): array
+    {
+        $watched = $rule->products->modelKeys();
+        $segmentIds = [];
+        $location = null;
+
+        foreach ($segments as $segment) {
+            if (! in_array($segment->product_id, $watched, true)) {
+                continue;
+            }
+
+            $view = $product->asSegment($segment);
+            $match = $this->matchesGeographySafely($rule, $view);
+
+            if (! $match->matched || ! $this->matchesRiskLevel($rule, $view)) {
+                continue;
+            }
+
+            $segmentIds[] = $segment->id;
+
+            if ($match->location !== null && ($location === null || $match->location->id < $location->id)) {
+                $location = $match->location;
+            }
+        }
+
+        return [$segmentIds, $location];
     }
 
     /**
@@ -100,11 +166,16 @@ class MatchWeatherAlertRules
         }
     }
 
-    private function dispatchOrSuppress(AlertRule $rule, IngestedProduct $product, ?Location $matchedLocation): void
+    /**
+     * @param  list<int>  $segmentIds  the matched IngestedProductSegment ids; empty for a bulletin without segments
+     */
+    private function dispatchOrSuppress(AlertRule $rule, IngestedProduct $product, ?Location $matchedLocation, array $segmentIds = []): void
     {
         $suppressed = $this->isWithinQuietHours($rule, $matchedLocation);
+        $segments = $product->matchedSegments($segmentIds);
+        $eventNames = $product->eventNamesFor($segments);
 
-        $rule->notificationChannels->each(function (NotificationChannel $channel) use ($rule, $product, $suppressed, $matchedLocation): void {
+        $rule->notificationChannels->each(function (NotificationChannel $channel) use ($rule, $product, $suppressed, $matchedLocation, $segmentIds, $segments, $eventNames): void {
             try {
                 // A backfilled SPC Convective Outlook row (see
                 // App\Actions\Pipeline\BackfillOutlookRiskAreas) gets
@@ -122,22 +193,26 @@ class MatchWeatherAlertRules
                 }
 
                 if ($suppressed) {
-                    DeliveryLog::create([
+                    $log = DeliveryLog::create([
                         'alert_rule_id' => $rule->id,
                         'notification_channel_id' => $channel->id,
                         'user_id' => $rule->user_id,
                         'channel_type' => $channel->channel_type,
                         'status' => 'suppressed',
                         'category' => $rule->category->value,
-                        'subject' => app(RenderAlertSubject::class)($rule, $product->product, $matchedLocation),
+                        'subject' => app(RenderAlertSubject::class)($rule, $eventNames, $matchedLocation),
                         'ingested_product_id' => $product->id,
                         'dispatched_at' => now(),
                     ]);
 
+                    if ($segments->isNotEmpty()) {
+                        $log->segments()->attach($segments->modelKeys());
+                    }
+
                     return;
                 }
 
-                DeliverWeatherAlert::dispatch($rule->id, $channel->id, $product->id, $matchedLocation?->id);
+                DeliverWeatherAlert::dispatch($rule->id, $channel->id, $product->id, $matchedLocation?->id, $segmentIds);
             } catch (Throwable $e) {
                 logger()->error('Failed to dispatch DeliverWeatherAlert', [
                     'rule_id' => $rule->id,
