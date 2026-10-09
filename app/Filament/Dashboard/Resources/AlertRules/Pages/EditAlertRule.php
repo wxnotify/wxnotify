@@ -2,6 +2,7 @@
 
 namespace App\Filament\Dashboard\Resources\AlertRules\Pages;
 
+use App\Actions\Alerts\SaveAlertRule;
 use App\Enums\AlertCategory;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
@@ -70,48 +71,18 @@ class EditAlertRule extends EditRecord
     }
 
     /**
-     * AlertRuleForm::clearAlertTemplateIfCategoryUnsupported() clears
-     * alert_template_id in live form STATE the moment category changes
-     * away from weather_alerts/spc_wpc, but that alone doesn't survive a
-     * save on THIS page: alertTemplateSelect() is hidden (not just
-     * disabled) once category no longer supports it, and Filament's
-     * default isDehydratedWhenHidden(false) means dehydrateState() removes
-     * a hidden field's key from $data entirely (confirmed by reading
-     * vendor/filament/schemas/src/Components/Concerns/HasState.php) rather
-     * than dehydrating its current (already-cleared) value. Since
-     * EditRecord's default handleRecordUpdate() does $record->update($data)
-     * -- plain mass assignment -- a key that's simply absent from $data
-     * leaves that column untouched, so a rule that already had
-     * alert_template_id set before the category change keeps its stale
-     * value in the database even though the in-wizard state (and a fresh
-     * Create) show it cleared. Force it here as the actual point that
-     * writes to the database, independent of dehydration.
+     * Persistence rules (units, risk-level flattening, clearing columns and the template that
+     * the saved category does not own) live in SaveAlertRule, which the mobile API shares. A
+     * hidden field is dropped from the dehydrated data, so the action, not the form state, is
+     * what keeps a stale value from surviving a category change.
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        if (! in_array($data['category'] ?? null, [AlertCategory::WeatherAlerts->value, AlertCategory::SpcWpc->value], true)) {
-            $data['alert_template_id'] = null;
-        }
-
-        // Every risk checklist is hidden once no selected product offers risk
-        // levels, and Filament then drops the whole `risk_levels` key, which
-        // would leave the old levels stored; so SPC & WPC always writes it.
-        if (($data['category'] ?? null) === AlertCategory::SpcWpc->value) {
-            $data['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels'] ?? []);
-        }
-
-        return AlertRuleFormUnits::toStorage($data, Units::for(auth()->user()), $this->record);
+        return app(SaveAlertRule::class)->attributes(auth()->user(), $data, $this->record);
     }
 
     protected function afterSave(): void
     {
-        // ->filter(is_numeric(...)) is defense-in-depth — see
-        // AlertRuleForm::seedProductIdsDefaults()'s docblock and
-        // CreateAlertRule::afterCreate()'s matching comment for why.
-        $this->record->products()->sync(
-            collect($this->data['product_ids'] ?? [])->flatten()->filter(fn ($id): bool => is_numeric($id))->values()->all()
-        );
-        $this->record->notificationChannels()->sync($this->data['channel_ids'] ?? []);
-        $this->record->locations()->sync($this->data['location_ids'] ?? []);
+        app(SaveAlertRule::class)->syncRelations($this->record, $this->data);
     }
 }
