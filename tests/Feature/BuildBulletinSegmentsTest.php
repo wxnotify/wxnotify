@@ -5,6 +5,9 @@ use App\Actions\Pipeline\ParseBulletinSegments;
 use App\Models\IngestedProduct;
 use App\Models\IngestedProductSegment;
 use App\Models\Product;
+use Illuminate\Support\Carbon;
+
+afterEach(fn () => Carbon::setTestNow());
 
 /** A bulletin made without the observer, so no job builds segments behind the test's back. */
 function buildSegmentsBulletin(array $attributes = []): IngestedProduct
@@ -105,4 +108,13 @@ test('a parse failure propagates and leaves the existing segments in place', fun
 
     expect(fn () => (new BuildBulletinSegments($failing))($bulletin))->toThrow(RuntimeException::class, 'boom')
         ->and(IngestedProductSegment::count())->toBe(3);
+});
+
+test('segments rebuilt in a later year keep the year the bulletin was stamped with', function () {
+    Carbon::setTestNow('2027-01-03 12:00:00');
+    $bulletin = buildSegmentsFixtureBulletin('MWW_MOB', ['vtec_year' => 2026]);
+
+    app(BuildBulletinSegments::class)($bulletin);
+
+    expect($bulletin->segments()->pluck('vtec_year')->unique()->all())->toBe([2026]);
 });

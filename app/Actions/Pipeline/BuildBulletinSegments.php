@@ -32,6 +32,10 @@ class BuildBulletinSegments
             $rows = [$this->fromBulletin($bulletin)];
         }
 
+        if ($bulletin->vtec_year !== null) {
+            $rows = array_map(fn (array $row): array => [...$row, 'vtec_year' => $bulletin->vtec_year], $rows);
+        }
+
         DB::transaction(function () use ($bulletin, $rows): void {
             $bulletin->segments()->delete();
 
