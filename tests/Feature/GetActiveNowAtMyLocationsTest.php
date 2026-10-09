@@ -7,6 +7,7 @@ use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\User;
@@ -293,4 +294,40 @@ test('an active event whose codes are unknown still reads Weather alert', functi
     $event = (new GetActiveNowAtMyLocations)($this->user)['events'][0];
 
     expect($event['event'])->toBe('Weather alert')->and($event['family'])->toBeNull();
+});
+
+test('a delivery that covered the event as a later section of its bulletin counts as alerted', function () {
+    $wwa = activeNowWarning();
+    $rule = activeNowRule($this->user, 'Gulf rule');
+    // The bulletin's own first VTEC line is a different event; the delivery covered this one through a segment.
+    $bulletin = IngestedProduct::factory()->createQuietly([
+        'vtec_office' => 'KBOU', 'vtec_phenomenon' => 'FF', 'vtec_significance' => 'W', 'vtec_event_number' => '0001', 'vtec_year' => 2026, 'is_test' => false,
+    ]);
+    $segment = IngestedProductSegment::factory()->for($bulletin)->create(ActiveWwa::vtecKeyFor($wwa));
+    DeliveryLog::factory()->for($this->user)->create([
+        'ingested_product_id' => $bulletin->id, 'alert_rule_id' => $rule->id, 'status' => 'success', 'dispatched_at' => now()->subMinutes(30),
+    ])->segments()->attach($segment);
+
+    $event = (new GetActiveNowAtMyLocations)($this->user)['events'][0];
+
+    expect($event['status'])->toBe('alerted')
+        ->and($event['alerted_via'])->toBe(['Gulf rule']);
+});
+
+test('a delivery linked only to other events of its bulletin does not count for an event the bulletin\'s first VTEC line names', function () {
+    $wwa = activeNowWarning();
+    $bulletin = IngestedProduct::factory()->createQuietly([...ActiveWwa::vtecKeyFor($wwa), 'is_test' => false]);
+    $otherEvent = IngestedProductSegment::factory()->for($bulletin)->create([...ActiveWwa::vtecKeyFor($wwa), 'vtec_event_number' => '0999']);
+    DeliveryLog::factory()->for($this->user)->create([
+        'ingested_product_id' => $bulletin->id, 'status' => 'success', 'dispatched_at' => now()->subMinutes(30),
+    ])->segments()->attach($otherEvent);
+
+    expect((new GetActiveNowAtMyLocations)($this->user)['events'][0]['status'])->toBe('none');
+});
+
+test('a delivery with no linked events still counts through its bulletin\'s VTEC columns', function () {
+    $wwa = activeNowWarning();
+    activeNowDelivery($this->user, $wwa, 'success');
+
+    expect((new GetActiveNowAtMyLocations)($this->user)['events'][0]['status'])->toBe('alerted');
 });

@@ -9,6 +9,7 @@ use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\Timezones;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -19,6 +20,9 @@ use Illuminate\Support\Facades\Cache;
  * delivery_logs rows for the same VTEC event (the five vtec_* columns an
  * IngestedProduct shares with ActiveWwa::vtecKeyFor(), non-test only), so it
  * reuses the real matching result instead of duplicating MatchWeatherAlertRules.
+ * A delivery that has linked events (delivery_log_segment) covers exactly those
+ * events; a delivery logged before segments existed has none and is matched
+ * through its bulletin's vtec_* columns.
  * A warning issued before an alert existed therefore reads "none". Precedence
  * per event: alerted, held (quiet hours), failed, none.
  *
@@ -94,7 +98,15 @@ class GetActiveNowAtMyLocations
             ->where('user_id', $user->id)
             ->whereIn('status', ['success', 'suppressed', 'failure'])
             ->where('dispatched_at', '>=', $wwa->created_at->copy()->subDay())
-            ->whereIn('ingested_product_id', IngestedProduct::query()->select('id')->where(ActiveWwa::vtecKeyFor($wwa))->where('is_test', false))
+            ->where(function (Builder $query) use ($wwa): void {
+                $query->whereHas('segments', function (Builder $segments) use ($wwa): void {
+                    $segments->where(ActiveWwa::vtecKeyFor($wwa))
+                        ->whereHas('ingestedProduct', fn (Builder $bulletin) => $bulletin->where('is_test', false));
+                })->orWhere(function (Builder $unlinked) use ($wwa): void {
+                    $unlinked->doesntHave('segments')
+                        ->whereIn('ingested_product_id', IngestedProduct::query()->select('id')->where(ActiveWwa::vtecKeyFor($wwa))->where('is_test', false));
+                });
+            })
             ->with(['alertRule.products', 'alertRule.location'])
             ->orderByDesc('dispatched_at')
             ->get();
