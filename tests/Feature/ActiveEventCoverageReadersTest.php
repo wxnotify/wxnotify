@@ -175,3 +175,48 @@ test('a follow-up statement with no polygon is matched against the event\'s zone
     Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->ruleId === $insideRule->id);
     Queue::assertNotPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->ruleId === $outsideRule->id);
 });
+
+/** An event whose zone A (COZ040) is Active with a polygon around 40,-105 and zone B (COZ041) is Cancelled with a polygon around 41,-103. */
+function coverageReaderSplitEventSetup(array $statement): array
+{
+    Queue::fake();
+    $flashFlood = Product::where('code', 'FF.W')->sole();
+    $key = ['vtec_office' => 'KBOU', 'vtec_phenomenon' => 'FF', 'vtec_significance' => 'W', 'vtec_event_number' => '0043', 'vtec_year' => 2026];
+    $event = ActiveWwa::factory()->create(['product_id' => $flashFlood->id, ...$key, 'ugc_codes' => ['COZ040']]);
+    ActiveWwaArea::factory()->for($event)->withPolygon('POLYGON((-105.1 39.9,-105.1 40.1,-104.9 40.1,-104.9 39.9,-105.1 39.9))')->create(['ugc_code' => 'COZ040']);
+    ActiveWwaArea::factory()->for($event)->withPolygon('POLYGON((-103.1 40.9,-103.1 41.1,-102.9 41.1,-102.9 40.9,-103.1 40.9))')->create(['ugc_code' => 'COZ041', 'status' => 'Cancelled']);
+    $bulletin = IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create([
+        ...$key, 'product_id' => $flashFlood->id, 'vtec_action' => 'CON', 'cccc' => 'kbou', ...$statement,
+    ]));
+
+    return [$flashFlood, $bulletin];
+}
+
+test('a follow-up statement with no polygon is matched only against the polygons of the zones it names', function () {
+    [$flashFlood, $statement] = coverageReaderSplitEventSetup(['ugc_codes' => ['COZ040'], 'polygon' => null]);
+    $inCancelledZone = Location::factory()->create(['lat' => 41.0, 'lng' => -103.0, 'forecast_zone_ugc' => 'COZ099']);
+    $inNamedZone = Location::factory()->create(['lat' => 40.0, 'lng' => -105.0, 'forecast_zone_ugc' => 'COZ099']);
+    $cancelledRule = coverageReaderPolygonRule($inCancelledZone, $flashFlood);
+    $namedRule = coverageReaderPolygonRule($inNamedZone, $flashFlood);
+
+    (new MatchWeatherAlertRules)($statement);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->ruleId === $namedRule->id);
+    Queue::assertNotPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->ruleId === $cancelledRule->id);
+});
+
+test('a follow-up statement that carries its own polygon is matched by it, not by the event\'s older zone polygons', function () {
+    [$flashFlood, $statement] = coverageReaderSplitEventSetup([
+        'ugc_codes' => ['COZ040'],
+        'polygon' => [['lat' => 39.0, 'lon' => -108.1], ['lat' => 39.0, 'lon' => -107.9], ['lat' => 39.2, 'lon' => -107.9], ['lat' => 39.2, 'lon' => -108.1]],
+    ]);
+    $inOwnPolygon = Location::factory()->create(['lat' => 39.1, 'lng' => -108.0, 'forecast_zone_ugc' => 'COZ099']);
+    $inOlderZonePolygon = Location::factory()->create(['lat' => 40.0, 'lng' => -105.0, 'forecast_zone_ugc' => 'COZ099']);
+    $ownRule = coverageReaderPolygonRule($inOwnPolygon, $flashFlood);
+    $olderRule = coverageReaderPolygonRule($inOlderZonePolygon, $flashFlood);
+
+    (new MatchWeatherAlertRules)($statement);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->ruleId === $ownRule->id);
+    Queue::assertNotPushed(DeliverWeatherAlert::class, fn (DeliverWeatherAlert $job): bool => $job->ruleId === $olderRule->id);
+});

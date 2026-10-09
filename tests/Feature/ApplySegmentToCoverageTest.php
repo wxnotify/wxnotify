@@ -231,3 +231,9 @@ test('a saved segment is linked from the zones it set', function () {
 
     expect($wwa->areas()->pluck('latest_segment_id')->unique()->all())->toBe([$segment->id]);
 });
+
+test('a zone repeated in the segment\'s list is applied once, without error', function () {
+    $wwa = coverageApply(['ugc_codes' => ['FLZ206', 'FLZ206']]);
+
+    expect($wwa->areas()->pluck('ugc_code')->all())->toBe(['FLZ206']);
+});

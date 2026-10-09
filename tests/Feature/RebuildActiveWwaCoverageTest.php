@@ -119,7 +119,7 @@ test('--days widens the window', function () {
 
     $this->artisan('active-wwas:rebuild', ['--days' => 7])->assertSuccessful();
 
-    expect(rebuildZoneStates($stale))->toBe(['FLZ206' => 'Active']);
+    expect(rebuildZoneStates($stale))->toBe(['FLZ203' => 'Active', 'FLZ206' => 'Active']);
 });
 
 test('a test event is rebuilt only from test bulletins', function () {
@@ -129,7 +129,7 @@ test('a test event is rebuilt only from test bulletins', function () {
 
     $this->artisan('active-wwas:rebuild')->assertSuccessful();
 
-    expect(rebuildZoneStates($real))->toBe(['ALZ266' => 'Active']);
+    expect(rebuildZoneStates($real))->toBe(['ALZ266' => 'Active', 'FLZ203' => 'Active']);
 });
 
 test('sends nothing, queues nothing and writes no delivery log', function () {
@@ -147,4 +147,15 @@ test('--days must be at least 1', function () {
     $this->artisan('active-wwas:rebuild', ['--days' => 0])
         ->expectsOutputToContain('--days must be at least 1')
         ->assertFailed();
+});
+
+test('keeps a zone row that no stored bulletin names, while rebuilding the zones they do', function () {
+    $event = rebuildCollapsedEvent();
+    ActiveWwaArea::factory()->for($event)->create(['ugc_code' => 'FLZ299', 'status' => 'Active', 'expires' => null]);
+    rebuildStoredMessage('FLZ206', 'NEW', now()->subHours(6));
+    rebuildStoredMessage('FLZ203', 'CAN', now()->subHour());
+
+    $this->artisan('active-wwas:rebuild')->assertSuccessful();
+
+    expect(rebuildZoneStates($event))->toBe(['FLZ203' => 'Cancelled', 'FLZ206' => 'Active', 'FLZ299' => 'Active']);
 });

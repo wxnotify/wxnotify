@@ -317,13 +317,8 @@ class MatchWeatherAlertRules
         $lng = (float) $location->lng;
         $lat = (float) $location->lat;
 
-        $activeWwaResult = $this->matchesActiveWwaPolygon($product, $lng, $lat);
-        if ($activeWwaResult !== null) {
-            return $activeWwaResult;
-        }
-
         if ($product->polygon === null) {
-            return null;
+            return $this->matchesActiveWwaPolygon($product, $lng, $lat);
         }
 
         $wkt = $this->polygonToWkt($product->polygon);
@@ -337,10 +332,12 @@ class MatchWeatherAlertRules
     }
 
     /**
-     * A VTEC-class product's persisted zone polygons take priority over the triggering row's own
-     * (possibly null on a continuation statement like SVS/FFS) polygon -- see
-     * ApplySegmentToCoverage, which is what keeps them current across an event's whole lifetime.
-     * The location is covered if any zone row's polygon contains it. Returns null (not false) both
+     * Read only for a statement that carries no polygon of its own (a continuation like SVS/FFS):
+     * a polygon the bulletin or segment does carry is the authority, never the event's older zone
+     * polygons (a zone cancelled earlier keeps its old one). The persisted zone polygons are kept
+     * current by ApplySegmentToCoverage across an event's whole lifetime; when the statement names
+     * zones, only those zones' polygons are consulted, else all of the event's. The location is
+     * covered if any such zone row's polygon contains it. Returns null (not false) both
      * when the product isn't VTEC-class at all and when the event has no polygon, so the caller
      * falls back to the row's own polygon field either way. An event with no zone rows at all
      * (a row from before they existed) is read from its own polygon column.
@@ -359,9 +356,12 @@ class MatchWeatherAlertRules
             return null;
         }
 
+        $named = array_values(array_unique($product->ugc_codes ?? []));
+        $restriction = $named === [] ? '' : ' AND ugc_code IN ('.implode(', ', array_fill(0, count($named), '?')).')';
+
         $areas = DB::selectOne(
-            'SELECT count(*) AS zones, count(polygon) AS polygons, coalesce(bool_or(ST_Contains(polygon, ST_SetSRID(ST_MakePoint(?, ?), 4269))), false) AS contains FROM active_wwa_areas WHERE active_wwa_id = ?',
-            [$lng, $lat, $activeWwa->id],
+            'SELECT count(*) AS zones, count(polygon) AS polygons, coalesce(bool_or(ST_Contains(polygon, ST_SetSRID(ST_MakePoint(?, ?), 4269))), false) AS contains FROM active_wwa_areas WHERE active_wwa_id = ?'.$restriction,
+            [$lng, $lat, $activeWwa->id, ...$named],
         );
 
         if ((int) $areas->zones > 0) {

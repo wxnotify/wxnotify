@@ -61,7 +61,8 @@ class ApplySegmentToCoverage
 
     private function applyToZones(ActiveWwa $wwa, IngestedProduct $bulletin, IngestedProductSegment $segment): void
     {
-        $zones = $segment->ugc_codes ?? [];
+        // A CAP message may repeat a geocode; one upsert cannot touch the same row twice.
+        $zones = array_values(array_unique($segment->ugc_codes ?? []));
 
         if ($zones === []) {
             return;

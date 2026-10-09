@@ -18,8 +18,9 @@ use Illuminate\Support\Str;
  * number of days.
  *
  * For every Active event with a segment from a bulletin stored in the last N days it deletes the
- * event's zone rows and replays ALL of the event's stored segments, oldest bulletin first,
- * through ApplySegmentToCoverage in one transaction. Cancelled and expired events are left alone.
+ * event's zone rows that its stored segments mention (a zone known only from an older unparsed
+ * bulletin, or only from the back-fill, is kept as it is) and replays ALL of the event's stored
+ * segments, oldest bulletin first, through ApplySegmentToCoverage in one transaction. Cancelled and expired events are left alone.
  * Idempotent, and it only writes active_wwas and active_wwa_areas: no matching, no job, no
  * delivery log, so it cannot send a notification.
  */
@@ -59,9 +60,12 @@ class RebuildActiveWwaCoverage extends Command
             ->chunkById(100, function ($events) use ($apply, &$rebuilt): void {
                 foreach ($events as $wwa) {
                     DB::transaction(function () use ($wwa, $apply): void {
-                        $wwa->areas()->delete();
+                        $segments = $this->storedSegments($wwa);
+                        $mentioned = $segments->pluck('ugc_codes')->flatten()->filter()->unique()->values()->all();
 
-                        foreach ($this->storedSegments($wwa) as $segment) {
+                        $wwa->areas()->whereIn('ugc_code', $mentioned)->delete();
+
+                        foreach ($segments as $segment) {
                             $apply($segment->ingestedProduct, $segment);
                         }
                     });
