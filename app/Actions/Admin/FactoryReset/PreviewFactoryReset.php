@@ -23,6 +23,7 @@ class PreviewFactoryReset
                 'ingested_products' => DB::table('ingested_products')->count(),
                 'ingested_product_segments' => DB::table('ingested_product_segments')->count(),
                 'active_wwas' => DB::table('active_wwas')->count(),
+                'active_wwa_areas' => DB::table('active_wwa_areas')->count(),
                 'delivery_logs' => DB::table('delivery_logs')->count(),
             ];
         }

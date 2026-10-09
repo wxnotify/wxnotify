@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'product_id', 'vtec_office', 'vtec_phenomenon', 'vtec_significance', 'vtec_event_number', 'vtec_year',
@@ -68,6 +69,15 @@ class ActiveWwa extends Model
     public function latestIngestedProduct(): BelongsTo
     {
         return $this->belongsTo(IngestedProduct::class, 'latest_ingested_product_id');
+    }
+
+    /**
+     * The zones this event is (or was) in effect in. Coverage is read from here, not from this row's
+     * own ugc_codes/polygon, which only describe the latest bulletin.
+     */
+    public function areas(): HasMany
+    {
+        return $this->hasMany(ActiveWwaArea::class);
     }
 
     /**
