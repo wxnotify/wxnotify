@@ -1,12 +1,6 @@
-@use('App\Icons\Ios')
-@use('App\Icons\Android')
-
 <native:top-bar title="Account" display-mode="large"></native:top-bar>
 
-<native:bottom-nav>
-    <native:bottom-nav-item id="alerts" label="Alerts" url="/" icon="notifications" :ios-icon="Ios::Bell" :android-icon="Android::Notifications"></native:bottom-nav-item>
-    <native:bottom-nav-item id="account" label="Account" url="/account" icon="person" :ios-icon="Ios::Person" :android-icon="Android::Person" active="true"></native:bottom-nav-item>
-</native:bottom-nav>
+@include('native.partials.tabs', ['active' => 'account'])
 
 <native:column class="w-full h-full p-4 gap-4 bg-theme-background">
     @if ($profile !== null)

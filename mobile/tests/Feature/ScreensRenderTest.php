@@ -7,6 +7,7 @@ use App\NativeComponents\AuthCallback;
 use App\NativeComponents\AuthDenied;
 use App\NativeComponents\LocationPrompt;
 use App\NativeComponents\PushPrompt;
+use App\NativeComponents\RulesScreen;
 use App\NativeComponents\SignInScreen;
 use App\Providers\NativeServiceProvider;
 use App\Support\TokenStore;
@@ -128,6 +129,21 @@ test('the account screen renders its title, tabs, the profile and a sign-out but
         ->assertHasTab('Alerts')
         ->assertElement('text')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Sign out');
+});
+
+test('the rules screen renders its title, tabs, an add button and a tappable row with a switch', function () {
+    (new TokenStore)->put('9|secret');
+    Http::fake(['wx.test/api/v1/alert-rules' => Http::response(['data' => [['id' => 1, 'name' => 'Freeze', 'display_name' => 'Freeze', 'category' => 'threshold', 'category_label' => 'Threshold Alerts', 'is_active' => true]]])]);
+
+    Native::test(RulesScreen::class)
+        ->assertNavTitle('Alert rules')
+        ->assertHasTabBar()
+        ->assertTabActive('Rules')
+        ->assertHasTab('Locations')
+        ->assertElement('scroll_view')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Add rule')
+        ->assertElement('pressable')
+        ->assertElement('toggle', fn (array $toggle) => $toggle['props']['value'] === true);
 });
 
 test('the native UI plugin is enabled for the native build', function () {

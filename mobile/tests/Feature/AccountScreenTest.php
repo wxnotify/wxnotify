@@ -304,3 +304,13 @@ test('coming back to the screen re-renders from the current native status', func
 
     $screen->call('onResume')->assertSee('about every 5 minutes')->assertDontSee('Waiting for location permission');
 });
+
+test('the tab bar offers alerts, rules, locations and account', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+
+    $screen = Native::test(AccountScreen::class);
+
+    foreach (['Alerts', 'Rules', 'Locations', 'Account'] as $tab) {
+        $screen->assertHasTab($tab);
+    }
+});

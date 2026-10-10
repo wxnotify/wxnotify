@@ -434,3 +434,13 @@ test('opening the feed while location sharing is off sends nothing about it', fu
 
     Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'location-sharing'));
 });
+
+test('the tab bar offers alerts, rules, locations and account', function () {
+    Http::fake(['*' => Http::response(['data' => [], 'meta' => ['next_cursor' => null]])]);
+
+    $screen = Native::test(AlertsScreen::class);
+
+    foreach (['Alerts', 'Rules', 'Locations', 'Account'] as $tab) {
+        $screen->assertHasTab($tab);
+    }
+});
