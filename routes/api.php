@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AlertController;
+use App\Http\Controllers\Api\V1\AlertRuleController;
 use App\Http\Controllers\Api\V1\AlertRuleOptionsController;
 use App\Http\Controllers\Api\V1\AppTokenController;
 use App\Http\Controllers\Api\V1\LocationController;
@@ -33,6 +34,12 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/me', MeController::class)->name('api.v1.me');
         Route::get('/alerts', [AlertController::class, 'index'])->name('api.v1.alerts.index');
         Route::get('/alerts/{id}', [AlertController::class, 'show'])->whereNumber('id')->name('api.v1.alerts.show');
+        Route::get('/alert-rules', [AlertRuleController::class, 'index'])->name('api.v1.alert-rules.index');
+        Route::post('/alert-rules', [AlertRuleController::class, 'store'])->name('api.v1.alert-rules.store');
+        Route::get('/alert-rules/{id}', [AlertRuleController::class, 'show'])->whereNumber('id')->name('api.v1.alert-rules.show');
+        Route::put('/alert-rules/{id}', [AlertRuleController::class, 'update'])->whereNumber('id')->name('api.v1.alert-rules.update');
+        Route::patch('/alert-rules/{id}', [AlertRuleController::class, 'setActive'])->whereNumber('id')->name('api.v1.alert-rules.set-active');
+        Route::delete('/alert-rules/{id}', [AlertRuleController::class, 'destroy'])->whereNumber('id')->name('api.v1.alert-rules.destroy');
         Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
         Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
         Route::get('/zones', ZoneController::class)->name('api.v1.zones');
