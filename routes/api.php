@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\AlertRuleController;
 use App\Http\Controllers\Api\V1\AlertRuleOptionsController;
 use App\Http\Controllers\Api\V1\AppTokenController;
+use App\Http\Controllers\Api\V1\ChannelController;
 use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\LocationSharingController;
 use App\Http\Controllers\Api\V1\MeController;
@@ -47,6 +48,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/locations/{id}', [SavedLocationController::class, 'show'])->whereNumber('id')->name('api.v1.locations.show');
         Route::put('/locations/{id}', [SavedLocationController::class, 'update'])->whereNumber('id')->name('api.v1.locations.update');
         Route::delete('/locations/{id}', [SavedLocationController::class, 'destroy'])->whereNumber('id')->name('api.v1.locations.destroy');
+        Route::get('/channel-types', [ChannelController::class, 'types'])->name('api.v1.channel-types');
+        Route::get('/channels', [ChannelController::class, 'index'])->name('api.v1.channels.index');
         Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
         Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
         Route::get('/zones', ZoneController::class)->name('api.v1.zones');
