@@ -127,9 +127,7 @@ test('the account screen renders its title, tabs, the profile and a sign-out but
 
     Native::test(AccountScreen::class)
         ->assertNavTitle('Account')
-        ->assertHasTabBar()
-        ->assertTabActive('Settings')
-        ->assertHasTab('Alerts')
+        ->assertMissingElement('bottom_nav_item')
         ->assertElement('text')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Sign out');
 });
@@ -140,9 +138,7 @@ test('the rules screen renders its title, tabs, an add button and a tappable row
 
     Native::test(RulesScreen::class)
         ->assertNavTitle('Alert rules')
-        ->assertHasTabBar()
-        ->assertTabActive('Settings')
-        ->assertHasTab('Alerts')
+        ->assertMissingElement('bottom_nav_item')
         ->assertElement('scroll_view')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Add rule')
         ->assertElement('pressable')
@@ -187,9 +183,7 @@ test('the locations screen renders its title, tabs, an add button and a tappable
 
     Native::test(LocationsScreen::class)
         ->assertNavTitle('Locations')
-        ->assertHasTabBar()
-        ->assertTabActive('Settings')
-        ->assertHasTab('Alerts')
+        ->assertMissingElement('bottom_nav_item')
         ->assertElement('scroll_view')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Add location')
         ->assertElement('pressable')

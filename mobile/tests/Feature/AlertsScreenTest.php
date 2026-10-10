@@ -467,14 +467,14 @@ test('tapping Settings opens a menu of Rules, Locations and Account', function (
         ->assertSee('Account');
 });
 
-test('the Settings menu goes to the page chosen and closes', function (string $method, string $uri) {
+test('the Settings menu pushes the page chosen and closes', function (string $method, string $uri) {
     Http::fake(['*' => Http::response(feedResponse([]))]);
 
     Native::test(AlertsScreen::class)
         ->press('openSettingsMenu')
         ->press($method)
         ->assertSet('settingsMenuOpen', false)
-        ->assertReplacedWith($uri);
+        ->assertNavigatedTo($uri);
 })->with([
     ['openRules', '/rules'],
     ['openLocations', '/locations'],

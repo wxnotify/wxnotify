@@ -9,7 +9,6 @@ use App\Services\PushRegistration;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\Concerns\HandlesPushToken;
-use App\Support\Concerns\OpensSettingsMenu;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use App\Support\PushState;
@@ -24,7 +23,6 @@ use Throwable;
 class AccountScreen extends NativeComponent
 {
     use HandlesPushToken;
-    use OpensSettingsMenu;
     use RequiresSignIn;
 
     /** @var array<string, mixed>|null */
@@ -33,11 +31,6 @@ class AccountScreen extends NativeComponent
     public ?string $pushMessage = null;
 
     public ?string $locationMessage = null;
-
-    protected function settingsPage(): ?string
-    {
-        return '/account';
-    }
 
     public function mount(): void
     {

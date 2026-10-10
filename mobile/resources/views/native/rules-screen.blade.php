@@ -1,6 +1,4 @@
-<native:top-bar title="Alert rules" display-mode="large"></native:top-bar>
-
-@include('native.partials.tabs', ['active' => 'settings'])
+<native:top-bar title="Alert rules" show-navigation-icon="true"></native:top-bar>
 
 <native:column class="w-full h-full bg-theme-background">
     @if ($offline)

@@ -26,8 +26,7 @@ test('the account shows the subscriber, their plan and the app version', functio
         ->assertSee('Pat Smith')
         ->assertSee('pat@example.com')
         ->assertSee('Plus')
-        ->assertSee('1.2.3')
-        ->assertTabActive('Settings');
+        ->assertSee('1.2.3');
 
     expect((new LocalCache)->profile()['timezone'])->toBe('America/Chicago');
 });
@@ -318,16 +317,4 @@ test('coming back to the screen re-renders from the current native status', func
     $this->geolocation->status = sharingStatus();
 
     $screen->call('onResume')->assertSee('about every 5 minutes')->assertDontSee('Waiting for location permission');
-});
-
-test('Account sits under the Settings tab, and choosing it again only closes the menu', function () use ($profile) {
-    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
-
-    Native::test(AccountScreen::class)
-        ->assertHasTab('Alerts')
-        ->assertTabActive('Settings')
-        ->press('openSettingsMenu')
-        ->press('openAccount')
-        ->assertSet('settingsMenuOpen', false)
-        ->assertNoNavigation();
 });

@@ -13,7 +13,6 @@ use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\AlertPresenter;
 use App\Support\Concerns\HandlesPushToken;
-use App\Support\Concerns\OpensSettingsMenu;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use Illuminate\Support\Carbon;
@@ -27,7 +26,6 @@ use Native\Mobile\Facades\Browser;
 class AlertsScreen extends NativeComponent
 {
     use HandlesPushToken;
-    use OpensSettingsMenu;
     use RequiresSignIn;
 
     private const RESUME_REFRESH_AFTER_SECONDS = 60;
@@ -55,6 +53,9 @@ class AlertsScreen extends NativeComponent
     public ?string $lastPageLoadedAt = null;
 
     public ?string $timezone = null;
+
+    /** The Settings tab's menu (a bottom sheet: a bottom-bar item cannot carry a dropdown). */
+    public bool $settingsMenuOpen = false;
 
     public function mount(): void
     {
@@ -157,6 +158,41 @@ class AlertsScreen extends NativeComponent
     {
         return $this->lastPageLoadedAt !== null
             && Carbon::parse($this->lastPageLoadedAt)->diffInMilliseconds(now(), true) < self::LOAD_MORE_DEBOUNCE_SECONDS * 1000;
+    }
+
+    public function openSettingsMenu(): void
+    {
+        $this->settingsMenuOpen = true;
+    }
+
+    public function closeSettingsMenu(): void
+    {
+        $this->settingsMenuOpen = false;
+    }
+
+    public function openRules(): void
+    {
+        $this->openSettingsPage('/rules');
+    }
+
+    public function openLocations(): void
+    {
+        $this->openSettingsPage('/locations');
+    }
+
+    public function openAccount(): void
+    {
+        $this->openSettingsPage('/account');
+    }
+
+    /**
+     * Pushes the page over Alerts. The Settings pages carry no tab bar of their own: the bar swallows a tap
+     * on the tab it considers active, so Settings could not be tapped again from a page it owned.
+     */
+    private function openSettingsPage(string $uri): void
+    {
+        $this->settingsMenuOpen = false;
+        $this->navigate($uri);
     }
 
     /**

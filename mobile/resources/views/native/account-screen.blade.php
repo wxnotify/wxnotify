@@ -1,6 +1,4 @@
-<native:top-bar title="Account" display-mode="large"></native:top-bar>
-
-@include('native.partials.tabs', ['active' => 'settings'])
+<native:top-bar title="Account" show-navigation-icon="true"></native:top-bar>
 
 <native:column class="w-full h-full p-4 gap-4 bg-theme-background">
     @if ($profile !== null)

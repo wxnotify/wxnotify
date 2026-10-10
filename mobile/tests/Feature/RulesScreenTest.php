@@ -32,8 +32,7 @@ test('the rules list shows each rule\'s name, its category and an on/off switch'
         ->assertSee('Weather Alerts')
         ->assertSee('Off')
         ->assertElement('toggle', fn (array $node) => ($node['props']['value'] ?? null) === false)
-        ->assertHasTab('Alerts')
-        ->assertTabActive('Settings');
+        ->assertMissingElement('bottom_nav_item');
 });
 
 test('the list is remembered for offline use', function () {
