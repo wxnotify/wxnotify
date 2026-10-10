@@ -81,9 +81,8 @@ class MapScreen extends NativeComponent
 
         app(LocalCache::class)->rememberMap($snapshot);
 
-        if ($page !== $this->html) {
-            $this->html = $page;
-        }
+        // The page string is deterministic per snapshot: an unchanged snapshot assigns an identical string, so the web view is not reloaded.
+        $this->html = $page;
 
         $this->snapshot = app(LocalCache::class)->map() ?? [];
         $this->offline = false;
@@ -106,13 +105,27 @@ class MapScreen extends NativeComponent
     }
 
     /**
+     * The family (Warning, Watch), then when it ends: "Warning · Ends in 1 hour", or "Ended 3 hours ago" for a
+     * remembered warning whose end has passed.
+     *
      * @param  array<string, mixed>  $warning
      */
     public function warningSubtitle(array $warning): string
     {
-        return filled($warning['expires'] ?? null)
-            ? 'Ends '.Carbon::parse($warning['expires'])->diffForHumans()
-            : 'No end time given';
+        $parts = [];
+
+        if (filled($warning['family'] ?? null)) {
+            $parts[] = ucfirst((string) $warning['family']);
+        }
+
+        if (blank($warning['expires'] ?? null)) {
+            $parts[] = 'No end time given';
+        } else {
+            $expires = Carbon::parse($warning['expires']);
+            $parts[] = $expires->isPast() ? 'Ended '.$expires->diffForHumans() : 'Ends '.$expires->diffForHumans();
+        }
+
+        return implode(' · ', $parts);
     }
 
     /**

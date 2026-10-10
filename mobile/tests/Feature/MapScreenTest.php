@@ -17,7 +17,7 @@ function mapScreenSnapshot(array $overrides = []): array
             ['id' => 2, 'label' => 'Pixel 9', 'type' => 'mobile', 'lat' => 40.0, 'lng' => -105.0, 'stale' => true],
         ],
         'warnings' => [
-            ['id' => 7, 'event' => 'Tornado Warning', 'family' => 'warning', 'color' => '#ff0000', 'headline' => 'Issued', 'expires' => '2026-10-10T19:00:00+00:00', 'view_url' => 'https://wx.test/view-product/abc', 'geometry' => ['type' => 'GeometryCollection', 'geometries' => []]],
+            ['id' => 7, 'event' => 'Tornado Warning', 'family' => 'warning', 'color' => '#ff0000', 'headline' => 'Issued', 'expires' => now()->addHour()->toIso8601String(), 'view_url' => 'https://wx.test/view-product/abc', 'geometry' => ['type' => 'GeometryCollection', 'geometries' => []]],
             ['id' => 8, 'event' => 'Tornado Watch', 'family' => 'watch', 'color' => '#ffff00', 'headline' => null, 'expires' => null, 'view_url' => null, 'geometry' => ['type' => 'GeometryCollection', 'geometries' => []]],
         ],
         'layers' => [
@@ -44,7 +44,10 @@ test('the map shows a web view with the page, the Near you list, and the Map tab
         ->assertElement('webview', fn (array $node): bool => str_contains((string) ($node['props']['html'] ?? ''), 'L.map(') && ($node['props']['javascript'] ?? false) === true)
         ->assertSee('Near you')
         ->assertSee('Tornado Warning')
+        ->assertSee('Warning · Ends')
+        ->assertSee('from now')
         ->assertSee('Tornado Watch')
+        ->assertSee('Watch · No end time given')
         ->assertSee('Home')
         ->assertSee('No recent update');
 });
@@ -103,16 +106,68 @@ test('a failing server shows a message with Try again', function () {
     Native::test(MapScreen::class)->assertSee('WxNotify could not load the map. Try again in a moment.')->assertSee('Try again');
 });
 
-test('Refresh refetches the snapshot, and the page only changes when the snapshot does', function () {
-    Http::fake(['wx.test/api/v1/map' => Http::response(['data' => mapScreenSnapshot()])]);
+test('Refresh with the same places and warnings leaves the page identical, even when generated_at moves', function () {
+    $calls = 0;
+    Http::fake(['wx.test/api/v1/map' => function () use (&$calls) {
+        $calls++;
+
+        return Http::response(['data' => mapScreenSnapshot(['generated_at' => "2026-10-10T18:0{$calls}:00+00:00"])]);
+    }]);
 
     $screen = Native::test(MapScreen::class);
     $before = $screen->get('html');
 
     $screen->tap('refresh-map');
 
-    expect($screen->get('html'))->toBe($before);
+    expect($before)->toContain('L.map(')
+        ->and($screen->get('html'))->toBe($before);
     Http::assertSentCount(2);
+});
+
+test('Refresh with a changed snapshot rebuilds the page', function () {
+    $calls = 0;
+    Http::fake(['wx.test/api/v1/map' => function () use (&$calls) {
+        $calls++;
+        $places = mapScreenSnapshot()['places'];
+        $places[0]['label'] = $calls === 1 ? 'Home' : 'Cabin';
+
+        return Http::response(['data' => mapScreenSnapshot(['places' => $places])]);
+    }]);
+
+    $screen = Native::test(MapScreen::class);
+    $before = $screen->get('html');
+
+    $screen->tap('refresh-map');
+
+    expect($screen->get('html'))->not->toBe($before)->toContain('Cabin');
+    $screen->assertSee('Cabin');
+    Http::assertSentCount(2);
+});
+
+test('going offline on Refresh removes the web view, says the map needs a connection, and keeps the list', function () {
+    Http::fake(['wx.test/api/v1/map' => Http::response(['data' => mapScreenSnapshot()])]);
+
+    $screen = Native::test(MapScreen::class)->assertElement('webview');
+
+    $this->network->connected = false;
+
+    $screen->tap('refresh-map')
+        ->assertMissingElement('webview')
+        ->assertSee('The map needs a connection')
+        ->assertSee('Near you')
+        ->assertSee('Tornado Warning')
+        ->assertSee('Home');
+});
+
+test('a remembered warning whose end has passed reads Ended, not Ends', function () {
+    $snapshot = mapScreenSnapshot();
+    $snapshot['warnings'][0]['expires'] = now()->subHours(3)->toIso8601String();
+    (new LocalCache)->rememberMap($snapshot);
+    $this->network->connected = false;
+
+    Native::test(MapScreen::class)
+        ->assertSee('Warning · Ended 3 hours ago')
+        ->assertDontSee('Ends 3 hours ago');
 });
 
 test('a signed-out visitor is sent to Sign in, and a rejected token signs out', function () {
