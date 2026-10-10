@@ -7,6 +7,7 @@ use App\NativeComponents\AuthCallback;
 use App\NativeComponents\AuthDenied;
 use App\NativeComponents\LocationPrompt;
 use App\NativeComponents\PushPrompt;
+use App\NativeComponents\RuleEditor;
 use App\NativeComponents\RulesScreen;
 use App\NativeComponents\SignInScreen;
 use App\Providers\NativeServiceProvider;
@@ -144,6 +145,35 @@ test('the rules screen renders its title, tabs, an add button and a tappable row
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Add rule')
         ->assertElement('pressable')
         ->assertElement('toggle', fn (array $toggle) => $toggle['props']['value'] === true);
+});
+
+test('the rule editor opens from both routes and renders its form elements', function () {
+    (new TokenStore)->put('9|secret');
+    Http::fake([
+        'wx.test/api/v1/alert-rule-options' => Http::response(['data' => ruleFormOptions()]),
+        'wx.test/api/v1/alert-rules/4' => Http::response(['data' => [
+            'id' => 4, 'name' => null, 'category' => 'weather_alerts', 'matching_mode' => 'location', 'product_ids' => [10], 'location_ids' => [7],
+            'location_id' => null, 'wfo' => null, 'county_zone_codes' => [], 'risk_levels' => [], 'channel_ids' => [5],
+        ]]),
+    ]);
+
+    Native::visit('/rules/new')
+        ->assertScreen(RuleEditor::class)
+        ->assertNavTitle('New alert rule')
+        ->assertSet('ruleId', null)
+        ->assertElement('pressable')
+        ->assertElement('checkbox')
+        ->tap('category-threshold')
+        ->assertElement('select')
+        ->assertElement('outlined_text_input')
+        ->assertElement('date_picker', fn (array $picker) => $picker['props']['mode'] === 'time');
+
+    Native::visit('/rules/4')
+        ->assertNavTitle('Edit alert rule')
+        ->assertSet('ruleId', 4)
+        ->assertElement('accordion', fn (array $accordion) => $accordion['props']['expanded'] === true)
+        ->assertElement('checkbox', fn (array $checkbox) => $checkbox['props']['value'] === true)
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Delete rule');
 });
 
 test('the native UI plugin is enabled for the native build', function () {
