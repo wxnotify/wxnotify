@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes;
 
 use App\Models\ChannelType as ChannelTypeModel;
+use App\Models\User;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Illuminate\Support\Collection;
 
@@ -64,6 +65,19 @@ class ChannelTypeRegistry
                 'type' => $this->find($model->slug),
             ])
             ->filter(fn (array $row) => $row['type'] !== null && $row['type']->isAvailable())
+            ->values();
+    }
+
+    /**
+     * The picker's types the mobile app can create, in the catalog's order.
+     *
+     * @return Collection<int, ChannelType>
+     */
+    public function creatableInApp(User $user): Collection
+    {
+        return $this->forPicker()
+            ->map(fn (array $row): ChannelType => $row['type'])
+            ->filter(fn (ChannelType $type): bool => $type->appSetupFields($user) !== null)
             ->values();
     }
 }

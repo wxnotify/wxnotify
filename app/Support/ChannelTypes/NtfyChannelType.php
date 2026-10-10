@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes;
 
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
@@ -39,6 +40,14 @@ class NtfyChannelType implements ChannelType
                 ->label('Server (optional)')
                 ->url()
                 ->helperText('Leave blank to use the public ntfy.sh server, or enter your own self-hosted server URL.'),
+        ];
+    }
+
+    public function appSetupFields(User $user): ?array
+    {
+        return [
+            new ChannelSetupField('topic', 'Topic', help: 'A short, hard-to-guess name — anyone who knows it can subscribe. E.g. "wxnotify-a1b2c3".', rules: ['alpha_dash', 'max:255']),
+            new ChannelSetupField('server', 'Server (optional)', ChannelSetupField::URL, required: false, help: 'Leave blank to use the public ntfy.sh server, or enter your own self-hosted server URL.', rules: ['url', 'max:2048']),
         ];
     }
 

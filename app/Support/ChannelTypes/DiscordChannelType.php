@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes;
 
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
@@ -11,6 +12,8 @@ use Filament\Forms\Components\TextInput;
 class DiscordChannelType implements ChannelType
 {
     use MasksDestinationSecrets, UsesAppriseTransport;
+
+    public const WEBHOOK_URL_PATTERN = '#^https://discord(?:app)?\.com/api/webhooks/\d+/[\w-]+/?$#';
 
     public function slug(): string
     {
@@ -35,7 +38,14 @@ class DiscordChannelType implements ChannelType
                 ->url()
                 ->required()
                 ->helperText('From your Discord channel: Edit Channel → Integrations → Webhooks.')
-                ->rule('regex:#^https://discord(?:app)?\.com/api/webhooks/\d+/[\w-]+/?$#'),
+                ->rule('regex:'.self::WEBHOOK_URL_PATTERN),
+        ];
+    }
+
+    public function appSetupFields(User $user): ?array
+    {
+        return [
+            new ChannelSetupField('webhook_url', 'Webhook URL', ChannelSetupField::SECRET, help: 'From your Discord channel: Edit Channel → Integrations → Webhooks.', rules: ['url', 'max:2048', 'regex:'.self::WEBHOOK_URL_PATTERN]),
         ];
     }
 

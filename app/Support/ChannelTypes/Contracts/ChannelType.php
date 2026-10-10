@@ -4,6 +4,8 @@ namespace App\Support\ChannelTypes\Contracts;
 
 use App\Enums\ChannelTransport;
 use App\Models\NotificationChannel;
+use App\Models\User;
+use App\Support\ChannelTypes\ChannelSetupField;
 use Filament\Schemas\Components\Component;
 
 interface ChannelType
@@ -25,6 +27,14 @@ interface ChannelType
      * @return array<Component>
      */
     public function formSchema(): array;
+
+    /**
+     * The setup fields the mobile app can ask for, described without Filament, or null when the app
+     * cannot create this type (its setup needs a browser, a long list of options, or the app itself).
+     *
+     * @return list<ChannelSetupField>|null
+     */
+    public function appSetupFields(User $user): ?array;
 
     /**
      * The delivery transport this channel type sends through.

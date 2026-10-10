@@ -4,6 +4,7 @@ namespace App\Support\ChannelTypes;
 
 use App\Enums\ChannelTransport;
 use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\Concerns\NotCreatableInApp;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use LogicException;
 
@@ -15,6 +16,8 @@ use LogicException;
  */
 class MobilePushChannelType implements ChannelType
 {
+    use NotCreatableInApp;
+
     public function slug(): string
     {
         return 'mobile_push';

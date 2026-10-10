@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes;
 
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
@@ -36,11 +37,26 @@ class TeamsChannelType implements ChannelType
                 ->url()
                 ->required()
                 ->helperText('In Teams: Workflows → "Post to a channel when a webhook request is received", then copy the HTTP POST URL. Microsoft retired the old Office 365 connector webhooks, so those URLs no longer work.')
-                ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                    if (self::parseWorkflowUrl((string) $value) === null) {
-                        $fail('That is not a Power Automate Workflows webhook URL (https://…logic.azure.com/workflows/…&sig=…).');
-                    }
-                }),
+                ->rule(fn (): Closure => self::workflowUrlRule()),
+        ];
+    }
+
+    /**
+     * The validation rule both the Filament field and the app API apply to a pasted Workflows URL.
+     */
+    public static function workflowUrlRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if (self::parseWorkflowUrl((string) $value) === null) {
+                $fail('That is not a Power Automate Workflows webhook URL (https://…logic.azure.com/workflows/…&sig=…).');
+            }
+        };
+    }
+
+    public function appSetupFields(User $user): ?array
+    {
+        return [
+            new ChannelSetupField('webhook_url', 'Workflows webhook URL', ChannelSetupField::SECRET, help: 'In Teams: Workflows → "Post to a channel when a webhook request is received", then copy the HTTP POST URL. Microsoft retired the old Office 365 connector webhooks, so those URLs no longer work.', rules: ['url', 'max:2048', self::workflowUrlRule()]),
         ];
     }
 

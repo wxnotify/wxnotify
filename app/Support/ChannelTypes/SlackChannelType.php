@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes;
 
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
@@ -11,6 +12,8 @@ use Filament\Forms\Components\TextInput;
 class SlackChannelType implements ChannelType
 {
     use MasksDestinationSecrets, UsesAppriseTransport;
+
+    public const WEBHOOK_URL_PATTERN = '#^https://hooks\.slack\.com/services/([\w-]+)/([\w-]+)/([\w-]+)/?$#';
 
     public function slug(): string
     {
@@ -35,7 +38,14 @@ class SlackChannelType implements ChannelType
                 ->url()
                 ->required()
                 ->helperText('From Slack: Apps → Incoming Webhooks → Add New Webhook to Workspace.')
-                ->rule('regex:#^https://hooks\.slack\.com/services/([\w-]+)/([\w-]+)/([\w-]+)/?$#'),
+                ->rule('regex:'.self::WEBHOOK_URL_PATTERN),
+        ];
+    }
+
+    public function appSetupFields(User $user): ?array
+    {
+        return [
+            new ChannelSetupField('webhook_url', 'Incoming Webhook URL', ChannelSetupField::SECRET, help: 'From Slack: Apps → Incoming Webhooks → Add New Webhook to Workspace.', rules: ['url', 'max:2048', 'regex:'.self::WEBHOOK_URL_PATTERN]),
         ];
     }
 

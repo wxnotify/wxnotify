@@ -3,6 +3,7 @@
 namespace App\Support\ChannelTypes;
 
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Filament\Forms\Components\TextInput;
@@ -37,6 +38,14 @@ class TelegramChannelType implements ChannelType
                 ->label('Chat ID')
                 ->required()
                 ->helperText('Message your bot, then visit api.telegram.org/bot<token>/getUpdates to find your chat ID.'),
+        ];
+    }
+
+    public function appSetupFields(User $user): ?array
+    {
+        return [
+            new ChannelSetupField('bot_token', 'Bot token', ChannelSetupField::SECRET, help: 'Create a bot with @BotFather on Telegram to get a token.', rules: ['max:255']),
+            new ChannelSetupField('chat_id', 'Chat ID', help: 'Message your bot, then visit api.telegram.org/bot<token>/getUpdates to find your chat ID.', rules: ['max:255']),
         ];
     }
 

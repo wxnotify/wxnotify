@@ -4,6 +4,7 @@ namespace App\Support\ChannelTypes;
 
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
+use App\Support\ChannelTypes\Concerns\NotCreatableInApp;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Closure;
@@ -17,7 +18,7 @@ use Illuminate\Support\Js;
 
 class PushoverChannelType implements ChannelType
 {
-    use MasksDestinationSecrets, UsesAppriseTransport;
+    use MasksDestinationSecrets, NotCreatableInApp, UsesAppriseTransport;
 
     public const DEFAULT_PRIORITY = '0';
 

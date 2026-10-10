@@ -7,6 +7,7 @@ use App\Models\NotificationChannel;
 use App\Rules\SafeWebhookHeaders;
 use App\Rules\SafeWebhookProxyUrl;
 use App\Rules\SafeWebhookUrl;
+use App\Support\ChannelTypes\Concerns\NotCreatableInApp;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use App\Support\Delivery\Transports\WebhookTransport;
 use App\Support\Delivery\WebhookHeaderGuard;
@@ -22,6 +23,8 @@ use Illuminate\Support\Str;
 
 class WebhookChannelType implements ChannelType
 {
+    use NotCreatableInApp;
+
     /**
      * Every key a webhook channel's encrypted `config` may hold, with the value
      * a channel that predates the option gets. Channels created before these

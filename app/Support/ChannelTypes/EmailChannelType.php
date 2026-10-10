@@ -4,6 +4,7 @@ namespace App\Support\ChannelTypes;
 
 use App\Enums\ChannelTransport;
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use Filament\Forms\Components\TextInput;
 
@@ -32,6 +33,13 @@ class EmailChannelType implements ChannelType
                 ->email()
                 ->required()
                 ->default(fn () => auth()->user()->email),
+        ];
+    }
+
+    public function appSetupFields(User $user): ?array
+    {
+        return [
+            new ChannelSetupField('to', 'Email address', ChannelSetupField::EMAIL, default: $user->email, rules: ['email', 'max:255']),
         ];
     }
 
