@@ -37,4 +37,10 @@ class SettingsScreen extends NativeComponent
     {
         $this->navigate('/account');
     }
+
+    /** THROWAWAY (slice 5 spike). */
+    public function openMapSpike(): void
+    {
+        $this->navigate('/map-spike');
+    }
 }
