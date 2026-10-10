@@ -73,4 +73,19 @@ return [
         'token_days' => 90,
     ],
 
+    'map' => [
+        'warning_radius_miles' => 150,
+        'max_warnings' => 100,
+        'simplify_degrees' => 0.01,
+        'basemaps' => [
+            ['key' => 'topo', 'label' => 'Topo', 'url' => 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', 'max_zoom' => 16],
+            ['key' => 'imagery', 'label' => 'Imagery', 'url' => 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}', 'max_zoom' => 16],
+        ],
+        'radar' => [
+            'wms_url' => 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows',
+            'layer' => 'conus_bref_qcd',
+        ],
+        'attribution' => 'USGS The National Map · NOAA/NWS MRMS',
+    ],
+
 ];
