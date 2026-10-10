@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * What the app keeps on the phone so it opens instantly and works offline: the latest feed
  * page, any alert detail the subscriber opened, the profile from /me, and when the feed was
- * last refreshed, plus the alert rules, saved locations, notification channels and rule-form options. Signing out wipes all of it.
+ * last refreshed, plus the alert rules, saved locations, notification channels, rule-form options and the map snapshot's lists. Signing out wipes all of it.
  */
 class LocalCache
 {
@@ -28,6 +28,8 @@ class LocalCache
     private const OPTIONS = 'wxnotify.rule_options';
 
     private const CHANNELS = 'wxnotify.channels';
+
+    private const MAP = 'wxnotify.map';
 
     /**
      * @return array<int, array<string, mixed>>
@@ -188,6 +190,31 @@ class LocalCache
         return Cache::get(self::OPTIONS);
     }
 
+    /**
+     * The map snapshot's list data for the offline "Near you" list: the places, phone, centre and the
+     * warnings WITHOUT their geometry (the page and the shapes are never cached), plus when it was made.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
+    public function rememberMap(array $snapshot): void
+    {
+        Cache::forever(self::MAP, [
+            'center' => $snapshot['center'] ?? null,
+            'phone' => $snapshot['phone'] ?? null,
+            'places' => $snapshot['places'] ?? [],
+            'warnings' => array_map(fn (array $warning): array => collect($warning)->except('geometry')->all(), $snapshot['warnings'] ?? []),
+            'generated_at' => $snapshot['generated_at'] ?? null,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null null until a snapshot was fetched once
+     */
+    public function map(): ?array
+    {
+        return Cache::get(self::MAP);
+    }
+
     public function wipe(): void
     {
         CachedAlert::query()->delete();
@@ -198,5 +225,6 @@ class LocalCache
         Cache::forget(self::LOCATIONS_META);
         Cache::forget(self::OPTIONS);
         Cache::forget(self::CHANNELS);
+        Cache::forget(self::MAP);
     }
 }

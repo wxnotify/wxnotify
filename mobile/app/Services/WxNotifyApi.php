@@ -308,6 +308,16 @@ class WxNotifyApi
     }
 
     /**
+     * The map snapshot: the phone, the places, the warnings near them and the layer configuration.
+     *
+     * @return array<string, mixed>
+     */
+    public function map(): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/map')));
+    }
+
+    /**
      * @return array<int, array{label: string, lat: float, lng: float}>
      */
     public function searchPlaces(string $query): array
