@@ -9,13 +9,13 @@
 </native:bottom-nav>
 
 @if ($settingsMenuOpen)
-<native:bottom-sheet :visible="true" detents="small" @dismiss="closeSettingsMenu">
+<bottom-sheet :visible="true" detents="small" @dismiss="closeSettingsMenu">
     <native:column class="w-full p-4 gap-3 bg-theme-surface">
         <native:button label="Rules" variant="secondary" @tap="openRules" class="w-full" />
         <native:button label="Locations" variant="secondary" @tap="openLocations" class="w-full" />
         <native:button label="Account" variant="secondary" @tap="openAccount" class="w-full" />
     </native:column>
-</native:bottom-sheet>
+</bottom-sheet>
 @endif
 
 <native:column class="w-full h-full bg-theme-background">
