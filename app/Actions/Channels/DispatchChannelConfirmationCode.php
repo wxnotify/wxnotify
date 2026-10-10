@@ -23,14 +23,14 @@ class DispatchChannelConfirmationCode
      */
     public function __invoke(NotificationChannel $channel): bool
     {
-        Cache::forget(VerifyChannelConfirmationCode::attemptsKey($channel));
-
         $code = (string) random_int(100000, 999999);
 
         $channel->forceFill([
             'confirmation_code' => $code,
             'confirmation_code_expires_at' => now()->addMinutes(15),
         ])->save();
+
+        Cache::forget(VerifyChannelConfirmationCode::attemptsKey($channel));
 
         try {
             return app(ChannelDispatcher::class)->send(

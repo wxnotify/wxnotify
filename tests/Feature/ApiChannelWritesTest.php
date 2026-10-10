@@ -6,9 +6,9 @@ use App\Models\AlertRule;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Settings\GeneralSettings;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\RateLimiter;
 use Spatie\Activitylog\Models\Activity;
 
 beforeEach(function () {
@@ -225,7 +225,6 @@ test('another subscriber\'s channel is a 404 on every write', function (string $
 
 test('sending is limited to ten an hour per subscriber, shared by create, resend and test', function () {
     $channel = NotificationChannel::factory()->for($this->user)->unverified()->create();
-    RateLimiter::clear('app-channel-send:'.$this->user->id);
 
     foreach (range(1, 10) as $_) {
         apiChannelWriteCall($this, 'POST', "/api/v1/channels/{$channel->id}/resend")->assertNoContent();
@@ -233,6 +232,24 @@ test('sending is limited to ten an hour per subscriber, shared by create, resend
 
     apiChannelWriteCall($this, 'POST', "/api/v1/channels/{$channel->id}/resend")->assertStatus(429);
     apiChannelWriteCall($this, 'POST', '/api/v1/channels', ['channel_type' => 'ntfy', 'topic' => 'wx'])->assertStatus(429);
+});
+
+test('requests that never tried to send do not spend the sending budget', function () {
+    foreach (range(1, 12) as $_) {
+        apiChannelWriteCall($this, 'POST', '/api/v1/channels', ['channel_type' => 'discord', 'webhook_url' => 'https://example.com/hook'])->assertUnprocessable();
+    }
+
+    apiChannelWriteCall($this, 'POST', '/api/v1/channels', ['channel_type' => 'ntfy', 'topic' => 'wx'])->assertCreated();
+});
+
+test('refused resends on an already verified channel do not trip the limiter', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create();
+
+    foreach (range(1, 11) as $_) {
+        apiChannelWriteCall($this, 'POST', "/api/v1/channels/{$channel->id}/resend")->assertStatus(409);
+    }
+
+    Http::assertNothingSent();
 });
 
 test('during maintenance a write answers 503 with the maintenance message as plain text', function () {
@@ -246,4 +263,17 @@ test('during maintenance a write answers 503 with the maintenance message as pla
 
     $response->assertStatus(503);
     expect($response->getContent())->toBe('Back soon.')->and($channel->fresh()->label)->not->toBe('New');
+});
+
+test('a resend refused during maintenance leaves the attempt counter as it was', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->unverified()->create();
+    $key = VerifyChannelConfirmationCode::attemptsKey($channel);
+    Cache::put($key, 3, now()->addMinutes(30));
+    $settings = app(GeneralSettings::class);
+    $settings->maintenance_mode = true;
+    $settings->save();
+
+    apiChannelWriteCall($this, 'POST', "/api/v1/channels/{$channel->id}/resend")->assertStatus(503);
+
+    expect(Cache::get($key))->toBe(3);
 });

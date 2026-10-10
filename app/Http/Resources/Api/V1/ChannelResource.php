@@ -9,7 +9,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * A channel as the app's list and screen need it. Never carries `apprise_url`, `config`, a URL, a
- * token or a confirmation code: `destination` is the type's masked summary.
+ * token or a confirmation code: `destination` is the type's `displaySummary()` (masked for secret-bearing
+ * types such as Discord, Slack, Telegram bot tokens and Pushover; the full address for Email), never a URL
+ * or token.
  *
  * @property NotificationChannel $resource
  */

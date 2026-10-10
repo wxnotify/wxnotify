@@ -87,9 +87,12 @@ class AppServiceProvider extends ServiceProvider
             ->by('app-authorize:'.($request->user()?->id ?? ClientIp::for($request) ?? $request->ip())));
 
         // Create, resend and test each send a real message to a destination the subscriber typed:
-        // ten an hour per subscriber, shared (the limiter name is the shared bucket).
+        // ten an hour per subscriber, shared (the limiter name is the shared bucket). Only requests
+        // that actually tried to send spend the budget (2xx, or 502 when the destination refused);
+        // validation, plan-limit, not-found and conflict answers do not.
         RateLimiter::for('app-channel-send', fn (Request $request) => Limit::perHour(10)
-            ->by('app-channel-send:'.($request->user()?->id ?? $request->ip())));
+            ->by('app-channel-send:'.($request->user()?->id ?? $request->ip()))
+            ->after(fn ($response): bool => $response->isSuccessful() || $response->getStatusCode() === 502));
 
         // Without this, activity logged while an admin impersonates a
         // subscriber attributes to the subscriber (Auth::user() during

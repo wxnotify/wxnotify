@@ -7,7 +7,10 @@ use Illuminate\Support\Facades\Cache;
 
 class VerifyChannelConfirmationCode
 {
-    /** A six-digit code is guessable, so this many wrong tries clear it and a resend is required. */
+    /**
+     * A six-digit code is guessable, so this many tries clear it and a resend is required. Tries are
+     * counted before the comparison, so concurrent guesses cannot each get one.
+     */
     public const MAX_WRONG_CODES = 5;
 
     public static function attemptsKey(NotificationChannel $channel): string
@@ -25,8 +28,21 @@ class VerifyChannelConfirmationCode
             return false;
         }
 
+        $key = self::attemptsKey($channel);
+
+        Cache::add($key, 0, now()->addMinutes(30));
+        $attempts = Cache::increment($key);
+
+        if ($attempts > self::MAX_WRONG_CODES) {
+            $this->clearStoredCode($channel);
+
+            return false;
+        }
+
         if (! hash_equals((string) $channel->confirmation_code, $code)) {
-            $this->recordWrongCode($channel);
+            if ($attempts === self::MAX_WRONG_CODES) {
+                $this->clearStoredCode($channel);
+            }
 
             return false;
         }
@@ -41,22 +57,13 @@ class VerifyChannelConfirmationCode
             'confirmation_code_expires_at' => null,
         ])->save();
 
-        Cache::forget(self::attemptsKey($channel));
+        Cache::forget($key);
 
         return true;
     }
 
-    private function recordWrongCode(NotificationChannel $channel): void
+    private function clearStoredCode(NotificationChannel $channel): void
     {
-        $key = self::attemptsKey($channel);
-
-        Cache::add($key, 0, now()->addMinutes(30));
-
-        if (Cache::increment($key) < self::MAX_WRONG_CODES) {
-            return;
-        }
-
-        Cache::forget($key);
         $channel->forceFill(['confirmation_code' => null, 'confirmation_code_expires_at' => null])->save();
     }
 }
