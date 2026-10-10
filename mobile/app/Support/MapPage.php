@@ -9,7 +9,7 @@ namespace App\Support;
  */
 class MapPage
 {
-    private const JSON_FLAGS = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES;
+    private const JSON_FLAGS = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR;
 
     public function __construct(private ?string $leafletJs = null, private ?string $leafletCss = null) {}
 
@@ -25,9 +25,9 @@ class MapPage
             'phone' => $snapshot['phone'] ?? null,
             'places' => $snapshot['places'] ?? [],
             'warnings' => $snapshot['warnings'] ?? [],
-            'basemaps' => $layers['basemaps'] ?? [],
+            'basemaps' => $this->escapedBasemaps($layers['basemaps'] ?? []),
             'radar' => $layers['radar'] ?? null,
-            'attribution' => $layers['attribution'] ?? '',
+            'attribution' => $this->escaped($layers['attribution'] ?? ''),
         ];
 
         return view('map.page', [
@@ -39,7 +39,25 @@ class MapPage
     }
 
     /**
-     * The https origins the page may load images from: the base maps' and the radar's.
+     * Leaflet writes base-map names and attribution with innerHTML, so they are escaped here. Place and warning text is
+     * not: the page puts it in with text nodes.
+     *
+     * @param  list<array<string, mixed>>  $basemaps
+     * @return list<array<string, mixed>>
+     */
+    private function escapedBasemaps(array $basemaps): array
+    {
+        return array_map(fn (array $basemap): array => [...$basemap, 'label' => $this->escaped($basemap['label'] ?? '')], $basemaps);
+    }
+
+    private function escaped(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
+     * The https origins the page may load images from: the base maps' and the radar's. A host must be plain letters,
+     * digits, dots and hyphens (so config cannot inject CSP directives); an explicit numeric port is kept.
      *
      * @param  array<string, mixed>  $layers
      * @return list<string>
@@ -56,7 +74,11 @@ class MapPage
             ->map(function (string $url): ?string {
                 $parts = parse_url($url);
 
-                return isset($parts['host'], $parts['scheme']) && $parts['scheme'] === 'https' ? "https://{$parts['host']}" : null;
+                if (! is_array($parts) || ($parts['scheme'] ?? null) !== 'https' || ! preg_match('/^[A-Za-z0-9.-]+$/', $parts['host'] ?? '')) {
+                    return null;
+                }
+
+                return isset($parts['port']) ? "https://{$parts['host']}:{$parts['port']}" : "https://{$parts['host']}";
             })
             ->filter()->unique()->values()->all();
     }

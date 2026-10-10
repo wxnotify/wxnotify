@@ -57,7 +57,7 @@ html, body, #map { height: 100%; margin: 0; }
     if (data.radar) {
         var radar = L.tileLayer.wms(data.radar.wms_url, { layers: data.radar.layer, format: 'image/png', transparent: true, opacity: 0.65, version: '1.1.1' }).addTo(map);
         overlays['Radar'] = radar;
-        setInterval(function () { radar.setParams({ _: Date.now() }, false); radar.redraw(); }, 120000);
+        setInterval(function () { radar.setParams({ _: Date.now() }); }, 120000);
     }
 
     var warnings = L.layerGroup();
