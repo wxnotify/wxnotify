@@ -1,11 +1,14 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AlertController;
+use App\Http\Controllers\Api\V1\AlertRuleOptionsController;
 use App\Http\Controllers\Api\V1\AppTokenController;
 use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\LocationSharingController;
 use App\Http\Controllers\Api\V1\MeController;
+use App\Http\Controllers\Api\V1\NwsOfficeController;
 use App\Http\Controllers\Api\V1\PushTokenController;
+use App\Http\Controllers\Api\V1\ZoneController;
 use App\Http\Controllers\IngestEmwinProductController;
 use App\Http\Controllers\IngestGlmFlashesController;
 use App\Http\Controllers\IngestNwwsProductController;
@@ -30,6 +33,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/me', MeController::class)->name('api.v1.me');
         Route::get('/alerts', [AlertController::class, 'index'])->name('api.v1.alerts.index');
         Route::get('/alerts/{id}', [AlertController::class, 'show'])->whereNumber('id')->name('api.v1.alerts.show');
+        Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
+        Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
+        Route::get('/zones', ZoneController::class)->name('api.v1.zones');
         Route::put('/push-token', [PushTokenController::class, 'update'])->name('api.v1.push-token.update');
         Route::delete('/push-token', [PushTokenController::class, 'destroy'])->name('api.v1.push-token.destroy');
         Route::put('/location-sharing', [LocationSharingController::class, 'update'])->name('api.v1.location-sharing.update');
