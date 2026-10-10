@@ -324,10 +324,10 @@ test('tapping an alert with no product page opens its detail', function () {
     expect($this->browser->inAppUrls)->toBe([]);
 });
 
-test('the bottom bar has Alerts and Settings', function () {
+test('the bottom bar has Alerts, Map and Settings', function () {
     Http::fake(['*' => Http::response(feedResponse([]))]);
 
-    Native::test(AlertsScreen::class)->assertTabActive('Alerts')->assertHasTab('Settings');
+    Native::test(AlertsScreen::class)->assertTabActive('Alerts')->assertHasTab('Map')->assertHasTab('Settings');
 });
 
 test('coming back from a detail keeps the pages already loaded and sends no request', function () {

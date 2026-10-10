@@ -101,6 +101,7 @@ test('the alerts screen renders its title, tabs and a native list with tappable 
         ->assertNavTitle('Alerts')
         ->assertHasTabBar()
         ->assertTabActive('Alerts')
+        ->assertHasTab('Map')
         ->assertHasTab('Settings')
         ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh'], $list['props']['on_end_reached']))
         ->assertElement('list_item', fn (array $item) => isset($item['on_press']) && $item['props']['headline'] === 'Tornado Warning')
@@ -130,6 +131,7 @@ test('the account screen renders its title, tabs, the profile and a sign-out but
         ->assertHasTabBar()
         ->assertTabActive('Settings')
         ->assertHasTab('Alerts')
+        ->assertHasTab('Map')
         ->assertElement('text')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Sign out');
 });
@@ -143,6 +145,7 @@ test('the rules screen renders its title, tabs, an add button and a tappable row
         ->assertHasTabBar()
         ->assertTabActive('Settings')
         ->assertHasTab('Alerts')
+        ->assertHasTab('Map')
         ->assertElement('scroll_view')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Add rule')
         ->assertElement('pressable')
@@ -190,6 +193,7 @@ test('the locations screen renders its title, tabs, an add button and a tappable
         ->assertHasTabBar()
         ->assertTabActive('Settings')
         ->assertHasTab('Alerts')
+        ->assertHasTab('Map')
         ->assertElement('scroll_view')
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Add location')
         ->assertElement('pressable')
