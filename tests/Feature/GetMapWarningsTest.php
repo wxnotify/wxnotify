@@ -123,6 +123,7 @@ test('an event with several areas is listed once, with the latest end, or none w
 
 test('a zone-only event takes its geometry from the public zone, county, fire zone or marine zone it names', function () {
     mapZoneRow('public_zones', ['state' => 'CO', 'cwa' => 'BOU', 'zone' => '040', 'name' => 'Front Range', 'state_zone' => 'CO040'], MAP_NEAR);
+    mapZoneRow('counties', ['state' => 'NM', 'cwa' => 'ABQ', 'countyname' => 'Elsewhere', 'fips' => '35031'], MAP_EDGE_OUT);
     mapZoneRow('counties', ['state' => 'CO', 'cwa' => 'BOU', 'countyname' => 'Denver', 'fips' => '08031'], MAP_COVERING);
     mapZoneRow('fire_zones', ['state' => 'CO', 'zone' => '215', 'cwa' => 'BOU', 'name' => 'Fire Zone', 'state_zone' => 'CO215'], MAP_COVERING);
     mapZoneRow('marine_zones_coastal', ['zone_type' => 'coastal', 'zone_id' => 'GMZ655', 'name' => 'Marine Zone'], MAP_COVERING);
@@ -135,6 +136,17 @@ test('a zone-only event takes its geometry from the public zone, county, fire zo
 
     expect(collect(mapEvents($this->anchors))->pluck('event')->sort()->values()->all())
         ->toBe(['County Warning', 'Fire Warning', 'Marine Warning', 'Zone Warning']);
+});
+
+test('a zone-only event takes its geometry from the offshore or high seas marine zone it names', function () {
+    mapZoneRow('marine_zones_offshore', ['zone_type' => 'offshore', 'zone_id' => 'GMZ850', 'name' => 'Offshore Zone'], MAP_NEAR);
+    mapZoneRow('marine_zones_high_seas', ['zone_type' => 'high_seas', 'zone_id' => 'PHZ170', 'name' => 'High Seas Zone'], MAP_COVERING);
+
+    foreach (['GMZ850' => 'Offshore Warning', 'PHZ170' => 'High Seas Warning'] as $ugc => $name) {
+        mapArea(mapEvent($name, 'warning'), null, ['ugc_code' => $ugc]);
+    }
+
+    expect(collect(mapEvents($this->anchors))->pluck('event')->sort()->values()->all())->toBe(['High Seas Warning', 'Offshore Warning']);
 });
 
 test('the nearest anchor of several decides the distance, and an event near any anchor is in', function () {
@@ -166,4 +178,54 @@ test('with no anchors there are no warnings and nothing is queried', function ()
     mapArea(mapEvent('Tornado Warning', 'warning'), MAP_COVERING);
 
     expect(mapEvents([]))->toBe([]);
+});
+
+test('geometry is simplified: wobble under the tolerance is dropped and a real bend is kept', function () {
+    mapArea(mapEvent('Tornado Warning', 'warning'), 'POLYGON((-105.5 39.5, -105.3 39.501, -105.1 39.499, -104.9 39.501, -104.7 39.499, -104.5 39.5, -104.45 40.0, -104.5 40.5, -105.5 40.5, -105.5 39.5))');
+
+    $ring = mapEvents($this->anchors)[0]['geometry']['geometries'][0]['coordinates'][0];
+
+    expect($ring)->toHaveCount(6)
+        ->and(collect($ring)->contains([-104.45, 40.0]))->toBeTrue();
+});
+
+test('geometries carry no per-geometry crs member', function () {
+    mapArea(mapEvent('Tornado Warning', 'warning'), MAP_COVERING);
+    mapZoneRow('public_zones', ['state' => 'CO', 'cwa' => 'BOU', 'zone' => '040', 'name' => 'Front Range', 'state_zone' => 'CO040'], MAP_NEAR);
+    mapArea(mapEvent('Zone Warning', 'warning'), null, ['ugc_code' => 'COZ040']);
+
+    $geometries = collect(mapEvents($this->anchors))->flatMap(fn (array $event): array => $event['geometry']['geometries']);
+
+    expect($geometries)->toHaveCount(2)
+        ->and($geometries->every(fn (array $geometry): bool => ! array_key_exists('crs', $geometry)))->toBeTrue();
+});
+
+test('an event without a catalog product takes its family from the VTEC significance letter', function () {
+    foreach (['W', 'A', 'Y', 'S'] as $letter) {
+        mapArea(ActiveWwa::factory()->create(['product_id' => null, 'vtec_phenomenon' => 'TO', 'vtec_significance' => $letter, 'status' => 'Active', 'is_test' => false]), MAP_COVERING);
+    }
+
+    expect(collect(mapEvents($this->anchors))->map(fn (array $event): string => $event['event'].'/'.$event['family'])->all())
+        ->toBe(['Tornado Warning/warning', 'Tornado Watch/watch']);
+});
+
+test('only the first 50 distinct anchors are considered', function () {
+    mapArea(mapEvent('Flash Flood Warning', 'warning'), MAP_COVERING);
+    mapArea(mapEvent('Tornado Warning', 'warning'), MAP_EDGE_OUT);
+
+    $fillers = fn (int $count): array => collect(range(1, $count))->map(fn (int $i): array => ['lat' => 10 + $i / 10, 'lng' => -150.0])->all();
+    $nearEdge = ['lat' => 40.0, 'lng' => -102.0];
+
+    $sixtieth = collect(mapEvents([...$this->anchors, ...$fillers(58), $nearEdge]))->pluck('event')->all();
+    $fiftieth = collect(mapEvents([...$this->anchors, ...$fillers(48), $nearEdge]))->pluck('event')->sort()->values()->all();
+
+    expect($sixtieth)->toBe(['Flash Flood Warning'])
+        ->and($fiftieth)->toBe(['Flash Flood Warning', 'Tornado Warning']);
+});
+
+test('the radius holds at high latitude, where a degree of longitude is short', function () {
+    mapArea(mapEvent('Tornado Warning', 'warning'), 'POLYGON((-143.6 70.9, -143.6 71.1, -143.2 71.1, -143.2 70.9, -143.6 70.9))');
+    mapArea(mapEvent('Severe Thunderstorm Warning', 'warning'), 'POLYGON((-142.9 70.9, -142.9 71.1, -142.5 71.1, -142.5 70.9, -142.9 70.9))');
+
+    expect(collect(mapEvents([['lat' => 71.0, 'lng' => -150.0]]))->pluck('event')->all())->toBe(['Tornado Warning']);
 });
