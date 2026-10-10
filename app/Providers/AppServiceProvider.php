@@ -86,6 +86,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('app-authorize', fn (Request $request) => Limit::perMinute(20)
             ->by('app-authorize:'.($request->user()?->id ?? ClientIp::for($request) ?? $request->ip())));
 
+        // Create, resend and test each send a real message to a destination the subscriber typed:
+        // ten an hour per subscriber, shared (the limiter name is the shared bucket).
+        RateLimiter::for('app-channel-send', fn (Request $request) => Limit::perHour(10)
+            ->by('app-channel-send:'.($request->user()?->id ?? $request->ip())));
+
         // Without this, activity logged while an admin impersonates a
         // subscriber attributes to the subscriber (Auth::user() during
         // impersonation), not the admin who is actually acting — defeating

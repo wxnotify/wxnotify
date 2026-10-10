@@ -50,6 +50,12 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/locations/{id}', [SavedLocationController::class, 'destroy'])->whereNumber('id')->name('api.v1.locations.destroy');
         Route::get('/channel-types', [ChannelController::class, 'types'])->name('api.v1.channel-types');
         Route::get('/channels', [ChannelController::class, 'index'])->name('api.v1.channels.index');
+        Route::post('/channels', [ChannelController::class, 'store'])->middleware('throttle:app-channel-send')->name('api.v1.channels.store');
+        Route::post('/channels/{id}/verify', [ChannelController::class, 'verify'])->whereNumber('id')->name('api.v1.channels.verify');
+        Route::post('/channels/{id}/resend', [ChannelController::class, 'resend'])->whereNumber('id')->middleware('throttle:app-channel-send')->name('api.v1.channels.resend');
+        Route::post('/channels/{id}/test', [ChannelController::class, 'test'])->whereNumber('id')->middleware('throttle:app-channel-send')->name('api.v1.channels.test');
+        Route::put('/channels/{id}', [ChannelController::class, 'update'])->whereNumber('id')->name('api.v1.channels.update');
+        Route::delete('/channels/{id}', [ChannelController::class, 'destroy'])->whereNumber('id')->name('api.v1.channels.destroy');
         Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
         Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
         Route::get('/zones', ZoneController::class)->name('api.v1.zones');
