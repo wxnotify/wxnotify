@@ -107,6 +107,39 @@ test('resend says when a new code could not be sent', function () {
         ->assertElement('column', inChannelActions('We couldn\'t send the confirmation code. Please try again in a moment.'));
 });
 
+test('resend clears a code that was typed and says a new one was sent', function () {
+    channelEditorFakes([editorChannelRow(['verified' => false])], ['wx.test/api/v1/channels/5/resend' => Http::response(status: 204)]);
+
+    Native::test(ChannelEditor::class, ['id' => 5])
+        ->input('field-code', '000000')
+        ->tap('Resend code')
+        ->assertSet('code', '')
+        ->assertElement('column', inChannelActions('We sent a new code.'));
+});
+
+test('resend and Send test say when too many have been sent', function (bool $verified, string $button, string $endpoint) {
+    channelEditorFakes([editorChannelRow(['verified' => $verified])], ["wx.test/api/v1/channels/5/{$endpoint}" => Http::response(['message' => 'Too Many Attempts.'], 429)]);
+
+    Native::test(ChannelEditor::class, ['id' => 5])
+        ->tap($button)
+        ->assertElement('column', inChannelActions('You\'ve sent too many codes or tests. Try again in a little while.'));
+})->with([
+    'resend' => [false, 'Resend code', 'resend'],
+    'test' => [true, 'Send test', 'test'],
+]);
+
+test('a validation error on the code shows under the code field', function () {
+    channelEditorFakes([editorChannelRow(['verified' => false])], [
+        'wx.test/api/v1/channels/5/verify' => Http::response(['message' => 'The code field is required.', 'errors' => ['code' => ['The code field is required.']]], 422),
+    ]);
+
+    Native::test(ChannelEditor::class, ['id' => 5])
+        ->input('field-code', '123456')
+        ->tap('Verify')
+        ->assertSet('codeError', 'The code field is required.')
+        ->assertSee('The code field is required.');
+});
+
 test('Send test reports success beside the buttons', function () {
     channelEditorFakes([editorChannelRow()], ['wx.test/api/v1/channels/5/test' => Http::response(status: 204)]);
 

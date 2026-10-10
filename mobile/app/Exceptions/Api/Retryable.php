@@ -2,4 +2,4 @@
 
 namespace App\Exceptions\Api;
 
-final class Retryable extends ApiException {}
+class Retryable extends ApiException {}

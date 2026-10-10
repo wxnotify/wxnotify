@@ -7,6 +7,7 @@ use App\Exceptions\Api\ChannelLimitReached;
 use App\Exceptions\Api\CodeNotSent;
 use App\Exceptions\Api\Maintenance;
 use App\Exceptions\Api\Offline;
+use App\Exceptions\Api\RateLimited;
 use App\Exceptions\Api\Unauthenticated;
 use App\Exceptions\Api\ValidationFailed;
 use App\Services\SignOut;
@@ -158,6 +159,10 @@ class ChannelCreator extends NativeComponent
             return;
         } catch (Offline) {
             $this->feedback = 'You\'re offline. Reconnect to send the code.';
+
+            return;
+        } catch (RateLimited) {
+            $this->feedback = 'You\'ve sent too many codes or tests. Try again in a little while.';
 
             return;
         } catch (ApiException) {

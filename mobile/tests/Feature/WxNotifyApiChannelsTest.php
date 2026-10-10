@@ -4,6 +4,7 @@ use App\Exceptions\Api\ChannelLimitReached;
 use App\Exceptions\Api\CodeNotSent;
 use App\Exceptions\Api\Conflict;
 use App\Exceptions\Api\InvalidCode;
+use App\Exceptions\Api\RateLimited;
 use App\Exceptions\Api\Retryable;
 use App\Exceptions\Api\TestFailed;
 use App\Exceptions\Api\ValidationFailed;
@@ -65,6 +66,14 @@ test('the server\'s refusals become typed exceptions', function (int $status, ar
     'in use' => [409, ['error' => 'channel_in_use', 'message' => 'x', 'alerts' => ['A']], Conflict::class],
     'a plain gateway error' => [502, ['message' => 'Bad gateway'], Retryable::class],
 ]);
+
+test('a 429 is a RateLimited, which is still a Retryable', function () {
+    Http::fake(['wx.test/*' => Http::response(['message' => 'Too Many Attempts.'], 429)]);
+
+    expect(fn () => $this->api->createChannel(['channel_type' => 'ntfy']))->toThrow(RateLimited::class)
+        ->and(fn () => $this->api->resendChannelCode(9))->toThrow(Retryable::class)
+        ->and(new RateLimited)->toBeInstanceOf(Retryable::class);
+});
 
 // Http::fake() stubs stack and the first match wins, so one fake answers both calls by URL.
 test('the exceptions carry the server\'s text and codes', function () {

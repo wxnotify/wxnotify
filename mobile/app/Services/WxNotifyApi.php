@@ -9,6 +9,7 @@ use App\Exceptions\Api\InvalidCode;
 use App\Exceptions\Api\LocationLimitReached;
 use App\Exceptions\Api\Maintenance;
 use App\Exceptions\Api\Offline;
+use App\Exceptions\Api\RateLimited;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\Retryable;
 use App\Exceptions\Api\TestFailed;
@@ -25,7 +26,7 @@ use Native\Mobile\Facades\Network;
 
 /**
  * The app's only way to reach WxNotify. Failures become typed exceptions the screens handle:
- * Unauthenticated (clear the token, go to Sign in), Offline, Retryable (429/5xx), Rejected.
+ * Unauthenticated (clear the token, go to Sign in), Offline, Retryable (5xx; RateLimited, a Retryable, for 429), Rejected.
  */
 class WxNotifyApi
 {
@@ -353,7 +354,8 @@ class WxNotifyApi
             $response->status() === 503 && str_starts_with((string) $response->header('Content-Type'), 'text/plain') => throw new Maintenance(trim($response->body()) ?: 'WxNotify is down for maintenance.'),
             $response->status() === 502 && $response->json('error') === 'code_not_sent' => throw new CodeNotSent,
             $response->status() === 502 && $response->json('error') === 'test_failed' => throw new TestFailed,
-            $response->status() === 429, $response->serverError() => throw new Retryable,
+            $response->status() === 429 => throw new RateLimited,
+            $response->serverError() => throw new Retryable,
             $response->status() === 422 && $response->json('error') === 'location_limit' => throw new LocationLimitReached,
             $response->status() === 422 && $response->json('error') === 'channel_limit' => throw new ChannelLimitReached((string) $response->json('message', '')),
             $response->status() === 422 && $response->json('error') === 'invalid_code' => throw new InvalidCode((string) $response->json('message', '')),

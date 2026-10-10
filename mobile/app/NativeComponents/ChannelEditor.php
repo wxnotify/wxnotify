@@ -8,6 +8,7 @@ use App\Exceptions\Api\Conflict;
 use App\Exceptions\Api\InvalidCode;
 use App\Exceptions\Api\Maintenance;
 use App\Exceptions\Api\Offline;
+use App\Exceptions\Api\RateLimited;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\TestFailed;
 use App\Exceptions\Api\Unauthenticated;
@@ -175,6 +176,10 @@ class ChannelEditor extends NativeComponent
             $this->codeError = $e->getMessage() !== '' ? $e->getMessage() : 'That code didn\'t match, or it expired. Request a new code if you need one.';
 
             return;
+        } catch (ValidationFailed $e) {
+            $this->codeError = $e->errors['code'] ?? 'Enter the 6-digit code.';
+
+            return;
         } catch (Conflict $e) {
             $this->banner = $e->getMessage() !== '' ? $e->getMessage() : 'This channel can\'t be verified.';
 
@@ -235,12 +240,17 @@ class ChannelEditor extends NativeComponent
             $this->banner = 'You\'re offline. Reconnect to resend the code.';
 
             return;
+        } catch (RateLimited) {
+            $this->banner = 'You\'ve sent too many codes or tests. Try again in a little while.';
+
+            return;
         } catch (ApiException) {
             $this->banner = 'Couldn\'t send a new code. Please try again.';
 
             return;
         }
 
+        $this->code = '';
         $this->info = 'We sent a new code.';
     }
 
@@ -273,6 +283,10 @@ class ChannelEditor extends NativeComponent
             return;
         } catch (Offline) {
             $this->banner = 'You\'re offline. Reconnect to send a test.';
+
+            return;
+        } catch (RateLimited) {
+            $this->banner = 'You\'ve sent too many codes or tests. Try again in a little while.';
 
             return;
         } catch (ApiException) {

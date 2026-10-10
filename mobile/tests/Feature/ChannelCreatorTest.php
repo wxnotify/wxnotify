@@ -147,6 +147,7 @@ test('the limit, an undeliverable code, offline and maintenance each say so besi
     'code not sent' => [fn () => creatorFakes(['wx.test/api/v1/channels' => Http::response(['error' => 'code_not_sent', 'message' => 'x'], 502)]), 'couldn\'t send the confirmation code'],
     'maintenance' => [fn () => creatorFakes(['wx.test/api/v1/channels' => Http::response('Back soon.', 503, ['Content-Type' => 'text/plain'])]), 'Back soon.'],
     'a server error' => [fn () => creatorFakes(['wx.test/api/v1/channels' => Http::response([], 500)]), 'Couldn\'t add the channel'],
+    'too many sends' => [fn () => creatorFakes(['wx.test/api/v1/channels' => Http::response(['message' => 'Too Many Attempts.'], 429)]), 'You\'ve sent too many codes or tests. Try again in a little while.'],
 ]);
 
 test('offline it says to reconnect, both when opening and when sending', function () {
