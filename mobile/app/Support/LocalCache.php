@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * What the app keeps on the phone so it opens instantly and works offline: the latest feed
  * page, any alert detail the subscriber opened, the profile from /me, and when the feed was
- * last refreshed, plus the alert rules, saved locations and rule-form options. Signing out wipes all of it.
+ * last refreshed, plus the alert rules, saved locations, notification channels and rule-form options. Signing out wipes all of it.
  */
 class LocalCache
 {
@@ -26,6 +26,8 @@ class LocalCache
     private const LOCATIONS_META = 'wxnotify.locations.meta';
 
     private const OPTIONS = 'wxnotify.rule_options';
+
+    private const CHANNELS = 'wxnotify.channels';
 
     /**
      * @return array<int, array<string, mixed>>
@@ -155,6 +157,22 @@ class LocalCache
     }
 
     /**
+     * @param  array<int, array<string, mixed>>  $channels
+     */
+    public function rememberChannels(array $channels): void
+    {
+        Cache::forever(self::CHANNELS, $channels);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>|null null until the list was fetched once
+     */
+    public function channels(): ?array
+    {
+        return Cache::get(self::CHANNELS);
+    }
+
+    /**
      * @param  array<string, mixed>  $options
      */
     public function rememberOptions(array $options): void
@@ -179,5 +197,6 @@ class LocalCache
         Cache::forget(self::LOCATIONS);
         Cache::forget(self::LOCATIONS_META);
         Cache::forget(self::OPTIONS);
+        Cache::forget(self::CHANNELS);
     }
 }

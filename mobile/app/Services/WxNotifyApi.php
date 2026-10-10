@@ -2,12 +2,16 @@
 
 namespace App\Services;
 
+use App\Exceptions\Api\ChannelLimitReached;
+use App\Exceptions\Api\CodeNotSent;
 use App\Exceptions\Api\Conflict;
+use App\Exceptions\Api\InvalidCode;
 use App\Exceptions\Api\LocationLimitReached;
 use App\Exceptions\Api\Maintenance;
 use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\Retryable;
+use App\Exceptions\Api\TestFailed;
 use App\Exceptions\Api\Unauthenticated;
 use App\Exceptions\Api\ValidationFailed;
 use App\Support\TokenStore;
@@ -228,6 +232,81 @@ class WxNotifyApi
     }
 
     /**
+     * The channel types the app can create, each with its setup fields.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function channelTypes(): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/channel-types')));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function channels(): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/channels')));
+    }
+
+    /**
+     * Creates a channel and has the server send its confirmation code.
+     *
+     * @param  array<string, mixed>  $payload  channel_type, optional label, and the type's fields
+     * @return array<string, mixed>
+     *
+     * @throws ChannelLimitReached
+     * @throws CodeNotSent
+     * @throws ValidationFailed
+     */
+    public function createChannel(array $payload): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->post('/api/v1/channels', $payload)));
+    }
+
+    /**
+     * @return array<string, mixed>
+     *
+     * @throws InvalidCode
+     */
+    public function verifyChannel(int $id, string $code): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->post("/api/v1/channels/{$id}/verify", ['code' => $code])));
+    }
+
+    /**
+     * @throws CodeNotSent
+     */
+    public function resendChannelCode(int $id): void
+    {
+        $this->send(fn (PendingRequest $request) => $request->post("/api/v1/channels/{$id}/resend"));
+    }
+
+    /**
+     * @throws TestFailed
+     */
+    public function testChannel(int $id): void
+    {
+        $this->send(fn (PendingRequest $request) => $request->post("/api/v1/channels/{$id}/test"));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function renameChannel(int $id, string $label): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->put("/api/v1/channels/{$id}", ['label' => $label])));
+    }
+
+    /**
+     * @throws Conflict when the channel is some alert's only one
+     */
+    public function deleteChannel(int $id): void
+    {
+        $this->send(fn (PendingRequest $request) => $request->delete("/api/v1/channels/{$id}"));
+    }
+
+    /**
      * @return array<int, array{label: string, lat: float, lng: float}>
      */
     public function searchPlaces(string $query): array
@@ -272,8 +351,12 @@ class WxNotifyApi
             $response->successful() => $this->decode($response),
             $response->status() === 401 => throw new Unauthenticated,
             $response->status() === 503 && str_starts_with((string) $response->header('Content-Type'), 'text/plain') => throw new Maintenance(trim($response->body()) ?: 'WxNotify is down for maintenance.'),
+            $response->status() === 502 && $response->json('error') === 'code_not_sent' => throw new CodeNotSent,
+            $response->status() === 502 && $response->json('error') === 'test_failed' => throw new TestFailed,
             $response->status() === 429, $response->serverError() => throw new Retryable,
             $response->status() === 422 && $response->json('error') === 'location_limit' => throw new LocationLimitReached,
+            $response->status() === 422 && $response->json('error') === 'channel_limit' => throw new ChannelLimitReached((string) $response->json('message', '')),
+            $response->status() === 422 && $response->json('error') === 'invalid_code' => throw new InvalidCode((string) $response->json('message', '')),
             $response->status() === 422 && is_array($response->json('errors')) => throw new ValidationFailed($this->firstMessages($response->json('errors')), (string) $response->json('message', '')),
             $response->status() === 409 => throw new Conflict((string) $response->json('error', ''), (string) $response->json('message', ''), array_values((array) $response->json('alerts', []))),
             default => throw new Rejected,
