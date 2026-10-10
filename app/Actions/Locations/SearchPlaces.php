@@ -2,21 +2,16 @@
 
 namespace App\Actions\Locations;
 
-use App\Enums\Integration;
-use App\Support\Delivery\HeartbeatUrlGuard;
-use App\Support\Integrations;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
-use Throwable;
 
 /**
  * Forward geocoding for the app's stationary-location picker, against the same Nominatim as the
  * reverse lookups (the admin-set endpoint or the configured URL) and under the same rules: one
- * request per second app-wide (sharing ReverseGeocodeCoordinates's budget, as OSM's policy counts
+ * request per second app-wide (sharing the budget of the reverse lookups, as OSM's policy counts
  * every request), an identifying User-Agent, the endpoint vetted and pinned by HeartbeatUrlGuard,
- * no redirects, answers cached. Never logs the query text; the cache key hashes it.
+ * no redirects, answers cached; NominatimRequest holds all of those settings. Never logs the query
+ * text; the cache key hashes it.
  *
  * Statuses: `found`, `none` (nothing matches), `failed` (could not ask or got no usable answer)
  * and `throttled` (the rate limit is spent: retry in a moment).
@@ -34,7 +29,8 @@ class SearchPlaces
      */
     public function __invoke(string $query): array
     {
-        $base = rtrim((string) (Integrations::endpoint(Integration::ReverseGeocoding) ?? config('filament-pinpoint.leaflet.nominatim_url')), '/');
+        $nominatim = app(NominatimRequest::class);
+        $base = $nominatim->endpoint();
         $text = trim((string) preg_replace('/\s+/', ' ', $query));
         $cacheKey = 'forward-geocode:'.substr(sha1($base), 0, 12).':'.sha1(mb_strtolower($text));
 
@@ -44,44 +40,19 @@ class SearchPlaces
             return $cached;
         }
 
-        $pin = app(HeartbeatUrlGuard::class)->requestOptions($base);
+        $answer = $nominatim($base, 'search', [
+            'format' => 'jsonv2',
+            'q' => $text,
+            'limit' => self::MAX_RESULTS,
+            'addressdetails' => 0,
+            'accept-language' => 'en',
+        ], 'Forward geocoding');
 
-        if ($pin === null) {
-            Log::warning('Forward geocoding endpoint refused');
-
-            return $this->result('failed');
+        if ($answer['status'] !== 'ok') {
+            return $this->result($answer['status']);
         }
 
-        if (! RateLimiter::attempt(ReverseGeocodeCoordinates::RATE_LIMIT_KEY, 1, fn (): bool => true, 1)) {
-            return $this->result('throttled');
-        }
-
-        try {
-            $response = Http::withHeaders(['User-Agent' => config('app.name').' (+'.config('app.url').')'])
-                ->acceptJson()
-                ->timeout(5)
-                ->connectTimeout(3)
-                ->withOptions(['allow_redirects' => false, ...$pin])
-                ->get("{$base}/search", [
-                    'format' => 'jsonv2',
-                    'q' => $text,
-                    'limit' => self::MAX_RESULTS,
-                    'addressdetails' => 0,
-                    'accept-language' => 'en',
-                ]);
-        } catch (Throwable) {
-            Log::warning('Forward geocoding request failed');
-
-            return $this->result('failed');
-        }
-
-        if (! $response->successful()) {
-            Log::warning('Forward geocoding endpoint returned an error', ['status' => $response->status()]);
-
-            return $this->result('failed');
-        }
-
-        $body = $response->json();
+        $body = $answer['body'];
 
         if (! is_array($body) || ! array_is_list($body)) {
             Log::warning('Forward geocoding endpoint returned an unreadable response');
@@ -112,10 +83,17 @@ class SearchPlaces
             return null;
         }
 
+        $lat = (float) $item['lat'];
+        $lng = (float) $item['lon'];
+
+        if (! is_finite($lat) || ! is_finite($lng) || abs($lat) > 90 || abs($lng) > 180) {
+            return null;
+        }
+
         return [
             'label' => mb_substr(trim($item['display_name']), 0, self::LABEL_MAX_LENGTH),
-            'lat' => (float) $item['lat'],
-            'lng' => (float) $item['lon'],
+            'lat' => $lat,
+            'lng' => $lng,
         ];
     }
 

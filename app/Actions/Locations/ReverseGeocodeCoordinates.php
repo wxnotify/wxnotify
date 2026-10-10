@@ -2,14 +2,8 @@
 
 namespace App\Actions\Locations;
 
-use App\Enums\Integration;
-use App\Support\Delivery\HeartbeatUrlGuard;
-use App\Support\Integrations;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
-use Throwable;
 
 /**
  * The nearest street address for a coordinate, from a Nominatim reverse-geocoding
@@ -33,7 +27,7 @@ class ReverseGeocodeCoordinates
 {
     public const CACHE_DAYS = 30;
 
-    public const RATE_LIMIT_KEY = 'reverse-geocode';
+    public const RATE_LIMIT_KEY = NominatimRequest::RATE_LIMIT_KEY;
 
     private const ADDRESS_MAX_LENGTH = 255;
 
@@ -42,7 +36,8 @@ class ReverseGeocodeCoordinates
      */
     public function __invoke(float $lat, float $lng): array
     {
-        $base = rtrim((string) (Integrations::endpoint(Integration::ReverseGeocoding) ?? config('filament-pinpoint.leaflet.nominatim_url')), '/');
+        $nominatim = app(NominatimRequest::class);
+        $base = $nominatim->endpoint();
         $cacheKey = sprintf('reverse-geocode:%s:%.4f:%.4f', substr(sha1($base), 0, 12), $lat, $lng);
 
         $cached = Cache::get($cacheKey);
@@ -51,45 +46,20 @@ class ReverseGeocodeCoordinates
             return $cached;
         }
 
-        $pin = app(HeartbeatUrlGuard::class)->requestOptions($base);
+        $answer = $nominatim($base, 'reverse', [
+            'format' => 'jsonv2',
+            'lat' => round($lat, 7),
+            'lon' => round($lng, 7),
+            'zoom' => 18,
+            'addressdetails' => 0,
+            'accept-language' => 'en',
+        ], 'Reverse geocoding');
 
-        if ($pin === null) {
-            Log::warning('Reverse geocoding endpoint refused');
-
-            return $this->result('failed');
+        if ($answer['status'] !== 'ok') {
+            return $this->result($answer['status']);
         }
 
-        if (! RateLimiter::attempt(self::RATE_LIMIT_KEY, 1, fn (): bool => true, 1)) {
-            return $this->result('throttled');
-        }
-
-        try {
-            $response = Http::withHeaders(['User-Agent' => config('app.name').' (+'.config('app.url').')'])
-                ->acceptJson()
-                ->timeout(5)
-                ->connectTimeout(3)
-                ->withOptions(['allow_redirects' => false, ...$pin])
-                ->get("{$base}/reverse", [
-                    'format' => 'jsonv2',
-                    'lat' => round($lat, 7),
-                    'lon' => round($lng, 7),
-                    'zoom' => 18,
-                    'addressdetails' => 0,
-                    'accept-language' => 'en',
-                ]);
-        } catch (Throwable) {
-            Log::warning('Reverse geocoding request failed');
-
-            return $this->result('failed');
-        }
-
-        if (! $response->successful()) {
-            Log::warning('Reverse geocoding endpoint returned an error', ['status' => $response->status()]);
-
-            return $this->result('failed');
-        }
-
-        $body = $response->json();
+        $body = $answer['body'];
         $name = is_array($body) ? ($body['display_name'] ?? null) : null;
 
         $result = match (true) {

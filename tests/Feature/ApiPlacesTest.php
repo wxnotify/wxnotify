@@ -73,6 +73,19 @@ test('items without a name or a usable coordinate are skipped and an over-long n
     expect($places)->toHaveCount(1)->and(mb_strlen($places[0]['label']))->toBe(255);
 });
 
+test('items with a non-finite or out-of-range coordinate are skipped', function () {
+    Http::fake(['nominatim.example.test/*' => Http::response([
+        ['display_name' => 'Infinite latitude', 'lat' => '1e999', 'lon' => '-97.1'],
+        ['display_name' => 'Latitude too high', 'lat' => '91', 'lon' => '-97.1'],
+        ['display_name' => 'Longitude too low', 'lat' => '35.1', 'lon' => '-180.5'],
+        ['display_name' => 'Edge of the range', 'lat' => '-90', 'lon' => '180'],
+    ])]);
+
+    $places = placeCall($this, '/api/v1/places/search?q=anything')->assertOk()->json('data');
+
+    expect($places)->toEqual([['label' => 'Edge of the range', 'lat' => -90.0, 'lng' => 180.0]]);
+});
+
 test('no match is an empty list and the same search is answered from the cache', function () {
     Http::fake(['nominatim.example.test/*' => Http::response([])]);
 
@@ -101,6 +114,18 @@ test('a failing or refused geocoder answers 502', function () {
 
     placeCall($this, '/api/v1/places/search?q=other')->assertStatus(502);
     Http::assertSentCount(1);
+});
+
+test('a redirect from the endpoint is not followed and answers 502', function () {
+    Http::fake([
+        'nominatim.example.test/*' => Http::response('', 302, ['Location' => 'https://elsewhere.example.test/search']),
+        'elsewhere.example.test/*' => Http::response(nominatimItems(1)),
+    ]);
+
+    placeCall($this, '/api/v1/places/search?q=norman')->assertStatus(502)->assertJsonPath('error', 'unavailable');
+
+    Http::assertSentCount(1);
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'elsewhere'));
 });
 
 test('the search text is never logged or put in the activity log', function () {
