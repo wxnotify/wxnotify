@@ -2,17 +2,21 @@
 
 namespace App\Services;
 
+use App\Exceptions\Api\Conflict;
 use App\Exceptions\Api\LocationLimitReached;
+use App\Exceptions\Api\Maintenance;
 use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\Retryable;
 use App\Exceptions\Api\Unauthenticated;
+use App\Exceptions\Api\ValidationFailed;
 use App\Support\TokenStore;
 use Closure;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Native\Mobile\Facades\Network;
 
 /**
@@ -116,6 +120,129 @@ class WxNotifyApi
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function alertRules(): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/alert-rules')));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function alertRule(int $id): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get("/api/v1/alert-rules/{$id}")));
+    }
+
+    /**
+     * Creates a rule (null id) or replaces one.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     *
+     * @throws ValidationFailed
+     * @throws Maintenance
+     */
+    public function saveAlertRule(?int $id, array $payload): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $id === null
+            ? $request->post('/api/v1/alert-rules', $payload)
+            : $request->put("/api/v1/alert-rules/{$id}", $payload)));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function setAlertRuleActive(int $id, bool $active): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->patch("/api/v1/alert-rules/{$id}", ['is_active' => $active])));
+    }
+
+    public function deleteAlertRule(int $id): void
+    {
+        $this->send(fn (PendingRequest $request) => $request->delete("/api/v1/alert-rules/{$id}"));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function alertRuleOptions(): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/alert-rule-options')));
+    }
+
+    /**
+     * @return array<int, array{code: string, label: string}>
+     */
+    public function nwsOffices(): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/nws-offices')));
+    }
+
+    /**
+     * @return array{data: array<int, array{code: string, label: string}>, next_after: ?string}
+     */
+    public function zones(?string $state, ?string $query, ?string $after = null): array
+    {
+        $body = $this->send(fn (PendingRequest $request) => $request->get('/api/v1/zones', array_filter(
+            ['state' => $state, 'q' => $query, 'after' => $after],
+            fn ($value) => $value !== null && $value !== '',
+        )));
+
+        return ['data' => $this->data($body), 'next_after' => $body['meta']['next_after'] ?? null];
+    }
+
+    /**
+     * @return array{data: array<int, array<string, mixed>>, meta: array<string, mixed>}
+     */
+    public function locations(): array
+    {
+        $body = $this->send(fn (PendingRequest $request) => $request->get('/api/v1/locations'));
+
+        return ['data' => $this->data($body), 'meta' => is_array($body['meta'] ?? null) ? $body['meta'] : []];
+    }
+
+    /**
+     * Creates a stationary location (null id) or edits one.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     *
+     * @throws LocationLimitReached
+     * @throws ValidationFailed
+     */
+    public function saveLocation(?int $id, array $payload): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $id === null
+            ? $request->post('/api/v1/locations', $payload)
+            : $request->put("/api/v1/locations/{$id}", $payload)));
+    }
+
+    /**
+     * @throws Conflict when alerts still use the location or it follows a phone
+     */
+    public function deleteLocation(int $id): void
+    {
+        $this->send(fn (PendingRequest $request) => $request->delete("/api/v1/locations/{$id}"));
+    }
+
+    /**
+     * @return array<int, array{label: string, lat: float, lng: float}>
+     */
+    public function searchPlaces(string $query): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/places/search', ['q' => $query])));
+    }
+
+    public function reversePlace(float $lat, float $lng): ?string
+    {
+        $data = $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/places/reverse', ['lat' => $lat, 'lng' => $lng])));
+
+        return is_string($data['address'] ?? null) ? $data['address'] : null;
+    }
+
+    /**
      * @param  Closure(PendingRequest): Response  $call
      * @return array<string, mixed>
      */
@@ -144,10 +271,32 @@ class WxNotifyApi
         return match (true) {
             $response->successful() => $this->decode($response),
             $response->status() === 401 => throw new Unauthenticated,
+            $response->status() === 503 && str_starts_with((string) $response->header('Content-Type'), 'text/plain') => throw new Maintenance(trim($response->body()) ?: 'WxNotify is down for maintenance.'),
             $response->status() === 429, $response->serverError() => throw new Retryable,
             $response->status() === 422 && $response->json('error') === 'location_limit' => throw new LocationLimitReached,
+            $response->status() === 422 && is_array($response->json('errors')) => throw new ValidationFailed($this->firstMessages($response->json('errors')), (string) $response->json('message', '')),
+            $response->status() === 409 => throw new Conflict((string) $response->json('error', ''), (string) $response->json('message', ''), array_values((array) $response->json('alerts', []))),
             default => throw new Rejected,
         };
+    }
+
+    /**
+     * The first message of each field; a nested key such as `channel_ids.0` is reported against
+     * its root field, and the first message seen for a field wins.
+     *
+     * @param  array<string, mixed>  $errors
+     * @return array<string, string>
+     */
+    private function firstMessages(array $errors): array
+    {
+        $messages = [];
+
+        foreach ($errors as $key => $value) {
+            $field = Str::before((string) $key, '.');
+            $messages[$field] ??= (string) (is_array($value) ? ($value[0] ?? '') : $value);
+        }
+
+        return $messages;
     }
 
     /**

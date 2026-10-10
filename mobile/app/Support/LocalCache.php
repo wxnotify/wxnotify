@@ -11,13 +11,21 @@ use Illuminate\Support\Facades\DB;
 /**
  * What the app keeps on the phone so it opens instantly and works offline: the latest feed
  * page, any alert detail the subscriber opened, the profile from /me, and when the feed was
- * last refreshed. Signing out wipes all of it.
+ * last refreshed, plus the alert rules, saved locations and rule-form options. Signing out wipes all of it.
  */
 class LocalCache
 {
     private const SYNCED_AT = 'wxnotify.feed.synced_at';
 
     private const PROFILE = 'wxnotify.profile';
+
+    private const RULES = 'wxnotify.rules';
+
+    private const LOCATIONS = 'wxnotify.locations';
+
+    private const LOCATIONS_META = 'wxnotify.locations.meta';
+
+    private const OPTIONS = 'wxnotify.rule_options';
 
     /**
      * @return array<int, array<string, mixed>>
@@ -104,10 +112,72 @@ class LocalCache
         return Cache::get(self::PROFILE);
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $rules
+     */
+    public function rememberRules(array $rules): void
+    {
+        Cache::forever(self::RULES, $rules);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>|null null until the list was fetched once
+     */
+    public function rules(): ?array
+    {
+        return Cache::get(self::RULES);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $locations
+     * @param  array<string, mixed>  $meta
+     */
+    public function rememberLocations(array $locations, array $meta): void
+    {
+        Cache::forever(self::LOCATIONS, $locations);
+        Cache::forever(self::LOCATIONS_META, $meta);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function locations(): ?array
+    {
+        return Cache::get(self::LOCATIONS);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function locationsMeta(): ?array
+    {
+        return Cache::get(self::LOCATIONS_META);
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     */
+    public function rememberOptions(array $options): void
+    {
+        Cache::forever(self::OPTIONS, $options);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function options(): ?array
+    {
+        return Cache::get(self::OPTIONS);
+    }
+
     public function wipe(): void
     {
         CachedAlert::query()->delete();
         Cache::forget(self::SYNCED_AT);
         Cache::forget(self::PROFILE);
+        Cache::forget(self::RULES);
+        Cache::forget(self::LOCATIONS);
+        Cache::forget(self::LOCATIONS_META);
+        Cache::forget(self::OPTIONS);
     }
 }
