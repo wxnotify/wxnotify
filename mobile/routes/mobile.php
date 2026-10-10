@@ -11,6 +11,7 @@ use App\NativeComponents\LocationsScreen;
 use App\NativeComponents\PushPrompt;
 use App\NativeComponents\RuleEditor;
 use App\NativeComponents\RulesScreen;
+use App\NativeComponents\SettingsScreen;
 use App\NativeComponents\SignInScreen;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,7 @@ Route::native('/sign-in', SignInScreen::class);
 Route::native('/auth/callback/{code}/{state}', AuthCallback::class);
 Route::native('/auth/denied/{state}', AuthDenied::class);
 Route::native('/alerts/{id}', AlertDetail::class);
+Route::native('/settings', SettingsScreen::class);
 Route::native('/rules', RulesScreen::class);
 Route::native('/rules/new', RuleEditor::class);
 Route::native('/rules/{id}', RuleEditor::class);

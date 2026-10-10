@@ -26,7 +26,8 @@ test('the account shows the subscriber, their plan and the app version', functio
         ->assertSee('Pat Smith')
         ->assertSee('pat@example.com')
         ->assertSee('Plus')
-        ->assertSee('1.2.3');
+        ->assertSee('1.2.3')
+        ->assertTabActive('Settings');
 
     expect((new LocalCache)->profile()['timezone'])->toBe('America/Chicago');
 });

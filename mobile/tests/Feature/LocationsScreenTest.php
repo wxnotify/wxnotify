@@ -42,7 +42,8 @@ test('the list shows each location with what kind it is and how current it is', 
         ->assertSee('WxNotify app · Not linked to a phone')
         ->assertSee('Truck')
         ->assertSee('Traccar · No recent update')
-        ->assertMissingElement('bottom_nav_item');
+        ->assertHasTab('Alerts')
+        ->assertTabActive('Settings');
 });
 
 test('the list is remembered for offline use, and offline shows it with a note', function () {

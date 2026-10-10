@@ -1,5 +1,7 @@
 <native:top-bar title="Locations" show-navigation-icon="true"></native:top-bar>
 
+@include('native.partials.tabs', ['active' => 'settings'])
+
 <native:column class="w-full h-full bg-theme-background">
     @if ($offline)
         <native:row class="w-full p-3 bg-theme-surface">
