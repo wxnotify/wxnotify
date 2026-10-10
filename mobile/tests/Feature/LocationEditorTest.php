@@ -174,37 +174,51 @@ test('a position whose address cannot be found is still kept', function () {
         ->assertSee('couldn\'t look up the address');
 });
 
-test('without location permission it asks once, retries when granted and otherwise points to the settings', function () {
-    locationFakes();
+test('without location permission it points to the settings at once, never waiting on a permission reply', function () {
+    locationFakes(['wx.test/api/v1/places/reverse*' => Http::response(['data' => ['address' => '1 Main Street, Norman']])]);
     System::shouldReceive('appSettings')->once();
 
     $screen = Native::test(LocationEditor::class)
         ->tap('Use my current position')
-        ->emitNative(LocationReceived::class, ['success' => false, 'error' => 'Location permission denied', 'id' => 'wxnotify-place'])
-        ->assertSet('locating', true);
-
-    expect($this->geolocation->permissionRequests)->toBe(1);
-
-    $screen->emitNative(PermissionRequestResult::class, ['location' => 'granted', 'coarseLocation' => 'granted', 'fineLocation' => 'granted', 'id' => 'wxnotify-place']);
-
-    expect($this->geolocation->positionRequests)->toHaveCount(2);
-
-    $screen
         ->emitNative(LocationReceived::class, ['success' => false, 'error' => 'Location permission denied', 'id' => 'wxnotify-place'])
         ->assertSet('locating', false)
         ->assertSet('permissionDenied', true)
         ->assertSee('Location permission is off')
         ->tap('Open settings');
 
-    expect($this->geolocation->permissionRequests)->toBe(1);
+    expect($this->geolocation->permissionRequests)->toBe(0);
+
+    // Back from the settings with access allowed: a second tap simply asks for the position again.
+    $screen->tap('Use my current position')
+        ->assertSet('permissionDenied', false)
+        ->emitNative(LocationReceived::class, ['success' => true, 'latitude' => 35.2226, 'longitude' => -97.4395, 'id' => 'wxnotify-place'])
+        ->assertSet('draft.lat', '35.222600')
+        ->assertDontSee('Location permission is off');
+
+    expect($this->geolocation->positionRequests)->toHaveCount(2);
 });
 
-test('a refused permission request points to the settings at once', function () {
+test('on iOS, where no permission reply ever comes once access is denied, the screen is not left finding the position', function () {
     locationFakes();
 
     Native::test(LocationEditor::class)
         ->tap('Use my current position')
-        ->emitNative(LocationReceived::class, ['success' => false, 'error' => 'Location permission not granted', 'id' => 'wxnotify-place'])
+        ->assertSee('Finding your position')
+        ->emitNative(LocationReceived::class, ['success' => false, 'latitude' => null, 'longitude' => null, 'error' => 'Location permission not granted', 'id' => 'wxnotify-place'])
+        ->assertSet('locating', false)
+        ->assertDontSee('Finding your position')
+        ->assertSee('Location permission is off')
+        ->assertSee('Open settings');
+
+    expect($this->geolocation->permissionRequests)->toBe(0);
+});
+
+test('on Android a permanently refused permission points to the settings, and a later permission event changes nothing', function () {
+    locationFakes();
+
+    Native::test(LocationEditor::class)
+        ->tap('Use my current position')
+        ->emitNative(LocationReceived::class, ['success' => false, 'error' => 'Location permissions not granted', 'id' => 'wxnotify-place'])
         ->emitNative(PermissionRequestResult::class, ['location' => 'permanently_denied', 'coarseLocation' => 'permanently_denied', 'fineLocation' => 'permanently_denied', 'id' => 'wxnotify-place'])
         ->assertSet('locating', false)
         ->assertSee('Location permission is off')
@@ -213,12 +227,25 @@ test('a refused permission request points to the settings at once', function () 
     expect($this->geolocation->positionRequests)->toHaveCount(1);
 });
 
+test('a position that fails for another reason says so without the settings button', function () {
+    locationFakes();
+
+    Native::test(LocationEditor::class)
+        ->tap('Use my current position')
+        ->emitNative(LocationReceived::class, ['success' => false, 'error' => 'Location request timed out', 'id' => 'wxnotify-place'])
+        ->assertSet('locating', false)
+        ->assertSee('Couldn\'t get your position')
+        ->assertDontSee('Open settings');
+});
+
 test('a position event for another request is ignored', function () {
     locationFakes();
 
     Native::test(LocationEditor::class)
+        ->tap('Use my current position')
         ->emitNative(LocationReceived::class, ['success' => true, 'latitude' => 1.0, 'longitude' => 2.0, 'id' => 'something-else'])
-        ->assertSet('draft.lat', '');
+        ->assertSet('draft.lat', '')
+        ->assertSet('locating', true);
 });
 
 test('an existing stationary location opens filled in, and a rename alone sends only the name', function () {
@@ -301,6 +328,19 @@ test('a Traccar location says which device follows it', function () {
     Native::test(LocationEditor::class, ['id' => 3])->assertSee('F-150');
 });
 
+test('a Traccar location without a device name, or whose device is missing, says so plainly', function () {
+    locationFakes([], [
+        editorLocation(['id' => 3, 'type' => 'mobile', 'source' => 'traccar', 'source_label' => 'Traccar', 'device_name' => null, 'update_interval_minutes' => 15]),
+        editorLocation(['id' => 4, 'type' => 'mobile', 'source' => 'traccar', 'source_label' => 'Traccar', 'device_name' => 'F-150', 'has_missing_device' => true, 'update_interval_minutes' => 15]),
+    ]);
+
+    Native::test(LocationEditor::class, ['id' => 3])
+        ->assertSee('Tracked by a Traccar device.')
+        ->assertDontSee('device .');
+
+    Native::test(LocationEditor::class, ['id' => 4])->assertSee('Its Traccar device (F-150) is missing');
+});
+
 test('the server refusing a field puts its message on the page and keeps the draft', function () {
     locationFakes(['wx.test/api/v1/locations/1' => Http::response(['message' => 'Invalid.', 'errors' => ['label' => ['The label field must not be greater than 255 characters.']]], 422)], [editorLocation()]);
 
@@ -311,6 +351,28 @@ test('the server refusing a field puts its message on the page and keeps the dra
         ->assertSet('draft.label', 'Cabin')
         ->assertNoNavigation();
 });
+
+test('a server message for a detail with no field of its own still shows', function (array $errors, string $text, ?string $slot) {
+    locationFakes([
+        'wx.test/api/v1/places/search*' => Http::response(['data' => [['label' => 'Denver, Colorado', 'lat' => 39.74, 'lng' => -104.99]]]),
+        'wx.test/api/v1/locations/1' => Http::response(['message' => 'Invalid.', 'errors' => $errors], 422),
+    ], [editorLocation()]);
+
+    $screen = Native::test(LocationEditor::class, ['id' => 1])
+        ->set('placeQuery', 'Denver')
+        ->tap('Search')
+        ->tap('place-0')
+        ->tap('Save location')
+        ->assertSee($text)
+        ->assertNoNavigation();
+
+    $slot === null
+        ? $screen->assertElement('column', inLocationActions($text))
+        : $screen->assertSet("errors.{$slot}", $text)->assertSet('banner', null);
+})->with([
+    'the address, shown with the position' => [['address' => ['The address field must not be greater than 255 characters.']], 'The address field must not be greater than 255 characters.', 'position'],
+    'an unknown field, summarised beside the buttons' => [['source' => ['The source field is prohibited.']], 'Some details need fixing. The source field is prohibited.', null],
+]);
 
 test('the plan limit and maintenance each say so on save, beside the buttons', function (int $status, string $contentType, string $body, string $text) {
     locationFakes([

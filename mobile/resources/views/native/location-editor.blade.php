@@ -25,7 +25,7 @@
                         {{ ($location['linked'] ?? false) ? 'Kept current by a phone running WxNotify. Turn location sharing on or off in Account.' : 'Not linked to a phone. Turn on location sharing in the app on a phone to link it again.' }}
                     </native:text>
                 @else
-                    <native:text class="text-sm text-theme-on-surface-variant">Tracked by the Traccar device {{ $location['device_name'] ?? '' }}. Change the device on wxnotify.com.</native:text>
+                    <native:text class="text-sm text-theme-on-surface-variant">{{ $this->traccarDescription() }}</native:text>
                 @endif
 
                 @if (filled($location['address'] ?? null))

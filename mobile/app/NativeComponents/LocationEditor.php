@@ -17,7 +17,6 @@ use App\Support\LocalCache;
 use Native\Mobile\Attributes\On;
 use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Events\Geolocation\LocationReceived;
-use Native\Mobile\Events\Geolocation\PermissionRequestResult;
 use Native\Mobile\Facades\Geolocation;
 use Native\Mobile\Facades\System;
 
@@ -57,6 +56,9 @@ class LocationEditor extends NativeComponent
 
     private const INTERVALS = [5, 10, 15, 20, 25, 30];
 
+    /** The summary shown beside the buttons when the server refuses a detail the page has no field for. */
+    private const FIX_SUMMARY = 'Some details need fixing.';
+
     private const PERMISSION_OFF = 'Location permission is off. Allow it in your phone\'s settings, or search for an address instead.';
 
     public ?int $locationId = null;
@@ -92,8 +94,6 @@ class LocationEditor extends NativeComponent
     public ?string $positionMessage = null;
 
     public bool $locating = false;
-
-    public bool $permissionAsked = false;
 
     public bool $permissionDenied = false;
 
@@ -145,6 +145,20 @@ class LocationEditor extends NativeComponent
         return ($this->location['type'] ?? 'stationary') === 'mobile';
     }
 
+    /**
+     * Which Traccar device keeps this location current, or that it is missing, in one sentence.
+     */
+    public function traccarDescription(): string
+    {
+        $device = filled($this->location['device_name'] ?? null) ? (string) $this->location['device_name'] : null;
+
+        if ($this->location['has_missing_device'] ?? false) {
+            return ($device === null ? 'Its Traccar device is missing' : "Its Traccar device ({$device}) is missing").'. Choose another device on wxnotify.com.';
+        }
+
+        return ($device === null ? 'Tracked by a Traccar device.' : "Tracked by the Traccar device {$device}.").' Change the device on wxnotify.com.';
+    }
+
     // ---- position ------------------------------------------------------------------------------
 
     public function useCurrentPosition(): void
@@ -157,8 +171,10 @@ class LocationEditor extends NativeComponent
     }
 
     /**
-     * A one-shot fix (or its failure). A permission failure asks for the permission once per visit;
-     * after that, or when the ask is refused, the screen points to the phone's settings.
+     * A one-shot fix (or its failure). getCurrentPosition() already shows the system prompt when
+     * nothing is decided yet, so a permission failure means access is refused: the screen points to
+     * the phone's settings at once. (Asking again would wait forever on iOS, which never answers a
+     * request once access is denied.)
      */
     #[On(LocationReceived::class)]
     public function receivePosition(bool $success, ?float $latitude = null, ?float $longitude = null, ?string $error = null, ?string $id = null): void
@@ -176,34 +192,9 @@ class LocationEditor extends NativeComponent
 
         $isPermission = stripos((string) $error, 'permission') !== false;
 
-        if ($isPermission && ! $this->permissionAsked) {
-            $this->permissionAsked = true;
-            Geolocation::requestPermissions()->id(self::POSITION_REQUEST)->get();
-
-            return;
-        }
-
         $this->locating = false;
         $this->permissionDenied = $isPermission;
         $this->positionMessage = $isPermission ? self::PERMISSION_OFF : 'Couldn\'t get your position. Try again, or search for an address.';
-    }
-
-    #[On(PermissionRequestResult::class)]
-    public function receivePermission(string $location = '', string $coarseLocation = '', string $fineLocation = '', ?string $id = null): void
-    {
-        if (! $this->locating || ($id !== null && $id !== self::POSITION_REQUEST)) {
-            return;
-        }
-
-        if (in_array('granted', [$location, $coarseLocation, $fineLocation], true)) {
-            Geolocation::getCurrentPosition()->id(self::POSITION_REQUEST)->get();
-
-            return;
-        }
-
-        $this->locating = false;
-        $this->permissionDenied = true;
-        $this->positionMessage = self::PERMISSION_OFF;
     }
 
     public function openSettings(): void
@@ -548,15 +539,31 @@ class LocationEditor extends NativeComponent
     }
 
     /**
+     * Puts each server message on the field it belongs to (latitude, longitude and the address on
+     * the position); a message for a detail the page has no field for goes into the summary beside
+     * the buttons, so no refusal is silent.
+     *
      * @param  array<string, string>  $serverErrors
      * @return array<string, string>
      */
     private function mapServerErrors(array $serverErrors): array
     {
+        $slots = $this->isMobile() ? ['label', 'update_interval_minutes'] : ['label', 'position', 'timezone'];
         $errors = [];
+        $unplaced = [];
 
         foreach ($serverErrors as $field => $message) {
-            $errors[in_array($field, ['lat', 'lng'], true) ? 'position' : $field] ??= $message;
+            $slot = in_array($field, ['lat', 'lng', 'address'], true) ? 'position' : $field;
+
+            if (in_array($slot, $slots, true)) {
+                $errors[$slot] ??= $message;
+            } else {
+                $unplaced[] = $message;
+            }
+        }
+
+        if ($unplaced !== [] || $errors === []) {
+            $this->banner = trim(self::FIX_SUMMARY.' '.implode(' ', $unplaced));
         }
 
         return $errors;
