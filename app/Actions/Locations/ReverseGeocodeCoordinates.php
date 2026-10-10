@@ -33,7 +33,7 @@ class ReverseGeocodeCoordinates
 {
     public const CACHE_DAYS = 30;
 
-    private const RATE_LIMIT_KEY = 'reverse-geocode';
+    public const RATE_LIMIT_KEY = 'reverse-geocode';
 
     private const ADDRESS_MAX_LENGTH = 255;
 

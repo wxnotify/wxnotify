@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\LocationSharingController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\NwsOfficeController;
+use App\Http\Controllers\Api\V1\PlaceController;
 use App\Http\Controllers\Api\V1\PushTokenController;
 use App\Http\Controllers\Api\V1\SavedLocationController;
 use App\Http\Controllers\Api\V1\ZoneController;
@@ -49,6 +50,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
         Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
         Route::get('/zones', ZoneController::class)->name('api.v1.zones');
+        Route::get('/places/search', [PlaceController::class, 'search'])->middleware('throttle:app-places')->name('api.v1.places.search');
+        Route::get('/places/reverse', [PlaceController::class, 'reverse'])->middleware('throttle:app-places')->name('api.v1.places.reverse');
         Route::put('/push-token', [PushTokenController::class, 'update'])->name('api.v1.push-token.update');
         Route::delete('/push-token', [PushTokenController::class, 'destroy'])->name('api.v1.push-token.destroy');
         Route::put('/location-sharing', [LocationSharingController::class, 'update'])->name('api.v1.location-sharing.update');

@@ -75,6 +75,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('app-location', fn (Request $request) => Limit::perMinute(30)
             ->by('app-location:'.($request->user()?->currentAccessToken()?->id ?? $request->ip())));
 
+        // Place search and reverse lookup are for a person tapping a button; the geocoder itself is
+        // limited to one request per second app-wide, so a runaway client must hit this first.
+        RateLimiter::for('app-places', fn (Request $request) => Limit::perMinute(20)
+            ->by('app-places:'.($request->user()?->currentAccessToken()?->id ?? $request->ip())));
+
         RateLimiter::for('app-auth', fn (Request $request) => Limit::perMinute(10)
             ->by('app-auth:'.(ClientIp::for($request) ?? $request->ip())));
 
