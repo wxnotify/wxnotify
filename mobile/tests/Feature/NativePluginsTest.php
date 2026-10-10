@@ -17,7 +17,7 @@ test('every native capability the app calls has its plugin registered for the na
     expect((new NativeServiceProvider(app()))->plugins())->toContain($provider);
 })->with([
     'Browser::auth() and Browser::inApp() (sign-in handoff, View full product)' => BrowserServiceProvider::class,
-    'Geolocation::sharePosition() and backgroundWatchStatus() (the location beacon), getCurrentPosition() and requestPermissions() (the location editor)' => GeolocationServiceProvider::class,
+    'Geolocation::sharePosition(), backgroundWatchStatus(), trimWatch() and stopBackgroundWatch() (the location beacon), getCurrentPosition() (the location editor, one-shot)' => GeolocationServiceProvider::class,
     'Network::status() (offline detection)' => NetworkServiceProvider::class,
     'PushNotifications (permission, enrollment and the FCM token)' => PushNotificationsServiceProvider::class,
     'SecureStorage (the API token)' => SecureStorageServiceProvider::class,

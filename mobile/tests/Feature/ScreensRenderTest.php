@@ -5,7 +5,9 @@ use App\NativeComponents\AlertDetail;
 use App\NativeComponents\AlertsScreen;
 use App\NativeComponents\AuthCallback;
 use App\NativeComponents\AuthDenied;
+use App\NativeComponents\LocationEditor;
 use App\NativeComponents\LocationPrompt;
+use App\NativeComponents\LocationsScreen;
 use App\NativeComponents\PushPrompt;
 use App\NativeComponents\RuleEditor;
 use App\NativeComponents\RulesScreen;
@@ -174,6 +176,55 @@ test('the rule editor opens from both routes and renders its form elements', fun
         ->assertElement('accordion', fn (array $accordion) => $accordion['props']['expanded'] === true)
         ->assertElement('checkbox', fn (array $checkbox) => $checkbox['props']['value'] === true)
         ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Delete rule');
+});
+
+test('the locations screen renders its title, tabs, an add button and a tappable row', function () {
+    (new TokenStore)->put('9|secret');
+    Http::fake(['wx.test/api/v1/locations' => Http::response([
+        'data' => [['id' => 3, 'label' => 'Home', 'type' => 'stationary', 'source' => null, 'address' => '1 Main Street, Norman', 'lat' => 35.2226, 'lng' => -97.4395, 'timezone' => 'America/Chicago']],
+        'meta' => ['can_create' => true, 'limit' => 5],
+    ])]);
+
+    Native::test(LocationsScreen::class)
+        ->assertNavTitle('Locations')
+        ->assertHasTabBar()
+        ->assertTabActive('Locations')
+        ->assertHasTab('Rules')
+        ->assertElement('scroll_view')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Add location')
+        ->assertElement('pressable')
+        ->assertElement('divider');
+});
+
+test('the location editor renders the stationary form', function () {
+    (new TokenStore)->put('9|secret');
+    Http::fake(['wx.test/api/v1/locations' => Http::response(['data' => [], 'meta' => ['can_create' => true, 'limit' => 5]])]);
+
+    Native::test(LocationEditor::class)
+        ->assertNavTitle('New location')
+        ->assertElement('scroll_view')
+        ->assertElement('outlined_text_input')
+        ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Timezone')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Use my current position')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Search')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Save location')
+        ->assertMissingElement('select', fn (array $select) => $select['props']['label'] === 'Update every');
+});
+
+test('the location editor renders a phone location with an update interval and a delete button, and no position search', function () {
+    (new TokenStore)->put('9|secret');
+    Http::fake(['wx.test/api/v1/locations' => Http::response(['data' => [[
+        'id' => 2, 'label' => 'Pixel 9', 'type' => 'mobile', 'source' => 'app', 'source_label' => 'WxNotify app', 'address' => null, 'lat' => 35.2, 'lng' => -97.4,
+        'timezone' => null, 'update_interval_minutes' => 5, 'linked' => true, 'device_name' => null, 'has_missing_device' => false,
+    ]], 'meta' => ['can_create' => true, 'limit' => 5]])]);
+
+    Native::test(LocationEditor::class, ['id' => 2])
+        ->assertNavTitle('Edit location')
+        ->assertElement('outlined_text_input')
+        ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Update every')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Delete location')
+        ->assertMissingElement('select', fn (array $select) => $select['props']['label'] === 'Timezone')
+        ->assertMissingElement('button', fn (array $button) => $button['props']['label'] === 'Use my current position');
 });
 
 test('the native UI plugin is enabled for the native build', function () {

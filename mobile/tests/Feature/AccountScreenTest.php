@@ -55,6 +55,21 @@ test('signing out revokes the token on the server, forgets it, wipes the cache a
         ->and((new LocalCache)->profile())->toBeNull();
 });
 
+test('signing out also forgets the cached rules, locations and form options', function () use ($profile) {
+    $cache = new LocalCache;
+    $cache->rememberRules([['id' => 1]]);
+    $cache->rememberLocations([['id' => 2]], ['can_create' => true, 'limit' => 5]);
+    $cache->rememberOptions(['categories' => []]);
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/auth/token' => Http::response(null, 204),
+    ]);
+
+    Native::test(AccountScreen::class)->tap('Sign out')->assertReplacedWith('/sign-in');
+
+    expect($cache->rules())->toBeNull()->and($cache->locations())->toBeNull()->and($cache->locationsMeta())->toBeNull()->and($cache->options())->toBeNull();
+});
+
 test('signing out works offline: the phone is cleared even though the server could not be told', function () use ($profile) {
     (new LocalCache)->rememberProfile($profile);
     $this->network->connected = false;
