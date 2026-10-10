@@ -35,6 +35,7 @@ class AlertResource extends JsonResource
             'dispatched_at' => $this->resource->latestAt()->toIso8601String(),
             'channels' => $this->resource->rows->map(fn (DeliveryLog $row) => $this->channel($row))->values()->all(),
             'has_failure' => $this->resource->hasFailure(),
+            'product_url' => $first->ingestedProduct?->viewUrl(),
         ];
     }
 

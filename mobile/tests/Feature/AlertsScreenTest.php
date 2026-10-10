@@ -21,6 +21,7 @@ function apiEntry(int $id, array $overrides = []): array
         'dispatched_at' => now()->subMinutes(5)->toIso8601String(),
         'channels' => [['type' => 'discord', 'type_label' => 'Discord', 'status' => 'success']],
         'has_failure' => false,
+        'product_url' => null,
         ...$overrides,
     ];
 }
@@ -299,10 +300,20 @@ test('load more is unavailable offline', function () {
     Http::assertSentCount(1);
 });
 
-test('tapping an alert opens its detail', function () {
+test('tapping an alert with a product page opens it in the in-app browser', function () {
+    Http::fake(['*' => Http::response(feedResponse([apiEntry(4, ['product_url' => 'https://wx.test/view-product/abc'])]))]);
+
+    Native::test(AlertsScreen::class)->tap('Tornado Warning 4')->assertNoNavigation();
+
+    expect($this->browser->inAppUrls)->toBe(['https://wx.test/view-product/abc']);
+});
+
+test('tapping an alert with no product page opens its detail', function () {
     Http::fake(['*' => Http::response(feedResponse([apiEntry(4)]))]);
 
     Native::test(AlertsScreen::class)->tap('Tornado Warning 4')->assertNavigatedTo('/alerts/4');
+
+    expect($this->browser->inAppUrls)->toBe([]);
 });
 
 test('the bottom bar has Alerts and Account', function () {

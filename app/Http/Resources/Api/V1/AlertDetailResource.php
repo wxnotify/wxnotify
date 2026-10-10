@@ -7,8 +7,7 @@ use App\Support\Units;
 use Illuminate\Http\Request;
 
 /**
- * An alert's detail: the feed entry plus the rule, each channel's own label, and the public
- * product page when there is one.
+ * An alert's detail: the feed entry plus the rule and each channel's own label.
  */
 class AlertDetailResource extends AlertResource
 {
@@ -22,7 +21,6 @@ class AlertDetailResource extends AlertResource
         return [
             ...parent::toArray($request),
             'rule_name' => $first->alertRule?->displayName(Units::for($request->user())->system),
-            'product_url' => $first->ingestedProduct?->viewUrl(),
         ];
     }
 

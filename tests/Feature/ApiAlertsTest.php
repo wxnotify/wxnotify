@@ -159,14 +159,20 @@ test('the tier does not matter', function () {
     $this->withToken($this->token)->getJson('/api/v1/alerts')->assertOk()->assertJsonCount(1, 'data');
 });
 
-test('listing the feed does not load the products, whose text column is large', function () {
+test('listing the feed carries each alert\'s product page without loading the products\' text column', function () {
     ($this->log)();
+    ($this->log)(['ingested_product_id' => null, 'category' => 'daily_summary', 'subject' => 'Daily summary']);
 
     DB::enableQueryLog();
 
-    $this->withToken($this->token)->getJson('/api/v1/alerts')->assertOk()->assertJsonCount(1, 'data');
+    $this->withToken($this->token)->getJson('/api/v1/alerts')
+        ->assertOk()
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.1.product_url', $this->product->viewUrl())
+        ->assertJsonPath('data.0.product_url', null);
 
     $productQueries = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains($query['query'], 'from "ingested_products"'));
 
-    expect($productQueries)->toBeEmpty();
+    expect($productQueries)->toHaveCount(1)
+        ->and($productQueries->first()['query'])->toContain('select "id", "view_slug" from "ingested_products"');
 });

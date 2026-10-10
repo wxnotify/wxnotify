@@ -17,6 +17,7 @@ use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use Illuminate\Support\Carbon;
 use Native\Mobile\Edge\NativeComponent;
+use Native\Mobile\Facades\Browser;
 
 /**
  * The home screen: the subscriber's recent alerts. Paints from the local cache first, then
@@ -156,8 +157,20 @@ class AlertsScreen extends NativeComponent
             && Carbon::parse($this->lastPageLoadedAt)->diffInMilliseconds(now(), true) < self::LOAD_MORE_DEBOUNCE_SECONDS * 1000;
     }
 
+    /**
+     * Opens the alert's public product page in the in-app browser; an alert with no product page
+     * (a daily summary, say) or a cached row from before the feed carried the link opens its detail.
+     */
     public function open(int $id): void
     {
+        $alert = collect($this->alerts)->firstWhere('id', $id);
+
+        if (filled($alert['product_url'] ?? null)) {
+            Browser::inApp($alert['product_url']);
+
+            return;
+        }
+
         $this->navigate("/alerts/{$id}");
     }
 
