@@ -73,3 +73,49 @@ function something()
 {
     // ..
 }
+
+function ruleFormOptions(array $overrides = []): array
+{
+    return [
+        'categories' => [
+            ['value' => 'weather_alerts', 'label' => 'Weather Alerts', 'description' => 'Warnings.'],
+            ['value' => 'daily_summary', 'label' => 'Daily Weather Summary', 'description' => 'Daily.'],
+            ['value' => 'threshold', 'label' => 'Threshold Alerts', 'description' => 'Values.'],
+            ['value' => 'spc_wpc', 'label' => 'SPC & WPC Alerts', 'description' => 'Outlooks.'],
+            ['value' => 'lightning', 'label' => 'Lightning Alerts', 'description' => 'Strikes.'],
+        ],
+        'products' => [
+            'weather_alerts' => [['category' => 'tornado', 'label' => 'Tornado', 'products' => [
+                ['id' => 10, 'name' => 'Tornado Warning', 'description' => null, 'risk_levels' => []],
+                ['id' => 11, 'name' => 'Tornado Watch', 'description' => null, 'risk_levels' => []],
+            ]]],
+            'spc_wpc' => [
+                ['category' => 'convective', 'label' => 'Convective Outlooks', 'products' => [
+                    ['id' => 20, 'name' => 'Day 1 Outlook', 'description' => null, 'risk_levels' => ['MRGL', 'SLGT', 'ENH']],
+                    ['id' => 21, 'name' => 'Mesoscale Discussion', 'description' => null, 'risk_levels' => []],
+                ]],
+            ],
+        ],
+        'matching_modes' => [
+            ['value' => 'nationwide', 'label' => 'All products, any location', 'description' => 'n'],
+            ['value' => 'location', 'label' => 'By my location', 'description' => 'l'],
+            ['value' => 'wfo', 'label' => 'By issuing office (WFO)', 'description' => 'w'],
+            ['value' => 'county_zone', 'label' => 'By county/zone (UGC)', 'description' => 'c'],
+            ['value' => 'polygon', 'label' => 'By product polygon', 'description' => 'p'],
+            ['value' => 'risk_area', 'label' => 'By risk area at my location', 'description' => 'r'],
+        ],
+        'thresholds' => [
+            'variables' => [['value' => 'temperature', 'label' => 'Temperature', 'unit' => '°F', 'decimals' => 1], ['value' => 'wind_speed', 'label' => 'Wind speed', 'unit' => 'mph', 'decimals' => 1]],
+            'directions' => [['value' => 'above', 'label' => 'Rises above'], ['value' => 'below', 'label' => 'Falls below']],
+            'timeframes' => [['value' => 'day', 'label' => 'During the day'], ['value' => 'overnight', 'label' => 'Overnight']],
+        ],
+        'lightning' => ['unit' => 'mi', 'min' => 10, 'max' => 50, 'default' => 15],
+        'tier' => ['can_customize_messages' => false],
+        'message_body_styles' => [['value' => 'full', 'label' => 'Full'], ['value' => 'brief', 'label' => 'Brief']],
+        'channels' => [['id' => 5, 'label' => 'Discord', 'type' => 'discord', 'type_label' => 'Discord', 'verified' => true]],
+        'templates' => ['weather_alerts' => [], 'spc_wpc' => []],
+        'locations' => [['id' => 7, 'label' => 'Home']],
+        'can_create_location' => true,
+        ...$overrides,
+    ];
+}
