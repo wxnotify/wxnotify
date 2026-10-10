@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\AppTokenController;
 use App\Http\Controllers\Api\V1\ChannelController;
 use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\LocationSharingController;
+use App\Http\Controllers\Api\V1\MapController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\NwsOfficeController;
 use App\Http\Controllers\Api\V1\PlaceController;
@@ -56,6 +57,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/channels/{id}/test', [ChannelController::class, 'test'])->whereNumber('id')->middleware('throttle:app-channel-send')->name('api.v1.channels.test');
         Route::put('/channels/{id}', [ChannelController::class, 'update'])->whereNumber('id')->name('api.v1.channels.update');
         Route::delete('/channels/{id}', [ChannelController::class, 'destroy'])->whereNumber('id')->name('api.v1.channels.destroy');
+        Route::get('/map', MapController::class)->name('api.v1.map');
         Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
         Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
         Route::get('/zones', ZoneController::class)->name('api.v1.zones');
