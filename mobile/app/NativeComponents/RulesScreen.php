@@ -9,6 +9,7 @@ use App\Exceptions\Api\Unauthenticated;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\Concerns\HandlesPushToken;
+use App\Support\Concerns\OpensSettingsMenu;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use Native\Mobile\Edge\NativeComponent;
@@ -20,6 +21,7 @@ use Native\Mobile\Edge\NativeComponent;
 class RulesScreen extends NativeComponent
 {
     use HandlesPushToken;
+    use OpensSettingsMenu;
     use RequiresSignIn;
 
     /** @var array<int, array<string, mixed>> */
@@ -33,6 +35,11 @@ class RulesScreen extends NativeComponent
     public ?string $error = null;
 
     public ?string $message = null;
+
+    protected function settingsPage(): ?string
+    {
+        return '/rules';
+    }
 
     public function mount(): void
     {

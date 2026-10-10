@@ -324,10 +324,10 @@ test('tapping an alert with no product page opens its detail', function () {
     expect($this->browser->inAppUrls)->toBe([]);
 });
 
-test('the bottom bar has Alerts and Account', function () {
+test('the bottom bar has Alerts and Settings', function () {
     Http::fake(['*' => Http::response(feedResponse([]))]);
 
-    Native::test(AlertsScreen::class)->assertHasTab('Alerts')->assertHasTab('Account');
+    Native::test(AlertsScreen::class)->assertTabActive('Alerts')->assertHasTab('Settings');
 });
 
 test('coming back from a detail keeps the pages already loaded and sends no request', function () {
@@ -454,12 +454,39 @@ test('opening the feed while location sharing is off sends nothing about it', fu
     Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'location-sharing'));
 });
 
-test('the tab bar offers alerts, rules, locations and account', function () {
-    Http::fake(['*' => Http::response(['data' => [], 'meta' => ['next_cursor' => null]])]);
+test('tapping Settings opens a menu of Rules, Locations and Account', function () {
+    Http::fake(['*' => Http::response(feedResponse([]))]);
 
-    $screen = Native::test(AlertsScreen::class);
+    Native::test(AlertsScreen::class)
+        ->assertSet('settingsMenuOpen', false)
+        ->press('openSettingsMenu')
+        ->assertSet('settingsMenuOpen', true)
+        ->assertElement('bottom_sheet', fn (array $sheet) => $sheet['props']['visible'] === true)
+        ->assertSee('Rules')
+        ->assertSee('Locations')
+        ->assertSee('Account');
+});
 
-    foreach (['Alerts', 'Rules', 'Locations', 'Account'] as $tab) {
-        $screen->assertHasTab($tab);
-    }
+test('the Settings menu goes to the page chosen and closes', function (string $method, string $uri) {
+    Http::fake(['*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class)
+        ->press('openSettingsMenu')
+        ->press($method)
+        ->assertSet('settingsMenuOpen', false)
+        ->assertReplacedWith($uri);
+})->with([
+    ['openRules', '/rules'],
+    ['openLocations', '/locations'],
+    ['openAccount', '/account'],
+]);
+
+test('dismissing the Settings menu closes it without navigating', function () {
+    Http::fake(['*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class)
+        ->press('openSettingsMenu')
+        ->call('closeSettingsMenu')
+        ->assertSet('settingsMenuOpen', false)
+        ->assertNoNavigation();
 });

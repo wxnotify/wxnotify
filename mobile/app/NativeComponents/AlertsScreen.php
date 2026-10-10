@@ -13,6 +13,7 @@ use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\AlertPresenter;
 use App\Support\Concerns\HandlesPushToken;
+use App\Support\Concerns\OpensSettingsMenu;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use Illuminate\Support\Carbon;
@@ -26,6 +27,7 @@ use Native\Mobile\Facades\Browser;
 class AlertsScreen extends NativeComponent
 {
     use HandlesPushToken;
+    use OpensSettingsMenu;
     use RequiresSignIn;
 
     private const RESUME_REFRESH_AFTER_SECONDS = 60;
