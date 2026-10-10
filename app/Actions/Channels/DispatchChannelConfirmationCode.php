@@ -5,6 +5,7 @@ namespace App\Actions\Channels;
 use App\Models\NotificationChannel;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 
 class DispatchChannelConfirmationCode
 {
@@ -22,6 +23,8 @@ class DispatchChannelConfirmationCode
      */
     public function __invoke(NotificationChannel $channel): bool
     {
+        Cache::forget(VerifyChannelConfirmationCode::attemptsKey($channel));
+
         $code = (string) random_int(100000, 999999);
 
         $channel->forceFill([

@@ -2,11 +2,11 @@
 
 namespace App\Filament\Dashboard\Pages;
 
-use App\Actions\Channels\DispatchChannelConfirmationCode;
+use App\Actions\Channels\BeginChannelConnection;
 use App\Actions\Channels\VerifyChannelConfirmationCode;
+use App\Exceptions\ChannelCodeNotSent;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
-use App\Support\ChannelTypes\Contracts\ChannelType;
 use BackedEnum;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Hidden;
@@ -21,7 +21,6 @@ use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
 use ToneGabes\BetterOptions\Forms\Components\RadioCards;
@@ -89,30 +88,12 @@ class ConnectChannel extends Page implements HasForms
                             $type = app(ChannelTypeRegistry::class)->find($get('channel_type'));
 
                             try {
-                                $destination = $type->buildDestination($get());
+                                $channel = app(BeginChannelConnection::class)(auth()->user(), $type, $get());
                             } catch (\InvalidArgumentException $e) {
                                 Notification::make()->title($e->getMessage())->danger()->send();
 
                                 throw new Halt;
-                            }
-
-                            $existing = $this->existingWebPushChannel($type, $destination);
-                            $channel = $this->storePendingChannel($type, $destination, $existing);
-
-                            $dispatched = app(DispatchChannelConfirmationCode::class)($channel);
-
-                            if (! $dispatched) {
-                                // Delete rather than leave a permanently-pending
-                                // channel behind: nothing else can retry it, and
-                                // an unqualified retry (clicking Next again)
-                                // would otherwise create a duplicate row on
-                                // every attempt. A channel that already existed
-                                // is only ever refreshed, never deleted — it is
-                                // the subscriber's own, previously working one.
-                                if ($existing === null) {
-                                    $channel->delete();
-                                }
-
+                            } catch (ChannelCodeNotSent) {
                                 Notification::make()
                                     ->title('Couldn\'t send your confirmation code')
                                     ->body('The notification service is temporarily unavailable. Please try again in a moment.')
@@ -176,62 +157,6 @@ class ConnectChannel extends Page implements HasForms
                 $set($component->getName(), $component->getDefaultState());
             }
         }
-    }
-
-    /**
-     * The subscriber's existing Web Push channel for this exact browser
-     * endpoint, if any.
-     *
-     * The subscribe component deliberately reuses the browser's live
-     * PushSubscription rather than creating a second one, so a subscriber who
-     * runs the wizard twice in one browser would otherwise end up with two
-     * channels pointing at one endpoint and receive every alert twice. Nothing
-     * at the database level can catch this: `config` is an encrypted column, so
-     * the endpoint is only comparable after decryption.
-     *
-     * @param  array<string, mixed>  $destination
-     */
-    private function existingWebPushChannel(ChannelType $type, array $destination): ?NotificationChannel
-    {
-        $endpoint = $destination['config']['endpoint'] ?? null;
-
-        if ($type->slug() !== 'webpush' || ! is_string($endpoint)) {
-            return null;
-        }
-
-        return NotificationChannel::query()
-            ->where('user_id', auth()->id())
-            ->where('channel_type', 'webpush')
-            ->get()
-            ->first(fn (NotificationChannel $channel): bool => ($channel->config['endpoint'] ?? null) === $endpoint);
-    }
-
-    /**
-     * Refresh the given channel with the newly-built destination, or create one
-     * when there is nothing to refresh. A refreshed channel goes back to
-     * unverified: its keys just changed, and the subscriber has to confirm the
-     * new code before it delivers again.
-     *
-     * @param  array<string, mixed>  $destination
-     */
-    private function storePendingChannel(ChannelType $type, array $destination, ?NotificationChannel $existing): NotificationChannel
-    {
-        $attributes = [
-            'label' => $destination['label'] ?? $type->label(),
-            ...Arr::only($destination, ['apprise_url', 'config']),
-        ];
-
-        if ($existing !== null) {
-            $existing->forceFill([...$attributes, 'verified_at' => null])->save();
-
-            return $existing;
-        }
-
-        return NotificationChannel::create([
-            'user_id' => auth()->id(),
-            'channel_type' => $type->slug(),
-            ...$attributes,
-        ]);
     }
 
     public function connect(): void
