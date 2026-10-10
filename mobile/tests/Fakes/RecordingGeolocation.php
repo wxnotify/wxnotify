@@ -3,6 +3,7 @@
 namespace Tests\Fakes;
 
 use DateTimeInterface;
+use Native\Mobile\PendingGeolocation;
 use NativePHP\Geolocation\Geolocation;
 use NativePHP\Geolocation\PendingSharedLocationWatch;
 use Throwable;
@@ -33,6 +34,25 @@ class RecordingGeolocation extends Geolocation
 
     /** Thrown by stopBackgroundWatch(), to simulate a native failure while stopping it. */
     public ?Throwable $throwOnStop = null;
+
+    /** @var list<array{fine: bool}> */
+    public array $positionRequests = [];
+
+    public int $permissionRequests = 0;
+
+    public function getCurrentPosition(bool $fineAccuracy = false): PendingGeolocation
+    {
+        $this->positionRequests[] = ['fine' => $fineAccuracy];
+
+        return parent::getCurrentPosition($fineAccuracy);
+    }
+
+    public function requestPermissions(): PendingGeolocation
+    {
+        $this->permissionRequests++;
+
+        return parent::requestPermissions();
+    }
 
     public function watchPosition(bool $fineAccuracy = false): PendingSharedLocationWatch
     {

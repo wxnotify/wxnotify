@@ -8,8 +8,8 @@ use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\Unauthenticated;
 use App\Exceptions\Api\ValidationFailed;
-use App\Services\SignOut;
 use App\Services\WxNotifyApi;
+use App\Support\Concerns\EditsADraft;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use App\Support\RuleFormPresenter;
@@ -22,6 +22,7 @@ use Native\Mobile\Edge\NativeComponent;
  */
 class RuleEditor extends NativeComponent
 {
+    use EditsADraft;
     use RequiresSignIn;
 
     private const MAX_OFFICE_RESULTS = 20;
@@ -50,10 +51,6 @@ class RuleEditor extends NativeComponent
     public bool $ready = false;
 
     public bool $canRetry = false;
-
-    public bool $confirmingDelete = false;
-
-    public bool $confirmingDiscard = false;
 
     public string $officeQuery = '';
 
@@ -388,16 +385,6 @@ class RuleEditor extends NativeComponent
         $this->back();
     }
 
-    public function askDelete(): void
-    {
-        $this->confirmingDelete = true;
-    }
-
-    public function cancelDelete(): void
-    {
-        $this->confirmingDelete = false;
-    }
-
     public function delete(): void
     {
         if ($this->ruleId === null) {
@@ -456,31 +443,6 @@ class RuleEditor extends NativeComponent
         if ($key !== null) {
             $this->forgetError(explode('.', $key)[0]);
         }
-    }
-
-    /**
-     * The system back gesture: leave straight away unless there are unsaved edits.
-     */
-    public function onBackPressed(): void
-    {
-        if ($this->ready && $this->isDirty()) {
-            $this->confirmingDiscard = true;
-
-            return;
-        }
-
-        $this->back();
-    }
-
-    public function discard(): void
-    {
-        $this->original = $this->draft;
-        $this->back();
-    }
-
-    public function keepEditing(): void
-    {
-        $this->confirmingDiscard = false;
     }
 
     public function openAccount(): void
@@ -660,11 +622,5 @@ class RuleEditor extends NativeComponent
         }
 
         $cache->rememberRules($rules);
-    }
-
-    private function signOutLocally(): void
-    {
-        app(SignOut::class)->clearLocal();
-        $this->replace('/sign-in');
     }
 }
