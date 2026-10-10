@@ -170,6 +170,17 @@ test('a failed save says why and keeps the draft', function (int $status, string
     'a server error' => [500, 'application/json', '{}', 'Couldn\'t save the rule. Please try again.'],
 ]);
 
+test('saving a rule that was deleted elsewhere says it no longer exists', function () {
+    editorFakes(['wx.test/api/v1/alert-rules/4' => fn (Request $request) => $request->method() === 'PUT' ? Http::response([], 404) : Http::response(['data' => editorSavedRule()])]);
+
+    Native::test(RuleEditor::class, ['id' => 4])
+        ->input('field-threshold_value', '30')
+        ->tap('Save rule')
+        ->assertSee('This rule no longer exists.')
+        ->assertDontSee('Couldn\'t save the rule')
+        ->assertNoNavigation();
+});
+
 test('saving while offline says so and keeps the draft', function () {
     editorFakes();
 

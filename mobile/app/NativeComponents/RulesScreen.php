@@ -27,6 +27,7 @@ class RulesScreen extends NativeComponent
 
     public bool $offline = false;
 
+    /** Whether the list on screen is known (remembered or just loaded): only then can it be "empty". */
     public bool $loaded = false;
 
     public ?string $error = null;
@@ -54,13 +55,19 @@ class RulesScreen extends NativeComponent
         $this->refresh();
     }
 
+    /**
+     * Offline or failing with nothing remembered leaves the list unknown, so no "no alert rules yet".
+     */
     public function refresh(): void
     {
+        $this->message = null;
+
         try {
             $this->rules = app(WxNotifyApi::class)->alertRules();
             app(LocalCache::class)->rememberRules($this->rules);
             $this->offline = false;
             $this->error = null;
+            $this->loaded = true;
         } catch (Unauthenticated) {
             app(SignOut::class)->clearLocal();
             $this->replace('/sign-in');
@@ -73,8 +80,6 @@ class RulesScreen extends NativeComponent
         } catch (ApiException) {
             $this->offline = false;
             $this->error = 'WxNotify could not load your alert rules. Try again in a moment.';
-        } finally {
-            $this->loaded = true;
         }
     }
 

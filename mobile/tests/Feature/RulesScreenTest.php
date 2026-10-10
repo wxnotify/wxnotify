@@ -52,11 +52,25 @@ test('offline, the remembered list is shown with a note', function () {
     Native::test(RulesScreen::class)->assertSee('Freeze')->assertSee('offline');
 });
 
-test('offline with nothing remembered says so', function () {
+test('offline with nothing remembered says so without claiming there are no rules', function () {
     $this->network->connected = false;
     Http::fake();
 
-    Native::test(RulesScreen::class)->assertSee('offline')->assertSee('No alert rules yet');
+    Native::test(RulesScreen::class)->assertSee('offline')->assertDontSee('No alert rules yet');
+});
+
+test('a refresh clears the message left by an earlier failed switch', function () {
+    Http::fake([
+        'wx.test/api/v1/alert-rules' => Http::response(['data' => [listedRule()]]),
+        'wx.test/api/v1/alert-rules/1' => Http::response('Back soon.', 500, ['Content-Type' => 'text/plain']),
+    ]);
+
+    Native::test(RulesScreen::class)
+        ->toggle('active-1', false)
+        ->assertSee('Couldn\'t update that alert')
+        ->call('refresh')
+        ->assertSet('message', null)
+        ->assertDontSee('Couldn\'t update that alert');
 });
 
 test('with no rules the screen explains how to add one', function () {

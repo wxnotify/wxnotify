@@ -171,12 +171,22 @@ test('validation mirrors the server\'s required fields', function (string $categ
     'a complete nationwide rule' => ['weather_alerts', ['product_ids' => [10], 'matching_mode' => 'nationwide', 'channel_ids' => [5]], []],
     'a threshold with nothing' => ['threshold', ['channel_ids' => [5]], ['variable', 'direction', 'threshold_value', 'timeframe', 'location_id', 'delivery_time']],
     'a threshold value that is not a number' => ['threshold', ['variable' => 'temperature', 'direction' => 'below', 'threshold_value' => 'cold', 'timeframe' => 'day', 'location_id' => 7, 'delivery_time' => '06:00', 'channel_ids' => [5]], ['threshold_value']],
+    'a threshold value above 9999' => ['threshold', ['variable' => 'temperature', 'direction' => 'below', 'threshold_value' => '10000', 'timeframe' => 'day', 'location_id' => 7, 'delivery_time' => '06:00', 'channel_ids' => [5]], ['threshold_value']],
+    'a threshold value below -9999' => ['threshold', ['variable' => 'temperature', 'direction' => 'below', 'threshold_value' => '-10000', 'timeframe' => 'day', 'location_id' => 7, 'delivery_time' => '06:00', 'channel_ids' => [5]], ['threshold_value']],
+    'a threshold value at the bounds' => ['threshold', ['variable' => 'temperature', 'direction' => 'below', 'threshold_value' => '-9999', 'timeframe' => 'day', 'location_id' => 7, 'delivery_time' => '06:00', 'channel_ids' => [5]], []],
     'a daily summary with nothing' => ['daily_summary', ['channel_ids' => [5]], ['location_id', 'delivery_time']],
     'a lightning radius below the minimum' => ['lightning', ['location_id' => 7, 'radius' => '9', 'channel_ids' => [5]], ['radius']],
     'a lightning radius above the maximum' => ['lightning', ['location_id' => 7, 'radius' => '51', 'channel_ids' => [5]], ['radius']],
     'a lightning radius that is not a whole number' => ['lightning', ['location_id' => 7, 'radius' => '24.5', 'channel_ids' => [5]], ['radius']],
     'a complete lightning rule' => ['lightning', ['location_id' => 7, 'radius' => '15', 'channel_ids' => [5]], []],
 ]);
+
+test('a threshold value outside the storable range says what is allowed', function () {
+    $presenter = rulePresenter();
+    $draft = draftWith($presenter, 'threshold', ['variable' => 'temperature', 'direction' => 'below', 'threshold_value' => '1e6', 'timeframe' => 'day', 'location_id' => 7, 'delivery_time' => '06:00', 'channel_ids' => [5]]);
+
+    expect($presenter->validate($draft)['threshold_value'])->toBe('Enter a value between -9999 and 9999.');
+});
 
 test('small helpers read from the options', function () {
     $presenter = rulePresenter(['tier' => ['can_customize_messages' => true]]);

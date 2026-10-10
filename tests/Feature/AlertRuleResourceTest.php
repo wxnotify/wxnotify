@@ -758,6 +758,24 @@ test('a subscriber cannot attach another subscriber\'s location via location_ids
     expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
 });
 
+test('a threshold value too large to store is refused', function (int $value) {
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'threshold',
+            'variable' => 'temperature',
+            'direction' => 'below',
+            'threshold_value' => $value,
+            'timeframe' => 'overnight',
+            'location_id' => $this->location->id,
+            'delivery_time' => '06:00',
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['threshold_value']);
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+})->with([1000000, -1000000]);
+
 test('saving changes to an alert returns the subscriber to the alerts list', function () {
     $rule = AlertRule::factory()->for($this->user)->for($this->location)->create(['threshold_value' => 32]);
     $rule->notificationChannels()->attach($this->channel);

@@ -116,6 +116,26 @@ test('the matching mode decides whether the office and the county/zone codes are
         ->and($wfo->matching_mode)->toBe(MatchingMode::Wfo);
 });
 
+test('only the matching modes that use locations keep the chosen locations', function (string $mode, bool $kept) {
+    $rule = ($this->save)(($this->weatherData)(['matching_mode' => $mode, 'wfo' => 'OKX', 'county_zone_codes' => ['NYC103'], 'location_ids' => [$this->location->id]]));
+
+    expect($rule->locations->pluck('id')->all())->toBe($kept ? [$this->location->id] : []);
+})->with([
+    'nationwide' => ['nationwide', false],
+    'office' => ['wfo', false],
+    'county and zone' => ['county_zone', false],
+    'location' => ['location', true],
+    'polygon' => ['polygon', true],
+]);
+
+test('switching a location rule to nationwide drops its locations', function () {
+    $rule = ($this->save)(($this->weatherData)(['matching_mode' => 'location', 'location_ids' => [$this->location->id]]));
+
+    $rule = ($this->save)(($this->weatherData)(['matching_mode' => 'nationwide', 'location_ids' => [$this->location->id]]), $rule);
+
+    expect($rule->locations)->toBeEmpty();
+});
+
 test('changing the category clears the columns and relations that no longer apply', function () {
     $weather = ($this->save)(($this->weatherData)(['matching_mode' => 'location', 'location_ids' => [$this->location->id]]));
 

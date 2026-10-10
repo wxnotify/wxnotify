@@ -42,6 +42,9 @@ class SaveAlertRule
 
     private const CATEGORIES_WITH_PRODUCTS = ['weather_alerts', 'spc_wpc'];
 
+    /** The matching modes that match against the subscriber's saved locations. */
+    private const MODES_WITH_LOCATIONS = ['location', 'polygon', 'risk_area'];
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -114,8 +117,8 @@ class SaveAlertRule
     }
 
     /**
-     * Pivot syncs. Products and locations only apply to the product-based categories; the
-     * channel list always applies.
+     * Pivot syncs. Products only apply to the product-based categories, and locations only to a
+     * product-based rule whose matching mode uses them; the channel list always applies.
      *
      * @param  array<string, mixed>  $data
      */
@@ -126,7 +129,9 @@ class SaveAlertRule
         $rule->products()->sync($usesProducts
             ? collect($data['product_ids'] ?? [])->flatten()->filter(fn ($id): bool => is_numeric($id))->values()->all()
             : []);
-        $rule->locations()->sync($usesProducts ? ($data['location_ids'] ?? []) : []);
+        $usesLocations = $usesProducts && in_array($rule->matching_mode?->value, self::MODES_WITH_LOCATIONS, true);
+
+        $rule->locations()->sync($usesLocations ? ($data['location_ids'] ?? []) : []);
         $rule->notificationChannels()->sync($data['channel_ids'] ?? []);
     }
 

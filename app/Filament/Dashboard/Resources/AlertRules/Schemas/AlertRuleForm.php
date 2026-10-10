@@ -519,6 +519,8 @@ class AlertRuleForm
                 ->required(),
             TextInput::make('threshold_value')
                 ->numeric()
+                ->minValue(-9999)
+                ->maxValue(9999)
                 ->required()
                 ->suffix(fn (Get $get): ?string => ThresholdVariable::tryFrom($get('variable'))?->unit(Units::for(auth()->user())->system)),
             Select::make('timeframe')

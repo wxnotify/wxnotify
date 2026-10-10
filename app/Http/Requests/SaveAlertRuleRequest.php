@@ -67,8 +67,7 @@ class SaveAlertRuleRequest extends FormRequest
 
     /**
      * What SaveAlertRule reads: the validated fields, with optional ones present as null (a PUT
-     * replaces the rule), fields that the matching mode does not use emptied, and `radius`
-     * renamed to the form's `radius_miles` key.
+     * replaces the rule), and `radius` renamed to the form's `radius_miles` key.
      *
      * @return array<string, mixed>
      */
@@ -79,20 +78,6 @@ class SaveAlertRuleRequest extends FormRequest
             'custom_subject_template' => null, 'alert_template_id' => null,
             ...$this->validated(),
         ];
-
-        $mode = $data['matching_mode'] ?? null;
-
-        if (! in_array($mode, self::LOCATION_MODES, true)) {
-            $data['location_ids'] = [];
-        }
-
-        if ($mode !== MatchingMode::Wfo->value) {
-            $data['wfo'] = null;
-        }
-
-        if ($mode !== MatchingMode::CountyZone->value) {
-            $data['county_zone_codes'] = null;
-        }
 
         if (array_key_exists('radius', $data)) {
             $data['radius_miles'] = $data['radius'];
@@ -136,7 +121,7 @@ class SaveAlertRuleRequest extends FormRequest
         return [
             'variable' => ['required', Rule::enum(ThresholdVariable::class)],
             'direction' => ['required', Rule::enum(ThresholdDirection::class)],
-            'threshold_value' => ['required', 'numeric'],
+            'threshold_value' => ['required', 'numeric', 'between:-9999,9999'],
             'timeframe' => ['required', Rule::enum(ThresholdTimeframe::class)],
             ...$this->scheduledRules(),
         ];

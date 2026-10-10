@@ -374,6 +374,10 @@ class RuleEditor extends NativeComponent
             $this->banner = 'You\'re offline. Reconnect to save.';
 
             return;
+        } catch (Rejected) {
+            $this->banner = $this->ruleId === null ? 'Couldn\'t save the rule. Please try again.' : 'This rule no longer exists.';
+
+            return;
         } catch (ApiException) {
             $this->banner = 'Couldn\'t save the rule. Please try again.';
 

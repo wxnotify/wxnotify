@@ -17,6 +17,9 @@ final class RuleFormPresenter
 
     private const LOCATION_MODES = ['location', 'polygon', 'risk_area'];
 
+    /** The server refuses a threshold beyond this in the subscriber's own units (the column is decimal(6,1)). */
+    private const MAX_THRESHOLD_VALUE = 9999;
+
     /**
      * @param  array<string, mixed>  $options  the /alert-rule-options payload
      */
@@ -319,6 +322,8 @@ final class RuleFormPresenter
 
             if (! is_numeric($draft['threshold_value'])) {
                 $errors['threshold_value'] = 'Enter a number.';
+            } elseif (abs((float) $draft['threshold_value']) > self::MAX_THRESHOLD_VALUE) {
+                $errors['threshold_value'] = 'Enter a value between -'.self::MAX_THRESHOLD_VALUE.' and '.self::MAX_THRESHOLD_VALUE.'.';
             }
 
             if ($draft['timeframe'] === '') {
