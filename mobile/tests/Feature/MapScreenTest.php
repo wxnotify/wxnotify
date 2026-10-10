@@ -31,6 +31,7 @@ function mapScreenSnapshot(array $overrides = []): array
 }
 
 beforeEach(function () {
+    $this->freezeTime();
     (new TokenStore)->put('9|secret');
 });
 
