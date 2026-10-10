@@ -229,3 +229,25 @@ test('the radius holds at high latitude, where a degree of longitude is short', 
 
     expect(collect(mapEvents([['lat' => 71.0, 'lng' => -150.0]]))->pluck('event')->all())->toBe(['Tornado Warning']);
 });
+
+test('an event whose areas share one polygon is drawn once, and different polygons are all kept', function () {
+    $storm = mapEvent('Tornado Warning', 'warning');
+    mapArea($storm, MAP_COVERING, ['ugc_code' => 'XXC001']);
+    mapArea($storm, MAP_COVERING, ['ugc_code' => 'XXC002']);
+    mapArea($storm, MAP_COVERING, ['ugc_code' => 'XXC003']);
+    $zones = mapEvent('Flash Flood Warning', 'warning');
+    mapArea($zones, MAP_COVERING, ['ugc_code' => 'XXZ001']);
+    mapArea($zones, MAP_NEAR, ['ugc_code' => 'XXZ002']);
+
+    $events = collect(mapEvents($this->anchors))->keyBy('event');
+
+    expect($events['Tornado Warning']['geometry']['geometries'])->toHaveCount(1)
+        ->and($events['Flash Flood Warning']['geometry']['geometries'])->toHaveCount(2);
+});
+
+test('the exact distance, not just the search box, decides: a box corner beyond the radius is out and one within is in', function () {
+    mapArea(mapEvent('Tornado Warning', 'warning'), 'POLYGON((-102.6 41.9, -102.6 42.1, -102.4 42.1, -102.4 41.9, -102.6 41.9))');
+    mapArea(mapEvent('Severe Thunderstorm Warning', 'warning'), 'POLYGON((-103.2 41.0, -103.2 41.1, -103.1 41.1, -103.1 41.0, -103.2 41.0))');
+
+    expect(collect(mapEvents($this->anchors))->pluck('event')->all())->toBe(['Severe Thunderstorm Warning']);
+});

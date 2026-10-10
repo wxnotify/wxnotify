@@ -75,3 +75,8 @@ SPC outlooks; radar looping; a nationwide warnings switch; loading warnings as t
 - **Web view behaviour:** the inline page's size, the opaque origin's network access and Android's system WebView are untested; the spike decides inline versus PHP mode.
 - **USGS and NOAA service terms and availability:** both are public and keyless; neither is a paid service with an SLA, so an outage shows as a blank layer. Radar covers the continental US only (Alaska, Hawaii and Puerto Rico have separate MRMS layers, not in this slice).
 - **Geometry cost:** the zone-boundary union and simplification run per request; the plan measures it and adds a short cache or a cap if it is slow.
+
+## Clarifications settled while building
+
+- **Refresh** is a button in the "Near you" header: no screen in the app uses a top-bar action.
+- **Payload size** was measured on a worst-case dev snapshot in the final review, before de-duplicating identical geometries: one anchor at (31, -84) gave 30 events, 503 KB and 410-477 ms; six anchors gave 49 events, 860 KB and 674 ms. After de-duplicating a storm-based warning's repeated polygon, the same one-anchor call gives 30 events, 502 KB (238 geometries instead of 244) and about 320-360 ms through the action: that snapshot is dominated by zone-only events (one tropical storm warning alone is 72 zone boundaries, 193 KB), which de-duplication does not touch. Further reduction (ST_Union per event, coarser simplification at 0.02 degrees, applying the cap before building GeoJSON) is decided by the device check.

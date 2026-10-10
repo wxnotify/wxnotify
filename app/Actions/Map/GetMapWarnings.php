@@ -69,7 +69,8 @@ class GetMapWarnings
      * One event's payload from its area rows, plus the private `_meters` (its nearest area's distance,
      * used to sort and stripped before returning). Null when the event is gone or, authoritatively, is
      * not a warning or watch (the SQL family filter is only a safe superset of this check). The end is
-     * the latest of its areas', or none when any area has none.
+     * the latest of its areas', or none when any area has none. Identical geometries are listed once: a
+     * storm-based warning's one polygon is stored on every zone row it covers.
      *
      * @param  Collection<int, object>  $areaRows
      * @return ?array<string, mixed>
@@ -94,7 +95,7 @@ class GetMapWarnings
             'view_url' => $wwa->latestIngestedProduct?->viewUrl(),
             'geometry' => [
                 'type' => 'GeometryCollection',
-                'geometries' => $areaRows->map(fn ($row): array => json_decode($row->geojson, true))->values()->all(),
+                'geometries' => $areaRows->unique('geojson')->map(fn ($row): array => json_decode($row->geojson, true))->values()->all(),
             ],
             '_meters' => (float) $areaRows->min('meters'),
         ];
