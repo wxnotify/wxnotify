@@ -308,6 +308,14 @@ test('tapping an alert with a product page opens it in the in-app browser', func
     expect($this->browser->inAppUrls)->toBe(['https://wx.test/view-product/abc']);
 });
 
+test('long-pressing an alert with a product page opens its detail instead', function () {
+    Http::fake(['*' => Http::response(feedResponse([apiEntry(4, ['product_url' => 'https://wx.test/view-product/abc'])]))]);
+
+    Native::test(AlertsScreen::class)->longPress('openDetail(4)')->assertNavigatedTo('/alerts/4');
+
+    expect($this->browser->inAppUrls)->toBe([]);
+});
+
 test('tapping an alert with no product page opens its detail', function () {
     Http::fake(['*' => Http::response(feedResponse([apiEntry(4)]))]);
 

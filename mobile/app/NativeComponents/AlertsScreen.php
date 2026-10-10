@@ -171,6 +171,15 @@ class AlertsScreen extends NativeComponent
             return;
         }
 
+        $this->openDetail($id);
+    }
+
+    /**
+     * The long-press action: the alert's detail (rule, channels, delivery status), whether or not it
+     * has a product page.
+     */
+    public function openDetail(int $id): void
+    {
         $this->navigate("/alerts/{$id}");
     }
 

@@ -25,6 +25,7 @@
                 :supporting="$this->supporting($alert)"
                 :trailing-badges="$this->failureBadges($alert)"
                 @tap="open({{ $alert['id'] }})"
+                @longPress="openDetail({{ $alert['id'] }})"
             ></list-item>
         @empty
             <native:column class="w-full p-6 items-center gap-2">
