@@ -13,6 +13,7 @@ test('Settings lists rules, locations and account under the active Settings tab'
         ->assertTabActive('Settings')
         ->assertSee('Alert rules')
         ->assertSee('Locations')
+        ->assertSee('Channels')
         ->assertSee('Account');
 });
 
@@ -23,6 +24,7 @@ test('each row pushes its page so the back arrow returns to Settings', function 
 })->with([
     ['openRules', '/rules'],
     ['openLocations', '/locations'],
+    ['openChannels', '/channels'],
     ['openAccount', '/account'],
 ]);
 

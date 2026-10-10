@@ -174,7 +174,7 @@
             @forelse ($options['channels'] ?? [] as $channel)
                 <checkbox :value="in_array($channel['id'], $draft['channel_ids'], true)" label="{{ $channel['label'] }} ({{ $channel['type_label'] }}){{ $channel['verified'] ? '' : ' (unverified)' }}" @change="setChannel({{ $channel['id'] }})" ref="channel-{{ $channel['id'] }}" />
             @empty
-                <native:text class="text-sm text-theme-on-surface-variant">You have no channels yet. Turn on push notifications in Account, or add a channel on wxnotify.com.</native:text>
+                <native:text class="text-sm text-theme-on-surface-variant">You have no channels yet. Turn on push notifications in Account, or add one under Settings → Channels.</native:text>
                 <native:button label="Open Account" variant="secondary" @tap="openAccount" class="w-full" />
             @endforelse
             @isset($errors['channel_ids'])

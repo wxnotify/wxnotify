@@ -261,7 +261,7 @@ test('a rule is deleted after a confirmation, and keeping it changes nothing', f
 test('with no channels the form says where to get one', function () {
     editorFakes([], ['channels' => []]);
 
-    Native::test(RuleEditor::class)->assertSee('You have no channels yet.')->assertSee('add a channel on wxnotify.com');
+    Native::test(RuleEditor::class)->assertSee('You have no channels yet.')->assertSee('add one under Settings → Channels');
 });
 
 test('an unverified channel is marked as such', function () {

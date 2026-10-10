@@ -6,7 +6,7 @@ use App\Support\Concerns\RequiresSignIn;
 use Native\Mobile\Edge\NativeComponent;
 
 /**
- * The Settings tab: the way into alert rules, locations and the account. Each page is pushed over
+ * The Settings tab: the way into alert rules, locations, channels and the account. Each page is pushed over
  * this one, so the back arrow returns here.
  */
 class SettingsScreen extends NativeComponent
@@ -26,6 +26,11 @@ class SettingsScreen extends NativeComponent
     public function openLocations(): void
     {
         $this->navigate('/locations');
+    }
+
+    public function openChannels(): void
+    {
+        $this->navigate('/channels');
     }
 
     public function openAccount(): void

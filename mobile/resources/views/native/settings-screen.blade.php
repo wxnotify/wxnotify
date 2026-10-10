@@ -6,5 +6,6 @@
 <list separator class="w-full h-full bg-theme-background">
     <list-item headline="Alert rules" supporting="What you are alerted about, and where" @tap="openRules"></list-item>
     <list-item headline="Locations" supporting="The places and phones you watch" @tap="openLocations"></list-item>
+    <list-item headline="Channels" supporting="Where your alerts are sent" @tap="openChannels"></list-item>
     <list-item headline="Account" supporting="Your plan, push, location sharing and sign out" @tap="openAccount"></list-item>
 </list>
