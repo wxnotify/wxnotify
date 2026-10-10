@@ -390,3 +390,136 @@ test('maintenance while opening the form shows the server\'s message and a retry
         ->assertDontSee('Back soon.')
         ->assertSee('What kind of alert?');
 });
+
+/**
+ * Every visible text and label inside a node, its own included.
+ *
+ * @return array<int, string>
+ */
+function editorTextsIn(array $node): array
+{
+    $texts = array_values(array_filter([$node['props']['text'] ?? null, $node['props']['label'] ?? null], 'is_string'));
+
+    foreach ($node['children'] ?? [] as $child) {
+        $texts = [...$texts, ...editorTextsIn($child)];
+    }
+
+    return $texts;
+}
+
+/**
+ * Matches the action area at the bottom of the form (beside Save rule) when it shows the text.
+ */
+function inEditorActions(string $text): Closure
+{
+    return fn (array $node): bool => ($node['ref'] ?? null) === 'editor-actions' && in_array($text, editorTextsIn($node), true);
+}
+
+test('save feedback and the discard prompt appear beside the buttons, not only at the top of the form', function () {
+    editorFakes(['wx.test/api/v1/alert-rules/4' => Http::response(['data' => editorSavedRule()])]);
+
+    $screen = Native::test(RuleEditor::class, ['id' => 4])->input('field-threshold_value', '30');
+    $this->network->connected = false;
+
+    $screen->tap('Save rule')
+        ->assertElement('column', inEditorActions('You\'re offline. Reconnect to save.'))
+        ->assertElement('column', inEditorActions('Save rule'))
+        ->pressBack()
+        ->assertElement('column', inEditorActions('Discard your changes?'))
+        ->assertElement('column', inEditorActions('Discard changes'));
+});
+
+test('more zone results continue the search that found them, even after the inputs change', function () {
+    Http::fake([
+        'wx.test/api/v1/alert-rule-options' => Http::response(['data' => ruleFormOptions()]),
+        'wx.test/api/v1/zones*' => Http::sequence()
+            ->push(['data' => [['code' => 'NYC103', 'label' => 'NYC103 — Suffolk County, NY']], 'meta' => ['next_after' => 'NYC103']])
+            ->push(['data' => [['code' => 'NYZ072', 'label' => 'NYZ072 — Suffolk, NY']], 'meta' => ['next_after' => null]]),
+    ]);
+
+    Native::test(RuleEditor::class)
+        ->tap('category-weather_alerts')
+        ->tap('mode-county_zone')
+        ->set('zoneState', 'ny')
+        ->set('zoneQuery', 'suff')
+        ->tap('Search zones')
+        ->assertSee('NYC103 — Suffolk County, NY')
+        ->set('zoneState', 'tx')
+        ->set('zoneQuery', 'harris')
+        ->tap('More results')
+        ->assertSee('NYC103 — Suffolk County, NY')
+        ->assertSee('NYZ072 — Suffolk, NY')
+        ->assertDontSee('More results');
+
+    Http::assertSent(fn (Request $r) => str_contains($r->url(), '/zones?') && str_contains($r->url(), 'after=NYC103')
+        && str_contains($r->url(), 'state=NY') && str_contains($r->url(), 'q=suff'));
+    Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'state=TX') || str_contains($r->url(), 'harris'));
+});
+
+test('a failed delete says why beside the buttons, keeps the rule and stays', function (int $status, string $contentType, string $body, string $text) {
+    editorFakes(['wx.test/api/v1/alert-rules/4' => fn (Request $request) => $request->method() === 'DELETE'
+        ? Http::response($body, $status, ['Content-Type' => $contentType])
+        : Http::response(['data' => editorSavedRule()])]);
+    (new LocalCache)->rememberRules([editorSavedRule(), editorSavedRule(['id' => 5])]);
+
+    Native::test(RuleEditor::class, ['id' => 4])
+        ->tap('Delete rule')
+        ->tap('Yes, delete')
+        ->assertElement('column', inEditorActions($text))
+        ->assertSet('confirmingDelete', false)
+        ->assertNoNavigation();
+
+    expect(collect((new LocalCache)->rules())->pluck('id')->all())->toBe([4, 5]);
+})->with([
+    'maintenance' => [503, 'text/plain', 'Back soon.', 'Back soon.'],
+    'a server error' => [500, 'application/json', '{}', 'Couldn\'t delete the rule. Please try again.'],
+]);
+
+test('deleting while offline says so, keeps the rule and stays', function () {
+    editorFakes(['wx.test/api/v1/alert-rules/4' => Http::response(['data' => editorSavedRule()])]);
+    (new LocalCache)->rememberRules([editorSavedRule()]);
+
+    $screen = Native::test(RuleEditor::class, ['id' => 4])->tap('Delete rule');
+    $this->network->connected = false;
+
+    $screen->tap('Yes, delete')
+        ->assertElement('column', inEditorActions('You\'re offline. Reconnect to delete this rule.'))
+        ->assertNoNavigation();
+
+    Http::assertNotSent(fn (Request $r) => $r->method() === 'DELETE');
+    expect(collect((new LocalCache)->rules())->pluck('id')->all())->toBe([4]);
+});
+
+test('unchecking and re-checking a channel is not an unsaved edit', function () {
+    editorFakes(['wx.test/api/v1/alert-rules/4' => Http::response(['data' => editorSavedRule(['channel_ids' => [5, 6]])])], ['channels' => [
+        ['id' => 5, 'label' => 'Discord', 'type' => 'discord', 'type_label' => 'Discord', 'verified' => true],
+        ['id' => 6, 'label' => 'Pager', 'type' => 'email', 'type_label' => 'Email', 'verified' => true],
+    ]]);
+
+    Native::test(RuleEditor::class, ['id' => 4])
+        ->check('channel-5', false)
+        ->check('channel-5', true)
+        ->assertSet('draft.channel_ids', [6, 5])
+        ->pressBack()
+        ->assertWentBack();
+});
+
+test('a field\'s message goes once the field changes, and the summary once no message is left', function () {
+    editorFakes();
+
+    Native::test(RuleEditor::class)
+        ->tap('category-lightning')
+        ->input('field-radius', '5')
+        ->tap('Save rule')
+        ->assertSee('Choose a location.')
+        ->assertSee('Enter a whole-number radius')
+        ->select('field-location', 'Home')
+        ->assertDontSee('Choose a location.')
+        ->assertSee('Some details need fixing.')
+        ->input('field-radius', '20')
+        ->assertDontSee('Enter a whole-number radius')
+        ->assertSee('Some details need fixing.')
+        ->check('channel-5', true)
+        ->assertDontSee('Choose at least one channel.')
+        ->assertDontSee('Some details need fixing.');
+});

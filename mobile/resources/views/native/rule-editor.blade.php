@@ -13,20 +13,13 @@
 
 <native:scroll-view class="w-full h-full bg-theme-background">
     <native:column class="w-full p-4 gap-4">
-        @if ($banner)
+        {{-- Why the form could not open; once it is open, feedback shows beside the buttons at the bottom. --}}
+        @if ($banner && ! $ready)
             <native:text class="text-sm text-theme-destructive">{{ $banner }}</native:text>
         @endif
 
         @if ($canRetry)
             <native:button label="Try again" variant="secondary" @tap="load" ref="retry-editor" class="w-full" />
-        @endif
-
-        @if ($confirmingDiscard)
-            <native:column class="w-full p-3 gap-2 bg-theme-surface">
-                <native:text class="text-base text-theme-on-background">Discard your changes?</native:text>
-                <native:button label="Discard changes" @tap="discard" class="w-full" />
-                <native:button label="Keep editing" variant="secondary" @tap="keepEditing" class="w-full" />
-            </native:column>
         @endif
 
         @if ($ready)
@@ -221,19 +214,34 @@
                 @endforeach
             @endif
 
-            <native:button label="Save rule" @tap="save" class="w-full" />
+            {{-- The save/delete feedback and the confirmations sit right above the buttons that lead to them, where the subscriber is when they appear. --}}
+            <native:column ref="editor-actions" class="w-full gap-3">
+                @if ($banner)
+                    <native:text ref="editor-feedback" class="text-sm text-theme-destructive">{{ $banner }}</native:text>
+                @endif
 
-            @if ($ruleId !== null)
+                @if ($confirmingDiscard)
+                    <native:column class="w-full p-3 gap-2 bg-theme-surface">
+                        <native:text class="text-base text-theme-on-background">Discard your changes?</native:text>
+                        <native:button label="Discard changes" @tap="discard" class="w-full" />
+                        <native:button label="Keep editing" variant="secondary" @tap="keepEditing" class="w-full" />
+                    </native:column>
+                @endif
+
                 @if ($confirmingDelete)
                     <native:column class="w-full p-3 gap-2 bg-theme-surface">
                         <native:text class="text-base text-theme-on-background">Delete this alert rule? This can't be undone.</native:text>
                         <native:button label="Yes, delete" @tap="delete" class="w-full" />
                         <native:button label="Keep rule" variant="secondary" @tap="cancelDelete" class="w-full" />
                     </native:column>
-                @else
-                    <native:button label="Delete rule" variant="secondary" @tap="askDelete" class="w-full" />
                 @endif
-            @endif
+
+                <native:button label="Save rule" @tap="save" ref="save-rule" class="w-full" />
+
+                @if ($ruleId !== null && ! $confirmingDelete)
+                    <native:button label="Delete rule" variant="secondary" @tap="askDelete" ref="delete-rule" class="w-full" />
+                @endif
+            </native:column>
         @endif
     </native:column>
 </native:scroll-view>

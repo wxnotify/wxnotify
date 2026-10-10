@@ -26,6 +26,11 @@ class RuleEditor extends NativeComponent
 
     private const MAX_OFFICE_RESULTS = 20;
 
+    private const FIX_SUMMARY = 'Some details need fixing.';
+
+    /** Draft keys holding id or code lists, whose order carries no meaning. */
+    private const LIST_FIELDS = ['product_ids', 'location_ids', 'channel_ids', 'county_zone_codes', 'risk_levels'];
+
     public ?int $ruleId = null;
 
     /** @var array<string, mixed> */
@@ -66,6 +71,12 @@ class RuleEditor extends NativeComponent
     public array $zoneResults = [];
 
     public ?string $zoneNextAfter = null;
+
+    /** The state filter of the search that produced the zone results ("More results" continues it). */
+    public ?string $zoneSearchState = null;
+
+    /** The name filter of the search that produced the zone results. */
+    public ?string $zoneSearchQuery = null;
 
     public ?string $pickerMessage = null;
 
@@ -186,7 +197,7 @@ class RuleEditor extends NativeComponent
     {
         $this->draft['matching_mode'] = $mode;
         $this->draft = $this->presenter()->reconcile($this->draft);
-        unset($this->errors['matching_mode']);
+        $this->forgetError('matching_mode');
     }
 
     public function setLocation(int $id, bool $on): void
@@ -207,14 +218,14 @@ class RuleEditor extends NativeComponent
     public function setTime(string $field, string $value): void
     {
         $this->draft[$field] = $value;
-        unset($this->errors[$field]);
+        $this->forgetError($field);
     }
 
     public function clearQuietHours(): void
     {
         $this->draft['quiet_hours_start'] = '';
         $this->draft['quiet_hours_end'] = '';
-        unset($this->errors['quiet_hours_start'], $this->errors['quiet_hours_end']);
+        $this->forgetError('quiet_hours_start', 'quiet_hours_end');
     }
 
     /**
@@ -235,7 +246,7 @@ class RuleEditor extends NativeComponent
             ? ($value === '' ? null : (int) $value)
             : (string) $value;
 
-        unset($this->errors[$field]);
+        $this->forgetError($field);
     }
 
     /**
@@ -304,7 +315,7 @@ class RuleEditor extends NativeComponent
     {
         $this->draft['wfo'] = $code;
         $this->officeResults = [];
-        unset($this->errors['wfo']);
+        $this->forgetError('wfo');
     }
 
     public function searchZones(): void
@@ -330,9 +341,8 @@ class RuleEditor extends NativeComponent
         }
 
         $this->pickerMessage = null;
-        $query = trim($this->zoneQuery);
 
-        $this->fetchZones($this->zoneStateFilter(), $query === '' ? null : $query, $this->zoneNextAfter, true);
+        $this->fetchZones($this->zoneSearchState, $this->zoneSearchQuery, $this->zoneNextAfter, true);
     }
 
     // ---- saving and leaving ----------------------------------------------------------------------
@@ -343,7 +353,7 @@ class RuleEditor extends NativeComponent
         $this->errors = $this->presenter()->validate($this->draft);
 
         if ($this->errors !== []) {
-            $this->banner = 'Some details need fixing.';
+            $this->banner = self::FIX_SUMMARY;
 
             return;
         }
@@ -356,7 +366,7 @@ class RuleEditor extends NativeComponent
             return;
         } catch (ValidationFailed $e) {
             $this->errors = $e->errors;
-            $this->banner = 'Some details need fixing.';
+            $this->banner = self::FIX_SUMMARY;
 
             return;
         } catch (Maintenance $e) {
@@ -428,9 +438,24 @@ class RuleEditor extends NativeComponent
         $this->back();
     }
 
+    /**
+     * Unsaved edits: the id and code lists compare as sets, so unchecking and re-checking a box
+     * (which moves its id to the end) is not an edit.
+     */
     public function isDirty(): bool
     {
-        return $this->draft !== $this->original;
+        return $this->comparable($this->draft) !== $this->comparable($this->original);
+    }
+
+    /**
+     * A typed field bound with native:model (value, radius, name, subject) changed: its message
+     * no longer applies.
+     */
+    public function updatedDraft(mixed $value, ?string $key = null): void
+    {
+        if ($key !== null) {
+            $this->forgetError(explode('.', $key)[0]);
+        }
     }
 
     /**
@@ -510,6 +535,36 @@ class RuleEditor extends NativeComponent
         $this->canRetry = true;
     }
 
+    /**
+     * Drops the messages for fields the subscriber just changed, and the "needs fixing" summary
+     * once no field message is left.
+     */
+    private function forgetError(string ...$fields): void
+    {
+        foreach ($fields as $field) {
+            unset($this->errors[$field]);
+        }
+
+        if ($this->errors === [] && $this->banner === self::FIX_SUMMARY) {
+            $this->banner = null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $draft
+     * @return array<string, mixed>
+     */
+    private function comparable(array $draft): array
+    {
+        foreach (self::LIST_FIELDS as $field) {
+            if (is_array($draft[$field] ?? null)) {
+                sort($draft[$field]);
+            }
+        }
+
+        return $draft;
+    }
+
     private function toggleIn(string $field, int|string $value, bool $on): void
     {
         $list = array_values(array_filter($this->draft[$field], fn (mixed $item): bool => $item !== $value));
@@ -519,7 +574,7 @@ class RuleEditor extends NativeComponent
         }
 
         $this->draft[$field] = $list;
-        unset($this->errors[$field]);
+        $this->forgetError($field);
     }
 
     private function zoneStateFilter(): ?string
@@ -580,6 +635,8 @@ class RuleEditor extends NativeComponent
 
         $this->zoneResults = $append ? [...$this->zoneResults, ...$page['data']] : $page['data'];
         $this->zoneNextAfter = $page['next_after'];
+        $this->zoneSearchState = $state;
+        $this->zoneSearchQuery = $query;
     }
 
     /**
