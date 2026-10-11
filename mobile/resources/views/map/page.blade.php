@@ -6,8 +6,8 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: {{ implode(' ', $imageHosts) }}">
 <style>{!! $leafletCss !!}</style>
 <style>
-html, body, #map { height: 100%; margin: 0; }
-.leaflet-control-layers-toggle { background-image: none; width: auto; height: auto; padding: 6px 10px; }
+html, body { margin: 0; }
+.leaflet-control-layers .leaflet-control-layers-toggle, .leaflet-touch .leaflet-control-layers-toggle { background-image: none; width: auto; height: auto; padding: 6px 10px; }
 .leaflet-control-layers-toggle::after { content: "Layers"; font: 600 13px sans-serif; color: #111; }
 .leaflet-popup-content { font: 13px/1.4 sans-serif; }
 </style>
@@ -40,7 +40,17 @@ html, body, #map { height: 100%; margin: 0; }
         return 'Until ' + d.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
     }
 
-    var map = L.map('map', { zoomControl: true, attributionControl: true });
+    // A percentage height resolves to 0 in the Android web view, so the map is sized from the window (and kept in step with it).
+    var mapEl = document.getElementById('map');
+    var map = null;
+    function fit() {
+        mapEl.style.height = window.innerHeight + 'px';
+        if (map) { map.invalidateSize(); }
+    }
+    fit();
+    window.addEventListener('resize', fit);
+
+    map = L.map('map', { zoomControl: true, attributionControl: true });
     map.attributionControl.setPrefix('');
 
     var bases = {};

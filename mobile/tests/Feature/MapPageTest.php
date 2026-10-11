@@ -35,6 +35,14 @@ test('the page carries Leaflet, the configured layers and the snapshot, and is t
         ->and((new MapPage)->html(mapPageSnapshot()))->toBe($html);
 });
 
+test('the map is sized from the window height, because a percentage height resolves to 0 in the Android web view', function () {
+    $html = (new MapPage)->html(mapPageSnapshot());
+
+    expect($html)->toContain('window.innerHeight')
+        ->toContain("addEventListener('resize', fit)")
+        ->not->toContain('#map { height: 100%');
+});
+
 function mapPageCsp(string $html): string
 {
     preg_match('/http-equiv="Content-Security-Policy" content="([^"]*)"/', $html, $matches);
