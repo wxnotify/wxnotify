@@ -42,7 +42,7 @@ test('the map shows a web view with the page, the Near you list, and the Map tab
         ->assertNavTitle('Map')
         ->assertHasTab('Map')
         ->assertTabActive('Map')
-        ->assertElement('webview', fn (array $node): bool => str_contains((string) ($node['props']['html'] ?? ''), 'L.map(') && ($node['props']['javascript'] ?? false) === true)
+        ->assertElement('webview', fn (array $node): bool => str_starts_with((string) ($node['props']['src'] ?? ''), '/map-page?v=') && ($node['props']['php'] ?? false) === true && ! isset($node['props']['html']))
         ->assertSee('Near you')
         ->assertSee('Tornado Warning')
         ->assertSee('Warning · Ends')
@@ -116,12 +116,12 @@ test('Refresh with the same places and warnings leaves the page identical, even 
     }]);
 
     $screen = Native::test(MapScreen::class);
-    $before = $screen->get('html');
+    $before = $screen->get('pageUrl');
 
     $screen->tap('refresh-map');
 
-    expect($before)->toContain('L.map(')
-        ->and($screen->get('html'))->toBe($before);
+    expect($before)->toStartWith('/map-page?v=')
+        ->and($screen->get('pageUrl'))->toBe($before);
     Http::assertSentCount(2);
 });
 
@@ -136,11 +136,12 @@ test('Refresh with a changed snapshot rebuilds the page', function () {
     }]);
 
     $screen = Native::test(MapScreen::class);
-    $before = $screen->get('html');
+    $before = $screen->get('pageUrl');
 
     $screen->tap('refresh-map');
 
-    expect($screen->get('html'))->not->toBe($before)->toContain('Cabin');
+    expect($screen->get('pageUrl'))->not->toBe($before)
+        ->and((new LocalCache)->mapPage())->toContain('Cabin');
     $screen->assertSee('Cabin');
     Http::assertSentCount(2);
 });
@@ -194,4 +195,22 @@ test('a snapshot the map page cannot encode shows the generic failure message in
         ->assertSee('WxNotify could not load the map. Try again in a moment.')
         ->assertSee('Try again')
         ->assertMissingElement('webview');
+});
+
+test('the map page route serves the cached page for the web view, with no caching, and 404s before a snapshot', function () {
+    $this->get('/map-page')->assertNotFound();
+
+    Http::fake(['wx.test/api/v1/map' => Http::response(['data' => mapScreenSnapshot()])]);
+    Native::test(MapScreen::class);
+
+    $this->get('/map-page')
+        ->assertOk()
+        ->assertHeader('Content-Type', 'text/html; charset=utf-8')
+        ->assertHeader('Cache-Control', 'no-store, private')
+        ->assertSee('L.map(', false)
+        ->assertDontSee('9|secret');
+
+    (new LocalCache)->wipe();
+
+    $this->get('/map-page')->assertNotFound();
 });

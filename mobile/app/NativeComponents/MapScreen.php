@@ -19,7 +19,7 @@ use Native\Mobile\Facades\Browser;
 /**
  * The Map tab: a Leaflet page in a web view (radar, the warnings and watches near the phone and the
  * places, the places and the phone), and a native "Near you" list that opens a warning's product page
- * or a place. The map page is display-only. Its HTML is rebuilt only when the snapshot changes, so
+ * or a place. The map page is display-only. The page is served to the web view by the `/map-page` route (PHP mode) and its URL changes only when the snapshot does, so
  * the web view is not reloaded (and pan and zoom not lost) by anything else.
  */
 class MapScreen extends NativeComponent
@@ -29,8 +29,8 @@ class MapScreen extends NativeComponent
     /** @var array<string, mixed> the snapshot's list data (never the geometry) */
     public array $snapshot = [];
 
-    /** The web view's page; null until a snapshot has been fetched this visit. */
-    public ?string $html = null;
+    /** The web view's page route, versioned by the page's content; null until a snapshot has been fetched this visit. */
+    public ?string $pageUrl = null;
 
     public bool $offline = false;
 
@@ -64,7 +64,7 @@ class MapScreen extends NativeComponent
         } catch (Offline) {
             $this->offline = true;
             $this->error = null;
-            $this->html = null;
+            $this->pageUrl = null;
 
             return;
         } catch (Maintenance $e) {
@@ -81,8 +81,8 @@ class MapScreen extends NativeComponent
 
         app(LocalCache::class)->rememberMap($snapshot);
 
-        // The page string is deterministic per snapshot: an unchanged snapshot assigns an identical string, so the web view is not reloaded.
-        $this->html = $page;
+        // The page is deterministic per snapshot, so an unchanged snapshot yields the same version and URL and the web view is not reloaded.
+        $this->pageUrl = '/map-page?v='.app(LocalCache::class)->rememberMapPage($page);
 
         $this->snapshot = app(LocalCache::class)->map() ?? [];
         $this->offline = false;

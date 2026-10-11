@@ -31,6 +31,8 @@ class LocalCache
 
     private const MAP = 'wxnotify.map';
 
+    private const MAP_PAGE = 'wxnotify.map.page';
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -215,6 +217,24 @@ class LocalCache
         return Cache::get(self::MAP);
     }
 
+    /**
+     * Keeps the map's web page (with its geometry) for the web view, which loads it from the `/map-page` route
+     * because a page this size cannot travel through the native element tree. Replaced on each fetch and wiped at sign-out.
+     *
+     * @return string a version for the page's URL: it changes only when the page does
+     */
+    public function rememberMapPage(string $html): string
+    {
+        Cache::forever(self::MAP_PAGE, $html);
+
+        return substr(sha1($html), 0, 16);
+    }
+
+    public function mapPage(): ?string
+    {
+        return Cache::get(self::MAP_PAGE);
+    }
+
     public function wipe(): void
     {
         CachedAlert::query()->delete();
@@ -226,5 +246,6 @@ class LocalCache
         Cache::forget(self::OPTIONS);
         Cache::forget(self::CHANNELS);
         Cache::forget(self::MAP);
+        Cache::forget(self::MAP_PAGE);
     }
 }

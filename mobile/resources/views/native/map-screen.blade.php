@@ -21,8 +21,8 @@
         </native:column>
     @endif
 
-    @if ($html !== null)
-        <webview :html="$html" javascript="true" dom-storage="true" class="w-full h-80" />
+    @if ($pageUrl !== null)
+        <webview :src="$pageUrl" php="true" class="w-full h-80" />
     @endif
 
     <native:scroll-view class="w-full flex-1 bg-theme-background">
