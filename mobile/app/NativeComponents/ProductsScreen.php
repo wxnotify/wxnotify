@@ -59,6 +59,9 @@ class ProductsScreen extends NativeComponent
 
     public ?string $message = null;
 
+    /** Whether the Type, Office and Period selects are shown. Hidden on every visit until the filters button is tapped. */
+    public bool $filtersOpen = false;
+
     /** When Search was last pressed (Unix time), so a text sync that arrives just after the press can finish the search. */
     public ?int $searchPressedAt = null;
 
@@ -109,6 +112,11 @@ class ProductsScreen extends NativeComponent
         if ($pressedJustNow && trim($this->query) !== $this->searchPressedText) {
             $this->runSearch();
         }
+    }
+
+    public function toggleFilters(): void
+    {
+        $this->filtersOpen = ! $this->filtersOpen;
     }
 
     public function pickType(string $label): void

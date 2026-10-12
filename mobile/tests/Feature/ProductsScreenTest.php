@@ -54,7 +54,7 @@ beforeEach(function () {
     (new TokenStore)->put('9|secret');
 });
 
-test('it opens with the search box, the filters and no results', function () {
+test('it opens with the search box, the filters button and no filters or results showing', function () {
     fakeProducts();
 
     Native::test(ProductsScreen::class)
@@ -62,15 +62,39 @@ test('it opens with the search box, the filters and no results', function () {
         ->assertHasTab('Products')
         ->assertTabActive('Products')
         ->assertElement('outlined_text_input')
-        ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Type')
-        ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Office')
-        ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Period')
         ->assertElement('pressable', fn (array $pressable) => ($pressable['ref'] ?? null) === 'search-products')
+        ->assertElement('pressable', fn (array $pressable) => ($pressable['ref'] ?? null) === 'toggle-filters')
+        ->assertMissingElement('select')
         ->assertDontSee('Area Forecast Discussion')
         ->assertDontSee('Clear filters')
         ->assertSee('Search by name or ID');
 
     Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '/api/v1/products'));
+});
+
+test('the filters button shows the Type, Office and Period selects and hides them again', function () {
+    fakeProducts();
+
+    Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
+        ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Type')
+        ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Office')
+        ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Period')
+        ->tap('toggle-filters')
+        ->assertMissingElement('select');
+});
+
+test('the filters button icon is plain until a filter is set, then tinted even with the filters hidden', function () {
+    fakeProducts();
+
+    $screen = Native::test(ProductsScreen::class)
+        ->assertElement('icon', fn (array $icon) => $icon['props']['color'] === theme('on-surface-variant'));
+
+    $screen->tap('toggle-filters')
+        ->select('field-period', 'Past hour')
+        ->tap('toggle-filters')
+        ->assertMissingElement('select')
+        ->assertElement('icon', fn (array $icon) => $icon['props']['color'] === theme('primary'));
 });
 
 test('the keyboard Search key and the Search button both run the typed search', function () {
@@ -106,6 +130,7 @@ test('a filter alone runs a search at once, and each filter is sent as the API e
     fakeProducts();
 
     $screen = Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
         ->select('field-office', 'MOB — Mobile, AL')
         ->assertSee('Area Forecast Discussion 1');
 
@@ -119,7 +144,8 @@ test('a filter alone runs a search at once, and each filter is sent as the API e
 test('two catalog products with the same name are told apart by their code and both can be chosen', function () {
     fakeProducts();
 
-    Native::test(ProductsScreen::class)->select('field-type', 'Tornado Warning (TOR)');
+    Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')->select('field-type', 'Tornado Warning (TOR)');
 
     expect(lastProductsQuery())->toBe(['type' => '5', 'limit' => '25']);
 });
@@ -128,6 +154,7 @@ test('clearing the filters, with no text, goes back to the opening state', funct
     fakeProducts();
 
     Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
         ->select('field-period', 'Past hour')
         ->assertSee('Clear filters')
         ->tap('clear-filters')
@@ -151,7 +178,8 @@ test('a row opens its product page in the in-app browser, and a row without a pa
 test('no matches says so and keeps the filters', function () {
     fakeProducts(['data' => [], 'meta' => ['next_cursor' => null]]);
 
-    Native::test(ProductsScreen::class)->select('field-period', 'Past hour')->assertSee('No products match')->assertSee('Clear filters');
+    Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')->select('field-period', 'Past hour')->assertSee('No products match')->assertSee('Clear filters');
 });
 
 test('Show more appends the next page using the cursor and goes away at the end', function () {
@@ -178,6 +206,7 @@ test('a search is saved as a recent search, tapping a recent search refills and 
     fakeProducts();
 
     $screen = Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
         ->submit('field-query', 'afd')
         ->select('field-office', 'MOB — Mobile, AL');
 
@@ -380,6 +409,7 @@ test('changing only the filters of the search just made replaces it in the recen
     fakeProducts();
 
     Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
         ->submit('field-query', 'afd')
         ->select('field-office', 'MOB — Mobile, AL')
         ->select('field-period', 'Past 7 days');
@@ -392,6 +422,7 @@ test('a different text starts a new recent search and keeps the earlier one', fu
     fakeProducts();
 
     Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
         ->submit('field-query', 'afd')
         ->select('field-office', 'MOB — Mobile, AL')
         ->submit('field-query', 'tornado');
@@ -405,6 +436,7 @@ test('a search saved in an earlier visit is kept when the same text is searched 
     (new LocalCache)->rememberSearch(['q' => 'afd', 'type' => null, 'type_label' => null, 'wfo' => '', 'period' => '']);
 
     Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
         ->set('query', 'afd')
         ->select('field-period', 'Past hour');
 
@@ -417,6 +449,7 @@ test('tapping a recent search and then changing a filter keeps the tapped search
     (new LocalCache)->rememberSearch(['q' => 'afd', 'type' => null, 'type_label' => null, 'wfo' => '', 'period' => '']);
 
     Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
         ->tap('recent-0')
         ->select('field-period', 'Past hour');
 

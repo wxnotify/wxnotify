@@ -1,3 +1,6 @@
+@use('App\Icons\Ios')
+@use('App\Icons\Android')
+
 {{-- Un-prefixed on purpose: native:validate does not know <pressable>, <select> or <outlined-text-input>, nor @change on <select> (a bare tag compiles the same). Handler arguments go through {{ }} so the validator skips them. --}}
 
 <native:top-bar title="Products" display-mode="large"></native:top-bar>
@@ -6,7 +9,13 @@
 
 <native:scroll-view class="w-full h-full bg-theme-background">
     <native:column class="w-full p-4 gap-3">
-        <outlined-text-input label="Search products" placeholder="Name or ID, such as AFD or AFDMOB" native:model.blur="query" max-length="100" @submit="search" ref="field-query" />
+        <native:row class="w-full items-center gap-2">
+            <outlined-text-input label="Search products" placeholder="Name or ID, such as AFD or AFDMOB" native:model.blur="query" max-length="100" @submit="search" ref="field-query" class="flex-1" />
+            {{-- Shows and hides the filters. The icon takes the primary colour while any filter is set, so a hidden filter is never invisible. --}}
+            <pressable @tap="toggleFilters" ref="toggle-filters" a11y-label="Filters">
+                <native:icon :ios="Ios::SliderHorizontal3" :android="Android::Tune" size="26" :color="$this->hasFilters() ? theme('primary') : theme('on-surface-variant')" />
+            </pressable>
+        </native:row>
         {{-- A pressable, not <native:button>: on Android only a pressable clears the text field's focus first, which flushes the typed text (native:model.blur) before the handler runs. --}}
         <pressable @tap="search" ref="search-products" class="w-full">
             <native:column class="w-full p-3 items-center bg-theme-primary rounded-full">
@@ -14,14 +23,16 @@
             </native:column>
         </pressable>
 
-        <select label="Type" :options="$this->typeLabels()" :value="$this->selectedTypeLabel()" @change="pickType" ref="field-type" />
-        <select label="Office" :options="$this->officeLabels()" :value="$this->selectedOfficeLabel()" @change="pickOffice" ref="field-office" />
-        <select label="Period" :options="$this->periodLabels()" :value="$this->selectedPeriodLabel()" @change="pickPeriod" ref="field-period" />
+        @if ($filtersOpen)
+            <select label="Type" :options="$this->typeLabels()" :value="$this->selectedTypeLabel()" @change="pickType" ref="field-type" />
+            <select label="Office" :options="$this->officeLabels()" :value="$this->selectedOfficeLabel()" @change="pickOffice" ref="field-office" />
+            <select label="Period" :options="$this->periodLabels()" :value="$this->selectedPeriodLabel()" @change="pickPeriod" ref="field-period" />
 
-        @if ($this->hasFilters())
-            <pressable @tap="clearFilters" ref="clear-filters" class="w-full">
-                <native:text class="text-sm font-semibold text-theme-primary p-2">Clear filters</native:text>
-            </pressable>
+            @if ($this->hasFilters())
+                <pressable @tap="clearFilters" ref="clear-filters" class="w-full">
+                    <native:text class="text-sm font-semibold text-theme-primary p-2">Clear filters</native:text>
+                </pressable>
+            @endif
         @endif
 
         @if ($offline)
@@ -38,7 +49,7 @@
         @endif
 
         @if ($results === null)
-            <native:text class="text-sm text-theme-on-surface-variant">Search by name or ID, or pick a filter, to find a weather product.</native:text>
+            <native:text class="text-sm text-theme-on-surface-variant">Search by name or ID, or use the filters button, to find a weather product.</native:text>
 
             @if ($recents !== [])
                 <native:row class="w-full justify-between items-center">

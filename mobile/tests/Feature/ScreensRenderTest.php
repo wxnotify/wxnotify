@@ -244,6 +244,7 @@ test('the products screen renders its title, tabs, a text input, selects and a s
     ]);
 
     Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
         ->assertNavTitle('Products')
         ->assertHasTabBar()
         ->assertTabActive('Products')
