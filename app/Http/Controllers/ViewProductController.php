@@ -28,7 +28,7 @@ class ViewProductController extends Controller
         }
 
         $issuedAt = $generateViewSlug->issuedAt($product) ?? $product->received_at;
-        $title = $this->title($product);
+        $title = $product->displayTitle();
         $office = filled($product->cccc) ? strtoupper($product->cccc) : null;
 
         return response()->view('view-product.show', [
@@ -39,16 +39,6 @@ class ViewProductController extends Controller
             'details' => $this->details($product, $office, $issuedAt),
             'loginUrl' => rtrim((string) config('app.url'), '/').route('filament.dashboard.auth.login', absolute: false),
         ])->header('Cache-Control', self::FOUND_CACHE);
-    }
-
-    private function title(IngestedProduct $product): string
-    {
-        return $product->product?->name
-            ?? match (true) {
-                filled($product->awipsid) => strtoupper($product->awipsid),
-                filled($product->ttaaii) => strtoupper($product->ttaaii),
-                default => 'Weather product',
-            };
     }
 
     /**

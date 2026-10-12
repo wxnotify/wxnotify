@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\MapController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\NwsOfficeController;
 use App\Http\Controllers\Api\V1\PlaceController;
+use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\PushTokenController;
 use App\Http\Controllers\Api\V1\SavedLocationController;
 use App\Http\Controllers\Api\V1\ZoneController;
@@ -60,6 +61,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/map', MapController::class)->name('api.v1.map');
         Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
         Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
+        Route::get('/products', [ProductController::class, 'index'])->name('api.v1.products.index');
         Route::get('/zones', ZoneController::class)->name('api.v1.zones');
         Route::get('/places/search', [PlaceController::class, 'search'])->middleware('throttle:app-places')->name('api.v1.places.search');
         Route::get('/places/reverse', [PlaceController::class, 'reverse'])->middleware('throttle:app-places')->name('api.v1.places.reverse');

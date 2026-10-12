@@ -150,6 +150,19 @@ class IngestedProduct extends Model
         return $this->belongsTo(TestProductScenario::class, 'test_product_scenario_id');
     }
 
+    /**
+     * The product's name for people: its catalog name, else its AWIPS ID, else its WMO header code, else a generic label.
+     */
+    public function displayTitle(): string
+    {
+        return $this->product?->name
+            ?? match (true) {
+                filled($this->awipsid) => strtoupper($this->awipsid),
+                filled($this->ttaaii) => strtoupper($this->ttaaii),
+                default => 'Weather product',
+            };
+    }
+
     public function viewUrl(): ?string
     {
         if ($this->view_slug === null) {
