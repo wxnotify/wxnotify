@@ -43,7 +43,7 @@ meta: { has_places, generated_at }
 
 ### Screen and behaviour
 
-- **Headers:** a header row "Current watches, warnings and advisories", then the events, then a header row "Alerts sent to you" above the existing alert rows (headers are non-tappable list items).
+- **Headers:** a header row "Current watches, warnings and advisories", then the events, then a header row "Alerts sent to you" above the existing alert rows (native `list-section` headers: the list is `plain`, so the headers are flat and sticky).
 - **Event rows:** small text above (`"Warning · Ends in 3 hours"`, `"Watch · No end time given"`), the event name as the headline, the affected places below (`"Home, Cabin"`). A row with a `view_url` opens it with `Browser::inApp()`; a row without one has no tap.
 - **Show all:** the first five rows, then a row "Show all (N)" when there are more; tapping it reveals the rest and the row becomes "Show fewer". The expanded state lasts for the visit.
 - **Empty states:** no events and places exist: "Nothing in effect at your places."; `has_places` false: "Add a place or turn on location sharing to see what's in effect near you."
@@ -73,5 +73,5 @@ Whether the subscriber's alerts told them about an event; statements, outlooks a
 
 - **Cost:** `activeFor()` runs a spatial query per place (up to 25). The plan's first task measures it on the dev data and keeps, or adjusts, the cache and cap.
 - **Stale phone position:** the phone's last fix may be old; rows say which places an event affects, not how old a position is. Left as it is unless it proves misleading on a device.
-- **Native list headers:** the headers are non-tappable list items; if the native list renders them badly (spacing, long text), the fallback is a plain styled item.
+- **Native list sections:** the headers are the list's own `list-section` headers (resolved while planning; the first idea, fake header rows, is not needed). The risk left is whether pull-to-refresh and loading older alerts still behave inside a sectioned `plain` list; the device check decides, and the fallback is header-looking list items.
 - **Many events:** a large outbreak could make "Show all" dozens of rows; rows are light and the list is native, so this is expected to be fine.
