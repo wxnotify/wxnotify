@@ -55,3 +55,13 @@ test('searches can be cleared, and sign-out wipes them', function () {
 
     expect($cache->recentSearches())->toBe([]);
 });
+
+test('a search can replace the earlier search it supersedes, leaving the others alone', function () {
+    $cache = new LocalCache;
+
+    $cache->rememberSearch(recentSearch('tornado'));
+    $cache->rememberSearch(recentSearch('afd'));
+    $cache->rememberSearch(recentSearch('afd', ['wfo' => 'MOB']), replacing: recentSearch('afd'));
+
+    expect($cache->recentSearches())->toBe([recentSearch('afd', ['wfo' => 'MOB']), recentSearch('tornado')]);
+});

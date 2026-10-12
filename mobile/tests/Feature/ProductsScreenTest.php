@@ -181,7 +181,7 @@ test('a search is saved as a recent search, tapping a recent search refills and 
         ->submit('field-query', 'afd')
         ->select('field-office', 'MOB — Mobile, AL');
 
-    expect(array_column((new LocalCache)->recentSearches(), 'wfo'))->toBe(['MOB', '']);
+    expect(array_column((new LocalCache)->recentSearches(), 'wfo'))->toBe(['MOB']);
 
     Native::test(ProductsScreen::class)
         ->assertSee('Recent searches')
@@ -374,4 +374,52 @@ test('a text sync that only repeats the text the press searched with does not se
     });
 
     expect($searches)->toBe(1);
+});
+
+test('changing only the filters of the search just made replaces it in the recents instead of adding entries', function () {
+    fakeProducts();
+
+    Native::test(ProductsScreen::class)
+        ->submit('field-query', 'afd')
+        ->select('field-office', 'MOB — Mobile, AL')
+        ->select('field-period', 'Past 7 days');
+
+    expect(array_map(fn (array $search) => [$search['q'], $search['wfo'], $search['period']], (new LocalCache)->recentSearches()))
+        ->toBe([['afd', 'MOB', 'week']]);
+});
+
+test('a different text starts a new recent search and keeps the earlier one', function () {
+    fakeProducts();
+
+    Native::test(ProductsScreen::class)
+        ->submit('field-query', 'afd')
+        ->select('field-office', 'MOB — Mobile, AL')
+        ->submit('field-query', 'tornado');
+
+    expect(array_map(fn (array $search) => [$search['q'], $search['wfo']], (new LocalCache)->recentSearches()))
+        ->toBe([['tornado', 'MOB'], ['afd', 'MOB']]);
+});
+
+test('a search saved in an earlier visit is kept when the same text is searched with a filter in a new visit', function () {
+    fakeProducts();
+    (new LocalCache)->rememberSearch(['q' => 'afd', 'type' => null, 'type_label' => null, 'wfo' => '', 'period' => '']);
+
+    Native::test(ProductsScreen::class)
+        ->set('query', 'afd')
+        ->select('field-period', 'Past hour');
+
+    expect(array_map(fn (array $search) => [$search['q'], $search['period']], (new LocalCache)->recentSearches()))
+        ->toBe([['afd', 'hour'], ['afd', '']]);
+});
+
+test('tapping a recent search and then changing a filter keeps the tapped search', function () {
+    fakeProducts();
+    (new LocalCache)->rememberSearch(['q' => 'afd', 'type' => null, 'type_label' => null, 'wfo' => '', 'period' => '']);
+
+    Native::test(ProductsScreen::class)
+        ->tap('recent-0')
+        ->select('field-period', 'Past hour');
+
+    expect(array_map(fn (array $search) => [$search['q'], $search['period']], (new LocalCache)->recentSearches()))
+        ->toBe([['afd', 'hour'], ['afd', '']]);
 });

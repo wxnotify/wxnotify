@@ -251,12 +251,13 @@ class LocalCache
 
     /**
      * @param  array{q: string, type: ?int, type_label: ?string, wfo: string, period: string}  $search
+     * @param  array{q: string, type: ?int, type_label: ?string, wfo: string, period: string}|null  $replacing  an earlier search this one supersedes (the same search with a filter changed): it is dropped instead of kept beside it
      */
-    public function rememberSearch(array $search): void
+    public function rememberSearch(array $search, ?array $replacing = null): void
     {
         $key = fn (array $entry): string => json_encode([mb_strtolower($entry['q']), $entry['type'], $entry['wfo'], $entry['period']]);
 
-        $others = array_filter($this->recentSearches(), fn (array $entry): bool => $key($entry) !== $key($search));
+        $others = array_filter($this->recentSearches(), fn (array $entry): bool => $key($entry) !== $key($search) && ($replacing === null || $key($entry) !== $key($replacing)));
 
         Cache::forever(self::SEARCHES, array_slice([$search, ...array_values($others)], 0, self::MAX_SEARCHES));
     }

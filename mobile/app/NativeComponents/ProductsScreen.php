@@ -62,6 +62,9 @@ class ProductsScreen extends NativeComponent
     /** When Search was last pressed (Unix time), so a text sync that arrives just after the press can finish the search. */
     public ?int $searchPressedAt = null;
 
+    /** The search this visit saved last, so changing only a filter replaces it in the recents instead of adding a second entry. */
+    public ?array $lastSavedSearch = null;
+
     /** The text that press searched with, so a sync that only repeats it does not search again. */
     public string $searchPressedText = '';
 
@@ -188,7 +191,7 @@ class ProductsScreen extends NativeComponent
         $this->wfo = $recent['wfo'];
         $this->period = $recent['period'];
 
-        $this->runSearch();
+        $this->runSearch(fromRecent: true);
     }
 
     public function clearRecent(): void
@@ -258,7 +261,7 @@ class ProductsScreen extends NativeComponent
         return ProductSearchPresenter::recentLabel($search);
     }
 
-    private function runSearch(): void
+    private function runSearch(bool $fromRecent = false): void
     {
         $text = trim($this->query);
         $this->message = null;
@@ -318,14 +321,24 @@ class ProductsScreen extends NativeComponent
         $this->offline = false;
         $this->error = null;
 
-        $cache = app(LocalCache::class);
-        $cache->rememberSearch([
+        $search = [
             'q' => $text,
             'type' => $this->typeId,
             'type_label' => $this->typeId === null ? null : ($this->typeOptions()[$this->typeId] ?? null),
             'wfo' => $this->wfo,
             'period' => $this->period,
-        ]);
+        ];
+
+        // Each filter change runs a search, so building "afd · MOB · Past 7 days" would otherwise leave three recents.
+        // The same text with another filter replaces the search this visit saved last; a recent that was tapped, and a
+        // search saved in an earlier visit, are kept.
+        $replacing = ! $fromRecent && $this->lastSavedSearch !== null && mb_strtolower($this->lastSavedSearch['q']) === mb_strtolower($text)
+            ? $this->lastSavedSearch
+            : null;
+
+        $cache = app(LocalCache::class);
+        $cache->rememberSearch($search, $replacing);
+        $this->lastSavedSearch = $fromRecent ? null : $search;
         $this->recents = $cache->recentSearches();
     }
 
