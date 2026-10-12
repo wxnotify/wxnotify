@@ -10,7 +10,7 @@
 <native:scroll-view class="w-full h-full bg-theme-background">
     <native:column class="w-full p-4 gap-3">
         <native:row class="w-full items-center gap-2">
-            <outlined-text-input label="Search products" placeholder="Name or ID, such as AFD or AFDMOB" native:model.blur="query" max-length="100" @submit="search" ref="field-query" class="flex-1" />
+            <outlined-text-input a11y-label="Search products" placeholder="Name or ID, such as AFD or AFDMOB" native:model.blur="query" max-length="100" @submit="search" ref="field-query" class="flex-1" />
             {{-- Shows and hides the filters. The icon takes the primary colour while any filter is set, so a hidden filter is never invisible. --}}
             <pressable @tap="toggleFilters" ref="toggle-filters" a11y-label="Filters">
                 <native:icon :ios="Ios::SliderHorizontal3" :android="Android::Tune" size="26" :color="$this->hasFilters() ? theme('primary') : theme('on-surface-variant')" />
