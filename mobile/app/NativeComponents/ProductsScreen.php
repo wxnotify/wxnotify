@@ -5,6 +5,7 @@ namespace App\NativeComponents;
 use App\Exceptions\Api\ApiException;
 use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Unauthenticated;
+use App\Exceptions\Api\ValidationFailed;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\Concerns\RequiresSignIn;
@@ -32,7 +33,7 @@ class ProductsScreen extends NativeComponent
 
     public string $period = '';
 
-    /** @var array<int, array{id: int, name: string}> */
+    /** @var array<int, array{id: int, name: string, code: string}> */
     public array $types = [];
 
     /** @var array<int, array{code: string, label: string}> */
@@ -169,7 +170,7 @@ class ProductsScreen extends NativeComponent
     }
 
     /**
-     * @return array<int, string> the Type select's options: "Any type", then each catalog product (a name shared by two products gets its id)
+     * @return array<int, string> the Type select's options: "Any type", then each catalog product (a name shared by two products gets its code)
      */
     public function typeLabels(): array
     {
@@ -267,6 +268,13 @@ class ProductsScreen extends NativeComponent
             $this->error = null;
 
             return;
+        } catch (ValidationFailed) {
+            $this->backToOpeningState();
+            $this->offline = false;
+            $this->error = null;
+            $this->message = 'That search could not be run. Check the text and filters.';
+
+            return;
         } catch (ApiException) {
             $this->backToOpeningState();
             $this->offline = false;
@@ -333,7 +341,7 @@ class ProductsScreen extends NativeComponent
     }
 
     /**
-     * @return array<int, string> catalog product id => label
+     * @return array<int, string> catalog product id => label (a name shared by two products is followed by the product's code)
      */
     private function typeOptions(): array
     {
@@ -341,7 +349,7 @@ class ProductsScreen extends NativeComponent
         $options = [];
 
         foreach ($this->types as $type) {
-            $options[$type['id']] = $counts[$type['name']] > 1 ? "{$type['name']} ({$type['id']})" : $type['name'];
+            $options[$type['id']] = $counts[$type['name']] > 1 ? "{$type['name']} ({$type['code']})" : $type['name'];
         }
 
         return $options;

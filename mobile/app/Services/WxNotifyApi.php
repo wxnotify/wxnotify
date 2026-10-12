@@ -208,7 +208,7 @@ class WxNotifyApi
     /**
      * The catalog products the archive search can filter by, grouped by category.
      *
-     * @return array<int, array{category: string, label: string, products: array<int, array{id: int, name: string}>}>
+     * @return array<int, array{category: string, label: string, products: array<int, array{id: int, name: string, code: string}>}>
      */
     public function productTypes(): array
     {

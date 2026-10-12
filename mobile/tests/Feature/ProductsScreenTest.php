@@ -23,8 +23,8 @@ function fakeProducts(?array $products = null): void
 {
     Http::fake([
         'wx.test/api/v1/product-types' => Http::response(['data' => [
-            ['category' => 'tornado_and_severe_thunderstorm', 'label' => 'Tornado and Severe Thunderstorm', 'products' => [['id' => 4, 'name' => 'Tornado Warning'], ['id' => 5, 'name' => 'Tornado Warning']]],
-            ['category' => 'winter_weather', 'label' => 'Winter Weather', 'products' => [['id' => 6, 'name' => 'Winter Storm Warning']]],
+            ['category' => 'tornado_and_severe_thunderstorm', 'label' => 'Tornado and Severe Thunderstorm', 'products' => [['id' => 4, 'name' => 'Tornado Warning', 'code' => 'TO.W'], ['id' => 5, 'name' => 'Tornado Warning', 'code' => 'TOR']]],
+            ['category' => 'winter_weather', 'label' => 'Winter Weather', 'products' => [['id' => 6, 'name' => 'Winter Storm Warning', 'code' => 'WS.W']]],
         ]]),
         'wx.test/api/v1/nws-offices' => Http::response(['data' => [['code' => 'MOB', 'label' => 'MOB — Mobile, AL'], ['code' => 'HFO', 'label' => 'HFO — Honolulu, HI']]]),
         'wx.test/api/v1/products*' => Http::response($products ?? ['data' => [productRow(1), productRow(2)], 'meta' => ['next_cursor' => null]]),
@@ -116,10 +116,10 @@ test('a filter alone runs a search at once, and each filter is sent as the API e
     expect(lastProductsQuery())->toBe(['type' => '6', 'wfo' => 'MOB', 'period' => 'week', 'limit' => '25']);
 });
 
-test('two catalog products with the same name can both be chosen', function () {
+test('two catalog products with the same name are told apart by their code and both can be chosen', function () {
     fakeProducts();
 
-    Native::test(ProductsScreen::class)->select('field-type', 'Tornado Warning (5)');
+    Native::test(ProductsScreen::class)->select('field-type', 'Tornado Warning (TOR)');
 
     expect(lastProductsQuery())->toBe(['type' => '5', 'limit' => '25']);
 });
@@ -235,7 +235,7 @@ test('a signed-out visitor is sent to Sign in, and a rejected token signs out', 
 
 test('the filter lists failing to load leaves the selects usable and the next search tries again', function () {
     Http::fake([
-        'wx.test/api/v1/product-types' => Http::sequence()->push([], 500)->push(['data' => [['category' => 'x', 'label' => 'X', 'products' => [['id' => 6, 'name' => 'Winter Storm Warning']]]]]),
+        'wx.test/api/v1/product-types' => Http::sequence()->push([], 500)->push(['data' => [['category' => 'x', 'label' => 'X', 'products' => [['id' => 6, 'name' => 'Winter Storm Warning', 'code' => 'WS.W']]]]]),
         'wx.test/api/v1/nws-offices' => Http::response(['data' => []]),
         'wx.test/api/v1/products*' => Http::response(['data' => [productRow(1)], 'meta' => ['next_cursor' => null]]),
     ]);
@@ -298,4 +298,25 @@ test('a failing later search shows the message, Try again and the recent searche
         ->assertSee('Recent searches')
         ->assertSee('afd')
         ->assertDontSee('Area Forecast Discussion');
+});
+
+test('the search box is capped at 100 characters, the most the server accepts', function () {
+    fakeProducts();
+
+    Native::test(ProductsScreen::class)
+        ->assertElement('outlined_text_input', fn (array $input) => ($input['props']['max_length'] ?? null) === 100);
+});
+
+test('a search the server refuses as invalid says so without offering Try again', function () {
+    Http::fake([
+        'wx.test/api/v1/product-types' => Http::response(['data' => []]),
+        'wx.test/api/v1/nws-offices' => Http::response(['data' => []]),
+        'wx.test/api/v1/products*' => Http::response(['message' => 'The q field must not be greater than 100 characters.', 'errors' => ['q' => ['The q field must not be greater than 100 characters.']]], 422),
+    ]);
+
+    Native::test(ProductsScreen::class)
+        ->submit('field-query', str_repeat('a', 101))
+        ->assertSee('That search could not be run. Check the text and filters.')
+        ->assertDontSee('Try again')
+        ->assertDontSee('could not search products');
 });

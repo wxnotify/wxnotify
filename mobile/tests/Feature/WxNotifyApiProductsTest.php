@@ -37,7 +37,7 @@ test('a search the API rejects throws a validation failure, and a dead connectio
 });
 
 test('the product types are fetched and unwrapped from data', function () {
-    Http::fake(['wx.test/api/v1/product-types' => Http::response(['data' => [['category' => 'winter_weather', 'label' => 'Winter Weather', 'products' => [['id' => 3, 'name' => 'Winter Storm Warning']]]]])]);
+    Http::fake(['wx.test/api/v1/product-types' => Http::response(['data' => [['category' => 'winter_weather', 'label' => 'Winter Weather', 'products' => [['id' => 3, 'name' => 'Winter Storm Warning', 'code' => 'WS.W']]]]])]);
 
-    expect(app(WxNotifyApi::class)->productTypes()[0]['products'][0])->toBe(['id' => 3, 'name' => 'Winter Storm Warning']);
+    expect(app(WxNotifyApi::class)->productTypes()[0]['products'][0])->toBe(['id' => 3, 'name' => 'Winter Storm Warning', 'code' => 'WS.W']);
 });

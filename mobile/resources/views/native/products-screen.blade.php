@@ -6,7 +6,7 @@
 
 <native:scroll-view class="w-full h-full bg-theme-background">
     <native:column class="w-full p-4 gap-3">
-        <outlined-text-input label="Search products" placeholder="Name or ID, such as AFD or AFDMOB" native:model.blur="query" @submit="search" ref="field-query" />
+        <outlined-text-input label="Search products" placeholder="Name or ID, such as AFD or AFDMOB" native:model.blur="query" max-length="100" @submit="search" ref="field-query" />
         <native:button label="Search" @tap="search" ref="search-products" class="w-full" />
 
         <select label="Type" :options="$this->typeLabels()" :value="$this->selectedTypeLabel()" @change="pickType" ref="field-type" />
