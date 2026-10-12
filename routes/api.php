@@ -62,6 +62,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
         Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
         Route::get('/products', [ProductController::class, 'index'])->name('api.v1.products.index');
+        Route::get('/product-types', [ProductController::class, 'types'])->name('api.v1.product-types');
         Route::get('/zones', ZoneController::class)->name('api.v1.zones');
         Route::get('/places/search', [PlaceController::class, 'search'])->middleware('throttle:app-places')->name('api.v1.places.search');
         Route::get('/places/reverse', [PlaceController::class, 'reverse'])->middleware('throttle:app-places')->name('api.v1.places.reverse');
