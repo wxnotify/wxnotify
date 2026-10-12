@@ -61,7 +61,7 @@ test('it opens with the search box, the filters button and no filters or results
         ->assertNavTitle('Products')
         ->assertHasTab('Products')
         ->assertTabActive('Products')
-        ->assertElement('outlined_text_input')
+        ->assertElement('outlined_text_input', fn (array $input) => ($input['props']['keyboard'] ?? null) === 'email')
         ->assertElement('pressable', fn (array $pressable) => ($pressable['ref'] ?? null) === 'search-products')
         ->assertElement('pressable', fn (array $pressable) => ($pressable['ref'] ?? null) === 'toggle-filters')
         ->assertMissingElement('select')
