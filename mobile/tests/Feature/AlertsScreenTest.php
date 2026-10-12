@@ -378,7 +378,7 @@ test('the bottom bar has Alerts, Map and Settings', function () {
     Native::test(AlertsScreen::class)->assertTabActive('Alerts')->assertHasTab('Map')->assertHasTab('Settings');
 });
 
-test('coming back from a detail keeps the pages already loaded and sends no request', function () {
+test('coming back from a detail keeps the pages already loaded and sends no feed request', function () {
     Http::fake([
         'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
         'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response(feedResponse([apiEntry(1)])),
@@ -393,7 +393,8 @@ test('coming back from a detail keeps the pages already loaded and sends no requ
         ->assertSee('Tornado Warning 1')
         ->assertSet('pagedBeyondFirst', true);
 
-    Http::assertSentCount(3);
+    Http::assertSentCount(4);
+    expect(Http::recorded(fn (Request $r) => str_contains($r->url(), 'before=CURSOR1'))->count())->toBe(1);
 });
 
 test('coming back refreshes only when the feed is more than a minute old', function () {
@@ -619,4 +620,118 @@ test('a rejected token on the section signs out', function () {
     Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
 
     Native::test(AlertsScreen::class)->assertReplacedWith('/sign-in');
+});
+
+test('a failed refresh with events on screen keeps them and says they could not be refreshed, with their age', function () {
+    $this->freezeSecond();
+    (new LocalCache)->rememberActiveAlerts(['data' => [activeEvent(1)], 'meta' => ['has_places' => true, 'generated_at' => now()->subMinutes(5)->toIso8601String()]]);
+    $this->activeAlerts = ['message' => 'boom'];
+    $this->activeAlertsStatus = 500;
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class)
+        ->assertSee('Tornado Warning 1')
+        ->assertSee("Couldn't refresh current alerts. As of 5 minutes ago")
+        ->assertDontSee("Couldn't load current alerts.")
+        ->assertDontSee("You're offline.");
+});
+
+test('an event whose end has passed is never shown, and the count and the empty line ignore it', function () {
+    $this->freezeSecond();
+    $ended = fn (int $id) => activeEvent($id, ['expires' => now()->subMinutes(5)->toIso8601String()]);
+    $this->activeAlerts = ['data' => [$ended(1), activeEvent(2)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class)
+        ->assertDontSee('Tornado Warning 1')
+        ->assertSee('Tornado Warning 2');
+
+    $this->activeAlerts = ['data' => [$ended(1), ...array_map(fn (int $id) => activeEvent($id), range(2, 6))], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+
+    Native::test(AlertsScreen::class)
+        ->assertSee('Tornado Warning 6')
+        ->assertDontSee('Show all');
+
+    $this->activeAlerts = ['data' => [$ended(1)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+
+    Native::test(AlertsScreen::class)
+        ->assertDontSee('Tornado Warning 1')
+        ->assertSee('Nothing in effect at your places.');
+});
+
+test('coming back refreshes the section on its own even when the feed is paged, and sends no feed request', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(2)], 'CURSOR1')),
+        'wx.test/api/v1/alerts?limit=25&before=CURSOR1' => Http::response(feedResponse([apiEntry(1)])),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->call('loadMore');
+    $this->activeAlerts = ['data' => [activeEvent(9)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+
+    $this->travel(30)->seconds();
+    $screen->call('onResume')->assertDontSee('Tornado Warning 9');
+
+    $this->travel(2)->minutes();
+    $screen->call('onResume')->assertSee('Tornado Warning 9')->assertSet('pagedBeyondFirst', true);
+
+    Http::assertSentCount(4);
+    expect(Http::recorded(fn (Request $r) => str_contains($r->url(), 'active-alerts'))->count())->toBe(2);
+    expect(Http::recorded(fn (Request $r) => str_contains($r->url(), 'before=CURSOR1'))->count())->toBe(1);
+});
+
+test('offline, a saved copy with no fetch time says only that you are offline', function () {
+    (new LocalCache)->rememberActiveAlerts(['data' => [activeEvent(1)], 'meta' => ['has_places' => true]]);
+    $this->network->connected = false;
+
+    Native::test(AlertsScreen::class)
+        ->assertSee('Tornado Warning 1')
+        ->assertSee("You're offline.")
+        ->assertDontSee('Current alerts need a connection.')
+        ->assertDontSee('As of');
+});
+
+test('a section error clears after a later successful refresh', function () {
+    $this->activeAlertsStatus = 500;
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    $screen = Native::test(AlertsScreen::class)->assertSee("Couldn't load current alerts.");
+
+    $this->activeAlertsStatus = 200;
+    $screen->call('refresh')
+        ->assertSet('activeError', false)
+        ->assertDontSee("Couldn't load current alerts.")
+        ->assertSee('Nothing in effect at your places.');
+});
+
+test('pull to refresh reloads the section as well as the feed', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    $screen = Native::test(AlertsScreen::class)->assertDontSee('Tornado Warning 1');
+
+    $this->activeAlerts = ['data' => [activeEvent(1)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    $screen->press('refresh')->assertSee('Tornado Warning 1');
+});
+
+test('a rejected token on both the feed and the section signs out once', function () {
+    $this->activeAlertsStatus = 401;
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response([], 401)]);
+
+    Native::test(AlertsScreen::class)->assertReplacedWith('/sign-in');
+
+    expect((new TokenStore)->token())->toBeNull();
+    Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'active-alerts'));
+});
+
+test('the list does not come back expanded after a refresh leaves five or fewer events', function () {
+    $many = fn (int $count) => ['data' => array_map(fn (int $id) => activeEvent($id), range(1, $count)), 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    $this->activeAlerts = $many(8);
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    $screen = Native::test(AlertsScreen::class)->tap('Show all (3)')->assertSet('showAllActive', true);
+
+    $this->activeAlerts = $many(3);
+    $screen->call('refresh')->assertSet('showAllActive', false);
+
+    $this->activeAlerts = $many(8);
+    $screen->call('refresh')->assertSee('Show all (3)')->assertDontSee('Tornado Warning 8');
 });

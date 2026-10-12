@@ -71,6 +71,12 @@ class AlertsScreen extends NativeComponent
 
     public bool $showAllActive = false;
 
+    /** True once a copy of the section exists (saved or fetched), whatever its metadata says. */
+    public bool $hasActiveCopy = false;
+
+    /** When the section was last fetched successfully (this phone's clock, not the server's generated_at). */
+    public ?string $activeRefreshedAt = null;
+
     public function mount(): void
     {
         if ($this->redirectIfSignedOut()) {
@@ -101,15 +107,18 @@ class AlertsScreen extends NativeComponent
      */
     public function onResume(): void
     {
-        if ($this->pagedBeyondFirst) {
-            return;
+        if (! $this->pagedBeyondFirst && ! $this->feedSyncedRecently()) {
+            $this->refreshFeed();
         }
 
-        if ($this->syncedAt !== null && Carbon::parse($this->syncedAt)->diffInSeconds(now(), true) < self::RESUME_REFRESH_AFTER_SECONDS) {
-            return;
+        if ($this->activeRefreshedAt === null || Carbon::parse($this->activeRefreshedAt)->diffInSeconds(now(), true) >= self::RESUME_REFRESH_AFTER_SECONDS) {
+            $this->refreshActive();
         }
+    }
 
-        $this->refresh();
+    private function feedSyncedRecently(): bool
+    {
+        return $this->syncedAt !== null && Carbon::parse($this->syncedAt)->diffInSeconds(now(), true) < self::RESUME_REFRESH_AFTER_SECONDS;
     }
 
     /**
@@ -164,8 +173,13 @@ class AlertsScreen extends NativeComponent
             app(LocalCache::class)->rememberActiveAlerts($body);
 
             $this->applyActive($body);
+            $this->activeRefreshedAt = now()->toIso8601String();
             $this->activeOffline = false;
             $this->activeError = false;
+
+            if (ActiveAlertsPresenter::hiddenCount($this->activeEventsInEffect(), false) === 0) {
+                $this->showAllActive = false;
+            }
         } catch (Unauthenticated) {
             app(SignOut::class)->clearLocal();
             $this->replace('/sign-in');
@@ -186,6 +200,7 @@ class AlertsScreen extends NativeComponent
         $this->activeEvents = $body['data'];
         $this->hasPlaces = (bool) ($body['meta']['has_places'] ?? true);
         $this->activeFetchedAt = $body['meta']['generated_at'] ?? null;
+        $this->hasActiveCopy = true;
     }
 
     public function toggleActive(): void
@@ -206,15 +221,14 @@ class AlertsScreen extends NativeComponent
     }
 
     /**
-     * Every event still in effect: offline the saved copy may be hours old, so events whose end has passed go.
+     * Every event still in effect. An event whose end has passed is never shown, however old the copy
+     * (a saved copy read offline, or a screen left open).
      *
      * @return array<int, array<string, mixed>>
      */
     private function activeEventsInEffect(): array
     {
-        return $this->activeOffline
-            ? ActiveAlertsPresenter::withoutEnded($this->activeEvents)
-            : $this->activeEvents;
+        return ActiveAlertsPresenter::withoutEnded($this->activeEvents);
     }
 
     /**
@@ -257,19 +271,26 @@ class AlertsScreen extends NativeComponent
     }
 
     /**
-     * The offline note above the events: when the shown copy was fetched, or that there is none to show.
+     * The note above the events: offline, when the shown copy was fetched (or that there is none to show);
+     * after a failed refresh with events still on screen, that they could not be refreshed and their age.
      */
     public function activeNote(): ?string
     {
-        if (! $this->activeOffline) {
-            return null;
+        if ($this->activeOffline) {
+            return match (true) {
+                ! $this->hasActiveCopy => 'Current alerts need a connection.',
+                $this->activeFetchedAt === null => "You're offline.",
+                default => ActiveAlertsPresenter::asOf($this->activeFetchedAt, $this->timezone).". You're offline.",
+            };
         }
 
-        if ($this->activeFetchedAt === null) {
-            return 'Current alerts need a connection.';
+        if ($this->activeError && $this->activeEventsInEffect() !== []) {
+            return $this->activeFetchedAt === null
+                ? "Couldn't refresh current alerts."
+                : "Couldn't refresh current alerts. ".ActiveAlertsPresenter::asOf($this->activeFetchedAt, $this->timezone);
         }
 
-        return ActiveAlertsPresenter::asOf($this->activeFetchedAt, $this->timezone).". You're offline.";
+        return null;
     }
 
     /**
@@ -277,7 +298,7 @@ class AlertsScreen extends NativeComponent
      */
     public function activeEmptyLine(): ?string
     {
-        if ($this->activeEventsInEffect() !== [] || ($this->activeOffline && $this->activeFetchedAt === null)) {
+        if ($this->activeEventsInEffect() !== [] || ($this->activeOffline && ! $this->hasActiveCopy)) {
             return null;
         }
 
