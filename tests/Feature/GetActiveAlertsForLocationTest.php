@@ -2,6 +2,7 @@
 
 use App\Actions\Weather\GetActiveAlertsForLocation;
 use App\Models\ActiveWwa;
+use App\Models\ActiveWwaArea;
 use App\Models\Location;
 use App\Models\Product;
 use Illuminate\Support\Carbon;
@@ -137,4 +138,33 @@ test('an alert the product catalog does not know is named from its VTEC codes an
 
     expect(array_column($alerts, 'event'))->toBe(['Gale Warning', 'Wind Advisory'])
         ->and(array_column($alerts, 'family'))->toBe(['warning', 'advisory']);
+});
+
+test('an event in effect at the location\'s fire weather zone is returned, through its own codes or its zone rows', function () {
+    $location = Location::factory()->create([
+        'lat' => 40.0, 'lng' => -105.0, 'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014', 'fire_weather_zone_ugc' => 'COZ214',
+    ]);
+    alertFor('Fire Weather Watch', 'watch', ['ugc_codes' => ['COZ214']]);
+    $zoned = alertFor('Red Flag Warning', 'warning', ['ugc_codes' => ['COZ999']]);
+    ActiveWwaArea::factory()->for($zoned)->create(['ugc_code' => 'COZ214']);
+    $elsewhere = alertFor('Red Flag Warning Elsewhere', 'warning', ['ugc_codes' => ['COZ999']]);
+    ActiveWwaArea::factory()->for($elsewhere)->create(['ugc_code' => 'COZ215']);
+    alertFor('Other Fire Zone Watch', 'watch', ['ugc_codes' => ['COZ215']]);
+
+    expect(collect((new GetActiveAlertsForLocation)($location))->pluck('event')->all())
+        ->toBe(['Red Flag Warning', 'Fire Weather Watch']);
+});
+
+test('a polygon-less zone row matching only the fire weather zone covers the location, and a location with no fire zone gets nothing from it', function () {
+    $fire = alertFor('Red Flag Warning', 'warning', ['ugc_codes' => ['COZ214']]);
+    ActiveWwaArea::factory()->for($fire)->create(['ugc_code' => 'COZ214', 'expires' => now()->addHours(4)]);
+    $withFireZone = Location::factory()->create([
+        'lat' => 40.0, 'lng' => -105.0, 'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC014', 'fire_weather_zone_ugc' => 'COZ214',
+    ]);
+
+    $alerts = (new GetActiveAlertsForLocation)($withFireZone);
+
+    expect($alerts)->toHaveCount(1)
+        ->and($alerts[0])->toMatchArray(['event' => 'Red Flag Warning', 'family' => 'warning'])
+        ->and((new GetActiveAlertsForLocation)($this->location))->toBe([]);
 });

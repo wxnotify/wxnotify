@@ -171,3 +171,14 @@ test('the result is cached for 60 seconds per subscriber', function () {
     $other = User::factory()->create();
     expect(Cache::has("app-active-alerts:{$other->id}"))->toBeFalse();
 });
+
+test('a place with a fire weather zone sees a Red Flag Warning issued for that fire zone', function () {
+    ($this->place)('Ranch', 'COZ040', ['fire_weather_zone_ugc' => 'COZ214']);
+    $redFlag = ($this->event)('Red Flag Warning', 'warning', 'COZ999');
+    ActiveWwaArea::factory()->for($redFlag)->create(['ugc_code' => 'COZ214', 'expires' => now()->addHours(2)]);
+
+    ($this->call)()->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.event', 'Red Flag Warning')
+        ->assertJsonPath('data.0.places', ['Ranch']);
+});

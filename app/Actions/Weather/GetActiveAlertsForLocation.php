@@ -19,7 +19,8 @@ use Illuminate\Support\Collection;
  * Active, unexpired zone row covers the location when its polygon (if it has one) contains the
  * point -- the polygon is the authoritative extent, so a polygon that excludes the point excludes
  * the alert even if the zone is listed -- or, for a row without a polygon, when its zone is one of
- * the location's zone or county codes. The event is listed once, with the latest end of the rows
+ * the location's forecast zone, county or fire weather zone codes (Red Flag Warnings and Fire
+ * Weather Watches are issued by fire weather zone, with no polygon). The event is listed once, with the latest end of the rows
  * that cover the location (none if any has none), set on the returned model for this lookup only.
  * An event with no zone rows at all (a row from before they existed) falls back to its own polygon
  * and zones, and its own end.
@@ -182,7 +183,7 @@ class GetActiveAlertsForLocation
             $location->refresh();
         }
 
-        return array_values(array_filter([$location->forecast_zone_ugc, $location->county_ugc]));
+        return array_values(array_filter([$location->forecast_zone_ugc, $location->county_ugc, $location->fire_weather_zone_ugc]));
     }
 
     private static function rankOf(ActiveWwa $wwa): int
