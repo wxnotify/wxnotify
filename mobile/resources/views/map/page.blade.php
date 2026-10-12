@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: {{ implode(' ', $imageHosts) }}">
 <style>{!! $leafletCss !!}</style>
 <style>
@@ -10,6 +10,9 @@ html, body { margin: 0; }
 .leaflet-control-layers .leaflet-control-layers-toggle, .leaflet-touch .leaflet-control-layers-toggle { background-image: none; width: auto; height: auto; padding: 6px 10px; }
 .leaflet-control-layers-toggle::after { content: "Layers"; font: 600 13px sans-serif; color: #111; }
 .leaflet-popup-content { font: 13px/1.4 sans-serif; }
+/* On iOS the web view runs behind the status bar and the floating tab bar: keep the controls below the first and the attribution above the second. */
+html.ios .leaflet-top { margin-top: max(env(safe-area-inset-top), 54px); }
+html.ios .leaflet-bottom { margin-bottom: 92px; }
 </style>
 </head>
 <body>
@@ -17,6 +20,8 @@ html, body { margin: 0; }
 <script>{!! $leafletJs !!}</script>
 <script>
 (function () {
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) { document.documentElement.classList.add('ios'); }
+
     var data = {!! $json !!};
 
     function text(parent, tag, value, style) {

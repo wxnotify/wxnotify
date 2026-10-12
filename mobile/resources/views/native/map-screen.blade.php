@@ -17,6 +17,6 @@
     @endif
 
     @if ($pageUrl !== null)
-        <webview :src="$pageUrl" php="true" class="w-full flex-1" />
+        <webview :src="$pageUrl" php="true" fullscreen="true" class="w-full flex-1" />
     @endif
 </native:column>

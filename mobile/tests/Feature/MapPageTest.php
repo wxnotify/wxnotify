@@ -157,3 +157,12 @@ test('text that cannot be encoded fails loudly instead of producing a broken pag
 
     expect(fn () => (new MapPage)->html(mapPageSnapshot($broken)))->toThrow(JsonException::class);
 });
+
+test('the page lets iOS run it behind the status bar and tab bar, keeping the controls and attribution clear of them', function () {
+    $html = (new MapPage)->html(mapPageSnapshot());
+
+    expect($html)->toContain('viewport-fit=cover')
+        ->toContain("classList.add('ios')")
+        ->toContain('html.ios .leaflet-top { margin-top: max(env(safe-area-inset-top), 54px); }')
+        ->toContain('html.ios .leaflet-bottom { margin-bottom: 92px; }');
+});

@@ -41,7 +41,7 @@ test('the map is a full-height web view on its page with the Map tab active, and
     Native::test(MapScreen::class)
         ->assertHasTab('Map')
         ->assertTabActive('Map')
-        ->assertElement('webview', fn (array $node): bool => str_starts_with((string) ($node['props']['src'] ?? ''), '/map-page?v=') && ($node['props']['php'] ?? false) === true && ! isset($node['props']['html']))
+        ->assertElement('webview', fn (array $node): bool => str_starts_with((string) ($node['props']['src'] ?? ''), '/map-page?v=') && ($node['props']['php'] ?? false) === true && ! isset($node['props']['html']) && ($node['props']['fullscreen'] ?? false) === true)
         ->assertDontSee('Near you')
         ->assertDontSee('Tornado Warning')
         ->assertDontSee('Refresh')
