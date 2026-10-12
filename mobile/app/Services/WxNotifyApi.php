@@ -186,6 +186,36 @@ class WxNotifyApi
     }
 
     /**
+     * A page of the product archive search. Filters that are null or empty are not sent.
+     *
+     * @param  array{q?: ?string, type?: ?int, wfo?: ?string, period?: ?string}  $filters
+     * @return array{data: array<int, array<string, mixed>>, meta: array{next_cursor: ?string}}
+     */
+    public function products(array $filters, ?string $before = null, int $limit = 25): array
+    {
+        $query = array_filter(
+            [...$filters, 'limit' => $limit, 'before' => $before],
+            fn ($value) => $value !== null && $value !== '',
+        );
+
+        $body = $this->send(fn (PendingRequest $request) => $request->get('/api/v1/products', $query));
+
+        $this->data($body);
+
+        return $body;
+    }
+
+    /**
+     * The catalog products the archive search can filter by, grouped by category.
+     *
+     * @return array<int, array{category: string, label: string, products: array<int, array{id: int, name: string}>}>
+     */
+    public function productTypes(): array
+    {
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/product-types')));
+    }
+
+    /**
      * @return array{data: array<int, array{code: string, label: string}>, next_after: ?string}
      */
     public function zones(?string $state, ?string $query, ?string $after = null): array

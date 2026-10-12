@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * What the app keeps on the phone so it opens instantly and works offline: the latest feed
  * page, any alert detail the subscriber opened, the profile from /me, and when the feed was
- * last refreshed, plus the alert rules, saved locations, notification channels, rule-form options and the map snapshot's lists. Signing out wipes all of it.
+ * last refreshed, plus the alert rules, saved locations, notification channels, rule-form options, the map snapshot's lists and the recent product searches. Signing out wipes all of it.
  */
 class LocalCache
 {
@@ -32,6 +32,10 @@ class LocalCache
     private const MAP = 'wxnotify.map';
 
     private const MAP_PAGE = 'wxnotify.map.page';
+
+    private const SEARCHES = 'wxnotify.product_searches';
+
+    private const MAX_SEARCHES = 10;
 
     /**
      * @return array<int, array<string, mixed>>
@@ -235,6 +239,33 @@ class LocalCache
         return Cache::get(self::MAP_PAGE);
     }
 
+    /**
+     * The last searches made in the Products tab, newest first. Kept on the phone only.
+     *
+     * @return array<int, array{q: string, type: ?int, type_label: ?string, wfo: string, period: string}>
+     */
+    public function recentSearches(): array
+    {
+        return Cache::get(self::SEARCHES, []);
+    }
+
+    /**
+     * @param  array{q: string, type: ?int, type_label: ?string, wfo: string, period: string}  $search
+     */
+    public function rememberSearch(array $search): void
+    {
+        $key = fn (array $entry): string => json_encode([mb_strtolower($entry['q']), $entry['type'], $entry['wfo'], $entry['period']]);
+
+        $others = array_filter($this->recentSearches(), fn (array $entry): bool => $key($entry) !== $key($search));
+
+        Cache::forever(self::SEARCHES, array_slice([$search, ...array_values($others)], 0, self::MAX_SEARCHES));
+    }
+
+    public function forgetSearches(): void
+    {
+        Cache::forget(self::SEARCHES);
+    }
+
     public function wipe(): void
     {
         CachedAlert::query()->delete();
@@ -247,5 +278,6 @@ class LocalCache
         Cache::forget(self::CHANNELS);
         Cache::forget(self::MAP);
         Cache::forget(self::MAP_PAGE);
+        Cache::forget(self::SEARCHES);
     }
 }
