@@ -18,6 +18,7 @@ use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use App\Support\TokenStore;
 use Illuminate\Support\Carbon;
+use Native\Mobile\Attributes\Poll;
 use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Facades\Browser;
 
@@ -111,6 +112,26 @@ class AlertsScreen extends NativeComponent
             $this->refreshFeed();
         }
 
+        $this->refreshActiveWhenStale();
+    }
+
+    /**
+     * Nothing re-renders this screen when the app returns to the foreground, so a phone left on it would
+     * keep showing an event that has ended (and miss a new one). Every minute this re-renders, which
+     * re-applies the ended-event filter and the relative "Ends ..." text, and refetches the section when
+     * its copy is a minute old. The sent-alerts feed is never touched.
+     */
+    #[Poll(60000)]
+    public function pollActive(): void
+    {
+        $this->refreshActiveWhenStale();
+    }
+
+    /**
+     * Refetches the section when the last successful fetch is missing or at least a minute old.
+     */
+    private function refreshActiveWhenStale(): void
+    {
         if ($this->activeRefreshedAt === null || Carbon::parse($this->activeRefreshedAt)->diffInSeconds(now(), true) >= self::RESUME_REFRESH_AFTER_SECONDS) {
             $this->refreshActive();
         }
@@ -222,7 +243,7 @@ class AlertsScreen extends NativeComponent
 
     /**
      * Every event still in effect. An event whose end has passed is never shown, however old the copy
-     * (a saved copy read offline, or a screen left open).
+     * (a saved copy read offline, or a screen left open). It compares with the phone's clock, at render time.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -304,9 +325,19 @@ class AlertsScreen extends NativeComponent
 
         return match (true) {
             $this->activeError => "Couldn't load current alerts.",
+            $this->activeOffline && $this->activeEvents !== [] => $this->endedSavedAlertsLine(),
             ! $this->hasPlaces => "Add a place or turn on location sharing to see what's in effect near you.",
             default => 'Nothing in effect at your places.',
         };
+    }
+
+    /**
+     * Offline, with a saved copy whose events have all ended: say so rather than that nothing is in effect,
+     * which the phone cannot know without a connection.
+     */
+    private function endedSavedAlertsLine(): string
+    {
+        return ActiveAlertsPresenter::savedAlertsEnded($this->activeFetchedAt, $this->timezone);
     }
 
     /**

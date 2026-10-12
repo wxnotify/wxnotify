@@ -735,3 +735,104 @@ test('the list does not come back expanded after a refresh leaves five or fewer 
     $this->activeAlerts = $many(8);
     $screen->call('refresh')->assertSee('Show all (3)')->assertDontSee('Tornado Warning 8');
 });
+
+function activeAlertRequestCount(): int
+{
+    return Http::recorded(fn (Request $r) => str_contains($r->url(), 'active-alerts'))->count();
+}
+
+test('a screen left open drops an event as it ends and refetches the section once the copy is a minute old, on a poll', function () {
+    $this->freezeSecond();
+    $this->activeAlerts = ['data' => [activeEvent(1, ['expires' => now()->addMinutes(10)->toIso8601String()]), activeEvent(2)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    $screen = Native::test(AlertsScreen::class)->assertSee('Tornado Warning 1')->assertSee('Tornado Warning 2');
+    expect(activeAlertRequestCount())->toBe(1);
+
+    $this->travel(11)->minutes();
+    $screen->firePoll('pollActive')
+        ->assertDontSee('Tornado Warning 1')
+        ->assertSee('Tornado Warning 2')
+        ->assertSee('Warning · Ends 2 hours from now');
+
+    expect(activeAlertRequestCount())->toBe(2);
+});
+
+test('a poll within a minute of the last fetch sends no request but still drops an event that has ended', function () {
+    $this->freezeSecond();
+    $this->activeAlerts = ['data' => [activeEvent(1, ['expires' => now()->addSeconds(20)->toIso8601String()]), activeEvent(2)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    $screen = Native::test(AlertsScreen::class)->assertSee('Tornado Warning 1');
+
+    $this->travel(30)->seconds();
+    $screen->firePoll('pollActive')
+        ->assertDontSee('Tornado Warning 1')
+        ->assertSee('Tornado Warning 2');
+
+    expect(activeAlertRequestCount())->toBe(1);
+});
+
+test('the poll shows a warning that came into effect since the last fetch', function () {
+    $this->freezeSecond();
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    $screen = Native::test(AlertsScreen::class)->assertSee('Nothing in effect at your places.');
+
+    $this->activeAlerts = ['data' => [activeEvent(9)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    $this->travel(90)->seconds();
+    $screen->firePoll('pollActive')->assertSee('Tornado Warning 9')->assertDontSee('Nothing in effect at your places.');
+});
+
+test('the poll never requests the sent-alerts feed, and does nothing once signed out', function () {
+    $this->freezeSecond();
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(7)]))]);
+
+    $screen = Native::test(AlertsScreen::class);
+    $feedRequests = fn () => Http::recorded(fn (Request $r) => str_contains($r->url(), '/api/v1/alerts'))->count();
+    expect($feedRequests())->toBe(1);
+
+    $this->travel(5)->minutes();
+    $screen->firePoll('pollActive');
+
+    expect($feedRequests())->toBe(1)->and(activeAlertRequestCount())->toBe(2);
+
+    (new TokenStore)->forget();
+    $this->travel(5)->minutes();
+    $screen->firePoll('pollActive');
+
+    Http::assertSentCount(3);
+});
+
+test('offline with a saved copy whose events have all ended, the section says the saved alerts have ended instead of that nothing is in effect', function () {
+    $this->freezeTime();
+    (new LocalCache)->rememberActiveAlerts(['data' => [activeEvent(1, ['expires' => now()->addMinutes(10)->toIso8601String()])], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]]);
+    $this->network->connected = false;
+    $this->travel(30)->minutes();
+
+    Native::test(AlertsScreen::class)
+        ->assertDontSee('Tornado Warning 1')
+        ->assertSee("You're offline.")
+        ->assertSee('The alerts saved 30 minutes ago have ended. Connect to check for new ones.')
+        ->assertDontSee('Nothing in effect at your places.');
+});
+
+test('the ended-alerts line gives the saved time in the subscriber\'s timezone when it is known', function () {
+    $this->freezeTime();
+    (new LocalCache)->rememberProfile(['timezone' => 'America/Chicago']);
+    (new LocalCache)->rememberActiveAlerts(['data' => [activeEvent(1, ['expires' => now()->addMinutes(10)->toIso8601String()])], 'meta' => ['has_places' => true, 'generated_at' => '2026-10-12T19:14:00+00:00']]);
+    $this->network->connected = false;
+    $this->travel(30)->minutes();
+
+    Native::test(AlertsScreen::class)->assertSee('The alerts saved at Oct 12, 2:14 PM CDT have ended. Connect to check for new ones.');
+});
+
+test('offline with a saved copy that had no events, the section still says nothing is in effect', function () {
+    (new LocalCache)->rememberActiveAlerts(['data' => [], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]]);
+    $this->network->connected = false;
+
+    Native::test(AlertsScreen::class)
+        ->assertSee("You're offline.")
+        ->assertSee('Nothing in effect at your places.')
+        ->assertDontSee('have ended');
+});
