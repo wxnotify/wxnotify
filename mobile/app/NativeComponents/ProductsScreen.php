@@ -25,6 +25,9 @@ class ProductsScreen extends NativeComponent
 
     private const MIN_QUERY_LENGTH = 2;
 
+    /** How long after a Search press a late text sync still completes that search. */
+    private const LATE_TEXT_SYNC_SECONDS = 1;
+
     public string $query = '';
 
     public ?int $typeId = null;
@@ -56,6 +59,12 @@ class ProductsScreen extends NativeComponent
 
     public ?string $message = null;
 
+    /** When Search was last pressed (Unix time), so a text sync that arrives just after the press can finish the search. */
+    public ?int $searchPressedAt = null;
+
+    /** The text that press searched with, so a sync that only repeats it does not search again. */
+    public string $searchPressedText = '';
+
     public function mount(): void
     {
         if ($this->redirectIfSignedOut()) {
@@ -76,7 +85,27 @@ class ProductsScreen extends NativeComponent
             $this->query = $text;
         }
 
+        $this->searchPressedAt = now()->timestamp;
+        $this->searchPressedText = trim($this->query);
+
         $this->runSearch();
+    }
+
+    /**
+     * The search box syncs its text when it loses focus (native:model.blur). Pressing Search clears that focus, but
+     * on Android the press can reach PHP before the text does, so the press would search the old text. When the
+     * text arrives right after a press, finish the search the subscriber asked for.
+     */
+    public function updatedQuery(): void
+    {
+        $pressedJustNow = $this->searchPressedAt !== null
+            && now()->timestamp - $this->searchPressedAt <= self::LATE_TEXT_SYNC_SECONDS;
+
+        $this->searchPressedAt = null;
+
+        if ($pressedJustNow && trim($this->query) !== $this->searchPressedText) {
+            $this->runSearch();
+        }
     }
 
     public function pickType(string $label): void

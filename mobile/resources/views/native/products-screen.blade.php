@@ -7,7 +7,12 @@
 <native:scroll-view class="w-full h-full bg-theme-background">
     <native:column class="w-full p-4 gap-3">
         <outlined-text-input label="Search products" placeholder="Name or ID, such as AFD or AFDMOB" native:model.blur="query" max-length="100" @submit="search" ref="field-query" />
-        <native:button label="Search" @tap="search" ref="search-products" class="w-full" />
+        {{-- A pressable, not <native:button>: on Android only a pressable clears the text field's focus first, which flushes the typed text (native:model.blur) before the handler runs. --}}
+        <pressable @tap="search" ref="search-products" class="w-full">
+            <native:column class="w-full p-3 items-center bg-theme-primary rounded-full">
+                <native:text class="text-base font-semibold text-theme-on-primary">Search</native:text>
+            </native:column>
+        </pressable>
 
         <select label="Type" :options="$this->typeLabels()" :value="$this->selectedTypeLabel()" @change="pickType" ref="field-type" />
         <select label="Office" :options="$this->officeLabels()" :value="$this->selectedOfficeLabel()" @change="pickOffice" ref="field-office" />

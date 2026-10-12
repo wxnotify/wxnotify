@@ -65,7 +65,7 @@ test('it opens with the search box, the filters and no results', function () {
         ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Type')
         ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Office')
         ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Period')
-        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Search')
+        ->assertElement('pressable', fn (array $pressable) => ($pressable['ref'] ?? null) === 'search-products')
         ->assertDontSee('Area Forecast Discussion')
         ->assertDontSee('Clear filters')
         ->assertSee('Search by name or ID');
@@ -256,9 +256,11 @@ test('Show more keeps using the search that produced the cursor, even after the 
             ->push(['data' => [productRow(2)], 'meta' => ['next_cursor' => null]]),
     ]);
 
-    Native::test(ProductsScreen::class)
-        ->submit('field-query', 'afd')
-        ->set('query', 'tornado')
+    $screen = Native::test(ProductsScreen::class)->submit('field-query', 'afd');
+
+    $this->travel(5)->seconds();
+
+    $screen->set('query', 'tornado')
         ->tap('show-more')
         ->assertSee('Area Forecast Discussion 2');
 
@@ -319,4 +321,57 @@ test('a search the server refuses as invalid says so without offering Try again'
         ->assertSee('That search could not be run. Check the text and filters.')
         ->assertDontSee('Try again')
         ->assertDontSee('could not search products');
+});
+
+test('a Search press that reaches PHP before the text field syncs still runs the search once the text arrives', function () {
+    fakeProducts();
+
+    Native::test(ProductsScreen::class)
+        ->tap('search-products')
+        ->assertDontSee('Area Forecast Discussion')
+        ->input('field-query', 'afd')
+        ->assertSee('Area Forecast Discussion 1');
+
+    expect(lastProductsQuery())->toBe(['q' => 'afd', 'limit' => '25']);
+});
+
+test('typing in the search box without pressing Search does not search', function () {
+    fakeProducts();
+
+    Native::test(ProductsScreen::class)
+        ->input('field-query', 'afd')
+        ->assertDontSee('Area Forecast Discussion');
+
+    Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '/api/v1/products'));
+});
+
+test('a text sync long after a Search press does not start a search', function () {
+    fakeProducts();
+
+    $screen = Native::test(ProductsScreen::class)->tap('search-products');
+
+    $this->travel(10)->seconds();
+
+    $screen->input('field-query', 'afd')->assertDontSee('Area Forecast Discussion');
+
+    Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '/api/v1/products'));
+});
+
+test('a text sync that only repeats the text the press searched with does not search again', function () {
+    fakeProducts();
+
+    Native::test(ProductsScreen::class)
+        ->input('field-query', 'afd')
+        ->tap('search-products')
+        ->input('field-query', 'afd')
+        ->assertSee('Area Forecast Discussion 1');
+
+    $searches = 0;
+    Http::assertSent(function (Request $request) use (&$searches) {
+        $searches += str_contains($request->url(), '/api/v1/products') ? 1 : 0;
+
+        return true;
+    });
+
+    expect($searches)->toBe(1);
 });

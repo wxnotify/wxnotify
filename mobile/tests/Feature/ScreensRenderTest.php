@@ -253,5 +253,5 @@ test('the products screen renders its title, tabs, a text input, selects and a s
         ->assertElement('scroll_view')
         ->assertElement('outlined_text_input')
         ->assertElement('select')
-        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Search');
+        ->assertElement('pressable', fn (array $pressable) => ($pressable['ref'] ?? null) === 'search-products');
 });
