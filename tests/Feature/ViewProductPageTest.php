@@ -201,3 +201,13 @@ test('the product details are in a collapsible section that starts collapsed, wi
         ->toContain('AWIPS ID')
         ->and(substr_count($html, '<details'))->toBe(1);
 });
+
+test('the Log in button is marked so a phone-sized screen can hide it', function () {
+    $product = pageProduct();
+
+    $html = $this->get(route('view-product.show', $product->view_slug))->assertOk()->getContent();
+
+    expect($html)->toMatch('/<a[^>]*class="[^"]*product-login-button[^"]*"[^>]*>\s*Log in/s')
+        ->toContain('@media (max-width: 639px)')
+        ->toContain('.product-login-button { display: none; }');
+});

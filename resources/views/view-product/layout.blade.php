@@ -20,6 +20,13 @@
             }
         </style>
 
+        <style>
+            /* The Log in button is only for wider screens: on a phone (including the app's in-app browser) it is hidden. */
+            @media (max-width: 639px) {
+                .product-login-button { display: none; }
+            }
+        </style>
+
         <script>
             window.theme = localStorage.getItem('theme') ?? @js(filament()->getDefaultThemeMode()->value)
 
@@ -38,7 +45,7 @@
                     {{ generateBrandName() }}
                 </a>
                 @isset($loginUrl)
-                    <x-filament::button tag="a" :href="$loginUrl" size="sm">Log in</x-filament::button>
+                    <x-filament::button tag="a" :href="$loginUrl" size="sm" class="product-login-button">Log in</x-filament::button>
                 @endisset
             </div>
         </header>
