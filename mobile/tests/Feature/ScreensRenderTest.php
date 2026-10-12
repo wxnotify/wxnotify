@@ -96,7 +96,10 @@ test('the denied-callback screen renders an empty root while it redirects', func
 
 test('the alerts screen renders its title, tabs and a native list with tappable rows', function () {
     (new TokenStore)->put('9|secret');
-    Http::fake(['wx.test/api/v1/alerts*' => Http::response(['data' => [renderableAlert()], 'meta' => ['next_cursor' => 'abc']])]);
+    Http::fake([
+        'wx.test/api/v1/active-alerts' => Http::response(['data' => [], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]]),
+        'wx.test/api/v1/alerts*' => Http::response(['data' => [renderableAlert()], 'meta' => ['next_cursor' => 'abc']]),
+    ]);
 
     Native::test(AlertsScreen::class)
         ->assertNavTitle('Alerts')

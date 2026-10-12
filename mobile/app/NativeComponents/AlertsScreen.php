@@ -11,10 +11,12 @@ use App\Services\LocationSharing;
 use App\Services\PushRegistration;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
+use App\Support\ActiveAlertsPresenter;
 use App\Support\AlertPresenter;
 use App\Support\Concerns\HandlesPushToken;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
+use App\Support\TokenStore;
 use Illuminate\Support\Carbon;
 use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Facades\Browser;
@@ -54,6 +56,21 @@ class AlertsScreen extends NativeComponent
 
     public ?string $timezone = null;
 
+    /** @var array<int, array<string, mixed>> The current watches, warnings and advisories at the subscriber's places. */
+    public array $activeEvents = [];
+
+    /** False when the server says the subscriber has no located place, so an empty list means something else. */
+    public bool $hasPlaces = true;
+
+    /** When the events being shown were fetched (the response's generated_at); null until a copy exists. */
+    public ?string $activeFetchedAt = null;
+
+    public bool $activeOffline = false;
+
+    public bool $activeError = false;
+
+    public bool $showAllActive = false;
+
     public function mount(): void
     {
         if ($this->redirectIfSignedOut()) {
@@ -65,6 +82,12 @@ class AlertsScreen extends NativeComponent
         $this->alerts = $cache->feed();
         $this->timezone = $cache->profile()['timezone'] ?? null;
         $this->syncedAt = $cache->syncedAt()?->toIso8601String();
+
+        $savedActive = $cache->activeAlerts();
+
+        if ($savedActive !== null) {
+            $this->applyActive($savedActive);
+        }
 
         $this->refresh();
 
@@ -89,7 +112,17 @@ class AlertsScreen extends NativeComponent
         $this->refresh();
     }
 
+    /**
+     * Reloads the sent-alerts feed, then the current-alerts section. The two are independent: neither
+     * one's failure changes the other's state.
+     */
     public function refresh(): void
+    {
+        $this->refreshFeed();
+        $this->refreshActive();
+    }
+
+    private function refreshFeed(): void
     {
         $cache = app(LocalCache::class);
 
@@ -114,6 +147,145 @@ class AlertsScreen extends NativeComponent
             $this->offline = false;
             $this->error = 'WxNotify could not load your alerts. Pull down to try again.';
         }
+    }
+
+    /**
+     * Reloads the section. Offline or on an error it keeps what is shown; a rejected token signs out.
+     */
+    public function refreshActive(): void
+    {
+        if (app(TokenStore::class)->token() === null) {
+            return;
+        }
+
+        try {
+            $body = app(WxNotifyApi::class)->activeAlerts();
+
+            app(LocalCache::class)->rememberActiveAlerts($body);
+
+            $this->applyActive($body);
+            $this->activeOffline = false;
+            $this->activeError = false;
+        } catch (Unauthenticated) {
+            app(SignOut::class)->clearLocal();
+            $this->replace('/sign-in');
+        } catch (Offline) {
+            $this->activeOffline = true;
+            $this->activeError = false;
+        } catch (ApiException) {
+            $this->activeOffline = false;
+            $this->activeError = true;
+        }
+    }
+
+    /**
+     * @param  array{data: array<int, array<string, mixed>>, meta?: array<string, mixed>}  $body
+     */
+    private function applyActive(array $body): void
+    {
+        $this->activeEvents = $body['data'];
+        $this->hasPlaces = (bool) ($body['meta']['has_places'] ?? true);
+        $this->activeFetchedAt = $body['meta']['generated_at'] ?? null;
+    }
+
+    public function toggleActive(): void
+    {
+        $this->showAllActive = ! $this->showAllActive;
+    }
+
+    /**
+     * Opens the event's public product page in the in-app browser; an unknown event, or one with no page, does nothing.
+     */
+    public function openActive(int $id): void
+    {
+        $url = collect($this->activeEvents)->firstWhere('id', $id)['view_url'] ?? null;
+
+        if (filled($url)) {
+            Browser::inApp($url);
+        }
+    }
+
+    /**
+     * Every event still in effect: offline the saved copy may be hours old, so events whose end has passed go.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function activeEventsInEffect(): array
+    {
+        return $this->activeOffline
+            ? ActiveAlertsPresenter::withoutEnded($this->activeEvents)
+            : $this->activeEvents;
+    }
+
+    /**
+     * The event rows to show: all of them, or the first few until the subscriber expands the list.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function activeRows(): array
+    {
+        return ActiveAlertsPresenter::visible($this->activeEventsInEffect(), $this->showAllActive);
+    }
+
+    public function activeHiddenCount(): int
+    {
+        return ActiveAlertsPresenter::hiddenCount($this->activeEventsInEffect(), $this->showAllActive);
+    }
+
+    /**
+     * True when the list is expanded and has more events than the collapsed view shows, so "Show fewer" is offered.
+     */
+    public function canShowFewerActive(): bool
+    {
+        return $this->showAllActive && ActiveAlertsPresenter::hiddenCount($this->activeEventsInEffect(), false) > 0;
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function activeOverline(array $event): string
+    {
+        return ActiveAlertsPresenter::overline($event);
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function activePlaces(array $event): string
+    {
+        return ActiveAlertsPresenter::places($event);
+    }
+
+    /**
+     * The offline note above the events: when the shown copy was fetched, or that there is none to show.
+     */
+    public function activeNote(): ?string
+    {
+        if (! $this->activeOffline) {
+            return null;
+        }
+
+        if ($this->activeFetchedAt === null) {
+            return 'Current alerts need a connection.';
+        }
+
+        return ActiveAlertsPresenter::asOf($this->activeFetchedAt, $this->timezone).". You're offline.";
+    }
+
+    /**
+     * The line that replaces the event rows when there are none to show.
+     */
+    public function activeEmptyLine(): ?string
+    {
+        if ($this->activeEventsInEffect() !== [] || ($this->activeOffline && $this->activeFetchedAt === null)) {
+            return null;
+        }
+
+        return match (true) {
+            $this->activeError => "Couldn't load current alerts.",
+            ! $this->hasPlaces => "Add a place or turn on location sharing to see what's in effect near you.",
+            default => 'Nothing in effect at your places.',
+        };
     }
 
     /**

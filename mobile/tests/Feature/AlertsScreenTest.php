@@ -46,8 +46,54 @@ function feedResponse(array $entries, ?string $next = null): array
     return ['data' => $entries, 'meta' => ['next_cursor' => $next]];
 }
 
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function activeEvent(int $id, array $overrides = []): array
+{
+    return [
+        'id' => $id,
+        'event' => "Tornado Warning {$id}",
+        'family' => 'warning',
+        'places' => ['Home'],
+        'expires' => now()->addHours(3)->toIso8601String(),
+        'view_url' => "https://wx.test/view-product/e{$id}",
+        ...$overrides,
+    ];
+}
+
+/**
+ * The rows of the "Alerts sent to you" section (the second section of the list).
+ *
+ * @param  array<string, mixed>  $tree
+ * @return array<int, array<string, mixed>>
+ */
+function sentAlertRows(array $tree): array
+{
+    $sections = [];
+    $collect = function (array $node) use (&$collect, &$sections): void {
+        if (($node['type'] ?? null) === 'list_section') {
+            $sections[$node['props']['header'] ?? ''] = $node;
+        }
+
+        foreach ($node['children'] ?? [] as $child) {
+            $collect($child);
+        }
+    };
+    $collect($tree);
+
+    return array_values(findRows($sections['Alerts sent to you'] ?? []));
+}
+
 beforeEach(function () {
     (new TokenStore)->put('9|secret');
+
+    // Every mount also fetches the current-alerts section. A test changes its response by assigning these
+    // before mounting (the first matching Http::fake stub wins, so the URL is never faked a second time).
+    $this->activeAlerts = ['data' => [], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    $this->activeAlertsStatus = 200;
+    Http::fake(['wx.test/api/v1/active-alerts' => fn () => Http::response($this->activeAlerts, $this->activeAlertsStatus)]);
 });
 
 test('a signed-out visitor is sent to sign in', function () {
@@ -92,8 +138,10 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
             && $list['props']['separator'] === true
             && $list['style']['bg_color'] === '#F8FAFC'
             && $list['props']['dark_bg_color'] === '#0F172A'
-            && count($list['children']) === 2
-            && count(array_filter($list['children'], fn (array $row) => array_key_exists('trailing_badges_json', $row['props']))) === 1)
+            && $list['props']['plain'] === true
+            && array_column(array_column($list['children'], 'props'), 'header') === ['Current watches, warnings and advisories', 'Alerts sent to you']
+            && count(findRows($list['children'][1])) === 2
+            && count(array_filter(findRows($list['children'][1]), fn (array $row) => array_key_exists('trailing_badges_json', $row['props']))) === 1)
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 1'
             && $item['props']['overline'] === 'Weather Alerts · 5 minutes ago'
             && $item['props']['supporting'] === 'Sent via Discord'
@@ -115,7 +163,7 @@ test('a delivery with no category shows only the time in the overline', function
     ]))]);
 
     Native::test(AlertsScreen::class)
-        ->assertElement('list_item', fn (array $item) => $item['props']['overline'] === '5 minutes ago')
+        ->assertElement('list_item', fn (array $item) => ($item['props']['overline'] ?? null) === '5 minutes ago')
         ->assertDontSee('· ');
 });
 
@@ -178,8 +226,8 @@ test('an empty feed says there are no alerts yet', function () {
     Native::test(AlertsScreen::class)
         ->assertSee('No alerts yet')
         ->assertSee('Alerts you receive show up here')
-        ->assertMissingElement('list_item')
-        ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh']));
+        ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh'])
+            && array_column(array_column(findRows($list['children'][1]), 'props'), 'headline') === ['No alerts yet']);
 });
 
 test('load more appends the next page with the cursor and stops when there is none', function () {
@@ -196,7 +244,7 @@ test('load more appends the next page with the cursor and stops when there is no
         ->assertSet('nextCursor', null)
         ->assertSet('pagedBeyondFirst', true)
         ->assertMissingElement('button')
-        ->assertElement('list', fn (array $list) => count($list['children']) === 2);
+        ->assertElement('list', fn (array $list) => count(findRows($list['children'][1])) === 2);
 
     Http::assertSent(fn (Request $r) => str_contains($r->url(), 'before=CURSOR1'));
 });
@@ -209,7 +257,7 @@ test('load more sends nothing without a next cursor', function () {
         ->call('loadMore')
         ->assertSet('pagedBeyondFirst', false);
 
-    Http::assertSentCount(1);
+    Http::assertSentCount(2);
 });
 
 test('a load more while one is already running sends no extra request', function () {
@@ -221,7 +269,7 @@ test('a load more while one is already running sends no extra request', function
         ->assertSet('pagedBeyondFirst', false)
         ->assertSet('loadingMore', true);
 
-    Http::assertSentCount(1);
+    Http::assertSentCount(2);
 });
 
 test('a load more within a second of a page loading is ignored, and works again after it', function () {
@@ -241,17 +289,17 @@ test('a load more within a second of a page loading is ignored, and works again 
         ->call('loadMore')
         ->assertSet('nextCursor', 'CURSOR1');
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(3);
 
     $this->travelTo($loadedAt->copy()->addMilliseconds(999));
     $screen->call('loadMore')->assertDontSee('Tornado Warning 1')->assertSet('nextCursor', 'CURSOR1');
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(3);
 
     $this->travelTo($loadedAt->copy()->addMilliseconds(1001));
     $screen->call('loadMore')->assertSee('Tornado Warning 1')->assertSet('nextCursor', null);
 
-    Http::assertSentCount(3);
+    Http::assertSentCount(4);
 });
 
 test('a failed load more releases the guard and leaves the cursor so a later one can retry', function () {
@@ -273,7 +321,7 @@ test('a refresh that prepends an alert puts it first and the rows are not keyed'
         ->push(feedResponse([apiEntry(3), apiEntry(2), apiEntry(1)])),
     ]);
 
-    $rows = fn (array $tree): array => array_values(findRows($tree));
+    $rows = fn (array $tree): array => sentAlertRows($tree);
 
     $screen = Native::test(AlertsScreen::class);
     $before = $rows($screen->tree());
@@ -297,7 +345,7 @@ test('load more is unavailable offline', function () {
     $this->network->connected = false;
     $screen->call('loadMore')->assertSet('offline', true)->assertSet('loadingMore', false);
 
-    Http::assertSentCount(1);
+    Http::assertSentCount(2);
 });
 
 test('tapping an alert with a product page opens it in the in-app browser', function () {
@@ -345,7 +393,7 @@ test('coming back from a detail keeps the pages already loaded and sends no requ
         ->assertSee('Tornado Warning 1')
         ->assertSet('pagedBeyondFirst', true);
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(3);
 });
 
 test('coming back refreshes only when the feed is more than a minute old', function () {
@@ -355,11 +403,11 @@ test('coming back refreshes only when the feed is more than a minute old', funct
 
     $this->travel(30)->seconds();
     $screen->call('onResume');
-    Http::assertSentCount(1);
+    Http::assertSentCount(2);
 
     $this->travel(2)->minutes();
     $screen->call('onResume');
-    Http::assertSentCount(2);
+    Http::assertSentCount(4);
 });
 
 test('a successful refresh after paging starts the list over from the first page', function () {
@@ -442,7 +490,7 @@ test('opening the feed while location sharing is wanted checks it with the serve
 
     Native::test(AlertsScreen::class);
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(3);
     Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r->url() === 'https://wx.test/api/v1/location-sharing');
 });
 
@@ -452,4 +500,123 @@ test('opening the feed while location sharing is off sends nothing about it', fu
     Native::test(AlertsScreen::class);
 
     Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'location-sharing'));
+});
+
+test('the section lists the events in effect with their end and places, above the sent alerts under their own headers', function () {
+    $this->freezeSecond();
+    $this->activeAlerts = ['data' => [activeEvent(1), activeEvent(2, ['family' => 'watch', 'places' => ['Cabin', 'Home'], 'expires' => null])], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(7)]))]);
+
+    Native::test(AlertsScreen::class)
+        ->assertElement('list_section', fn (array $section) => $section['props']['header'] === 'Current watches, warnings and advisories')
+        ->assertElement('list_section', fn (array $section) => $section['props']['header'] === 'Alerts sent to you')
+        ->assertSee('Warning · Ends 3 hours from now')
+        ->assertSee('Tornado Warning 1')
+        ->assertSee('Watch · No end time given')
+        ->assertSee('Cabin, Home')
+        ->assertSee('Tornado Warning 7');
+});
+
+test('an event row opens its product page, and a row without a page has no tap', function () {
+    $this->activeAlerts = ['data' => [activeEvent(1), activeEvent(2, ['view_url' => null])], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    $screen = Native::test(AlertsScreen::class);
+    $screen->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 1' && isset($item['on_press']))
+        ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 2' && ! isset($item['on_press']));
+
+    $screen->call('openActive', 1);
+    $screen->call('openActive', 2);
+    $screen->call('openActive', 99);
+
+    expect($this->browser->inAppUrls)->toBe(['https://wx.test/view-product/e1']);
+});
+
+test('only the first five show with Show all (N), and Show all reveals the rest and becomes Show fewer', function () {
+    $this->activeAlerts = ['data' => array_map(fn (int $id) => activeEvent($id), range(1, 8)), 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class)
+        ->assertSee('Tornado Warning 5')
+        ->assertDontSee('Tornado Warning 6')
+        ->assertSee('Show all (3)')
+        ->tap('Show all (3)')
+        ->assertSee('Tornado Warning 8')
+        ->assertSee('Show fewer')
+        ->tap('Show fewer')
+        ->assertDontSee('Tornado Warning 6');
+});
+
+test('nothing in effect says so, and no places asks for a place or location sharing instead', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class)->assertSee('Nothing in effect at your places.');
+
+    $this->activeAlerts = ['data' => [], 'meta' => ['has_places' => false, 'generated_at' => now()->toIso8601String()]];
+
+    Native::test(AlertsScreen::class)
+        ->assertSee("Add a place or turn on location sharing to see what's in effect near you.")
+        ->assertDontSee('Nothing in effect at your places.');
+});
+
+test('a successful load saves the response, and a later offline open paints the saved copy marked with when it was fetched', function () {
+    $this->freezeTime();
+    $this->activeAlerts = ['data' => [activeEvent(1)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class);
+
+    expect((new LocalCache)->activeAlerts()['data'][0]['event'])->toBe('Tornado Warning 1');
+
+    $this->network->connected = false;
+
+    Native::test(AlertsScreen::class)
+        ->assertSee('Tornado Warning 1')
+        ->assertSee("You're offline.")
+        ->assertSee('As of');
+});
+
+test('offline, an event whose end has passed since the copy was saved is not shown', function () {
+    $this->freezeTime();
+    (new LocalCache)->rememberActiveAlerts(['data' => [activeEvent(1, ['expires' => now()->addMinutes(10)->toIso8601String()]), activeEvent(2)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]]);
+    $this->network->connected = false;
+    $this->travel(30)->minutes();
+
+    Native::test(AlertsScreen::class)
+        ->assertDontSee('Tornado Warning 1')
+        ->assertSee('Tornado Warning 2');
+});
+
+test('offline with no saved copy the section says current alerts need a connection', function () {
+    $this->network->connected = false;
+
+    Native::test(AlertsScreen::class)->assertSee('Current alerts need a connection.');
+});
+
+test('a failing section load keeps the feed working and says it could not load', function () {
+    $this->activeAlerts = ['message' => 'boom'];
+    $this->activeAlertsStatus = 500;
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(7)]))]);
+
+    Native::test(AlertsScreen::class)
+        ->assertSee("Couldn't load current alerts.")
+        ->assertSee('Tornado Warning 7')
+        ->assertDontSee('could not load your alerts');
+});
+
+test('a failing feed keeps the section and its own message', function () {
+    $this->activeAlerts = ['data' => [activeEvent(1)], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(['message' => 'boom'], 500)]);
+
+    Native::test(AlertsScreen::class)
+        ->assertSee('Tornado Warning 1')
+        ->assertSee('WxNotify could not load your alerts. Pull down to try again.');
+});
+
+test('a rejected token on the section signs out', function () {
+    $this->activeAlerts = [];
+    $this->activeAlertsStatus = 401;
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    Native::test(AlertsScreen::class)->assertReplacedWith('/sign-in');
 });

@@ -20,6 +20,7 @@ beforeEach(function () {
         'wx.test/api/v1/push-token' => Http::response(null, 204),
         'wx.test/api/v1/me' => Http::response(['data' => ['id' => 5, 'name' => 'Pat', 'email' => 'pat@example.com', 'tier' => ['value' => 'plus', 'label' => 'Plus'], 'unit_system' => 'imperial', 'timezone' => 'America/Chicago']]),
         'wx.test/api/v1/alerts*' => Http::response(['data' => [], 'meta' => ['next_cursor' => null]]),
+        'wx.test/api/v1/active-alerts' => Http::response(['data' => [], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]]),
     ]);
 });
 
