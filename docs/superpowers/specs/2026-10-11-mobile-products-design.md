@@ -24,9 +24,9 @@ Query parameters, all optional and combined with AND:
 
 | Parameter | Meaning |
 | --- | --- |
-| `q` | Search text, at least 2 characters after trimming (else 422). A catalog product whose name contains it (case-insensitive), or an AWIPS ID or WMO header (`TTAAII CCCC`, any prefix of it) that starts with it. `%` and `_` in the text are literal. |
+| `q` | Search text, at least 2 characters after trimming (else 422). A catalog product whose name contains it, or an AWIPS ID or WMO header (`TTAAII CCCC`, any prefix of it) that starts with it; all case-insensitive (the pipeline stores these codes in lowercase). `%` and `_` in the text are literal. |
 | `type` | A catalog product id (`products.id`). |
-| `wfo` | An office code as `GET /nws-offices` lists it (`MOB`). Matches the product's issuing office, `cccc`, which is the code with a leading `K`, `P` or `T` (`KMOB`, `PHFO`, `TJSJ`): the match is on `cccc` ending with the code and being four letters long. An unknown code is a 422. |
+| `wfo` | An office code as `GET /nws-offices` lists it (`MOB`). Matches the product's issuing office, `cccc` (stored lowercase): the code with a leading `K` or `P` (`KMOB`, `PHFO`), plus the known exception `SJU` → `TJSJ`; plan Task 1 checks the full office list against the archive's `cccc` values for others. An unknown code is a 422. |
 | `period` | `hour`, `day`, `week` or `month`: products received in the last 1 hour, 24 hours, 7 days or 30 days. |
 | `before` | The cursor from the previous page. |
 | `limit` | 1 to 50, default 25. |
@@ -37,7 +37,7 @@ Results are ordered by `received_at` descending, then id descending; the cursor 
 { id, title, office, issued_at, source, product_id, type_label, view_url }
 ```
 
-`title` is the catalog name, else the AWIPS ID, else the WMO header (`TTAAII`), else "Weather product", as the product page does. `office` is `cccc`. `issued_at` is the header's issue time (`GenerateViewSlug::issuedAt()`), else `received_at`, as an ISO 8601 string. `view_url` is the product's `viewUrl()` (null when it has no slug). The response never carries the bulletin text, ugc codes, polygons or any other column. `meta` has `next_cursor`.
+`title` is the catalog name, else the AWIPS ID, else the WMO header (`TTAAII`), else "Weather product", as the product page does. `office` is `cccc`. `issued_at` is the header's issue time (`GenerateViewSlug::issuedAt()`), else `received_at`, as an ISO 8601 string. `type_label` is the catalog product's category label (null without a catalog entry). `view_url` is the product's `viewUrl()` (null when it has no slug). The response never carries the bulletin text, ugc codes, polygons or any other column. `meta` has `next_cursor`.
 
 ### `GET /api/v1/product-types`
 
@@ -55,7 +55,7 @@ The filter choices: catalog products that are `active` or `retired` (a retired p
 - **Search box and filters:** a text input with a Search button (and the keyboard's Search key) at the top; below it three selects, Type, Office and Period, each "Any" by default, plus a "Clear filters" link once any is set. Office uses `GET /nws-offices`; Type uses `GET /product-types`; Period uses the four presets. The Type and Office lists load when the screen opens and are kept for the visit.
 - **When it searches:** when the trimmed text has at least 2 characters or any filter is set. Submitting the text runs the search, and changing any filter runs it at once, so a filter alone (for example every AFD from MOB) works. Changing the text without submitting does nothing. Clearing the text and every filter returns to the opening state.
 - **Opening state:** the search box, the filters, and "Recent searches".
-- **Results:** below the box, a native list, newest first; a row shows the title, the office and the issue time ("KMOB · 2 hours ago"). The list loads the next page when the end is reached. Tapping a row with a `view_url` opens it in the in-app browser (`Browser::inApp`), like an alert; a row without one is not tappable.
+- **Results:** below the box, a native list, newest first; a row shows the title, the office and the issue time ("KMOB · 2 hours ago"). A "Show more" button under the rows loads the next page (the screen is one scrolling page, so the search box and filters stay above the rows). Tapping a row with a `view_url` opens it in the in-app browser (`Browser::inApp`), like an alert; a row without one is not tappable.
 - **Recent searches:** the last 10 distinct searches (text, type, office, period), newest first, labelled like "AFD · MOB · Past 7 days" (a search with no text and a type reads as the type's name). A search is saved when it runs and succeeds. Tapping one refills the box and filters and runs it. A Clear link empties the list. A search already in the list moves to the top.
 - **States:** a loading indicator while searching; "No products match" for an empty result, with the filters left as they are; "You're offline. Reconnect to search." offline (the recents still show; results are not cached); a failure shows a message with Try again; 401 signs out as everywhere.
 - **Cache:** `LocalCache` keeps the recent searches (and nothing else of this feature), wiped at sign-out with everything else. Results and the filter lists are never cached.
