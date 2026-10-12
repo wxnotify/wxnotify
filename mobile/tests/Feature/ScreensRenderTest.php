@@ -8,6 +8,7 @@ use App\NativeComponents\AuthDenied;
 use App\NativeComponents\LocationEditor;
 use App\NativeComponents\LocationPrompt;
 use App\NativeComponents\LocationsScreen;
+use App\NativeComponents\ProductsScreen;
 use App\NativeComponents\PushPrompt;
 use App\NativeComponents\RuleEditor;
 use App\NativeComponents\RulesScreen;
@@ -233,4 +234,24 @@ test('the location editor renders a phone location with an update interval and a
 
 test('the native UI plugin is enabled for the native build', function () {
     expect((new NativeServiceProvider(app()))->plugins())->toContain(NativeUIServiceProvider::class);
+});
+
+test('the products screen renders its title, tabs, a text input, selects and a search button', function () {
+    (new TokenStore)->put('9|secret');
+    Http::fake([
+        'wx.test/api/v1/product-types' => Http::response(['data' => []]),
+        'wx.test/api/v1/nws-offices' => Http::response(['data' => []]),
+    ]);
+
+    Native::test(ProductsScreen::class)
+        ->assertNavTitle('Products')
+        ->assertHasTabBar()
+        ->assertTabActive('Products')
+        ->assertHasTab('Alerts')
+        ->assertHasTab('Map')
+        ->assertHasTab('Settings')
+        ->assertElement('scroll_view')
+        ->assertElement('outlined_text_input')
+        ->assertElement('select')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Search');
 });
