@@ -3,8 +3,8 @@
 namespace App\Support;
 
 /**
- * An opaque pagination cursor for the app's alert feed: the sort time and id of the last
- * entry on the previous page, base64url-encoded JSON.
+ * An opaque pagination cursor for the app's paged lists (the alert feed, by dispatched_at, and the product archive
+ * search, by received_at): the sort time and id of the last entry on the previous page, base64url-encoded JSON.
  */
 final class AppAlertCursor
 {
@@ -25,7 +25,7 @@ final class AppAlertCursor
             return null;
         }
 
-        // dispatched_at is timestamp(0), so real cursors are always exactly Y-m-d H:i:s. Anything
+        // dispatched_at and received_at are both timestamp(0), so real cursors are always exactly Y-m-d H:i:s. Anything
         // looser (strtotime accepts "+1 week" and "2026-02-30") would reach Postgres and fail there.
         $at = \DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $data['at'], new \DateTimeZone('UTC'));
 

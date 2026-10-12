@@ -24,8 +24,8 @@ Query parameters, all optional and combined with AND:
 
 | Parameter | Meaning |
 | --- | --- |
-| `q` | Search text, at least 2 characters after trimming (else 422). A catalog product whose name contains it, or an AWIPS ID or WMO header (`TTAAII CCCC`, any prefix of it) that starts with it; all case-insensitive (the pipeline stores these codes in lowercase). `%` and `_` in the text are literal. |
-| `type` | A catalog product id (`products.id`). |
+| `q` | Search text, at least 2 characters after trimming (else 422). A catalog product whose name contains it, or an AWIPS ID or WMO header (`TTAAII CCCC`, any prefix of it) that starts with it; all case-insensitive (the pipeline stores these codes in lowercase). Spaces typed in the text are ignored for the AWIPS ID match ("AFD MOB" finds `afdmob`). `%` and `_` in the text are literal. A matched catalog product whose `code` is a 3-character AWIPS category (`TAF`, `AFD` ...) also matches the unclassified rows (`product_id` null) whose AWIPS ID starts with it, because the archive classifies only some products. |
+| `type` | A catalog product id (`products.id`): rows with that `product_id`; for a product whose `code` is a 3-character AWIPS category (`TAF`, `AFM` ...), also the unclassified rows (`product_id` null) whose AWIPS ID starts with the code. A VTEC-style code (`TO.W`) matches by `product_id` only. |
 | `wfo` | An office code as `GET /nws-offices` lists it (`MOB`). Matches the product's issuing office, `cccc` (stored lowercase): the code with a leading `K` or `P` (`KMOB`, `PHFO`), plus the known exception `SJU` → `TJSJ`; plan Task 1 checks the full office list against the archive's `cccc` values for others. An unknown code is a 422. |
 | `period` | `hour`, `day`, `week` or `month`: products received in the last 1 hour, 24 hours, 7 days or 30 days. |
 | `before` | The cursor from the previous page. |
@@ -41,7 +41,7 @@ Results are ordered by `received_at` descending, then id descending; the cursor 
 
 ### `GET /api/v1/product-types`
 
-The filter choices: catalog products that are `active` or `retired` (a retired product can still have archived rows), grouped by `ProductCategory` in the dashboard's section order: `{category, label, products: [{id, name}]}`. Drafts are left out.
+The filter choices: catalog products that are `active` or `retired` (a retired product can still have archived rows), grouped by `ProductCategory` in the dashboard's section order: `{category, label, products: [{id, name, code}]}`. Drafts are left out.
 
 ### Limits and cost
 

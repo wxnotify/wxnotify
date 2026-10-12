@@ -13,7 +13,7 @@ use Illuminate\Support\Collection;
 class ListProductTypes
 {
     /**
-     * @return list<array{category: string, label: string, products: list<array{id: int, name: string}>}>
+     * @return list<array{category: string, label: string, products: list<array{id: int, name: string, code: string}>}>
      */
     public function __invoke(): array
     {
@@ -21,7 +21,7 @@ class ListProductTypes
             ->whereIn('status', ['active', 'retired'])
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'name', 'category'])
+            ->get(['id', 'name', 'code', 'category'])
             ->groupBy(fn (Product $product): string => $product->category?->value ?? 'other');
 
         $groups = collect(ProductCategory::cases())
@@ -37,14 +37,14 @@ class ListProductTypes
 
     /**
      * @param  Collection<int, Product>  $products
-     * @return array{category: string, label: string, products: list<array{id: int, name: string}>}
+     * @return array{category: string, label: string, products: list<array{id: int, name: string, code: string}>}
      */
     private function group(string $category, string $label, $products): array
     {
         return [
             'category' => $category,
             'label' => $label,
-            'products' => $products->map(fn (Product $product): array => ['id' => $product->id, 'name' => $product->name])->values()->all(),
+            'products' => $products->map(fn (Product $product): array => ['id' => $product->id, 'name' => $product->name, 'code' => $product->code])->values()->all(),
         ];
     }
 }

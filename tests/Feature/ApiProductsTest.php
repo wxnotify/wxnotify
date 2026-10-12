@@ -123,6 +123,78 @@ test('the type filter returns only that catalog product', function () {
     expect($ids)->toBe([$tornado->id]);
 });
 
+test('the type filter on a 3-character category code also returns the unclassified rows of that AWIPS category', function () {
+    $taf = Product::factory()->create(['code' => 'TAF', 'name' => 'Terminal Aerodrome Forecast']);
+    $mobile = ($this->make)(['product_id' => null, 'awipsid' => 'tafmob', 'received_at' => now()->subMinutes(10)]);
+    $other = ($this->make)(['product_id' => null, 'awipsid' => 'tafkxx', 'received_at' => now()->subMinutes(20)]);
+    $classified = ($this->make)(['product_id' => $taf->id, 'awipsid' => 'tafhfo', 'received_at' => now()->subMinutes(30)]);
+    ($this->make)(['product_id' => null, 'awipsid' => 'rwrmob']);
+    ($this->make)(['product_id' => null, 'awipsid' => null]);
+    ($this->make)(['product_id' => $this->discussion->id, 'awipsid' => 'tafoth']);
+
+    $ids = collect(($this->search)(['type' => $taf->id])->assertOk()->json('data'))->pluck('id')->all();
+
+    expect($ids)->toBe([$mobile->id, $other->id, $classified->id]);
+});
+
+test('a catalog name match on a 3-character category code also returns the unclassified rows of that AWIPS category', function () {
+    Product::factory()->create(['code' => 'TAF', 'name' => 'Terminal Aerodrome Forecast']);
+    $mobile = ($this->make)(['product_id' => null, 'awipsid' => 'tafmob', 'received_at' => now()->subMinutes(10)]);
+    $other = ($this->make)(['product_id' => null, 'awipsid' => 'tafkxx', 'received_at' => now()->subMinutes(20)]);
+    ($this->make)(['product_id' => null, 'awipsid' => 'rwrmob']);
+
+    $ids = fn (string $q) => collect(($this->search)(['q' => $q])->assertOk()->json('data'))->pluck('id')->all();
+
+    expect($ids('terminal aero'))->toBe([$mobile->id, $other->id])
+        ->and($ids('TERMINAL AERO'))->toBe([$mobile->id, $other->id]);
+});
+
+test('a VTEC-style catalog code matches by product id only', function () {
+    $tornado = Product::factory()->create(['code' => 'ZZ.TOW', 'name' => 'Tornado Warning']);
+    $classified = ($this->make)(['product_id' => $tornado->id, 'awipsid' => 'tormob', 'received_at' => now()->subMinutes(10)]);
+    ($this->make)(['product_id' => null, 'awipsid' => 'zz.mob']);
+    ($this->make)(['product_id' => null, 'awipsid' => 'zzt000']);
+    ($this->make)(['product_id' => null, 'awipsid' => 'towmob']);
+
+    $byType = collect(($this->search)(['type' => $tornado->id])->assertOk()->json('data'))->pluck('id')->all();
+    $byName = collect(($this->search)(['q' => 'tornado warn'])->assertOk()->json('data'))->pluck('id')->all();
+
+    expect($byType)->toBe([$classified->id])
+        ->and($byName)->toBe([$classified->id]);
+});
+
+test('a classified row that matches both ways is returned once', function () {
+    $taf = Product::factory()->create(['code' => 'TAF', 'name' => 'Terminal Aerodrome Forecast']);
+    $row = ($this->make)(['product_id' => $taf->id, 'awipsid' => 'tafmob']);
+
+    expect(collect(($this->search)(['q' => 'taf'])->assertOk()->json('data'))->pluck('id')->all())->toBe([$row->id])
+        ->and(collect(($this->search)(['q' => 'terminal aero'])->assertOk()->json('data'))->pluck('id')->all())->toBe([$row->id])
+        ->and(collect(($this->search)(['type' => $taf->id])->assertOk()->json('data'))->pluck('id')->all())->toBe([$row->id]);
+});
+
+test('wildcards in a catalog code never widen the category match', function () {
+    $wildcard = Product::factory()->create(['code' => 'T%F', 'name' => 'Percent Code Product']);
+    $underscore = Product::factory()->create(['code' => 'T_F', 'name' => 'Underscore Code Product']);
+    ($this->make)(['product_id' => null, 'awipsid' => 'tafmob']);
+    ($this->make)(['product_id' => null, 'awipsid' => 'tffmob']);
+
+    expect(($this->search)(['type' => $wildcard->id])->assertOk()->json('data'))->toBe([])
+        ->and(($this->search)(['type' => $underscore->id])->assertOk()->json('data'))->toBe([])
+        ->and(($this->search)(['q' => 'percent code'])->assertOk()->json('data'))->toBe([])
+        ->and(($this->search)(['q' => 'underscore code'])->assertOk()->json('data'))->toBe([]);
+});
+
+test('spaces typed in the search text still find an AWIPS ID', function () {
+    $discussion = ($this->make)(['awipsid' => 'afdmob']);
+    ($this->make)(['awipsid' => 'afdhfo', 'cccc' => 'phfo']);
+
+    $ids = fn (string $q) => collect(($this->search)(['q' => $q])->assertOk()->json('data'))->pluck('id')->all();
+
+    expect($ids('AFD MOB'))->toBe([$discussion->id])
+        ->and($ids('afd  mob'))->toBe([$discussion->id])
+        ->and(count($ids('AFD')))->toBe(2);
+});
+
 test('the office filter matches the issuing centre by its K or P prefix and the San Juan and Pago Pago exceptions', function () {
     $mobile = ($this->make)(['cccc' => 'kmob']);
     $honolulu = ($this->make)(['cccc' => 'phfo']);
