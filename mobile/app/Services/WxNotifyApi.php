@@ -348,6 +348,20 @@ class WxNotifyApi
     }
 
     /**
+     * The warnings, watches and advisories in effect at the subscriber's places.
+     *
+     * @return array{data: array<int, array<string, mixed>>, meta: array{has_places: bool, generated_at: string}}
+     */
+    public function activeAlerts(): array
+    {
+        $body = $this->send(fn (PendingRequest $request) => $request->get('/api/v1/active-alerts'));
+
+        $this->data($body);
+
+        return $body;
+    }
+
+    /**
      * @return array<int, array{label: string, lat: float, lng: float}>
      */
     public function searchPlaces(string $query): array

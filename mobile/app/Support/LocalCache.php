@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * What the app keeps on the phone so it opens instantly and works offline: the latest feed
  * page, any alert detail the subscriber opened, the profile from /me, and when the feed was
- * last refreshed, plus the alert rules, saved locations, notification channels, rule-form options, the map's page and the recent product searches. Signing out wipes all of it.
+ * last refreshed, plus the alert rules, saved locations, notification channels, rule-form options, the map's page, the current watches, warnings and advisories and the recent product searches. Signing out wipes all of it.
  */
 class LocalCache
 {
@@ -32,6 +32,8 @@ class LocalCache
     private const MAP_PAGE = 'wxnotify.map.page';
 
     private const SEARCHES = 'wxnotify.product_searches';
+
+    private const ACTIVE_ALERTS = 'wxnotify.active_alerts';
 
     private const MAX_SEARCHES = 10;
 
@@ -240,6 +242,25 @@ class LocalCache
         Cache::forget(self::SEARCHES);
     }
 
+    /**
+     * The last "current watches, warnings and advisories" response, for the Alerts screen offline. Replaced on
+     * every fetch; the screen drops events that have ended and says when it was fetched.
+     *
+     * @param  array{data: array<int, array<string, mixed>>, meta: array<string, mixed>}  $body
+     */
+    public function rememberActiveAlerts(array $body): void
+    {
+        Cache::forever(self::ACTIVE_ALERTS, $body);
+    }
+
+    /**
+     * @return array{data: array<int, array<string, mixed>>, meta: array<string, mixed>}|null null until it was fetched once
+     */
+    public function activeAlerts(): ?array
+    {
+        return Cache::get(self::ACTIVE_ALERTS);
+    }
+
     public function wipe(): void
     {
         CachedAlert::query()->delete();
@@ -252,5 +273,6 @@ class LocalCache
         Cache::forget(self::CHANNELS);
         Cache::forget(self::MAP_PAGE);
         Cache::forget(self::SEARCHES);
+        Cache::forget(self::ACTIVE_ALERTS);
     }
 }
