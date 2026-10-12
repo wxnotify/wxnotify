@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\ActiveAlertController;
 use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\AlertRuleController;
 use App\Http\Controllers\Api\V1\AlertRuleOptionsController;
@@ -59,6 +60,7 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/channels/{id}', [ChannelController::class, 'update'])->whereNumber('id')->name('api.v1.channels.update');
         Route::delete('/channels/{id}', [ChannelController::class, 'destroy'])->whereNumber('id')->name('api.v1.channels.destroy');
         Route::get('/map', MapController::class)->name('api.v1.map');
+        Route::get('/active-alerts', ActiveAlertController::class)->name('api.v1.active-alerts');
         Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
         Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
         Route::get('/products', [ProductController::class, 'index'])->name('api.v1.products.index');

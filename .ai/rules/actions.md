@@ -19,3 +19,6 @@ AppServiceProvider's CauserResolver `resolveUsing` closure ignores the `causedBy
 
 ## SearchProducts owns the product archive search and mirrors the product page's test-product rule
 `App\Actions\Products\SearchProducts` is the only query behind `GET /api/v1/products`. It selects only the listed columns (never `text`), pages by `(received_at, id)` through `AppAlertCursor`, and hides `is_test` products in production like `ViewProductController`. What it matches: the catalog name, the AWIPS ID prefix and the WMO header prefix, plus (for catalog products with a 3-character AWIPS category code) the unclassified rows of that category, in both the text match and the `type` filter. A change to what the archive search matches belongs here.
+
+## GetActiveAlertsForUser reads events only through GetActiveAlertsForLocation::activeFor()
+`App\Actions\Alerts\GetActiveAlertsForUser` merges the per-place results of `activeFor()` (the zone rows, `active_wwa_areas`) into one entry per event: the latest end across the affected places (none when any has none), the sorted place labels, and the latest bulletin's page. Never read an event's own `ugc_codes` or `polygon` here (`.ai/rules/pipeline.md`).
