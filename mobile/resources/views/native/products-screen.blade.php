@@ -16,13 +16,6 @@
                 <native:icon :ios="Ios::SliderHorizontal3" :android="Android::Tune" size="26" :color="$this->hasFilters() ? theme('primary') : theme('on-surface-variant')" />
             </pressable>
         </native:row>
-        {{-- A pressable, not <native:button>: on Android only a pressable clears the text field's focus first, which flushes the typed text (native:model.blur) before the handler runs. --}}
-        <pressable @tap="search" ref="search-products" class="w-full">
-            <native:column class="w-full p-3 items-center bg-theme-primary rounded-full">
-                <native:text class="text-base font-semibold text-theme-on-primary">Search</native:text>
-            </native:column>
-        </pressable>
-
         @if ($filtersOpen)
             <select label="Type" :options="$this->typeLabels()" :value="$this->selectedTypeLabel()" @change="pickType" ref="field-type" />
             <select label="Office" :options="$this->officeLabels()" :value="$this->selectedOfficeLabel()" @change="pickOffice" ref="field-office" />
@@ -34,6 +27,13 @@
                 </pressable>
             @endif
         @endif
+
+        {{-- A pressable, not <native:button>: on Android only a pressable clears the text field's focus first, which flushes the typed text (native:model.blur) before the handler runs. --}}
+        <pressable @tap="search" ref="search-products" class="w-full">
+            <native:column class="w-full p-3 items-center bg-theme-primary rounded-full">
+                <native:text class="text-base font-semibold text-theme-on-primary">Search</native:text>
+            </native:column>
+        </pressable>
 
         @if ($offline)
             <native:text class="text-sm text-theme-on-surface-variant">You're offline. Reconnect to search.</native:text>
