@@ -11,8 +11,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
- * A page of the ingested-product archive for the app's Products tab, newest first. The search text matches the
- * catalog name, the AWIPS ID prefix and the WMO header prefix (never the headline or the bulletin text), all
+ * A page of the ingested-product archive for the app's Products tab, newest first. The search text matches a word
+ * of the catalog name that starts with it (so "tor" finds Tornado, not Thunderstorm), the AWIPS ID prefix and the
+ * WMO header prefix (never the headline or the bulletin text), all
  * case-insensitively because the pipeline stores those codes in lowercase. The pipeline sets product_id only for
  * VTEC products, AFD and a few SPC/WPC products, so a catalog product whose code is a 3-character AWIPS product
  * category (AFD, TAF, AFM ...) also matches the unclassified rows whose AWIPS ID starts with that category, both for
@@ -88,7 +89,11 @@ class SearchProducts
 
         $products = Product::query()
             ->whereIn('status', ['active', 'retired'])
-            ->whereRaw('lower(name) like ?', ["%{$escaped}%"])
+            ->where(function (Builder $name) use ($escaped): void {
+                foreach (['', '% ', '%-', '%/', '%('] as $beforeWord) {
+                    $name->orWhereRaw('lower(name) like ?', ["{$beforeWord}{$escaped}%"]);
+                }
+            })
             ->get(['id', 'code']);
 
         $query->where(function (Builder $match) use ($escaped, $withoutSpaces, $products): void {

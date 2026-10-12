@@ -278,3 +278,23 @@ test('test products are listed outside production and hidden in production', fun
 test('the route is rate limited like the rest of the app API', function () {
     ($this->search)()->assertOk()->assertHeader('X-RateLimit-Limit');
 });
+
+test('the search text matches the start of a word in the catalog name, never the middle of one', function () {
+    $tornado = Product::factory()->create(['name' => 'Tornado Warning', 'code' => 'ZZ.TOR']);
+    $thunderstorm = Product::factory()->create(['name' => 'Severe Thunderstorm Warning', 'code' => 'ZZ.SVR']);
+    $dust = Product::factory()->create(['name' => 'Dust Storm Warning', 'code' => 'ZZ.DST']);
+    $nonPrecip = Product::factory()->create(['name' => 'Non-Precipitation Statement', 'code' => 'ZZ.NPS']);
+
+    $tornadoRow = ($this->make)(['product_id' => $tornado->id, 'awipsid' => 'zzzaaa']);
+    $thunderRow = ($this->make)(['product_id' => $thunderstorm->id, 'awipsid' => 'zzzbbb']);
+    $dustRow = ($this->make)(['product_id' => $dust->id, 'awipsid' => 'zzzccc']);
+    $nonPrecipRow = ($this->make)(['product_id' => $nonPrecip->id, 'awipsid' => 'zzzddd']);
+
+    $ids = fn (string $q) => collect(($this->search)(['q' => $q])->assertOk()->json('data'))->pluck('id')->sort()->values()->all();
+
+    expect($ids('tor'))->toBe([$tornadoRow->id])
+        ->and($ids('storm'))->toBe([$dustRow->id])
+        ->and($ids('thunder'))->toBe([$thunderRow->id])
+        ->and($ids('warning'))->toBe(collect([$tornadoRow->id, $thunderRow->id, $dustRow->id])->sort()->values()->all())
+        ->and($ids('precip'))->toBe([$nonPrecipRow->id]);
+});
