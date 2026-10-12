@@ -391,7 +391,7 @@ class ProductsScreen extends NativeComponent
     }
 
     /**
-     * @return array<int, string> catalog product id => label (a name shared by two products is followed by the product's code)
+     * @return array<int, string> catalog product id => label, in alphabetical order (a name shared by two products is followed by the product's code)
      */
     private function typeOptions(): array
     {
@@ -401,6 +401,9 @@ class ProductsScreen extends NativeComponent
         foreach ($this->types as $type) {
             $options[$type['id']] = $counts[$type['name']] > 1 ? "{$type['name']} ({$type['code']})" : $type['name'];
         }
+
+        // A plain case-insensitive comparison, not a natural one: a natural sort skips spaces and puts "Airport" before "Air Quality".
+        uasort($options, fn (string $a, string $b): int => strcmp(mb_strtolower($a), mb_strtolower($b)));
 
         return $options;
     }

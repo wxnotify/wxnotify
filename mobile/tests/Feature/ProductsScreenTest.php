@@ -456,3 +456,18 @@ test('tapping a recent search and then changing a filter keeps the tapped search
     expect(array_map(fn (array $search) => [$search['q'], $search['period']], (new LocalCache)->recentSearches()))
         ->toBe([['afd', 'hour'], ['afd', '']]);
 });
+
+test('the Type options are in alphabetical order, ignoring case and counting a space before letters, after "Any type"', function () {
+    Http::fake([
+        'wx.test/api/v1/product-types' => Http::response(['data' => [
+            ['category' => 'winter_weather', 'label' => 'Winter Weather', 'products' => [['id' => 6, 'name' => 'Winter Storm Warning', 'code' => 'WS.W'], ['id' => 8, 'name' => 'zebra Product', 'code' => 'ZZ1']]],
+            ['category' => 'fire_weather', 'label' => 'Fire Weather', 'products' => [['id' => 7, 'name' => 'Red Flag Warning', 'code' => 'FW.W'], ['id' => 9, 'name' => 'Area Forecast Discussion', 'code' => 'AFD'], ['id' => 10, 'name' => 'Airport Weather Warning', 'code' => 'AWW'], ['id' => 11, 'name' => 'Air Quality Alert', 'code' => 'AQA'], ['id' => 12, 'name' => '911 Telephone Outage', 'code' => 'TOW']]],
+        ]]),
+        'wx.test/api/v1/nws-offices' => Http::response(['data' => []]),
+    ]);
+
+    Native::test(ProductsScreen::class)
+        ->tap('toggle-filters')
+        ->assertElement('select', fn (array $select) => $select['props']['label'] === 'Type'
+            && $select['props']['options'] === ['Any type', '911 Telephone Outage', 'Air Quality Alert', 'Airport Weather Warning', 'Area Forecast Discussion', 'Red Flag Warning', 'Winter Storm Warning', 'zebra Product']);
+});
