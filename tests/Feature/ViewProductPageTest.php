@@ -188,3 +188,16 @@ test('the test product banner and the not-found page use Filament components', f
     $this->get(route('view-product.show', $test->view_slug))->assertOk()->assertSee('fi-callout', false);
     $this->get('/view-product/does-not-exist')->assertNotFound()->assertSee('fi-empty-state', false);
 });
+
+test('the product details are in a collapsible section that starts collapsed, with the details still in the page', function () {
+    $product = pageProduct();
+
+    $html = $this->get(route('view-product.show', $product->view_slug))->assertOk()->getContent();
+
+    expect($html)->toMatch('/<details class="fi-section[^"]*" data-product-details>\s*<summary/')
+        ->not->toContain('data-product-details open')
+        ->toContain('Product details')
+        ->toContain('KEWX')
+        ->toContain('AWIPS ID')
+        ->and(substr_count($html, '<details'))->toBe(1);
+});
