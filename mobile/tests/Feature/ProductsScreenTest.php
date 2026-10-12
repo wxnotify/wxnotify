@@ -246,3 +246,56 @@ test('the filter lists failing to load leaves the selects usable and the next se
 
     expect($screen->get('types'))->toHaveCount(1);
 });
+
+test('Show more keeps using the search that produced the cursor, even after the box text is edited', function () {
+    Http::fake([
+        'wx.test/api/v1/product-types' => Http::response(['data' => []]),
+        'wx.test/api/v1/nws-offices' => Http::response(['data' => []]),
+        'wx.test/api/v1/products*' => Http::sequence()
+            ->push(['data' => [productRow(1)], 'meta' => ['next_cursor' => 'cur-1']])
+            ->push(['data' => [productRow(2)], 'meta' => ['next_cursor' => null]]),
+    ]);
+
+    Native::test(ProductsScreen::class)
+        ->submit('field-query', 'afd')
+        ->set('query', 'tornado')
+        ->tap('show-more')
+        ->assertSee('Area Forecast Discussion 2');
+
+    expect(lastProductsQuery())->toBe(['q' => 'afd', 'limit' => '25', 'before' => 'cur-1']);
+});
+
+test('going offline on a later search shows the message and the recent searches, and keeps the typed text', function () {
+    fakeProducts();
+
+    $screen = Native::test(ProductsScreen::class)->submit('field-query', 'afd');
+
+    $this->network->connected = false;
+
+    $screen->set('query', 'tornado')
+        ->tap('search-products')
+        ->assertSee("You're offline. Reconnect to search.")
+        ->assertSee('Recent searches')
+        ->assertSee('afd')
+        ->assertDontSee('Area Forecast Discussion')
+        ->assertSet('query', 'tornado');
+});
+
+test('a failing later search shows the message, Try again and the recent searches', function () {
+    Http::fake([
+        'wx.test/api/v1/product-types' => Http::response(['data' => []]),
+        'wx.test/api/v1/nws-offices' => Http::response(['data' => []]),
+        'wx.test/api/v1/products*' => Http::sequence()
+            ->push(['data' => [productRow(1)], 'meta' => ['next_cursor' => null]])
+            ->push(['message' => 'boom'], 500),
+    ]);
+
+    Native::test(ProductsScreen::class)
+        ->submit('field-query', 'afd')
+        ->submit('field-query', 'tornado')
+        ->assertSee('WxNotify could not search products. Try again in a moment.')
+        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Try again')
+        ->assertSee('Recent searches')
+        ->assertSee('afd')
+        ->assertDontSee('Area Forecast Discussion');
+});

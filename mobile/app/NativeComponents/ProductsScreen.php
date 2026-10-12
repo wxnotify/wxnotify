@@ -43,6 +43,9 @@ class ProductsScreen extends NativeComponent
 
     public ?string $nextCursor = null;
 
+    /** @var array{q: ?string, type: ?int, wfo: ?string, period: ?string} the criteria of the last successful first-page search; the cursor belongs to it */
+    public array $searched = [];
+
     /** @var array<int, array{q: string, type: ?int, type_label: ?string, wfo: string, period: string}> */
     public array $recents = [];
 
@@ -107,12 +110,12 @@ class ProductsScreen extends NativeComponent
 
     public function loadMore(): void
     {
-        if ($this->nextCursor === null || $this->results === null) {
+        if ($this->nextCursor === null || $this->results === null || $this->searched === []) {
             return;
         }
 
         try {
-            $page = app(WxNotifyApi::class)->products($this->criteria(), $this->nextCursor);
+            $page = app(WxNotifyApi::class)->products($this->searched, $this->nextCursor);
         } catch (Unauthenticated) {
             $this->signOut();
 
@@ -252,23 +255,27 @@ class ProductsScreen extends NativeComponent
         }
 
         try {
-            $page = app(WxNotifyApi::class)->products($this->criteria());
+            $criteria = $this->criteria();
+            $page = app(WxNotifyApi::class)->products($criteria);
         } catch (Unauthenticated) {
             $this->signOut();
 
             return;
         } catch (Offline) {
+            $this->backToOpeningState();
             $this->offline = true;
             $this->error = null;
 
             return;
         } catch (ApiException) {
+            $this->backToOpeningState();
             $this->offline = false;
             $this->error = 'WxNotify could not search products. Try again in a moment.';
 
             return;
         }
 
+        $this->searched = $criteria;
         $this->results = $page['data'];
         $this->nextCursor = $page['meta']['next_cursor'] ?? null;
         $this->offline = false;
@@ -283,6 +290,16 @@ class ProductsScreen extends NativeComponent
             'period' => $this->period,
         ]);
         $this->recents = $cache->recentSearches();
+    }
+
+    /**
+     * A failed search drops the old results (and their cursor) so the recent searches show again beside the message.
+     */
+    private function backToOpeningState(): void
+    {
+        $this->results = null;
+        $this->nextCursor = null;
+        $this->searched = [];
     }
 
     /**
