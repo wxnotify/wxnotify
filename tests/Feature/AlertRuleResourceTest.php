@@ -991,3 +991,14 @@ test('an untouched edit keeps the stored levels when their only risk product is 
 
     expect($rule->refresh()->risk_levels)->toBe(['High']);
 });
+
+test('the Set it up step has a scroll-to-bottom button for every category and none before a category is chosen', function (string $category) {
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => $category])
+        ->assertSeeHtml('aria-label="Scroll to bottom"');
+})->with(['weather_alerts', 'spc_wpc', 'threshold', 'daily_summary', 'lightning']);
+
+test('the scroll-to-bottom button is absent until a category is chosen', function () {
+    livewire(CreateAlertRule::class)
+        ->assertDontSeeHtml('aria-label="Scroll to bottom"');
+});

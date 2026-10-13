@@ -30,6 +30,7 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
@@ -132,13 +133,17 @@ class AlertRuleForm
     protected static function detailsStep(): Step
     {
         return Step::make('Set it up')
-            ->schema(fn (Get $get): array => match (AlertCategory::tryFrom($get('category'))) {
-                AlertCategory::WeatherAlerts => self::weatherAlertsFields(),
-                AlertCategory::SpcWpc => self::spcWpcFields(),
-                AlertCategory::Threshold => self::thresholdFields(),
-                AlertCategory::DailySummary => self::dailySummaryFields(),
-                AlertCategory::Lightning => self::lightningFields(),
-                null => [],
+            ->schema(function (Get $get): array {
+                $fields = match (AlertCategory::tryFrom($get('category'))) {
+                    AlertCategory::WeatherAlerts => self::weatherAlertsFields(),
+                    AlertCategory::SpcWpc => self::spcWpcFields(),
+                    AlertCategory::Threshold => self::thresholdFields(),
+                    AlertCategory::DailySummary => self::dailySummaryFields(),
+                    AlertCategory::Lightning => self::lightningFields(),
+                    null => [],
+                };
+
+                return $fields === [] ? [] : [...$fields, View::make('filament.dashboard.alert-rules.scroll-to-bottom')];
             });
     }
 
