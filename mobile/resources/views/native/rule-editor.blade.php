@@ -41,6 +41,10 @@
 
                 @foreach ($presenter->fields($draft) as $field)
                     @switch($field)
+                        @case('mixed_matching')
+                            <native:text class="text-base text-theme-on-background" ref="mixed-matching-notice">This alert matches each product its own way. Edit its matching on the web at wxnotify.com.</native:text>
+                            @break
+
                         @case('products')
                             @foreach ($presenter->productGroups($draft) as $group)
                                 @php($open = $loop->first || count(array_intersect(array_column($group['products'], 'id'), $draft['product_ids'])) > 0)

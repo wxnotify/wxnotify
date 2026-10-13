@@ -534,3 +534,42 @@ test('a field\'s message goes once the field changes, and the summary once no me
         ->assertDontSee('Choose at least one channel.')
         ->assertDontSee('Some details need fixing.');
 });
+
+test('a rule with per-product matching shows a web-only notice instead of its products and matching', function () {
+    editorFakes(['wx.test/api/v1/alert-rules/4' => Http::response(['data' => editorSavedRule(mixedApiRule())])]);
+
+    Native::test(RuleEditor::class, ['id' => 4])
+        ->assertSet('draft.mixed', true)
+        ->assertSee('Set it up')
+        ->assertSee('This alert matches each product its own way. Edit its matching on the web at wxnotify.com.')
+        ->assertDontSee('Mesoscale Discussion')
+        ->assertDontSee('Matching mode')
+        ->assertDontSee('Risk levels')
+        ->assertDontSee('Locations')
+        ->assertSee('Notify me on')
+        ->assertSee('Quiet hours start (optional)')
+        ->assertSee('Name this alert (optional)');
+});
+
+test('saving a rule with per-product matching sends its name, channels and quiet hours and none of the product or matching keys', function () {
+    editorFakes(['wx.test/api/v1/alert-rules/4' => Http::response(['data' => editorSavedRule(mixedApiRule())])]);
+
+    Native::test(RuleEditor::class, ['id' => 4])
+        ->input('field-name', 'Outlooks, renamed')
+        ->tap('Save rule')
+        ->assertWentBack();
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'PUT' && $r->url() === 'https://wx.test/api/v1/alert-rules/4' && bodyOf($r) == [
+        'category' => 'spc_wpc', 'name' => 'Outlooks, renamed', 'channel_ids' => [5], 'quiet_hours_start' => '22:00', 'quiet_hours_end' => '06:00',
+    ]);
+});
+
+test('a rule that matches its products the same way still shows its products and matching', function () {
+    editorFakes(['wx.test/api/v1/alert-rules/4' => Http::response(['data' => editorSavedRule(mixedApiRule(['matching_mode' => 'polygon', 'product_ids' => [21], 'risk_levels' => []]))])]);
+
+    Native::test(RuleEditor::class, ['id' => 4])
+        ->assertSet('draft.mixed', false)
+        ->assertSee('Mesoscale Discussion')
+        ->assertSee('Matching mode')
+        ->assertDontSee('This alert matches each product its own way');
+});

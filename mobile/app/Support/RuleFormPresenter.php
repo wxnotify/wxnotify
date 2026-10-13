@@ -9,13 +9,18 @@ namespace App\Support;
  * dashboard form and the server's request rules so the editor can guide the subscriber, but the
  * server stays the authority and re-validates everything.
  *
- * A draft uses the API's own keys; empty values are '', [] or null.
+ * A draft uses the API's own keys; empty values are '', [] or null. A rule whose products match
+ * differently is flagged `mixed`: its products and matching are never shown, validated or sent,
+ * so saving the rest of the rule leaves them as the server holds them.
  */
 final class RuleFormPresenter
 {
     private const PRODUCT_CATEGORIES = ['weather_alerts', 'spc_wpc'];
 
     private const LOCATION_MODES = ['location', 'polygon', 'risk_area'];
+
+    /** The matching mode the API reports for a rule whose products match differently; it is edited on the web only. */
+    private const MIXED_MODE = 'mixed';
 
     /** The server refuses a threshold beyond this in the subscriber's own units (the column is decimal(6,1)). */
     private const MAX_THRESHOLD_VALUE = 9999;
@@ -48,6 +53,7 @@ final class RuleFormPresenter
             'wfo' => '',
             'county_zone_codes' => [],
             'risk_levels' => [],
+            'mixed' => false,
             'variable' => '',
             'direction' => '',
             'threshold_value' => '',
@@ -82,6 +88,7 @@ final class RuleFormPresenter
             'wfo' => $text('wfo'),
             'county_zone_codes' => array_values($rule['county_zone_codes'] ?? []),
             'risk_levels' => array_values($rule['risk_levels'] ?? []),
+            'mixed' => ($rule['matching_mode'] ?? null) === self::MIXED_MODE,
             'variable' => $text('variable'),
             'direction' => $text('direction'),
             'threshold_value' => $number('threshold_value'),
@@ -122,6 +129,10 @@ final class RuleFormPresenter
     public function fields(array $draft): array
     {
         $mode = (string) $draft['matching_mode'];
+
+        if ($draft['mixed'] && in_array($draft['category'], self::PRODUCT_CATEGORIES, true)) {
+            return ['mixed_matching'];
+        }
 
         return match ($draft['category']) {
             'weather_alerts', 'spc_wpc' => [
@@ -207,7 +218,7 @@ final class RuleFormPresenter
      */
     public function reconcile(array $draft): array
     {
-        if (! in_array($draft['category'], self::PRODUCT_CATEGORIES, true)) {
+        if ($draft['mixed'] || ! in_array($draft['category'], self::PRODUCT_CATEGORIES, true)) {
             return $draft;
         }
 
@@ -238,6 +249,7 @@ final class RuleFormPresenter
 
     /**
      * The API request body: only the fields the category and mode use, numbers as numbers, blanks as null.
+     * A mixed draft sends no product or matching key at all, which is how the server knows to keep them.
      *
      * @param  array<string, mixed>  $draft
      * @return array<string, mixed>
@@ -295,7 +307,7 @@ final class RuleFormPresenter
             $errors['category'] = 'Choose a kind of alert.';
         }
 
-        if (in_array($category, self::PRODUCT_CATEGORIES, true)) {
+        if (in_array($category, self::PRODUCT_CATEGORIES, true) && ! $draft['mixed']) {
             if ($draft['product_ids'] === []) {
                 $errors['product_ids'] = 'Select at least one product.';
             }
@@ -394,6 +406,10 @@ final class RuleFormPresenter
      */
     private function productPayload(array $draft): array
     {
+        if ($draft['mixed']) {
+            return [];
+        }
+
         $mode = (string) $draft['matching_mode'];
 
         return [

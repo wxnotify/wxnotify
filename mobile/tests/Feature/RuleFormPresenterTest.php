@@ -197,3 +197,48 @@ test('small helpers read from the options', function () {
         ->and($presenter->radiusUnit())->toBe('mi')
         ->and($presenter->radiusBounds())->toBe(['min' => 10, 'max' => 50]);
 });
+
+/**
+ * @return array<string, mixed> a stored SPC & WPC rule whose products match differently, as the API returns it
+ */
+function mixedApiRule(array $overrides = []): array
+{
+    return [
+        'id' => 4, 'name' => 'Outlooks', 'category' => 'spc_wpc', 'is_active' => true, 'matching_mode' => 'mixed', 'product_ids' => [20, 21], 'location_ids' => [],
+        'location_id' => null, 'wfo' => null, 'county_zone_codes' => [], 'risk_levels' => ['SLGT'], 'variable' => null, 'direction' => null, 'threshold_value' => null,
+        'timeframe' => null, 'radius' => null, 'delivery_time' => null, 'quiet_hours_start' => '22:00', 'quiet_hours_end' => '06:00', 'message_body_style' => 'brief',
+        'custom_subject_template' => null, 'alert_template_id' => 3, 'channel_ids' => [5],
+        ...$overrides,
+    ];
+}
+
+test('a rule with per-product matching becomes a mixed draft whose payload leaves its products and matching to the server', function () {
+    $presenter = rulePresenter(['tier' => ['can_customize_messages' => true]]);
+    $draft = $presenter->draftFromRule(mixedApiRule());
+
+    expect($draft['mixed'])->toBeTrue()
+        ->and($presenter->fields($draft))->toBe(['mixed_matching'])
+        ->and($presenter->validate($draft))->toBe([])
+        ->and($presenter->payload($draft))->toBe([
+            'category' => 'spc_wpc', 'name' => 'Outlooks', 'channel_ids' => [5], 'quiet_hours_start' => '22:00', 'quiet_hours_end' => '06:00',
+            'message_body_style' => 'brief', 'custom_subject_template' => null, 'alert_template_id' => 3,
+        ]);
+});
+
+test('nothing that changes products or matching reaches a mixed draft\'s payload', function () {
+    $presenter = rulePresenter();
+    $draft = $presenter->draftFromRule(mixedApiRule(['category' => 'weather_alerts']));
+    $draft = $presenter->reconcile([...$draft, 'product_ids' => [10], 'matching_mode' => 'wfo', 'wfo' => 'OKX', 'location_ids' => [7], 'county_zone_codes' => ['NYC103'], 'risk_levels' => ['SLGT']]);
+
+    expect(array_keys($presenter->payload($draft)))->toBe(['category', 'name', 'channel_ids', 'quiet_hours_start', 'quiet_hours_end']);
+});
+
+test('a rule that matches its products the same way is not mixed, and a mixed draft still needs a channel', function () {
+    $presenter = rulePresenter();
+    $single = $presenter->draftFromRule(mixedApiRule(['matching_mode' => 'wfo', 'wfo' => 'OKX']));
+
+    expect($single['mixed'])->toBeFalse()
+        ->and($presenter->fields($single))->toContain('products', 'matching_mode', 'wfo')
+        ->and($presenter->payload($single))->toMatchArray(['product_ids' => [20, 21], 'matching_mode' => 'wfo', 'wfo' => 'OKX', 'risk_levels' => ['SLGT']])
+        ->and(array_keys($presenter->validate($presenter->draftFromRule(mixedApiRule(['channel_ids' => []])))))->toBe(['channel_ids']);
+});
