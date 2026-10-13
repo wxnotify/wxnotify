@@ -11,6 +11,7 @@ use App\Enums\ThresholdVariable;
 use App\Enums\Tier;
 use App\Enums\UnitSystem;
 use App\Models\Concerns\BlockedDuringMaintenance;
+use App\Support\ProductMatchSettings;
 use App\Support\Timezones;
 use App\Support\Units;
 use Database\Factories\AlertRuleFactory;
@@ -136,7 +137,48 @@ class AlertRule extends Model
 
     public function products(): BelongsToMany
     {
-        return $this->belongsToMany(Product::class);
+        return $this->belongsToMany(Product::class)->withPivot(['matching_mode', 'wfo', 'county_zone_codes']);
+    }
+
+    /**
+     * Each product's own saved locations (the pivot's product_id says which product).
+     *
+     * @return BelongsToMany<Location, $this>
+     */
+    public function productLocations(): BelongsToMany
+    {
+        return $this->belongsToMany(Location::class, 'alert_rule_product_location')->withPivot('product_id')->orderBy('locations.id');
+    }
+
+    /**
+     * How this rule matches one of its products: the product's own settings, else (a pivot row with no
+     * mode, i.e. a rule not yet saved through the per-product table) the rule's own columns and locations.
+     */
+    public function settingsFor(int $productId): ?ProductMatchSettings
+    {
+        $product = $this->products->firstWhere('id', $productId);
+
+        if ($product === null) {
+            return null;
+        }
+
+        if ($product->pivot->matching_mode === null) {
+            return new ProductMatchSettings(
+                $this->matching_mode,
+                $this->wfo,
+                filled($this->county_zone_codes) ? explode(',', $this->county_zone_codes) : [],
+                $this->locations,
+                true,
+            );
+        }
+
+        return new ProductMatchSettings(
+            MatchingMode::from($product->pivot->matching_mode),
+            $product->pivot->wfo,
+            filled($product->pivot->county_zone_codes) ? explode(',', $product->pivot->county_zone_codes) : [],
+            $this->productLocations->filter(fn (Location $location): bool => (int) $location->pivot->product_id === $productId)->values(),
+            false,
+        );
     }
 
     public function notificationChannels(): BelongsToMany
