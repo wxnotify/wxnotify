@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Alerts\SaveAlertRule;
 use App\Enums\MatchingMode;
 use App\Enums\ProductStatus;
 use App\Enums\Tier;
@@ -109,8 +110,8 @@ test('creating a weather alerts rule persists the chosen products and matching m
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->matching_mode->value)->toBe('location')
-        ->and($rule->locations->pluck('id')->all())->toBe([$this->location->id])
+    expect($rule->settingsFor($tornadoWarning->id)->mode->value)->toBe('location')
+        ->and($rule->settingsFor($tornadoWarning->id)->locations->pluck('id')->all())->toBe([$this->location->id])
         ->and($rule->products->pluck('id')->all())->toBe([$tornadoWarning->id])
         ->and($rule->displayName())->toBe('Tornado Warning');
 });
@@ -130,7 +131,7 @@ test('creating a nationwide weather alerts rule does not require a location', fu
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->matching_mode->value)->toBe('nationwide')
+    expect($rule->settingsFor($tornadoWarning->id)->mode->value)->toBe('nationwide')
         ->and($rule->location_id)->toBeNull();
 });
 
@@ -225,8 +226,8 @@ test('an spc wpc rule for the Convective Outlook can use RiskArea matching mode 
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->matching_mode)->toBe(MatchingMode::RiskArea)
-        ->and($rule->locations->pluck('id')->all())->toBe([$location->id]);
+    expect($rule->settingsFor($outlook->id)->mode)->toBe(MatchingMode::RiskArea)
+        ->and($rule->settingsFor($outlook->id)->locations->pluck('id')->all())->toBe([$location->id]);
 });
 
 test('RiskArea is not offered as a matching mode for weather_alerts -- it only applies to spc_wpc', function () {
@@ -300,7 +301,7 @@ test('creating a Weather Alerts rule for the Area Forecast Discussion picks a re
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->wfo)->toBe('OKX')
+    expect($rule->settingsFor($afd->id)->wfo)->toBe('OKX')
         ->and($rule->category->value)->toBe('weather_alerts')
         ->and($rule->products->pluck('code')->all())->toBe(['AFD']);
 });
@@ -351,8 +352,8 @@ test('a Wfo-mode weather alerts rule persists the office selected from the picke
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->wfo)->toBe('BUF')
-        ->and($rule->matching_mode->value)->toBe('wfo');
+    expect($rule->settingsFor($tornadoWarning->id)->wfo)->toBe('BUF')
+        ->and($rule->settingsFor($tornadoWarning->id)->mode->value)->toBe('wfo');
 });
 
 test('a subscriber cannot point an alert rule at another subscriber\'s location', function () {
@@ -502,7 +503,7 @@ test('the CountyZone picker options include real counties and zones for the filt
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->county_zone_codes)->toBe('NYC103,NYZ072');
+    expect($rule->settingsFor($tornadoWarning->id)->countyZoneCodes)->toBe(['NYC103', 'NYZ072']);
 });
 
 test('the CountyZone picker requires at least one code', function () {
@@ -558,7 +559,7 @@ test('editing a CountyZone rule preserves its stored codes without requiring the
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($rule->fresh()->county_zone_codes)->toBe('NYZ072,NYC061');
+    expect($rule->fresh()->settingsFor($tornadoWarning->id)->countyZoneCodes)->toBe(['NYZ072', 'NYC061']);
 });
 
 test('the Area Forecast Discussion is offered under Weather Alerts, in the Other Forecasts group', function () {
@@ -699,7 +700,7 @@ test('creating a weather alerts rule with two locations persists both via the pi
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->locations->pluck('id')->sort()->values()->all())
+    expect($rule->settingsFor($tornadoWarning->id)->locations->pluck('id')->sort()->values()->all())
         ->toBe(collect([$this->location->id, $secondLocation->id])->sort()->values()->all());
 });
 
@@ -716,8 +717,31 @@ test('editing an existing multi-location rule pre-fills every attached location,
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($rule->fresh()->locations->pluck('id')->sort()->values()->all())
+    expect($rule->fresh()->settingsFor($tornadoWarning->id)->locations->pluck('id')->sort()->values()->all())
         ->toBe(collect([$this->location->id, $secondLocation->id])->sort()->values()->all());
+});
+
+test('editing a rule saved per product pre-fills its products\' shared mode and locations, and saving keeps them', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $secondLocation = Location::factory()->for($this->user)->create();
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'weather_alerts',
+        'product_ids' => [$tornadoWarning->id],
+        'matching_mode' => 'polygon',
+        'location_ids' => [$this->location->id, $secondLocation->id],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet(['matching_mode' => 'polygon', 'location_ids' => [$this->location->id, $secondLocation->id]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $settings = $rule->fresh()->settingsFor($tornadoWarning->id);
+
+    expect($settings->mode)->toBe(MatchingMode::Polygon)
+        ->and($settings->inherited)->toBeFalse()
+        ->and($settings->locations->pluck('id')->all())->toBe([$this->location->id, $secondLocation->id]);
 });
 
 test('editing a multi-location rule down to one location detaches the rest', function () {
@@ -737,7 +761,7 @@ test('editing a multi-location rule down to one location detaches the rest', fun
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($rule->fresh()->locations->pluck('id')->all())->toBe([$this->location->id]);
+    expect($rule->fresh()->settingsFor($tornadoWarning->id)->locations->pluck('id')->all())->toBe([$this->location->id]);
 });
 
 test('a subscriber cannot attach another subscriber\'s location via location_ids', function () {

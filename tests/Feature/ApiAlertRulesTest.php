@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Alerts\SaveAlertRule;
 use App\Enums\AlertCategory;
 use App\Enums\Tier;
 use App\Enums\UnitSystem;
@@ -118,6 +119,40 @@ test('showing a rule returns its products, locations and codes; another subscrib
     ruleCall($this, 'GET', "/api/v1/alert-rules/{$theirs->id}")->assertNotFound();
 });
 
+test('a rule saved per product reads the settings its products share as the flat fields', function () {
+    $severe = Product::where('code', 'SV.W')->sole();
+    $body = [...validRule($this, 'weather by location'), 'product_ids' => [$this->tornado->id, $severe->id]];
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertCreated()
+        ->assertJsonPath('data.matching_mode', 'location')
+        ->assertJsonPath('data.location_ids', [$this->location->id])
+        ->assertJsonPath('data.wfo', null)
+        ->assertJsonPath('data.county_zone_codes', []);
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', validRule($this, 'weather by office'))->assertCreated()
+        ->assertJsonPath('data.matching_mode', 'wfo')
+        ->assertJsonPath('data.wfo', 'OKX')
+        ->assertJsonPath('data.location_ids', []);
+});
+
+test('a rule whose products match differently reads as mixed', function () {
+    $severe = Product::where('code', 'SV.W')->sole();
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'weather_alerts',
+        'product_settings' => [
+            ['product_id' => $this->tornado->id, 'matching_mode' => 'polygon', 'location_ids' => [$this->location->id]],
+            ['product_id' => $severe->id, 'matching_mode' => 'wfo', 'wfo' => 'OKX'],
+        ],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    ruleCall($this, 'GET', "/api/v1/alert-rules/{$rule->id}")->assertOk()
+        ->assertJsonPath('data.matching_mode', 'mixed')
+        ->assertJsonPath('data.location_ids', [])
+        ->assertJsonPath('data.wfo', null)
+        ->assertJsonPath('data.county_zone_codes', []);
+});
+
 test('a valid rule of every kind is created with its relations', function (string $kind) {
     $response = ruleCall($this, 'POST', '/api/v1/alert-rules', validRule($this, $kind))->assertCreated();
 
@@ -204,9 +239,11 @@ test('fields that do not apply to the chosen matching mode are dropped, not stor
 
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
-    expect($rule->locations)->toBeEmpty()
-        ->and($rule->wfo)->toBeNull()
-        ->and($rule->county_zone_codes)->toBeNull();
+    $settings = $rule->settingsFor($this->tornado->id);
+
+    expect($settings->locations)->toBeEmpty()
+        ->and($settings->wfo)->toBeNull()
+        ->and($settings->countyZoneCodes)->toBe([]);
 });
 
 test('message customisation is stored for a paid subscriber and ignored for a Free one', function () {
@@ -240,6 +277,7 @@ test('a rule can be replaced, including a change of category', function () {
         ->and($rule->matching_mode)->toBeNull()
         ->and($rule->products)->toBeEmpty()
         ->and($rule->locations)->toBeEmpty()
+        ->and($rule->productLocations)->toBeEmpty()
         ->and($rule->location_id)->toBe($this->location->id);
 });
 

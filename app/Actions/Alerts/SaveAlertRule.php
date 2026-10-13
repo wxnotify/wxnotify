@@ -22,14 +22,20 @@ use Spatie\Activitylog\Support\CauserResolver;
  * another category are cleared, and the product, location and channel pivots are synced.
  * Validation stays with the caller (the form's field rules, or SaveAlertRuleRequest).
  *
- * Input uses the dashboard form's keys, in the user's units (see the keys read below).
+ * Input uses the dashboard form's keys, in the user's units (see the keys read below). A
+ * product-based rule matches each product by that product's own settings (the pivot's mode, WFO
+ * and zones, and `alert_rule_product_location`): they come from `product_settings`, or from the
+ * flat `product_ids` with `matching_mode`, `location_ids`, `wfo` and `county_zone_codes`, which
+ * apply to every product. The rule's own `matching_mode`, `wfo`, `county_zone_codes` and
+ * `alert_rule_location` are no longer written for such a rule. A stored product-based rule saved
+ * with neither key keeps its products, their settings and its product-based columns as stored.
  */
 class SaveAlertRule
 {
     /** The category-specific columns each category owns; every other one is cleared on save. */
     private const CATEGORY_COLUMNS = [
-        'weather_alerts' => ['matching_mode', 'wfo', 'county_zone_codes'],
-        'spc_wpc' => ['matching_mode', 'risk_levels'],
+        'weather_alerts' => [],
+        'spc_wpc' => ['risk_levels'],
         'threshold' => ['variable', 'direction', 'threshold_value', 'timeframe', 'location_id', 'delivery_time'],
         'daily_summary' => ['location_id', 'delivery_time'],
         'lightning' => ['location_id', 'radius_miles'],
@@ -41,9 +47,6 @@ class SaveAlertRule
     ];
 
     private const CATEGORIES_WITH_PRODUCTS = ['weather_alerts', 'spc_wpc'];
-
-    /** The matching modes that match against the subscriber's saved locations. */
-    private const MODES_WITH_LOCATIONS = ['location', 'polygon', 'risk_area'];
 
     /**
      * @param  array<string, mixed>  $data
@@ -76,6 +79,7 @@ class SaveAlertRule
     {
         $category = AlertCategory::from((string) ($data['category'] ?? $stored?->category?->value));
         $owned = self::CATEGORY_COLUMNS[$category->value];
+        $keepsProducts = $stored !== null && self::usesProducts($stored->category) && $this->keepsProducts($category, $data);
 
         $attributes = Arr::only($data, ['name', 'quiet_hours_start', 'quiet_hours_end', ...self::ALL_CATEGORY_COLUMNS]);
         $attributes['category'] = $category->value;
@@ -86,25 +90,18 @@ class SaveAlertRule
             }
         }
 
-        foreach (self::ALL_CATEGORY_COLUMNS as $column) {
-            if (! in_array($column, $owned, true)) {
-                $attributes[$column] = null;
-            }
-        }
-
-        $mode = $attributes['matching_mode'] ?? null;
-
-        if (in_array('matching_mode', $owned, true)) {
-            if ($mode !== MatchingMode::Wfo->value) {
-                $attributes['wfo'] = null;
+        if ($keepsProducts) {
+            $attributes = Arr::except($attributes, self::ALL_CATEGORY_COLUMNS);
+        } else {
+            foreach (self::ALL_CATEGORY_COLUMNS as $column) {
+                if (! in_array($column, $owned, true)) {
+                    $attributes[$column] = null;
+                }
             }
 
-            $codes = $mode === MatchingMode::CountyZone->value ? ($data['county_zone_codes'] ?? null) : null;
-            $attributes['county_zone_codes'] = is_array($codes) ? (filled($codes) ? implode(',', $codes) : null) : (filled($codes) ? $codes : null);
-        }
-
-        if ($category === AlertCategory::SpcWpc) {
-            $attributes['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels'] ?? []);
+            if ($category === AlertCategory::SpcWpc) {
+                $attributes['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels'] ?? []);
+            }
         }
 
         $attributes = [...$attributes, ...$this->messageCustomisation($user, $category, $data, $stored)];
@@ -117,22 +114,104 @@ class SaveAlertRule
     }
 
     /**
-     * Pivot syncs. Products only apply to the product-based categories, and locations only to a
-     * product-based rule whose matching mode uses them; the channel list always applies.
+     * Pivot syncs. A product-based rule's products, their settings and their own locations are
+     * replaced together (left alone on the keep path); every other category has none, and the
+     * rule's own location list is no longer used. The channel list always applies.
      *
      * @param  array<string, mixed>  $data
      */
     public function syncRelations(AlertRule $rule, array $data): void
     {
-        $usesProducts = in_array($rule->category->value, self::CATEGORIES_WITH_PRODUCTS, true);
+        DB::transaction(function () use ($rule, $data): void {
+            if (! $this->keepsProducts($rule->category, $data)) {
+                $settings = self::usesProducts($rule->category) ? ($this->productSettings($data) ?? []) : [];
 
-        $rule->products()->sync($usesProducts
-            ? collect($data['product_ids'] ?? [])->flatten()->filter(fn ($id): bool => is_numeric($id))->values()->all()
-            : []);
-        $usesLocations = $usesProducts && in_array($rule->matching_mode?->value, self::MODES_WITH_LOCATIONS, true);
+                $rule->products()->sync(collect($settings)->mapWithKeys(fn (array $entry): array => [$entry['product_id'] => [
+                    'matching_mode' => $entry['matching_mode'],
+                    'wfo' => $entry['wfo'],
+                    'county_zone_codes' => $entry['county_zone_codes'],
+                ]])->all());
 
-        $rule->locations()->sync($usesLocations ? ($data['location_ids'] ?? []) : []);
-        $rule->notificationChannels()->sync($data['channel_ids'] ?? []);
+                DB::table('alert_rule_product_location')->where('alert_rule_id', $rule->id)->delete();
+                DB::table('alert_rule_product_location')->insert(collect($settings)->flatMap(fn (array $entry): array => array_map(
+                    fn (int $locationId): array => ['alert_rule_id' => $rule->id, 'product_id' => $entry['product_id'], 'location_id' => $locationId],
+                    $entry['location_ids'],
+                ))->all());
+
+                $rule->locations()->sync([]);
+            }
+
+            $rule->notificationChannels()->sync($data['channel_ids'] ?? []);
+        });
+    }
+
+    /**
+     * Each watched product's matching settings, as stored: `wfo` only for the WFO mode, the
+     * county/zone codes (comma-joined) only for County/Zone, and the de-duplicated locations only
+     * for the location-based modes. Built from `product_settings`, else from the flat
+     * `product_ids` with one shared mode; null when the input carries neither (the keep path).
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string}>|null
+     */
+    public function productSettings(array $data): ?array
+    {
+        if (array_key_exists('product_settings', $data)) {
+            $entries = collect($data['product_settings'] ?? []);
+        } elseif (array_key_exists('product_ids', $data)) {
+            $entries = collect($data['product_ids'] ?? [])->flatten()->map(fn ($id): array => [
+                'product_id' => $id,
+                'matching_mode' => $data['matching_mode'] ?? null,
+                'location_ids' => $data['location_ids'] ?? [],
+                'wfo' => $data['wfo'] ?? null,
+                'county_zone_codes' => $data['county_zone_codes'] ?? null,
+            ]);
+        } else {
+            return null;
+        }
+
+        return $entries
+            ->filter(fn ($entry): bool => is_array($entry) && is_numeric($entry['product_id'] ?? null))
+            ->unique(fn (array $entry): int => (int) $entry['product_id'])
+            ->map(fn (array $entry): array => self::normaliseEntry($entry))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     * @return array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string}
+     */
+    private static function normaliseEntry(array $entry): array
+    {
+        $mode = MatchingMode::tryFrom((string) ($entry['matching_mode'] ?? ''));
+        $usesLocations = in_array($mode, [MatchingMode::Location, MatchingMode::Polygon, MatchingMode::RiskArea], true);
+        $codes = $mode === MatchingMode::CountyZone ? ($entry['county_zone_codes'] ?? null) : null;
+
+        return [
+            'product_id' => (int) $entry['product_id'],
+            'matching_mode' => $mode?->value,
+            'location_ids' => $usesLocations
+                ? collect($entry['location_ids'] ?? [])->filter(fn ($id): bool => is_numeric($id))->map(fn ($id): int => (int) $id)->unique()->values()->all()
+                : [],
+            'wfo' => $mode === MatchingMode::Wfo && filled($entry['wfo'] ?? null) ? (string) $entry['wfo'] : null,
+            'county_zone_codes' => is_array($codes) ? (filled($codes) ? implode(',', $codes) : null) : (filled($codes) ? (string) $codes : null),
+        ];
+    }
+
+    /**
+     * The keep path: a product-based rule saved with neither `product_settings` nor `product_ids`.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function keepsProducts(AlertCategory $category, array $data): bool
+    {
+        return self::usesProducts($category) && $this->productSettings($data) === null;
+    }
+
+    private static function usesProducts(?AlertCategory $category): bool
+    {
+        return in_array($category?->value, self::CATEGORIES_WITH_PRODUCTS, true);
     }
 
     /**

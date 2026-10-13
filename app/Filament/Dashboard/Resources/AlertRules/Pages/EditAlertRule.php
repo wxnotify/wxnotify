@@ -50,6 +50,18 @@ class EditAlertRule extends EditRecord
         $data['channel_ids'] = $this->record->notificationChannels->pluck('id')->all();
         $data['location_ids'] = $this->record->locations->pluck('id')->all();
 
+        // The form still edits one rule-level mode: a rule saved per product fills it from its first
+        // product's settings (an old-style rule's products inherit the rule's own, so it reads the same).
+        $firstProduct = $this->record->products->first();
+        $settings = $firstProduct === null ? null : $this->record->settingsFor($firstProduct->id);
+
+        if ($settings !== null) {
+            $data['matching_mode'] = $settings->mode?->value;
+            $data['location_ids'] = $settings->locations->pluck('id')->all();
+            $data['wfo'] = $settings->wfo;
+            $data['county_zone_codes'] = implode(',', $settings->countyZoneCodes);
+        }
+
         if (($data['category'] ?? null) === AlertCategory::SpcWpc->value) {
             $data['risk_levels'] = SpcWpcRiskLevels::split($data['risk_levels'] ?? []);
         }

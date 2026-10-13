@@ -3,7 +3,9 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Models\AlertRule;
+use App\Models\Product;
 use App\Support\AlertRuleFormUnits;
+use App\Support\ProductMatchSettings;
 use App\Support\Units;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -28,6 +30,7 @@ class AlertRuleResource extends JsonResource
             'threshold_value' => $rule->threshold_value,
             'radius_miles' => $rule->radius_miles,
         ], $units);
+        $matching = $this->matching($rule);
 
         return [
             'id' => $rule->id,
@@ -36,12 +39,12 @@ class AlertRuleResource extends JsonResource
             'category' => $rule->category->value,
             'category_label' => $rule->category->label(),
             'is_active' => (bool) $rule->is_active,
-            'matching_mode' => $rule->matching_mode?->value,
+            'matching_mode' => $matching['matching_mode'],
             'product_ids' => $rule->products->pluck('id')->values()->all(),
-            'location_ids' => $rule->locations->pluck('id')->values()->all(),
+            'location_ids' => $matching['location_ids'],
             'location_id' => $rule->location_id,
-            'wfo' => $rule->wfo,
-            'county_zone_codes' => filled($rule->county_zone_codes) ? explode(',', $rule->county_zone_codes) : [],
+            'wfo' => $matching['wfo'],
+            'county_zone_codes' => $matching['county_zone_codes'],
             'risk_levels' => $rule->risk_levels ?? [],
             'variable' => $rule->variable?->value,
             'direction' => $rule->direction?->value,
@@ -58,6 +61,39 @@ class AlertRuleResource extends JsonResource
             'alert_template_id' => $rule->alert_template_id,
             'channel_ids' => $rule->notificationChannels->pluck('id')->values()->all(),
         ];
+    }
+
+    /**
+     * The rule's matching as one set of flat fields, from each watched product's settings
+     * (AlertRule::settingsFor()): their shared value when every product matches the same way,
+     * else `mixed` with the other fields empty; a rule with no products reads its own columns.
+     *
+     * @return array{matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}
+     */
+    private function matching(AlertRule $rule): array
+    {
+        $distinct = $rule->products
+            ->map(fn (Product $product): ?ProductMatchSettings => $rule->settingsFor($product->id))
+            ->filter()
+            ->map(fn (ProductMatchSettings $settings): array => [
+                'matching_mode' => $settings->mode?->value,
+                'location_ids' => $settings->locations->pluck('id')->map(fn ($id): int => (int) $id)->values()->all(),
+                'wfo' => $settings->wfo,
+                'county_zone_codes' => $settings->countyZoneCodes,
+            ])
+            ->unique(fn (array $fields): string => serialize($fields))
+            ->values();
+
+        return match ($distinct->count()) {
+            0 => [
+                'matching_mode' => $rule->matching_mode?->value,
+                'location_ids' => $rule->locations->pluck('id')->values()->all(),
+                'wfo' => $rule->wfo,
+                'county_zone_codes' => filled($rule->county_zone_codes) ? explode(',', $rule->county_zone_codes) : [],
+            ],
+            1 => $distinct->first(),
+            default => ['matching_mode' => 'mixed', 'location_ids' => [], 'wfo' => null, 'county_zone_codes' => []],
+        };
     }
 
     private function clock(mixed $time): ?string

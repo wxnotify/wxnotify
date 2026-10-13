@@ -13,6 +13,7 @@ use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\ProductCatalogSeeder;
+use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Models\Activity;
 
 beforeEach(function () {
@@ -22,7 +23,18 @@ beforeEach(function () {
     $this->location = Location::factory()->for($this->user)->create();
     $this->channel = NotificationChannel::factory()->for($this->user)->create();
     $this->tornado = Product::where('code', 'TO.W')->sole();
+    $this->severe = Product::where('code', 'SV.W')->sole();
+    $this->flood = Product::where('code', 'FF.W')->sole();
     $this->riskProduct = Product::where('family', 'spc_wpc')->whereNotNull('risk_level_options')->orderBy('id')->firstOrFail();
+
+    $this->pivotRows = fn (AlertRule $rule): array => DB::table('alert_rule_product')->where('alert_rule_id', $rule->id)->orderBy('product_id')
+        ->get(['product_id', 'matching_mode', 'wfo', 'county_zone_codes'])
+        ->map(fn (object $row): array => ['product_id' => (int) $row->product_id, 'matching_mode' => $row->matching_mode, 'wfo' => $row->wfo, 'county_zone_codes' => $row->county_zone_codes])
+        ->all();
+    $this->productLocationRows = fn (AlertRule $rule): array => DB::table('alert_rule_product_location')->where('alert_rule_id', $rule->id)->orderBy('product_id')->orderBy('location_id')
+        ->get()
+        ->map(fn (object $row): array => [(int) $row->product_id, (int) $row->location_id])
+        ->all();
 
     $this->save = fn (array $data, ?AlertRule $rule = null, ?User $user = null): AlertRule => app(SaveAlertRule::class)($user ?? $this->user, $data, $rule);
 
@@ -100,7 +112,7 @@ test('SPC and WPC risk levels are stored flat whether they arrive flat or per pr
     expect($nested->risk_levels)->toBe($levels)
         ->and($flat->risk_levels)->toBe($levels)
         ->and($nested->products->pluck('id')->all())->toBe([$this->riskProduct->id])
-        ->and($nested->locations->pluck('id')->all())->toBe([$this->location->id]);
+        ->and($nested->settingsFor($this->riskProduct->id)->locations->pluck('id')->all())->toBe([$this->location->id]);
 });
 
 test('the matching mode decides whether the office and the county/zone codes are kept', function () {
@@ -108,18 +120,22 @@ test('the matching mode decides whether the office and the county/zone codes are
     $codes = ($this->save)(($this->weatherData)(['matching_mode' => 'county_zone', 'wfo' => 'OKX', 'county_zone_codes' => ['NYC103', 'NYZ072']]));
     $string = ($this->save)(($this->weatherData)(['matching_mode' => 'county_zone', 'county_zone_codes' => 'NYC103,NYZ072']));
 
+    $wfo = $wfo->settingsFor($this->tornado->id);
+    $codes = $codes->settingsFor($this->tornado->id);
+    $string = $string->settingsFor($this->tornado->id);
+
     expect($wfo->wfo)->toBe('OKX')
-        ->and($wfo->county_zone_codes)->toBeNull()
+        ->and($wfo->countyZoneCodes)->toBe([])
         ->and($codes->wfo)->toBeNull()
-        ->and($codes->county_zone_codes)->toBe('NYC103,NYZ072')
-        ->and($string->county_zone_codes)->toBe('NYC103,NYZ072')
-        ->and($wfo->matching_mode)->toBe(MatchingMode::Wfo);
+        ->and($codes->countyZoneCodes)->toBe(['NYC103', 'NYZ072'])
+        ->and($string->countyZoneCodes)->toBe(['NYC103', 'NYZ072'])
+        ->and($wfo->mode)->toBe(MatchingMode::Wfo);
 });
 
 test('only the matching modes that use locations keep the chosen locations', function (string $mode, bool $kept) {
     $rule = ($this->save)(($this->weatherData)(['matching_mode' => $mode, 'wfo' => 'OKX', 'county_zone_codes' => ['NYC103'], 'location_ids' => [$this->location->id]]));
 
-    expect($rule->locations->pluck('id')->all())->toBe($kept ? [$this->location->id] : []);
+    expect($rule->settingsFor($this->tornado->id)->locations->pluck('id')->all())->toBe($kept ? [$this->location->id] : []);
 })->with([
     'nationwide' => ['nationwide', false],
     'office' => ['wfo', false],
@@ -133,7 +149,7 @@ test('switching a location rule to nationwide drops its locations', function () 
 
     $rule = ($this->save)(($this->weatherData)(['matching_mode' => 'nationwide', 'location_ids' => [$this->location->id]]), $rule);
 
-    expect($rule->locations)->toBeEmpty();
+    expect($rule->settingsFor($this->tornado->id)->locations)->toBeEmpty();
 });
 
 test('changing the category clears the columns and relations that no longer apply', function () {
@@ -144,6 +160,7 @@ test('changing the category clears the columns and relations that no longer appl
     expect($daily->matching_mode)->toBeNull()
         ->and($daily->products)->toBeEmpty()
         ->and($daily->locations)->toBeEmpty()
+        ->and($daily->productLocations)->toBeEmpty()
         ->and($daily->location_id)->toBe($this->location->id);
 
     $threshold = ($this->save)(($this->thresholdData)(), $daily);
@@ -155,7 +172,7 @@ test('changing the category clears the columns and relations that no longer appl
         ->and($back->timeframe)->toBeNull()
         ->and($back->location_id)->toBeNull()
         ->and($back->delivery_time)->toBeNull()
-        ->and($back->matching_mode)->toBe(MatchingMode::Nationwide);
+        ->and($back->settingsFor($this->tornado->id)->mode)->toBe(MatchingMode::Nationwide);
 });
 
 test('a Free subscriber\'s message customisation is ignored', function () {
@@ -186,6 +203,153 @@ test('a blank name and blank quiet hours are stored as null', function () {
     expect($rule->name)->toBeNull()
         ->and($rule->quiet_hours_start)->toBeNull()
         ->and($rule->quiet_hours_end)->toBeNull();
+});
+
+test('product_settings writes each product\'s own mode, office, zones and locations', function () {
+    $other = Location::factory()->for($this->user)->create();
+
+    $rule = ($this->save)([
+        'category' => 'weather_alerts',
+        'product_settings' => [
+            ['product_id' => $this->tornado->id, 'matching_mode' => 'polygon', 'location_ids' => [$other->id, $this->location->id, $other->id]],
+            ['product_id' => $this->severe->id, 'matching_mode' => 'wfo', 'wfo' => 'OKX'],
+            ['product_id' => $this->flood->id, 'matching_mode' => 'county_zone', 'county_zone_codes' => ['NYC103', 'NYZ072']],
+        ],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    expect(($this->pivotRows)($rule))->toEqualCanonicalizing([
+        ['product_id' => $this->tornado->id, 'matching_mode' => 'polygon', 'wfo' => null, 'county_zone_codes' => null],
+        ['product_id' => $this->severe->id, 'matching_mode' => 'wfo', 'wfo' => 'OKX', 'county_zone_codes' => null],
+        ['product_id' => $this->flood->id, 'matching_mode' => 'county_zone', 'wfo' => null, 'county_zone_codes' => 'NYC103,NYZ072'],
+    ])
+        ->and(($this->productLocationRows)($rule))->toEqualCanonicalizing([
+            [$this->tornado->id, $this->location->id],
+            [$this->tornado->id, $other->id],
+        ])
+        ->and($rule->settingsFor($this->tornado->id)->locations->pluck('id')->all())->toBe([$this->location->id, $other->id]);
+});
+
+test('the flat input expands to one row per product with the same mode and settings', function () {
+    $rule = ($this->save)(($this->weatherData)([
+        'product_ids' => [$this->tornado->category->value => [$this->tornado->id, $this->severe->id], $this->flood->category->value => [$this->flood->id]],
+        'matching_mode' => 'location',
+        'location_ids' => [$this->location->id],
+    ]));
+
+    expect(($this->pivotRows)($rule))->toEqualCanonicalizing(collect([$this->tornado, $this->severe, $this->flood])->map(fn (Product $product): array => [
+        'product_id' => $product->id, 'matching_mode' => 'location', 'wfo' => null, 'county_zone_codes' => null,
+    ])->all())
+        ->and(($this->productLocationRows)($rule))->toEqualCanonicalizing([
+            [$this->tornado->id, $this->location->id],
+            [$this->severe->id, $this->location->id],
+            [$this->flood->id, $this->location->id],
+        ]);
+});
+
+test('settings a product\'s mode does not use are not stored', function () {
+    $rule = ($this->save)([
+        'category' => 'weather_alerts',
+        'product_settings' => [
+            ['product_id' => $this->tornado->id, 'matching_mode' => 'nationwide', 'location_ids' => [$this->location->id], 'wfo' => 'OKX', 'county_zone_codes' => ['NYC103']],
+            ['product_id' => $this->severe->id, 'matching_mode' => 'location', 'location_ids' => [$this->location->id], 'wfo' => 'OKX', 'county_zone_codes' => 'NYC103'],
+        ],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    expect(($this->pivotRows)($rule))->toEqualCanonicalizing([
+        ['product_id' => $this->tornado->id, 'matching_mode' => 'nationwide', 'wfo' => null, 'county_zone_codes' => null],
+        ['product_id' => $this->severe->id, 'matching_mode' => 'location', 'wfo' => null, 'county_zone_codes' => null],
+    ])
+        ->and(($this->productLocationRows)($rule))->toBe([[$this->severe->id, $this->location->id]]);
+});
+
+test('re-saving with a changed list leaves no product or location rows behind', function () {
+    $other = Location::factory()->for($this->user)->create();
+    $rule = ($this->save)([
+        'category' => 'weather_alerts',
+        'product_settings' => [
+            ['product_id' => $this->tornado->id, 'matching_mode' => 'location', 'location_ids' => [$this->location->id, $other->id]],
+            ['product_id' => $this->severe->id, 'matching_mode' => 'polygon', 'location_ids' => [$this->location->id]],
+        ],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    $rule = ($this->save)([
+        'category' => 'weather_alerts',
+        'product_settings' => [
+            ['product_id' => $this->tornado->id, 'matching_mode' => 'location', 'location_ids' => [$other->id]],
+            ['product_id' => $this->flood->id, 'matching_mode' => 'nationwide'],
+        ],
+        'channel_ids' => [$this->channel->id],
+    ], $rule);
+
+    expect(($this->pivotRows)($rule))->toEqualCanonicalizing([
+        ['product_id' => $this->tornado->id, 'matching_mode' => 'location', 'wfo' => null, 'county_zone_codes' => null],
+        ['product_id' => $this->flood->id, 'matching_mode' => 'nationwide', 'wfo' => null, 'county_zone_codes' => null],
+    ])
+        ->and(($this->productLocationRows)($rule))->toBe([[$this->tornado->id, $other->id]]);
+});
+
+test('a product-based rule no longer stores its own mode, office, zones or locations', function (array $flat) {
+    $rule = ($this->save)(($this->weatherData)(['location_ids' => [$this->location->id], ...$flat]));
+
+    expect($rule->matching_mode)->toBeNull()
+        ->and($rule->wfo)->toBeNull()
+        ->and($rule->county_zone_codes)->toBeNull()
+        ->and(DB::table('alert_rule_location')->where('alert_rule_id', $rule->id)->exists())->toBeFalse()
+        ->and($rule->settingsFor($this->tornado->id)->inherited)->toBeFalse();
+})->with([
+    'location' => [['matching_mode' => 'location']],
+    'office' => [['matching_mode' => 'wfo', 'wfo' => 'OKX']],
+    'county and zone' => [['matching_mode' => 'county_zone', 'county_zone_codes' => ['NYC103']]],
+]);
+
+test('changing the category to threshold clears every product row and per-product location', function () {
+    $rule = ($this->save)(($this->weatherData)(['matching_mode' => 'location', 'location_ids' => [$this->location->id]]));
+
+    $threshold = ($this->save)(($this->thresholdData)(), $rule);
+
+    expect(($this->pivotRows)($threshold))->toBe([])
+        ->and(($this->productLocationRows)($threshold))->toBe([]);
+});
+
+test('a stored mixed rule saved without any product fields keeps its products, their settings and its risk levels', function () {
+    $plain = Product::where('family', 'spc_wpc')->whereNull('risk_level_options')->orderBy('id')->firstOrFail();
+    $levels = array_slice($this->riskProduct->risk_level_options, 0, 2);
+    $rule = ($this->save)([
+        'category' => 'spc_wpc',
+        'product_settings' => [
+            ['product_id' => $this->riskProduct->id, 'matching_mode' => 'risk_area', 'location_ids' => [$this->location->id]],
+            ['product_id' => $plain->id, 'matching_mode' => 'nationwide'],
+        ],
+        'risk_levels' => $levels,
+        'channel_ids' => [$this->channel->id],
+    ]);
+    $pivotRows = ($this->pivotRows)($rule);
+    $locationRows = ($this->productLocationRows)($rule);
+    $otherChannel = NotificationChannel::factory()->for($this->user)->create();
+
+    $saved = ($this->save)(['name' => 'Renamed', 'channel_ids' => [$otherChannel->id]], $rule);
+
+    expect(app(SaveAlertRule::class)->productSettings(['name' => 'Renamed']))->toBeNull()
+        ->and($saved->name)->toBe('Renamed')
+        ->and($saved->notificationChannels->pluck('id')->all())->toBe([$otherChannel->id])
+        ->and($saved->risk_levels)->toBe($levels)
+        ->and(($this->pivotRows)($saved))->toBe($pivotRows)
+        ->and(($this->productLocationRows)($saved))->toBe($locationRows);
+});
+
+test('an old-style rule saved without any product fields keeps its own mode and locations', function () {
+    $rule = AlertRule::factory()->for($this->user)->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => null]);
+    $rule->products()->attach($this->tornado->id);
+    $rule->locations()->attach($this->location->id);
+
+    $saved = ($this->save)(['name' => 'Renamed', 'channel_ids' => [$this->channel->id]], $rule);
+
+    expect($saved->matching_mode)->toBe(MatchingMode::Location)
+        ->and($saved->locations->pluck('id')->all())->toBe([$this->location->id])
+        ->and($saved->settingsFor($this->tornado->id)->inherited)->toBeTrue();
 });
 
 test('the write is logged with the subscriber as the causer although there is no session', function () {

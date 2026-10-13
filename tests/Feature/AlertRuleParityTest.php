@@ -98,6 +98,11 @@ function storedShape(AlertRule $rule): array
         'has_location' => $rule->location_id !== null,
         'has_template' => $rule->alert_template_id !== null,
         'products' => $rule->products->pluck('code')->sort()->values()->all(),
+        'product_settings' => $rule->products->sortBy('code')->map(function (Product $product) use ($rule): array {
+            $settings = $rule->settingsFor($product->id);
+
+            return [$product->code, $settings->mode?->value, $settings->wfo, $settings->countyZoneCodes, $settings->locations->count(), $settings->inherited];
+        })->values()->all(),
         'locations' => $rule->locations->count(),
         'channels' => $rule->notificationChannels->count(),
     ];
@@ -130,7 +135,7 @@ test('the dashboard and the API store the same rule', function (string $scenario
     expect(storedShape($fromApi))->toEqual(storedShape($fromDashboard));
 
     if (str_contains($scenario, 'stray locations')) {
-        expect($fromApi->locations)->toBeEmpty()->and($fromDashboard->locations)->toBeEmpty();
+        expect($fromApi->productLocations)->toBeEmpty()->and($fromDashboard->productLocations)->toBeEmpty();
     }
 })->with([
     'threshold', 'daily summary', 'lightning', 'weather nationwide', 'weather nationwide with stray locations', 'weather by location',

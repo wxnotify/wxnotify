@@ -60,7 +60,7 @@ class RenderAlertSubject
 
         $subject = strtr($subjectTemplate, [
             '{product}' => $eventNames === [] ? $rule->category->label() : implode(' + ', $eventNames),
-            '{location}' => $location?->label ?? ($rule->wfo !== null ? "WFO {$rule->wfo}" : 'your area'),
+            '{location}' => $location?->label ?? $this->officeOrArea($rule, $bulletin, $segments),
             '{category}' => $rule->category->label(),
             '{until}' => $this->until($bulletin, $segments, $location),
             '{states}' => $this->states($bulletin, $segments),
@@ -68,6 +68,21 @@ class RenderAlertSubject
         ]);
 
         return trim((string) preg_replace('/ {2,}/', ' ', $subject));
+    }
+
+    /**
+     * "WFO OKX" for a rule that follows an office, else "your area". A rule saved per product holds
+     * the office on the matched product's settings (the first matched segment's product, else the
+     * bulletin's), not on the rule.
+     *
+     * @param  Collection<int, IngestedProductSegment>  $segments
+     */
+    private function officeOrArea(AlertRule $rule, ?IngestedProduct $bulletin, Collection $segments): string
+    {
+        $productId = $segments->first()?->product_id ?? $bulletin?->product_id;
+        $wfo = $rule->wfo ?? ($productId === null ? null : $rule->settingsFor((int) $productId)?->wfo);
+
+        return $wfo !== null ? "WFO {$wfo}" : 'your area';
     }
 
     /**

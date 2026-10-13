@@ -128,6 +128,28 @@ test('{location} falls back to the WFO code when the rule has a WFO but no locat
     expect((new RenderAlertSubject)($rule))->toBe('Discussion for WFO OKX');
 });
 
+test('{location} falls back to the WFO of the matched product\'s own settings when the rule holds none', function () {
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $discussion = Product::factory()->create();
+    $tornado = Product::factory()->create();
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts',
+        'matching_mode' => null,
+        'location_id' => null,
+        'wfo' => null,
+        'custom_subject_template' => 'Discussion for {location}',
+    ]);
+    $rule->products()->attach([
+        $discussion->id => ['matching_mode' => 'wfo', 'wfo' => 'OKX'],
+        $tornado->id => ['matching_mode' => 'wfo', 'wfo' => 'BUF'],
+    ]);
+    $bulletin = IngestedProduct::factory()->create(['product_id' => $discussion->id]);
+    $segments = new Collection([IngestedProductSegment::factory()->create(['ingested_product_id' => $bulletin->id, 'product_id' => $tornado->id])]);
+
+    expect((new RenderAlertSubject)($rule, null, null, $bulletin))->toBe('Discussion for WFO OKX')
+        ->and((new RenderAlertSubject)($rule, null, null, $bulletin, $segments))->toBe('Discussion for WFO BUF');
+});
+
 test('{location} falls back to "your area" when the rule has neither a location nor a WFO', function () {
     $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
     $rule = AlertRule::factory()->for($plusUser)->create([
