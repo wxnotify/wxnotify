@@ -4,9 +4,13 @@ use App\Actions\Weather\RenderAlertSubject;
 use App\Enums\Tier;
 use App\Models\AlertRule;
 use App\Models\AlertTemplate;
+use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 test('no custom template falls back to displayName()', function () {
     $rule = AlertRule::factory()->create(['category' => 'threshold', 'custom_subject_template' => null]);
@@ -265,4 +269,74 @@ test('an empty list of event names keeps displayName() and the category label fo
 
     expect((new RenderAlertSubject)($unnamed, []))->toBe($unnamed->displayName())
         ->and((new RenderAlertSubject)($templated, []))->toBe('Weather Alerts');
+});
+
+function untilRule(string $template): AlertRule
+{
+    return AlertRule::factory()->for(User::factory()->create(['tier_override' => Tier::Plus]))->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'custom_subject_template' => $template,
+    ]);
+}
+
+test('{until} names the latest end of the matched segments in the location timezone', function () {
+    $location = Location::factory()->create(['label' => 'Home', 'timezone' => 'America/Denver']);
+    $bulletin = IngestedProduct::factory()->create(['vtec_end' => null]);
+    $segments = new Collection([
+        IngestedProductSegment::factory()->create(['ingested_product_id' => $bulletin->id, 'vtec_end' => Carbon::parse('2026-07-15 03:00:00 UTC')]),
+        IngestedProductSegment::factory()->create(['ingested_product_id' => $bulletin->id, 'vtec_end' => Carbon::parse('2026-07-15 04:00:00 UTC')]),
+    ]);
+
+    expect((new RenderAlertSubject)(untilRule('{product} {until}'), ['Tornado Warning'], $location, $bulletin, $segments))
+        ->toBe('Tornado Warning until 10:00pm MDT');
+});
+
+test('{until} follows daylight saving and falls back to the bulletin end without segments', function () {
+    $location = Location::factory()->create(['timezone' => 'America/Denver']);
+    $bulletin = IngestedProduct::factory()->create(['vtec_end' => Carbon::parse('2026-01-15 05:00:00 UTC')]);
+
+    expect((new RenderAlertSubject)(untilRule('{until}'), ['Winter Storm Warning'], $location, $bulletin))->toBe('until 10:00pm MST');
+});
+
+test('{until} is empty without an end time, a location timezone or a bulletin, and leaves no gap', function () {
+    $zoned = Location::factory()->create(['timezone' => 'America/Denver']);
+    $unzoned = Location::factory()->create(['timezone' => null]);
+    $ending = IngestedProduct::factory()->create(['vtec_end' => Carbon::parse('2026-07-15 04:00:00 UTC')]);
+    $open = IngestedProduct::factory()->create(['vtec_end' => null]);
+    $rule = untilRule('{product} {until} ({category})');
+
+    expect((new RenderAlertSubject)($rule, ['Flood Watch'], $zoned, $open))->toBe('Flood Watch (Weather Alerts)')
+        ->and((new RenderAlertSubject)($rule, ['Flood Watch'], $unzoned, $ending))->toBe('Flood Watch (Weather Alerts)')
+        ->and((new RenderAlertSubject)($rule, ['Flood Watch'], $zoned))->toBe('Flood Watch (Weather Alerts)');
+});
+
+test('{states} lists the distinct states of the matched segments, sorted, without marine zones', function () {
+    $bulletin = IngestedProduct::factory()->create(['ugc_codes' => ['TXC001']]);
+    $segments = new Collection([
+        IngestedProductSegment::factory()->create(['ingested_product_id' => $bulletin->id, 'ugc_codes' => ['GAC001', 'GAZ002', 'FLC057']]),
+        IngestedProductSegment::factory()->create(['ingested_product_id' => $bulletin->id, 'ugc_codes' => ['GMZ830', 'FLZ050']]),
+    ]);
+    $rule = untilRule('{product} - {states}');
+
+    expect((new RenderAlertSubject)($rule, ['Hurricane Watch'], null, $bulletin, $segments))->toBe('Hurricane Watch - FL, GA')
+        ->and((new RenderAlertSubject)($rule, ['Hurricane Watch'], null, $bulletin))->toBe('Hurricane Watch - TX')
+        ->and((new RenderAlertSubject)($rule, ['Small Craft Advisory'], null, IngestedProduct::factory()->create(['ugc_codes' => ['GMZ830']])))->toBe('Small Craft Advisory -');
+});
+
+test('{wfo} is the office code of the issuing centre', function (string $centre, string $expected) {
+    $bulletin = IngestedProduct::factory()->create(['cccc' => $centre]);
+
+    expect((new RenderAlertSubject)(untilRule('{wfo}'), ['Flood Watch'], null, $bulletin))->toBe($expected);
+})->with([
+    'a contiguous office' => ['ktbw', 'TBW'],
+    'a Pacific office' => ['pgum', 'GUM'],
+    'San Juan' => ['tjsj', 'SJU'],
+    'Pago Pago' => ['nstu', 'PPG'],
+    'not an NWS centre' => ['cwao', ''],
+]);
+
+test('the new placeholders are empty without a bulletin, as for a scheduled alert', function () {
+    $location = Location::factory()->create(['timezone' => 'America/Denver']);
+
+    expect((new RenderAlertSubject)(untilRule('Check [{until}] [{states}] [{wfo}]'), null, $location))->toBe('Check [] [] []');
 });

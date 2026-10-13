@@ -481,6 +481,23 @@ test('a delivery for several matched events is titled with all of them and recor
         ->and($log->segments()->pluck('ingested_product_segments.id')->sort()->values()->all())->toBe([$watch->id, $statement->id]);
 });
 
+test('a custom subject fills {until}, {states} and {wfo} from the bulletin and the matched segments', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $plusUser = User::factory()->create(['tier_override' => Tier::Plus]);
+    $location = Location::factory()->for($plusUser)->create(['timezone' => 'America/Denver']);
+    $rule = AlertRule::factory()->for($plusUser)->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'custom_subject_template' => '{product} {until} in {states} from {wfo}',
+    ]);
+    $channel = NotificationChannel::factory()->for($plusUser)->create(['apprise_url' => 'discord://token/id']);
+    $bulletin = IngestedProduct::factory()->createQuietly(['cccc' => 'kboi', 'ugc_codes' => ['TXC001']]);
+    $watch = IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('HU.A')->create(['ugc_codes' => ['IDZ001', 'MTZ002'], 'vtec_end' => '2026-07-15 04:00:00']);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id, $location->id, [$watch->id]))->handle(app(ChannelDispatcher::class));
+
+    expect(DeliveryLog::sole()->subject)->toBe('Hurricane Watch until 10:00pm MDT in ID, MT from BOI');
+});
+
 test('an event named twice in one bulletin appears once in the subject', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
     [$rule, $channel] = segmentDeliveryRule();

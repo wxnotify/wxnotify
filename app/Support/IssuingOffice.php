@@ -19,4 +19,21 @@ final class IssuingOffice
 
         return [...(self::EXCEPTIONS[strtoupper($wfo)] ?? []), 'k'.$code, 'p'.$code];
     }
+
+    /**
+     * The NWS office code an issuing centre publishes for (KTBW gives TBW), or null for a centre that is not an NWS
+     * office's.
+     */
+    public static function code(string $centre): ?string
+    {
+        $centre = strtolower($centre);
+
+        foreach (self::EXCEPTIONS as $office => $centres) {
+            if (in_array($centre, $centres, true)) {
+                return $office;
+            }
+        }
+
+        return preg_match('/^[kp][a-z]{3}$/', $centre) === 1 ? strtoupper(substr($centre, 1)) : null;
+    }
 }

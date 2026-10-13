@@ -237,7 +237,7 @@ class AlertRuleForm
                 TextInput::make('custom_subject_template')
                     ->label('Custom subject line (optional)')
                     ->maxLength(255)
-                    ->helperText('Leave blank to use the default. Placeholders: {product}, {location}, {category}.')
+                    ->helperText('Leave blank to use the default. Placeholders: {product}, {location}, {category}, {until}, {states}, {wfo}.')
                     ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free),
                 self::alertTemplateSelect()
                     ->visible(fn (Get $get): bool => auth()->user()->tier() !== Tier::Free

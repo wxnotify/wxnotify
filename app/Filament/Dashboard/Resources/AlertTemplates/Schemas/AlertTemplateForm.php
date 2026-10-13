@@ -42,7 +42,7 @@ class AlertTemplateForm
             TextInput::make('subject_template')
                 ->label('Custom subject line (optional)')
                 ->maxLength(255)
-                ->helperText('Leave blank to use the default. Placeholders: {product}, {location}, {category}.'),
+                ->helperText('Leave blank to use the default. Placeholders: {product}, {location}, {category}, {until}, {states}, {wfo}.'),
             CheckboxList::make('sections')
                 ->label('Include in message')
                 ->columns(2)

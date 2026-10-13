@@ -203,7 +203,7 @@
             @if ($presenter->canCustomizeMessages())
                 <select label="Message length" :options="$this->selectLabels('message_body_style')" :value="$this->selectedLabel('message_body_style')" @change="pick({!! $quote('message_body_style') !!})" ref="field-message_body_style" />
                 <outlined-text-input label="Custom subject line (optional)" native:model="draft.custom_subject_template" ref="field-custom_subject_template" />
-                <native:text class="text-sm text-theme-on-surface-variant">Placeholders: {product}, {location}, {category}.</native:text>
+                <native:text class="text-sm text-theme-on-surface-variant">Placeholders: {product}, {location}, {category}, {until}, {states}, {wfo}.</native:text>
                 @if ($isProductCategory)
                     <select label="Message template (optional)" :options="$this->selectLabels('alert_template_id')" :value="$this->selectedLabel('alert_template_id')" @change="pick({!! $quote('alert_template_id') !!})" ref="field-alert_template_id" />
                 @endif

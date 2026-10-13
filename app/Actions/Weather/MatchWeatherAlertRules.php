@@ -200,7 +200,7 @@ class MatchWeatherAlertRules
                         'channel_type' => $channel->channel_type,
                         'status' => 'suppressed',
                         'category' => $rule->category->value,
-                        'subject' => app(RenderAlertSubject::class)($rule, $eventNames, $matchedLocation),
+                        'subject' => app(RenderAlertSubject::class)($rule, $eventNames, $matchedLocation, $product, $segments),
                         'ingested_product_id' => $product->id,
                         'dispatched_at' => now(),
                     ]);

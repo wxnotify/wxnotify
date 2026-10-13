@@ -120,7 +120,7 @@ class DeliverWeatherAlert implements ShouldQueue
         $eventNames = $product->eventNamesFor($segments);
 
         if (! $rule->is_active) {
-            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $eventNames, $location), $segments);
+            $this->logSkipped($rule, $channel, 'The rule was deactivated after this delivery was dispatched.', $product, app(RenderAlertSubject::class)($rule, $eventNames, $location, $product, $segments), $segments);
 
             return;
         }
@@ -135,7 +135,7 @@ class DeliverWeatherAlert implements ShouldQueue
         $maxLength = $templatedBody === null && $rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief ? 280 : 1500;
         $body = $isEmailChannel ? $bodySource : Str::limit($bodySource, $maxLength, preserveWords: true);
 
-        $subject = app(RenderAlertSubject::class)($rule, $eventNames, $location);
+        $subject = app(RenderAlertSubject::class)($rule, $eventNames, $location, $product, $segments);
 
         $result = $dispatcher->send($channel, $body, $subject, [
             'type' => 'alert',
