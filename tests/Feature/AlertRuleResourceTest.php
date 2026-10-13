@@ -1325,6 +1325,67 @@ test('adding a location from a row works while editing an alert too', function (
     expect($rule->fresh()->settingsFor($tornadoWarning->id)->locations->pluck('id')->all())->toBe([$this->location->id, $office->id]);
 });
 
+test('a product with an example shows an icon button for it, and a product without one does not', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $severe = Product::where('code', 'SV.W')->sole();
+    $tornadoWarning->update(['example' => 'BULLETIN - IMMEDIATE BROADCAST REQUESTED']);
+    $severe->update(['example' => "  \n "]);
+
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts']);
+    $html = $component->html();
+
+    expect($html)->toContain('aria-label="Show example of '.$tornadoWarning->name.'"')
+        ->and($html)->not->toContain('aria-label="Show example of '.$severe->name.'"');
+});
+
+test('a product example is not in the page or the component state until its modal is opened', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $tornadoWarning->update(['example' => 'BULLETIN - IMMEDIATE BROADCAST REQUESTED zebra-crossing-marker']);
+    $table = "product_settings.{$tornadoWarning->category->value}";
+
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts']);
+
+    expect($component->html())->not->toContain('zebra-crossing-marker')
+        ->and(json_encode($component->snapshot))->not->toContain('zebra-crossing-marker');
+
+    $component->mountFormComponentAction($table, 'showExample', ['product' => $tornadoWarning->id])
+        ->assertFormComponentActionMounted($table, 'showExample')
+        ->assertMountedActionModalSee(['zebra-crossing-marker', $tornadoWarning->name, 'Close']);
+});
+
+test('the example modal escapes the text and has no submit button', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $tornadoWarning->update(['example' => '<script>alert("x")</script> WWUS55']);
+    $table = "product_settings.{$tornadoWarning->category->value}";
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'weather_alerts'])
+        ->mountFormComponentAction($table, 'showExample', ['product' => $tornadoWarning->id])
+        ->assertMountedActionModalSeeHtml('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; WWUS55')
+        ->assertMountedActionModalDontSeeHtml('<script>alert("x")</script>')
+        ->assertMountedActionModalDontSee('Submit');
+});
+
+test('the example modal refuses a product that is not in its table or has no example', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $table = "product_settings.{$tornadoWarning->category->value}";
+    $otherCategory = Product::whereNotNull('category')->where('category', '!=', $tornadoWarning->category)->where('family', 'warning')->firstOrFail();
+    $otherCategory->update(['example' => 'secret-other-table-example']);
+    $blank = Product::where('code', 'SV.W')->sole();
+    $blank->update(['example' => null]);
+    $spc = Product::where('family', 'spc_wpc')->firstOrFail();
+    $spc->update(['example' => 'secret-spc-example']);
+
+    foreach ([$otherCategory->id, $blank->id, $spc->id, 0, 999999] as $productId) {
+        livewire(CreateAlertRule::class)
+            ->fillForm(['category' => 'weather_alerts'])
+            ->mountFormComponentAction($table, 'showExample', ['product' => $productId])
+            ->assertFormComponentActionNotMounted($table, 'showExample')
+            ->assertDontSee('secret-other-table-example')
+            ->assertDontSee('secret-spc-example');
+    }
+});
+
 test('the add-a-location action is hidden once a Free subscriber is at their location limit', function () {
     livewire(CreateAlertRule::class)
         ->fillForm(['category' => 'weather_alerts'])

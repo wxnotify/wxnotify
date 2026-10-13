@@ -19,8 +19,10 @@ use Filament\Forms\Components\Field;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -140,7 +142,10 @@ class ProductMatchingTable extends Field
             ->whereNotNull('category')
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get(['id', 'name', 'description', 'category', 'has_polygon', 'risk_level_options']);
+            // The example itself is up to several KB a product: only whether there is one is read here.
+            ->select(['id', 'name', 'description', 'category', 'has_polygon', 'risk_level_options'])
+            ->selectRaw("(example IS NOT NULL AND btrim(example, E' \\t\\r\\n') <> '') AS has_example")
+            ->get();
     }
 
     /**
@@ -279,6 +284,7 @@ class ProductMatchingTable extends Field
         $this->registerActions([
             fn (ProductMatchingTable $component): Action => $component->chooseZonesAction(),
             fn (ProductMatchingTable $component): Action => $component->addLocationAction(),
+            fn (ProductMatchingTable $component): Action => $component->showExampleAction(),
         ]);
     }
 
@@ -645,6 +651,38 @@ class ProductMatchingTable extends Field
                     'location_ids' => array_values(array_unique([...self::ids($row['location_ids'] ?? []), (int) $location->getKey()])),
                 ]);
             });
+    }
+
+    /**
+     * Whether the product has an example worth an icon (the catalog query only reports this, it
+     * never loads the text).
+     */
+    public function hasExample(Product $product): bool
+    {
+        return (bool) $product->getAttribute('has_example');
+    }
+
+    /**
+     * Opens a modal with the product's example text. The text is read here, when the modal
+     * opens, so it is never in the page or the form's state; the action is only available for a
+     * product of this table that has an example, whatever id a request names.
+     */
+    protected function showExampleAction(): Action
+    {
+        return Action::make('showExample')
+            ->label('Show example')
+            ->visible(function (array $arguments): bool {
+                $product = $this->products->get((int) ($arguments['product'] ?? 0));
+
+                return $product !== null && $this->hasExample($product);
+            })
+            ->modalHeading(fn (array $arguments): string => (string) $this->products->get((int) ($arguments['product'] ?? 0))?->name)
+            ->modalContent(fn (array $arguments): View => view('filament.dashboard.alert-rules.product-example', [
+                'example' => (string) Product::query()->whereKey((int) ($arguments['product'] ?? 0))->value('example'),
+            ]))
+            ->modalWidth(Width::ThreeExtraLarge)
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close');
     }
 
     /**

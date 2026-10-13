@@ -204,7 +204,20 @@
                         </td>
 
                         <td class="py-3 pe-4">
-                            <div class="font-medium text-gray-950 dark:text-white">{{ $product->name }}</div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-medium text-gray-950 dark:text-white">{{ $product->name }}</span>
+                                @if ($hasExample($product))
+                                    <button
+                                        type="button"
+                                        title="Show example"
+                                        aria-label="Show example of {{ $product->name }}"
+                                        x-on:click="action('showExample', {{ $product->id }})"
+                                        class="shrink-0 text-gray-400 hover:text-primary-600 dark:text-gray-500 dark:hover:text-primary-400"
+                                    >
+                                        <x-filament::icon icon="heroicon-o-document-text" class="size-5" />
+                                    </button>
+                                @endif
+                            </div>
                             @if (filled($product->description))
                                 <p class="text-gray-500 dark:text-gray-400">{{ $product->description }}</p>
                             @endif
