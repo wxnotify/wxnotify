@@ -198,20 +198,6 @@ test('small helpers read from the options', function () {
         ->and($presenter->radiusBounds())->toBe(['min' => 10, 'max' => 50]);
 });
 
-/**
- * @return array<string, mixed> a stored SPC & WPC rule whose products match differently, as the API returns it
- */
-function mixedApiRule(array $overrides = []): array
-{
-    return [
-        'id' => 4, 'name' => 'Outlooks', 'category' => 'spc_wpc', 'is_active' => true, 'matching_mode' => 'mixed', 'product_ids' => [20, 21], 'location_ids' => [],
-        'location_id' => null, 'wfo' => null, 'county_zone_codes' => [], 'risk_levels' => ['SLGT'], 'variable' => null, 'direction' => null, 'threshold_value' => null,
-        'timeframe' => null, 'radius' => null, 'delivery_time' => null, 'quiet_hours_start' => '22:00', 'quiet_hours_end' => '06:00', 'message_body_style' => 'brief',
-        'custom_subject_template' => null, 'alert_template_id' => 3, 'channel_ids' => [5],
-        ...$overrides,
-    ];
-}
-
 test('a rule with per-product matching becomes a mixed draft whose payload leaves its products and matching to the server', function () {
     $presenter = rulePresenter(['tier' => ['can_customize_messages' => true]]);
     $draft = $presenter->draftFromRule(mixedApiRule());
