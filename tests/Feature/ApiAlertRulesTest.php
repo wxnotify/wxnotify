@@ -357,7 +357,7 @@ test('a Metric subscriber replacing a threshold rule has the new value converted
  *
  * @return array<string, mixed>
  */
-function perProductRule($test): array
+function perProductRuleBody($test): array
 {
     return [
         'category' => 'weather_alerts',
@@ -372,7 +372,7 @@ function perProductRule($test): array
 test('a rule is created with a mode of its own for each product and reads back as mixed with its product settings', function () {
     $severe = Product::where('code', 'SV.W')->sole();
 
-    $response = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->assertCreated()
+    $response = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->assertCreated()
         ->assertJsonPath('data.matching_mode', 'mixed')
         ->assertJsonPath('data.location_ids', [])
         ->assertJsonPath('data.wfo', null)
@@ -403,7 +403,7 @@ test('a county/zone product setting is stored and read back as codes', function 
 });
 
 test('a rule is replaced with new product settings and leaves no orphan rows', function () {
-    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->json('data.id');
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->json('data.id');
     $watch = Product::where('family', 'watch')->orderBy('id')->firstOrFail();
 
     $body = ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_settings' => [
@@ -420,7 +420,7 @@ test('a rule is replaced with new product settings and leaves no orphan rows', f
 });
 
 test('product settings and the flat fields in one request are refused', function (string $flatKey, mixed $value) {
-    $body = [...perProductRule($this), $flatKey => $value];
+    $body = [...perProductRuleBody($this), $flatKey => $value];
 
     ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertUnprocessable()->assertJsonValidationErrorFor('product_settings');
 
@@ -441,7 +441,7 @@ test('an invalid product setting is refused naming its field and writes nothing'
     ]];
 
     $body = match ($case) {
-        'empty list' => [...perProductRule($this), 'product_settings' => []],
+        'empty list' => [...perProductRuleBody($this), 'product_settings' => []],
         'risk area on a weather alert' => $entry(['matching_mode' => 'risk_area', 'location_ids' => [$this->location->id]]),
         'mixed echoed back' => $entry(['matching_mode' => 'mixed']),
         'unknown mode' => $entry(['matching_mode' => 'sideways']),
@@ -499,7 +499,7 @@ test('each SPC and WPC product setting accepts polygon and risk area, never loca
 });
 
 test('a PUT with no product or matching fields keeps a mixed rule exactly as stored', function () {
-    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->json('data.id');
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->json('data.id');
     $before = ruleCall($this, 'GET', "/api/v1/alert-rules/{$id}")->json('data');
 
     $other = NotificationChannel::factory()->for($this->user)->create();
@@ -514,7 +514,7 @@ test('a PUT with no product or matching fields keeps a mixed rule exactly as sto
 });
 
 test('a PUT with no product or matching fields is refused when it changes the category', function (string $category) {
-    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->json('data.id');
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->json('data.id');
 
     ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", ['category' => $category, 'channel_ids' => [$this->channel->id]])
         ->assertUnprocessable()->assertJsonValidationErrorFor('product_ids');
@@ -529,22 +529,22 @@ test('a POST with neither product settings nor product ids is refused', function
 });
 
 test('a PUT with a stray matching field but no products is not the keep path', function () {
-    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->json('data.id');
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->json('data.id');
 
     ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'matching_mode' => 'nationwide'])
         ->assertUnprocessable()->assertJsonValidationErrorFor('product_ids');
 });
 
 test('reading rules does not query per product', function () {
-    ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->assertCreated();
-    ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->assertCreated();
+    ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->assertCreated();
+    ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->assertCreated();
 
     DB::enableQueryLog();
     ruleCall($this, 'GET', '/api/v1/alert-rules')->assertOk();
     $withTwo = count(DB::getQueryLog());
     DB::flushQueryLog();
 
-    ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->assertCreated();
+    ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->assertCreated();
     DB::flushQueryLog();
     ruleCall($this, 'GET', '/api/v1/alert-rules')->assertOk();
     $withThree = count(DB::getQueryLog());
