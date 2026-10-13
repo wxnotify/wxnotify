@@ -270,3 +270,33 @@ test('the dashboard and the API store the same rule when an existing rule change
     'weather location to nationwide' => ['weather location to nationwide', 'weather by location'],
     'threshold to weather alerts' => ['threshold to weather alerts', 'threshold'],
 ])->with(['imperial', 'metric']);
+
+test('the API stores product_settings exactly as it stores the flat input that expands to them', function (string $mode, array $extras) {
+    $severe = Product::where('code', 'SV.W')->sole();
+    $store = function () use ($mode, $extras, $severe): array {
+        $user = User::factory()->create();
+        $location = Location::factory()->for($user)->create()->id;
+        $channel = NotificationChannel::factory()->for($user)->create()->id;
+        $fill = fn (array $fields): array => collect($fields)->map(fn ($value) => $value === 'LOCATION' ? [$location] : $value)->all();
+        $token = $user->createToken('Pixel 9', ['app'])->plainTextToken;
+
+        app('auth')->forgetGuards();
+        $flat = $this->withToken($token)->postJson('/api/v1/alert-rules', ['category' => 'weather_alerts', 'channel_ids' => [$channel], 'product_ids' => [$this->tornado->id, $severe->id], 'matching_mode' => $mode, ...$fill($extras)])->assertCreated()->json('data.id');
+        $list = $this->withToken($token)->postJson('/api/v1/alert-rules', ['category' => 'weather_alerts', 'channel_ids' => [$channel], 'product_settings' => [
+            ['product_id' => $this->tornado->id, 'matching_mode' => $mode, ...$fill($extras)],
+            ['product_id' => $severe->id, 'matching_mode' => $mode, ...$fill($extras)],
+        ]])->assertCreated()->json('data.id');
+
+        return [storedShape(AlertRule::findOrFail($flat)), storedShape(AlertRule::findOrFail($list))];
+    };
+
+    [$flat, $list] = $store();
+
+    expect($list)->toEqual($flat);
+})->with([
+    'nationwide' => ['nationwide', []],
+    'location' => ['location', ['location_ids' => 'LOCATION']],
+    'polygon' => ['polygon', ['location_ids' => 'LOCATION']],
+    'office' => ['wfo', ['wfo' => 'OKX']],
+    'county and zone' => ['county_zone', ['county_zone_codes' => ['NYC103', 'NYZ072']]],
+]);

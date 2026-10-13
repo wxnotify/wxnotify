@@ -351,3 +351,203 @@ test('a Metric subscriber replacing a threshold rule has the new value converted
     ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", $withoutVariable, $token)->assertUnprocessable()->assertJsonValidationErrorFor('variable');
     expect((float) AlertRule::find($id)->threshold_value)->toBe(50.0);
 });
+
+/**
+ * A valid per-product body: Tornado by my location, Severe Thunderstorm by office.
+ *
+ * @return array<string, mixed>
+ */
+function perProductRule($test): array
+{
+    return [
+        'category' => 'weather_alerts',
+        'channel_ids' => [$test->channel->id],
+        'product_settings' => [
+            ['product_id' => $test->tornado->id, 'matching_mode' => 'location', 'location_ids' => [$test->location->id]],
+            ['product_id' => Product::where('code', 'SV.W')->sole()->id, 'matching_mode' => 'wfo', 'wfo' => 'OKX'],
+        ],
+    ];
+}
+
+test('a rule is created with a mode of its own for each product and reads back as mixed with its product settings', function () {
+    $severe = Product::where('code', 'SV.W')->sole();
+
+    $response = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->assertCreated()
+        ->assertJsonPath('data.matching_mode', 'mixed')
+        ->assertJsonPath('data.location_ids', [])
+        ->assertJsonPath('data.wfo', null)
+        ->assertJsonPath('data.county_zone_codes', []);
+
+    expect($response->json('data.product_ids'))->toBe([$this->tornado->id, $severe->id])
+        ->and($response->json('data.product_settings'))->toBe([
+            ['product_id' => $this->tornado->id, 'matching_mode' => 'location', 'location_ids' => [$this->location->id], 'wfo' => null, 'county_zone_codes' => []],
+            ['product_id' => $severe->id, 'matching_mode' => 'wfo', 'location_ids' => [], 'wfo' => 'OKX', 'county_zone_codes' => []],
+        ]);
+
+    $rule = AlertRule::find($response->json('data.id'));
+
+    expect($rule->settingsFor($this->tornado->id)->locations->pluck('id')->all())->toBe([$this->location->id])
+        ->and($rule->settingsFor($severe->id)->wfo)->toBe('OKX')
+        ->and($rule->matching_mode)->toBeNull();
+});
+
+test('a county/zone product setting is stored and read back as codes', function () {
+    $body = ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+        ['product_id' => $this->tornado->id, 'matching_mode' => 'county_zone', 'county_zone_codes' => ['NYC103', 'NYZ072']],
+    ]];
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertCreated()
+        ->assertJsonPath('data.matching_mode', 'county_zone')
+        ->assertJsonPath('data.county_zone_codes', ['NYC103', 'NYZ072'])
+        ->assertJsonPath('data.product_settings.0.county_zone_codes', ['NYC103', 'NYZ072']);
+});
+
+test('a rule is replaced with new product settings and leaves no orphan rows', function () {
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->json('data.id');
+    $watch = Product::where('family', 'watch')->orderBy('id')->firstOrFail();
+
+    $body = ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+        ['product_id' => $watch->id, 'matching_mode' => 'nationwide'],
+    ]];
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", $body)->assertOk()
+        ->assertJsonPath('data.product_ids', [$watch->id])
+        ->assertJsonPath('data.matching_mode', 'nationwide')
+        ->assertJsonPath('data.product_settings', [['product_id' => $watch->id, 'matching_mode' => 'nationwide', 'location_ids' => [], 'wfo' => null, 'county_zone_codes' => []]]);
+
+    expect(DB::table('alert_rule_product_location')->where('alert_rule_id', $id)->count())->toBe(0)
+        ->and(DB::table('alert_rule_product')->where('alert_rule_id', $id)->count())->toBe(1);
+});
+
+test('product settings and the flat fields in one request are refused', function (string $flatKey, mixed $value) {
+    $body = [...perProductRule($this), $flatKey => $value];
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertUnprocessable()->assertJsonValidationErrorFor('product_settings');
+
+    expect(AlertRule::where('user_id', $this->user->id)->count())->toBe(0);
+})->with([
+    'product_ids' => ['product_ids', [1]],
+    'matching_mode' => ['matching_mode', 'nationwide'],
+    'location_ids' => ['location_ids', [1]],
+    'wfo' => ['wfo', 'OKX'],
+    'county_zone_codes' => ['county_zone_codes', ['NYC103']],
+]);
+
+test('an invalid product setting is refused naming its field and writes nothing', function (string $case, string $field) {
+    $other = User::factory()->create();
+    $severe = Product::where('code', 'SV.W')->sole();
+    $entry = fn (array $overrides, ?int $productId = null): array => ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+        ['product_id' => $productId ?? $this->tornado->id, 'matching_mode' => 'nationwide', ...$overrides],
+    ]];
+
+    $body = match ($case) {
+        'empty list' => [...perProductRule($this), 'product_settings' => []],
+        'risk area on a weather alert' => $entry(['matching_mode' => 'risk_area', 'location_ids' => [$this->location->id]]),
+        'mixed echoed back' => $entry(['matching_mode' => 'mixed']),
+        'unknown mode' => $entry(['matching_mode' => 'sideways']),
+        'missing mode' => ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_settings' => [['product_id' => $this->tornado->id]]],
+        'location mode without locations' => $entry(['matching_mode' => 'location']),
+        'polygon mode without locations' => $entry(['matching_mode' => 'polygon', 'location_ids' => []]),
+        'another subscriber\'s location' => $entry(['matching_mode' => 'location', 'location_ids' => [Location::factory()->for($other)->create()->id]]),
+        'office mode without an office' => $entry(['matching_mode' => 'wfo']),
+        'unknown office' => $entry(['matching_mode' => 'wfo', 'wfo' => 'ZZZ']),
+        'county mode without codes' => $entry(['matching_mode' => 'county_zone']),
+        'unknown county code' => $entry(['matching_mode' => 'county_zone', 'county_zone_codes' => ['NYC999']]),
+        'product of the wrong family' => $entry([], $this->riskProduct->id),
+        'unknown product' => $entry([], 999999),
+        'the same product twice' => ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+            ['product_id' => $severe->id, 'matching_mode' => 'nationwide'],
+            ['product_id' => $severe->id, 'matching_mode' => 'nationwide'],
+        ]],
+        'location mode on a later row without locations' => ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+            ['product_id' => $this->tornado->id, 'matching_mode' => 'location', 'location_ids' => [$this->location->id]],
+            ['product_id' => $severe->id, 'matching_mode' => 'location', 'location_ids' => []],
+        ]],
+    };
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertUnprocessable()->assertJsonValidationErrorFor($field);
+
+    expect(AlertRule::where('user_id', $this->user->id)->count())->toBe(0);
+})->with([
+    'empty list' => ['empty list', 'product_settings'],
+    'risk area on a weather alert' => ['risk area on a weather alert', 'product_settings.0.matching_mode'],
+    'mixed echoed back' => ['mixed echoed back', 'product_settings.0.matching_mode'],
+    'unknown mode' => ['unknown mode', 'product_settings.0.matching_mode'],
+    'missing mode' => ['missing mode', 'product_settings.0.matching_mode'],
+    'location mode without locations' => ['location mode without locations', 'product_settings.0.location_ids'],
+    'polygon mode without locations' => ['polygon mode without locations', 'product_settings.0.location_ids'],
+    'another subscriber\'s location' => ['another subscriber\'s location', 'product_settings.0.location_ids.0'],
+    'office mode without an office' => ['office mode without an office', 'product_settings.0.wfo'],
+    'unknown office' => ['unknown office', 'product_settings.0.wfo'],
+    'county mode without codes' => ['county mode without codes', 'product_settings.0.county_zone_codes'],
+    'unknown county code' => ['unknown county code', 'product_settings.0.county_zone_codes.0'],
+    'product of the wrong family' => ['product of the wrong family', 'product_settings.0.product_id'],
+    'unknown product' => ['unknown product', 'product_settings.0.product_id'],
+    'the same product twice' => ['the same product twice', 'product_settings.0.product_id'],
+    'location mode on a later row without locations' => ['location mode on a later row without locations', 'product_settings.1.location_ids'],
+]);
+
+test('each SPC and WPC product setting accepts polygon and risk area, never location', function () {
+    $plain = Product::where('family', 'spc_wpc')->whereNull('risk_level_options')->orderBy('id')->firstOrFail();
+    $body = fn (string $mode, Product $product): array => ['category' => 'spc_wpc', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+        ['product_id' => $product->id, 'matching_mode' => $mode, 'location_ids' => [$this->location->id]],
+    ]];
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', $body('polygon', $plain))->assertCreated()->assertJsonPath('data.matching_mode', 'polygon');
+    ruleCall($this, 'POST', '/api/v1/alert-rules', $body('risk_area', $this->riskProduct))->assertCreated()->assertJsonPath('data.matching_mode', 'risk_area');
+    ruleCall($this, 'POST', '/api/v1/alert-rules', $body('location', $plain))->assertUnprocessable()->assertJsonValidationErrorFor('product_settings.0.matching_mode');
+});
+
+test('a PUT with no product or matching fields keeps a mixed rule exactly as stored', function () {
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->json('data.id');
+    $before = ruleCall($this, 'GET', "/api/v1/alert-rules/{$id}")->json('data');
+
+    $other = NotificationChannel::factory()->for($this->user)->create();
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", ['category' => 'weather_alerts', 'name' => 'Renamed', 'channel_ids' => [$other->id]])->assertOk();
+
+    $after = ruleCall($this, 'GET', "/api/v1/alert-rules/{$id}")->json('data');
+
+    expect($after)->toMatchArray([...$before, 'name' => 'Renamed', 'channel_ids' => [$other->id], 'display_name' => 'Renamed'])
+        ->and($after['product_settings'])->toBe($before['product_settings'])
+        ->and($after['matching_mode'])->toBe('mixed');
+});
+
+test('a PUT with no product or matching fields is refused when it changes the category', function (string $category) {
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->json('data.id');
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", ['category' => $category, 'channel_ids' => [$this->channel->id]])
+        ->assertUnprocessable()->assertJsonValidationErrorFor('product_ids');
+
+    expect(AlertRule::find($id)->category)->toBe(AlertCategory::WeatherAlerts)
+        ->and(AlertRule::find($id)->products)->toHaveCount(2);
+})->with(['spc_wpc']);
+
+test('a POST with neither product settings nor product ids is refused', function () {
+    ruleCall($this, 'POST', '/api/v1/alert-rules', ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id]])
+        ->assertUnprocessable()->assertJsonValidationErrorFor('product_ids');
+});
+
+test('a PUT with a stray matching field but no products is not the keep path', function () {
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->json('data.id');
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'matching_mode' => 'nationwide'])
+        ->assertUnprocessable()->assertJsonValidationErrorFor('product_ids');
+});
+
+test('reading rules does not query per product', function () {
+    ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->assertCreated();
+    ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->assertCreated();
+
+    DB::enableQueryLog();
+    ruleCall($this, 'GET', '/api/v1/alert-rules')->assertOk();
+    $withTwo = count(DB::getQueryLog());
+    DB::flushQueryLog();
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRule($this))->assertCreated();
+    DB::flushQueryLog();
+    ruleCall($this, 'GET', '/api/v1/alert-rules')->assertOk();
+    $withThree = count(DB::getQueryLog());
+
+    expect($withThree)->toBe($withTwo);
+});

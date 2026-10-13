@@ -13,9 +13,11 @@ use App\Enums\Tier;
 use App\Models\Product;
 use App\Rules\KnownUgcCode;
 use App\Settings\TierThresholdSettings;
+use App\Support\ProductMatching;
 use App\Support\Units;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 
 /**
  * The dashboard form's rules for an alert rule, per category. The body is in the subscriber's
@@ -24,6 +26,12 @@ use Illuminate\Validation\Rule;
 class SaveAlertRuleRequest extends FormRequest
 {
     private const LOCATION_MODES = ['location', 'polygon', 'risk_area'];
+
+    /** The flat matching input that product_settings replaces (never sent together with it). */
+    private const FLAT_PRODUCT_KEYS = ['product_ids', 'matching_mode', 'location_ids', 'wfo', 'county_zone_codes'];
+
+    /** Any of these on a PUT means the client is setting products or matching, not keeping them. */
+    private const PRODUCT_KEYS = ['product_settings', 'risk_levels', ...self::FLAT_PRODUCT_KEYS];
 
     public function authorize(): bool
     {
@@ -92,25 +100,86 @@ class SaveAlertRuleRequest extends FormRequest
      */
     private function productRules(AlertCategory $category): array
     {
+        if ($this->keepsStoredProducts($category)) {
+            return [];
+        }
+
+        $riskLevelRules = $category === AlertCategory::SpcWpc ? [
+            'risk_levels' => ['nullable', 'array'],
+            'risk_levels.*' => ['string', Rule::in($this->riskLevelOptions())],
+        ] : [];
+
+        return $this->has('product_settings')
+            ? [...$this->productSettingsRules($category), ...$riskLevelRules]
+            : [...$this->flatProductRules($category), ...$riskLevelRules];
+    }
+
+    /**
+     * The keep path: a PUT of a product-based rule that carries none of the product or matching
+     * fields leaves the stored products and their settings alone. Safe only while the category is
+     * unchanged; otherwise the old family's products would carry into the new category.
+     */
+    private function keepsStoredProducts(AlertCategory $category): bool
+    {
+        if (! $this->isMethod('PUT') || $this->hasAny(self::PRODUCT_KEYS)) {
+            return false;
+        }
+
+        $stored = $this->user()->alertRules()->find($this->route('id'));
+
+        return $stored !== null && $stored->category === $category;
+    }
+
+    /**
+     * One entry per watched product, each with its own mode and that mode's inputs. A mode must be
+     * one the category accepts, so a client echoing back a read rule's `mixed` is refused rather
+     * than stored as "inherit".
+     *
+     * @return array<string, mixed>
+     */
+    private function productSettingsRules(AlertCategory $category): array
+    {
+        $locationModes = implode(',', self::LOCATION_MODES);
+
+        return [
+            'product_settings' => ['required', 'array', 'min:1', 'prohibits:'.implode(',', self::FLAT_PRODUCT_KEYS)],
+            'product_settings.*.product_id' => ['required', 'integer', 'distinct', $this->productExists($category)],
+            'product_settings.*.matching_mode' => ['required', 'string', Rule::in(array_map(fn (MatchingMode $mode): string => $mode->value, ProductMatching::acceptedModes($category)))],
+            'product_settings.*.location_ids' => ['required_if:product_settings.*.matching_mode,'.$locationModes, 'nullable', 'array'],
+            'product_settings.*.location_ids.*' => ['integer', Rule::exists('locations', 'id')->where('user_id', $this->user()->id)],
+            'product_settings.*.wfo' => ['exclude_unless:product_settings.*.matching_mode,'.MatchingMode::Wfo->value, 'required', 'string', Rule::exists('cwa_boundaries', 'cwa')],
+            'product_settings.*.county_zone_codes' => ['required_if:product_settings.*.matching_mode,'.MatchingMode::CountyZone->value, 'nullable', 'array'],
+            'product_settings.*.county_zone_codes.*' => ['string', new KnownUgcCode],
+        ];
+    }
+
+    /**
+     * The original flat input: one shared mode for every product.
+     *
+     * @return array<string, mixed>
+     */
+    private function flatProductRules(AlertCategory $category): array
+    {
         $mode = $this->input('matching_mode');
         $needsLocations = in_array($mode, self::LOCATION_MODES, true);
 
         return [
             'product_ids' => ['required', 'array', 'min:1'],
-            'product_ids.*' => ['integer', Rule::exists('products', 'id')->where(fn ($query) => $category === AlertCategory::SpcWpc
-                ? $query->where('family', 'spc_wpc')
-                : $query->whereIn('family', BuildAlertRuleOptions::WEATHER_FAMILIES))],
+            'product_ids.*' => ['integer', $this->productExists($category)],
             'matching_mode' => ['required', Rule::in($this->allowedModes($category))],
             'location_ids' => $needsLocations ? ['required', 'array', 'min:1'] : ['nullable', 'array'],
             'location_ids.*' => ['integer', Rule::exists('locations', 'id')->where('user_id', $this->user()->id)],
             'wfo' => $mode === MatchingMode::Wfo->value ? ['required', 'string', Rule::exists('cwa_boundaries', 'cwa')] : ['nullable'],
             'county_zone_codes' => $mode === MatchingMode::CountyZone->value ? ['required', 'array', 'min:1'] : ['nullable', 'array'],
             'county_zone_codes.*' => ['string', new KnownUgcCode],
-            ...($category === AlertCategory::SpcWpc ? [
-                'risk_levels' => ['nullable', 'array'],
-                'risk_levels.*' => ['string', Rule::in($this->riskLevelOptions())],
-            ] : []),
         ];
+    }
+
+    private function productExists(AlertCategory $category): Exists
+    {
+        return Rule::exists('products', 'id')->where(fn ($query) => $category === AlertCategory::SpcWpc
+            ? $query->where('family', 'spc_wpc')
+            : $query->whereIn('family', BuildAlertRuleOptions::WEATHER_FAMILIES));
     }
 
     /**

@@ -115,3 +115,22 @@ test('it says whether another location can be created', function () {
 
     expect(optionsCall($this)->json('data.can_create_location'))->toBeFalse();
 });
+
+test('every product carries the modes its row offers and its default mode', function () {
+    $tornado = Product::where('code', 'TO.W')->sole();
+    $risk = Product::where('family', 'spc_wpc')->whereNotNull('risk_level_options')->orderBy('id')->firstOrFail();
+    $plain = Product::where('family', 'spc_wpc')->whereNull('risk_level_options')->orderBy('id')->firstOrFail();
+    $tornado->forceFill(['has_polygon' => true])->save();
+    $noPolygon = Product::where('family', 'warning')->where('has_polygon', false)->where('status', 'active')->firstOrFail();
+
+    $response = optionsCall($this)->assertOk();
+    $find = fn (string $key, Product $product): array => collect($response->json("data.products.{$key}"))->pluck('products')->flatten(1)->firstWhere('id', $product->id);
+
+    expect($find('weather_alerts', $tornado)['modes'])->toBe(['nationwide', 'location', 'wfo', 'county_zone', 'polygon'])
+        ->and($find('weather_alerts', $tornado)['default_mode'])->toBe('polygon')
+        ->and($find('weather_alerts', $noPolygon)['default_mode'])->toBe('location')
+        ->and($find('spc_wpc', $risk)['modes'])->toBe(['nationwide', 'risk_area'])
+        ->and($find('spc_wpc', $risk)['default_mode'])->toBe('risk_area')
+        ->and($find('spc_wpc', $plain)['modes'])->toBe(['nationwide', 'polygon'])
+        ->and($find('spc_wpc', $plain)['default_mode'])->toBe('polygon');
+});

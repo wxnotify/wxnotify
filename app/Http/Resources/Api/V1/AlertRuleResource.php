@@ -9,6 +9,7 @@ use App\Support\ProductMatchSettings;
 use App\Support\Units;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
 
 /**
  * An alert rule as the app's editor needs it, in the subscriber's own units. Carries ids only for
@@ -30,7 +31,8 @@ class AlertRuleResource extends JsonResource
             'threshold_value' => $rule->threshold_value,
             'radius_miles' => $rule->radius_miles,
         ], $units);
-        $matching = $this->matching($rule);
+        $productSettings = $this->productSettings($rule);
+        $matching = $this->matching($rule, $productSettings);
 
         return [
             'id' => $rule->id,
@@ -41,6 +43,7 @@ class AlertRuleResource extends JsonResource
             'is_active' => (bool) $rule->is_active,
             'matching_mode' => $matching['matching_mode'],
             'product_ids' => $rule->products->pluck('id')->values()->all(),
+            'product_settings' => $productSettings,
             'location_ids' => $matching['location_ids'],
             'location_id' => $rule->location_id,
             'wfo' => $matching['wfo'],
@@ -64,23 +67,44 @@ class AlertRuleResource extends JsonResource
     }
 
     /**
-     * The rule's matching as one set of flat fields, from each watched product's settings
-     * (AlertRule::settingsFor()): their shared value when every product matches the same way,
-     * else `mixed` with the other fields empty; a rule with no products reads its own columns.
+     * Every watched product's matching settings (AlertRule::settingsFor()), in the order the rule lists its products.
      *
+     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}>
+     */
+    private function productSettings(AlertRule $rule): array
+    {
+        return $rule->products
+            ->map(fn (Product $product): array => $this->entry($product->id, $rule->settingsFor($product->id)))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}
+     */
+    private function entry(int $productId, ProductMatchSettings $settings): array
+    {
+        return [
+            'product_id' => $productId,
+            'matching_mode' => $settings->mode?->value,
+            'location_ids' => $settings->locations->pluck('id')->map(fn ($id): int => (int) $id)->values()->all(),
+            'wfo' => $settings->wfo,
+            'county_zone_codes' => $settings->countyZoneCodes,
+        ];
+    }
+
+    /**
+     * The rule's matching as one set of flat fields, from the products' settings: their shared value
+     * when every product matches the same way, else `mixed` with the other fields empty; a rule with
+     * no products reads its own columns.
+     *
+     * @param  list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}>  $productSettings
      * @return array{matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}
      */
-    private function matching(AlertRule $rule): array
+    private function matching(AlertRule $rule, array $productSettings): array
     {
-        $distinct = $rule->products
-            ->map(fn (Product $product): ?ProductMatchSettings => $rule->settingsFor($product->id))
-            ->filter()
-            ->map(fn (ProductMatchSettings $settings): array => [
-                'matching_mode' => $settings->mode?->value,
-                'location_ids' => $settings->locations->pluck('id')->map(fn ($id): int => (int) $id)->values()->all(),
-                'wfo' => $settings->wfo,
-                'county_zone_codes' => $settings->countyZoneCodes,
-            ])
+        $distinct = collect($productSettings)
+            ->map(fn (array $entry): array => Arr::except($entry, 'product_id'))
             ->unique(fn (array $fields): string => serialize($fields))
             ->values();
 

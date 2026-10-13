@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ProductMatching;
 use App\Support\Units;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -47,8 +48,8 @@ class BuildAlertRuleOptions
                 'description' => $category->description(),
             ])->all(),
             'products' => [
-                'weather_alerts' => $this->groups(Product::query()->whereIn('family', self::WEATHER_FAMILIES)->where('status', 'active')),
-                'spc_wpc' => $this->groups(Product::query()->where('family', 'spc_wpc')->where('status', 'active')),
+                'weather_alerts' => $this->groups(AlertCategory::WeatherAlerts, Product::query()->whereIn('family', self::WEATHER_FAMILIES)->where('status', 'active')),
+                'spc_wpc' => $this->groups(AlertCategory::SpcWpc, Product::query()->where('family', 'spc_wpc')->where('status', 'active')),
             ],
             'matching_modes' => collect(MatchingMode::cases())->map(fn (MatchingMode $mode): array => [
                 'value' => $mode->value,
@@ -92,14 +93,15 @@ class BuildAlertRuleOptions
     }
 
     /**
-     * One group per product category present, in the dashboard's section order.
+     * One group per product category present, in the dashboard's section order. Each product
+     * lists the matching modes its table row offers and the mode a newly switched-on row starts at.
      *
      * @param  Builder<Product>  $query
      * @return list<array{category: string, label: string, products: list<array<string, mixed>>}>
      */
-    private function groups(Builder $query): array
+    private function groups(AlertCategory $alertCategory, Builder $query): array
     {
-        $byCategory = $query->orderBy('sort_order')->get(['id', 'name', 'description', 'category', 'risk_level_options'])
+        $byCategory = $query->orderBy('sort_order')->get(['id', 'name', 'description', 'category', 'has_polygon', 'risk_level_options'])
             ->groupBy(fn (Product $product): ?string => $product->category?->value);
 
         return collect(ProductCategory::cases())
@@ -112,6 +114,8 @@ class BuildAlertRuleOptions
                     'name' => $product->name,
                     'description' => $product->description,
                     'risk_levels' => $product->risk_level_options ?? [],
+                    'modes' => array_map(fn (MatchingMode $mode): string => $mode->value, ProductMatching::offeredModes($alertCategory, $product)),
+                    'default_mode' => ProductMatching::defaultMode($alertCategory, $product)->value,
                 ])->values()->all(),
             ])
             ->values()
