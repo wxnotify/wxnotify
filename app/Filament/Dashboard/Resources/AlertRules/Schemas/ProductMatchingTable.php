@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,13 @@ class ProductMatchingTable extends Field
     /** @var Collection<int, Product> keyed by id, in display order */
     protected Collection $products;
 
-    protected bool $requiresAProduct = false;
+    /**
+     * Set on the first table only: the state keys of every table on the form, which together
+     * must hold at least one switched-on product.
+     *
+     * @var list<string>|null
+     */
+    protected ?array $requiresAProductAcross = null;
 
     protected bool $rendersOfficeList = false;
 
@@ -71,24 +78,29 @@ class ProductMatchingTable extends Field
      * SPC & WPC the category's risk-level checklist. Tornado and Severe Thunderstorm starts
      * expanded; any other category is collapsed unless it holds a switched-on product.
      *
-     * @param  list<int>  $productIdsInState  products already in the form (a rule may watch a retired one)
+     * @param  list<int>  $watchedProductIds  the edited rule's products (it may watch a retired one); never form state
      * @return array<Section>
      */
-    public static function sections(AlertCategory $alertCategory, array $productIdsInState = []): array
+    public static function sections(AlertCategory $alertCategory, array $watchedProductIds = []): array
     {
-        $productsByCategory = self::catalog($alertCategory, $productIdsInState)
+        $productsByCategory = self::catalog($alertCategory, $watchedProductIds)
             ->groupBy(fn (Product $product): ?string => $product->category?->value);
+        $tableKeys = collect(ProductCategory::cases())
+            ->filter(fn (ProductCategory $category): bool => $productsByCategory->has($category->value))
+            ->map(fn (ProductCategory $category): string => $category->value)
+            ->values()
+            ->all();
 
         return collect(ProductCategory::cases())
             ->filter(fn (ProductCategory $category): bool => $productsByCategory->has($category->value))
             ->values()
-            ->map(function (ProductCategory $category, int $index) use ($alertCategory, $productsByCategory): Section {
+            ->map(function (ProductCategory $category, int $index) use ($alertCategory, $productsByCategory, $tableKeys): Section {
                 $table = self::make("product_settings.{$category->value}")
                     ->hiddenLabel()
                     ->forCategory($alertCategory, $category, $productsByCategory->get($category->value)->keyBy('id'))
                     // The first table carries the "at least one product" check (it reads every
                     // category, so once is enough) and the one office list every table shares.
-                    ->requiresAProduct($index === 0)
+                    ->requiresAProductAcross($index === 0 ? $tableKeys : null)
                     ->rendersOfficeList($index === 0);
 
                 return Section::make($category->label())
@@ -111,7 +123,7 @@ class ProductMatchingTable extends Field
 
     /**
      * The table's products: the alert category's active products, plus any of its products the
-     * form already holds (a rule keeps a product that has since been retired), in display order.
+     * edited rule watches (a rule keeps a product that has since been retired), in display order.
      *
      * @param  list<int>  $includeProductIds
      * @return Collection<int, Product>
@@ -182,8 +194,10 @@ class ProductMatchingTable extends Field
     /**
      * The form data SaveAlertRule reads: for a product-based rule, `product_settings` becomes the
      * flat list of switched-on rows across every category (ids as ints, the office code trimmed
-     * and upper-cased). Called on both the dehydrated data and the raw `$this->data` (the pages'
-     * after-save hooks read the latter).
+     * and upper-cased). The pages call it once, on the validated, dehydrated form data (which
+     * holds only the form's own tables), and reuse the result after the record is written: never
+     * on the raw `$this->data`, where a tampered request can add keys no table validated. Only
+     * keys named after a product category are read.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -196,7 +210,10 @@ class ProductMatchingTable extends Field
             return $data;
         }
 
-        $data['product_settings'] = collect(self::enabledRows($data['product_settings'] ?? []))
+        $tables = collect(is_array($data['product_settings'] ?? null) ? $data['product_settings'] : [])
+            ->filter(fn (mixed $rows, int|string $key): bool => ProductCategory::tryFrom((string) $key) !== null);
+
+        $data['product_settings'] = $tables->flatMap(fn (mixed $rows): array => self::enabledRows($rows))
             ->map(fn (array $row): array => [
                 'product_id' => (int) $row['product_id'],
                 'matching_mode' => (string) ($row['matching_mode'] ?? ''),
@@ -211,19 +228,17 @@ class ProductMatchingTable extends Field
     }
 
     /**
-     * The switched-on rows of one category's state, or of the whole `product_settings` state.
+     * The switched-on rows of one table's state (`product_settings.{category}`).
      *
      * @return list<array<string, mixed>>
      */
     public static function enabledRows(mixed $state): array
     {
-        if (! is_array($state)) {
+        if (! is_array($state) || ! array_is_list($state)) {
             return [];
         }
 
-        $rows = array_is_list($state) ? $state : collect($state)->filter(fn (mixed $rows): bool => is_array($rows))->flatten(1)->all();
-
-        return collect($rows)
+        return collect($state)
             ->filter(fn (mixed $row): bool => is_array($row)
                 && is_numeric($row['product_id'] ?? null)
                 && filter_var($row['enabled'] ?? false, FILTER_VALIDATE_BOOL))
@@ -239,37 +254,24 @@ class ProductMatchingTable extends Field
         return collect(self::enabledRows($state))->map(fn (array $row): int => (int) $row['product_id'])->unique()->values()->all();
     }
 
-    /**
-     * Every product id in the form state, switched on or not.
-     *
-     * @return list<int>
-     */
-    public static function productIdsIn(mixed $state): array
-    {
-        return collect(is_array($state) ? $state : [])
-            ->filter(fn (mixed $rows): bool => is_array($rows))
-            ->flatten(1)
-            ->filter(fn (mixed $row): bool => is_array($row) && is_numeric($row['product_id'] ?? null))
-            ->map(fn (array $row): int => (int) $row['product_id'])
-            ->unique()
-            ->values()
-            ->all();
-    }
-
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->showAllValidationMessages();
 
+        // Implicit, so it also runs when a tampered request removed the table's key entirely (a
+        // plain closure rule is skipped for an absent attribute, and the form would save no product).
         $this->rules([
-            fn (ProductMatchingTable $component, Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($component, $get): void {
-                if ($component->requiresAProduct && self::enabledProductIds($get('product_settings')) === []) {
-                    $fail('Select at least one product.');
-                }
+            fn (ProductMatchingTable $component, Get $get): ValidationRule => new class($component, $get) implements ValidationRule
+            {
+                public bool $implicit = true;
 
-                foreach ($component->problems($value) as $problem) {
-                    $fail($problem);
+                public function __construct(private ProductMatchingTable $component, private Get $get) {}
+
+                public function validate(string $attribute, mixed $value, Closure $fail): void
+                {
+                    $this->component->validateState($value, $this->get, $fail);
                 }
             },
         ]);
@@ -292,9 +294,12 @@ class ProductMatchingTable extends Field
         return $this;
     }
 
-    public function requiresAProduct(bool $condition = true): static
+    /**
+     * @param  list<string>|null  $tableKeys
+     */
+    public function requiresAProductAcross(?array $tableKeys): static
     {
-        $this->requiresAProduct = $condition;
+        $this->requiresAProductAcross = $tableKeys;
 
         return $this;
     }
@@ -472,12 +477,40 @@ class ProductMatchingTable extends Field
     }
 
     /**
+     * The table's validation: on the first table, at least one switched-on product across every
+     * table of the form; on each table, what problems() finds.
+     */
+    public function validateState(mixed $state, Get $get, Closure $fail): void
+    {
+        if ($this->requiresAProductAcross !== null
+            && collect($this->requiresAProductAcross)->every(fn (string $key): bool => self::enabledProductIds($get("product_settings.{$key}")) === [])) {
+            $fail('Select at least one product.');
+        }
+
+        foreach ($this->problems($state) as $problem) {
+            $fail($problem);
+        }
+    }
+
+    /**
      * What is wrong with this table's switched-on rows, one message per problem.
      *
      * @return list<string>
      */
     public function problems(mixed $state): array
     {
+        $duplicates = collect(is_array($state) ? $state : [])
+            ->filter(fn (mixed $row): bool => is_array($row) && is_numeric($row['product_id'] ?? null))
+            ->countBy(fn (array $row): int => (int) $row['product_id'])
+            ->filter(fn (int $count): bool => $count > 1)
+            ->keys()
+            ->map(fn (int $productId): string => ($this->products->get($productId)?->name ?? 'A product').' is listed more than once.')
+            ->all();
+
+        if ($duplicates !== []) {
+            return array_values($duplicates);
+        }
+
         $rows = self::enabledRows($state);
 
         if ($rows === []) {

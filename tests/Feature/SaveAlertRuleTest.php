@@ -359,3 +359,15 @@ test('the write is logged with the subscriber as the causer although there is no
 
     expect($activity->causer_id)->toBe($this->user->id);
 });
+
+test('a product\'s locations are only ever the rule owner\'s own', function () {
+    $othersLocation = Location::factory()->for(User::factory())->create();
+
+    $rule = ($this->save)([
+        'category' => 'weather_alerts',
+        'product_settings' => [['product_id' => $this->tornado->id, 'matching_mode' => 'polygon', 'location_ids' => [$this->location->id, $othersLocation->id]]],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    expect(($this->productLocationRows)($rule))->toBe([[$this->tornado->id, $this->location->id]]);
+});

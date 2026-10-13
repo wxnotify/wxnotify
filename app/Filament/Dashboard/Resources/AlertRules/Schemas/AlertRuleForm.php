@@ -124,9 +124,10 @@ class AlertRuleForm
     protected static function detailsStep(): Step
     {
         return Step::make('Set it up')
-            ->schema(function (Get $get): array {
+            ->schema(function (Get $get, ?AlertRule $record): array {
                 $fields = match ($category = AlertCategory::tryFrom($get('category'))) {
-                    AlertCategory::WeatherAlerts, AlertCategory::SpcWpc => ProductMatchingTable::sections($category, ProductMatchingTable::productIdsIn($get('product_settings'))),
+                    // A retired product joins the table only when the edited rule watches it (never from form state).
+                    AlertCategory::WeatherAlerts, AlertCategory::SpcWpc => ProductMatchingTable::sections($category, $record?->products->pluck('id')->all() ?? []),
                     AlertCategory::Threshold => self::thresholdFields(),
                     AlertCategory::DailySummary => self::dailySummaryFields(),
                     AlertCategory::Lightning => self::lightningFields(),
@@ -323,14 +324,13 @@ class AlertRuleForm
     }
 
     /**
-     * The switched-on products of the product tables (`product_settings.*`), or of one
-     * category's table.
+     * The switched-on products of one category's product table (`product_settings.{category}`).
      *
      * @return list<int>
      */
-    protected static function selectedProductIds(Get $get, ?ProductCategory $only = null): array
+    protected static function selectedProductIds(Get $get, ProductCategory $category): array
     {
-        return ProductMatchingTable::enabledProductIds($get($only === null ? 'product_settings' : "product_settings.{$only->value}"));
+        return ProductMatchingTable::enabledProductIds($get("product_settings.{$category->value}"));
     }
 
     /**

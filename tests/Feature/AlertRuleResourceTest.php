@@ -1378,3 +1378,122 @@ test('a failed save leaves the stored rule unchanged', function () {
 
     expect(AlertRule::where('user_id', $this->user->id)->count())->toBe(1);
 });
+
+test('rows under a key that is not one of the form\'s tables are never saved', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $mesoscale = Product::where('code', 'SPC.MD')->sole();
+    $othersLocation = Location::factory()->for(User::factory())->create();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'polygon', ['location_ids' => [$this->location->id]])],
+            'product_settings.bogus' => [alertWizardRow($mesoscale, 'polygon', ['location_ids' => [$othersLocation->id]])],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($rule->products->pluck('id')->all())->toBe([$tornadoWarning->id])
+        ->and(DB::table('alert_rule_product_location')->where('location_id', $othersLocation->id)->exists())->toBeFalse();
+});
+
+test('a product_settings state that is a bare list of rows is not a product choice', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $othersLocation = Location::factory()->for(User::factory())->create();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id]])
+        ->set('data.product_settings', [alertWizardRow($tornadoWarning, 'polygon', ['location_ids' => [$othersLocation->id]])])
+        ->call('create')
+        ->assertHasFormErrors(['product_settings.tornado_and_severe_thunderstorm']);
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse()
+        ->and(DB::table('alert_rule_product_location')->where('location_id', $othersLocation->id)->exists())->toBeFalse();
+});
+
+test('a product listed twice in its table is refused', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            "product_settings.{$tornadoWarning->category->value}" => [
+                alertWizardRow($tornadoWarning, 'nationwide'),
+                alertWizardRow($tornadoWarning, 'polygon', ['location_ids' => [$this->location->id], 'enabled' => false]),
+            ],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(["product_settings.{$tornadoWarning->category->value}"])
+        ->assertSee('Tornado Warning is listed more than once.');
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+});
+
+test('editing cannot pull a retired product into the table through the form state', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $retired = Product::where('code', 'SV.W')->sole();
+    $retired->update(['status' => ProductStatus::Draft]);
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'weather_alerts',
+        'product_settings' => [['product_id' => $tornadoWarning->id, 'matching_mode' => 'nationwide']],
+        'channel_ids' => [$this->channel->id],
+    ]);
+    $table = "product_settings.{$tornadoWarning->category->value}";
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $rows = $component->get("data.{$table}");
+
+    $component
+        ->set("data.{$table}", [...$rows, alertWizardRow($retired, 'nationwide')])
+        ->call('save')
+        ->assertHasFormErrors([$table]);
+
+    expect($rule->fresh()->products->pluck('id')->all())->toBe([$tornadoWarning->id]);
+});
+
+test('a subscriber with no saved locations cannot save a switched-on location-based row', function () {
+    $this->location->delete();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'polygon')],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(["product_settings.{$tornadoWarning->category->value}"])
+        ->assertSee('Choose at least one location for Tornado Warning.');
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+});
+
+test('a location added from a row is offered to every row without a reload', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    $table = "product_settings.{$tornadoWarning->category->value}";
+    // The table's Alpine scope holds the location list; a new wire:key makes the morph start a new one.
+    $scopeKey = fn (string $html): ?string => preg_match('/wire:key="data\.'.preg_quote($table, '/').'\.locations\.([0-9a-f]+)"/', $html, $match) ? $match[1] : null;
+
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts'])->assertDontSee('Lake house');
+    $keyBefore = $scopeKey($component->html());
+
+    $component
+        ->callFormComponentAction($table, 'addLocation', data: [
+            'label' => 'Lake house',
+            'lat' => 38.8976,
+            'lng' => -77.0365,
+            'address' => '1600 Pennsylvania Ave NW, Washington, DC',
+            'timezone' => 'America/New_York',
+        ], arguments: ['product' => $tornadoWarning->id])
+        ->assertHasNoFormComponentActionErrors()
+        ->assertSee('Lake house');
+
+    expect($keyBefore)->not->toBeNull()
+        ->and($scopeKey($component->html()))->not->toBeNull()->not->toBe($keyBefore);
+});

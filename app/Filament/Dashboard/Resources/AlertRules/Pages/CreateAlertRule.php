@@ -23,6 +23,15 @@ class CreateAlertRule extends CreateRecord
     protected ?bool $hasDatabaseTransactions = true;
 
     /**
+     * What SaveAlertRule saves, built once from the validated, dehydrated form data before the
+     * record is written and reused for the relations after it: the raw `$this->data` may hold
+     * keys no field validated.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $saveInput = [];
+
+    /**
      * @return array<Step>
      */
     public function getSteps(): array
@@ -32,7 +41,9 @@ class CreateAlertRule extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        return app(SaveAlertRule::class)->attributes(auth()->user(), ProductMatchingTable::toSaveInput($data));
+        $this->saveInput = ProductMatchingTable::toSaveInput($data);
+
+        return app(SaveAlertRule::class)->attributes(auth()->user(), $this->saveInput);
     }
 
     protected function getRedirectUrl(): string
@@ -42,6 +53,6 @@ class CreateAlertRule extends CreateRecord
 
     protected function afterCreate(): void
     {
-        app(SaveAlertRule::class)->syncRelations($this->record, ProductMatchingTable::toSaveInput($this->data));
+        app(SaveAlertRule::class)->syncRelations($this->record, $this->saveInput);
     }
 }

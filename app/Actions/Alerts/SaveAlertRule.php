@@ -116,7 +116,9 @@ class SaveAlertRule
     /**
      * Pivot syncs. A product-based rule's products, their settings and their own locations are
      * replaced together (left alone on the keep path); every other category has none, and the
-     * rule's own location list is no longer used. The channel list always applies.
+     * rule's own location list is no longer used. A product's locations are only ever the rule
+     * owner's own (others are dropped here as well as refused by validation). The channel list
+     * always applies.
      *
      * @param  array<string, mixed>  $data
      */
@@ -132,10 +134,17 @@ class SaveAlertRule
                     'county_zone_codes' => $entry['county_zone_codes'],
                 ]])->all());
 
+                // Only the rule owner's own locations, whatever the caller validated.
+                $ownedLocationIds = DB::table('locations')->where('user_id', $rule->user_id)
+                    ->whereIn('id', collect($settings)->flatMap(fn (array $entry): array => $entry['location_ids'])->unique()->all())
+                    ->pluck('id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->all();
+
                 DB::table('alert_rule_product_location')->where('alert_rule_id', $rule->id)->delete();
                 DB::table('alert_rule_product_location')->insert(collect($settings)->flatMap(fn (array $entry): array => array_map(
                     fn (int $locationId): array => ['alert_rule_id' => $rule->id, 'product_id' => $entry['product_id'], 'location_id' => $locationId],
-                    $entry['location_ids'],
+                    array_values(array_intersect($entry['location_ids'], $ownedLocationIds)),
                 ))->all());
 
                 $rule->locations()->sync([]);

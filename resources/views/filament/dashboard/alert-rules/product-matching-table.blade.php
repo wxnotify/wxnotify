@@ -26,8 +26,13 @@
         $wire.get() and writes it with deferred wire:model / $wire.set(..., false), so nothing here
         makes a request except the two modal actions and the switch of an SPC & WPC risk-level
         product.
+
+        The scope captures the location list when it starts, so its wire:key changes with the
+        list: adding a location from a row makes the morph replace the table and start a new
+        scope that offers it (Alpine state is not re-read on a morph).
     --}}
     <div
+        wire:key="{{ $statePath }}.locations.{{ md5(json_encode($locationOptions)) }}"
         x-data="{
             helpers: @js($helperTexts),
             locationModes: @js($locationModes),
@@ -88,7 +93,7 @@
                     @endphp
 
                     <tr
-                        wire:key="{{ $statePath }}.{{ $product->id }}"
+                        wire:key="{{ $statePath }}.{{ $index }}.{{ $product->id }}"
                         data-product-id="{{ $product->id }}"
                         x-data="row(@js($rowPath))"
                         x-bind:class="{ 'opacity-50': ! on }"

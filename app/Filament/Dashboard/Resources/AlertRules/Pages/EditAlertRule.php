@@ -28,6 +28,15 @@ class EditAlertRule extends EditRecord
     protected ?bool $hasDatabaseTransactions = true;
 
     /**
+     * What SaveAlertRule saves, built once from the validated, dehydrated form data before the
+     * record is written and reused for the relations after it: the raw `$this->data` may hold
+     * keys no field validated.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $saveInput = [];
+
+    /**
      * @return array<Step>
      */
     public function getSteps(): array
@@ -70,11 +79,13 @@ class EditAlertRule extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        return app(SaveAlertRule::class)->attributes(auth()->user(), ProductMatchingTable::toSaveInput($data), $this->record);
+        $this->saveInput = ProductMatchingTable::toSaveInput($data);
+
+        return app(SaveAlertRule::class)->attributes(auth()->user(), $this->saveInput, $this->record);
     }
 
     protected function afterSave(): void
     {
-        app(SaveAlertRule::class)->syncRelations($this->record, ProductMatchingTable::toSaveInput($this->data));
+        app(SaveAlertRule::class)->syncRelations($this->record, $this->saveInput);
     }
 }
