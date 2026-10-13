@@ -5,6 +5,8 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Tables;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
 use App\Models\AlertRule;
+use App\Models\Product;
+use App\Support\ProductMatchSettings;
 use App\Support\Units;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -16,6 +18,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class AlertRulesTable
 {
@@ -27,10 +30,12 @@ class AlertRulesTable
 
     private const NONE = 'None';
 
+    private const MIXED = 'Mixed';
+
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['location', 'locations', 'notificationChannels', 'products']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['location', 'locations', 'notificationChannels', 'products', 'productLocations']))
             ->columns([
                 TextColumn::make('displayName')
                     ->label('Alert')
@@ -85,25 +90,50 @@ class AlertRulesTable
 
     /**
      * Where an alert applies: its saved locations, or -- for matching modes
-     * that are not tied to a saved location -- the mode's short name.
+     * that are not tied to a saved location -- the mode's short name. A
+     * Weather Alerts / SPC rule is read product by product: one shared mode
+     * reads as before, differing modes read "Mixed" followed by the union of
+     * the products' own locations.
      *
      * @return list<string>
      */
     private static function locationLabels(AlertRule $record): array
     {
-        if (in_array($record->category, [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc], true)) {
-            $mode = $record->matching_mode;
-
-            if (in_array($mode, [MatchingMode::Nationwide, MatchingMode::Wfo, MatchingMode::CountyZone], true)) {
-                return [$mode->shortLabel()];
-            }
-
-            $labels = $record->locations->pluck('label')->all();
-        } else {
+        if (! in_array($record->category, [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc], true)) {
             $labels = array_filter([$record->location?->label]);
+
+            return $labels === [] ? [self::NONE] : array_values($labels);
         }
 
-        return $labels === [] ? [self::NONE] : array_values($labels);
+        $settings = $record->products
+            ->map(fn (Product $product): ?ProductMatchSettings => $record->settingsFor($product->id))
+            ->filter()
+            ->values();
+
+        if ($settings->isEmpty()) {
+            $settings = collect([new ProductMatchSettings($record->matching_mode, null, [], $record->locations, true)]);
+        }
+
+        $modes = $settings->map(fn (ProductMatchSettings $entry): ?MatchingMode => $entry->mode)->unique();
+        $mode = $modes->count() === 1 ? $modes->first() : null;
+
+        if (in_array($mode, [MatchingMode::Nationwide, MatchingMode::Wfo, MatchingMode::CountyZone], true)) {
+            return [$mode->shortLabel()];
+        }
+
+        $labels = $settings
+            ->flatMap(fn (ProductMatchSettings $entry): Collection => $entry->locations)
+            ->unique('id')
+            ->sortBy('id')
+            ->pluck('label')
+            ->values()
+            ->all();
+
+        if ($modes->count() > 1) {
+            return [self::MIXED, ...$labels];
+        }
+
+        return $labels === [] ? [self::NONE] : $labels;
     }
 
     /**
@@ -113,6 +143,7 @@ class AlertRulesTable
     {
         return [
             self::NONE,
+            self::MIXED,
             MatchingMode::Nationwide->shortLabel(),
             MatchingMode::Wfo->shortLabel(),
             MatchingMode::CountyZone->shortLabel(),

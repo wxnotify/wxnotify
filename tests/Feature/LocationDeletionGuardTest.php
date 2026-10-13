@@ -7,6 +7,7 @@ use App\Filament\Dashboard\Resources\TraccarServers\Pages\EditTraccarServer;
 use App\Filament\Dashboard\Resources\TraccarServers\Pages\ListTraccarServers;
 use App\Models\AlertRule;
 use App\Models\Location;
+use App\Models\Product;
 use App\Models\TraccarServer;
 use App\Models\User;
 use App\Support\LocationDeletionGuard;
@@ -14,6 +15,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -35,6 +37,19 @@ function listedAlertUsing(Location $location, string $name = 'Storm warnings'): 
     return AlertRule::factory()->locations($location)->for($location->user)->create([
         'name' => $name, 'category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => null,
     ]);
+}
+
+/** A per-product Weather Alerts rule whose only use of the location is its product's own location row. */
+function perProductAlertUsing(Location $location, string $name = 'Tornado polygons'): AlertRule
+{
+    $rule = AlertRule::factory()->for($location->user)->create([
+        'name' => $name, 'category' => 'weather_alerts', 'matching_mode' => null, 'location_id' => null,
+    ]);
+    $product = Product::factory()->create();
+    $rule->products()->attach($product->id, ['matching_mode' => 'polygon', 'wfo' => null, 'county_zone_codes' => null]);
+    DB::table('alert_rule_product_location')->insert(['alert_rule_id' => $rule->id, 'product_id' => $product->id, 'location_id' => $location->id]);
+
+    return $rule;
 }
 
 test('alerts are found through the single location_id', function () {
@@ -214,4 +229,56 @@ test('another subscriber\'s alerts never block my location', function () {
     AlertRule::factory()->dailySummary()->for($stranger)->create(['location_id' => Location::factory()->for($stranger)->create()->id]);
 
     expect(LocationDeletionGuard::alertsUsing($location))->toBeEmpty();
+});
+
+test('alerts are found through a product\'s own locations', function () {
+    $location = Location::factory()->for($this->user)->create();
+    $alert = perProductAlertUsing($location);
+    perProductAlertUsing(Location::factory()->for($this->user)->create(), 'Elsewhere');
+
+    expect(LocationDeletionGuard::alertsUsing($location)->pluck('id')->all())->toBe([$alert->id]);
+});
+
+test('an alert using the location through a product and the locations list appears once', function () {
+    $location = Location::factory()->for($this->user)->create();
+    $alert = perProductAlertUsing($location);
+    $alert->locations()->attach($location->id);
+
+    expect(LocationDeletionGuard::alertsUsing($location)->pluck('id')->all())->toBe([$alert->id]);
+});
+
+test('a location used only by a product\'s own settings cannot be deleted from the Locations table', function () {
+    $location = Location::factory()->for($this->user)->create(['label' => 'Home']);
+    perProductAlertUsing($location, 'Tornado polygons');
+
+    livewire(ListLocations::class)
+        ->callAction(TestAction::make(DeleteAction::class)->table($location))
+        ->assertNotified("Can't delete Home");
+
+    expect(Location::find($location->id))->not->toBeNull()
+        ->and(DB::table('alert_rule_product_location')->where('location_id', $location->id)->exists())->toBeTrue();
+});
+
+test('the refusal names the alert that uses the location through a product', function () {
+    $location = Location::factory()->for($this->user)->create(['label' => 'Home']);
+    perProductAlertUsing($location, 'Tornado polygons');
+
+    livewire(ListLocations::class)
+        ->selectTableRecords([$location->id])
+        ->callAction(TestAction::make(DeleteBulkAction::class)->table()->bulk());
+
+    expect(sentNotificationBodies())->toContain('Tornado polygons');
+});
+
+test('a Traccar server whose location a product uses cannot be deleted', function () {
+    $server = TraccarServer::factory()->for($this->user)->create(['label' => 'Fleet']);
+    $location = Location::factory()->mobile()->for($this->user)->create(['traccar_server_id' => $server->id]);
+    perProductAlertUsing($location);
+
+    livewire(EditTraccarServer::class, ['record' => $server->id])
+        ->callAction(DeleteAction::class)
+        ->assertNotified("Can't delete Fleet")
+        ->assertNoRedirect();
+
+    expect(TraccarServer::find($server->id))->not->toBeNull();
 });

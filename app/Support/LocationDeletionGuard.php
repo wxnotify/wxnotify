@@ -11,10 +11,10 @@ use Illuminate\Support\Collection;
  * Which of a subscriber's alerts would silently stop working if a location (or
  * a Traccar server, whose mobile locations are deleted with it) went away.
  *
- * Deleting a location detaches it from every alert's locations list and nulls
- * the single location_id a scheduled alert (Daily Summary, Threshold,
- * Lightning) depends on -- the alert survives but never fires again, with no
- * warning. The subscriber panel's delete actions refuse while this returns
+ * Deleting a location detaches it from every alert's locations list and from
+ * each product's own locations (per-product matching), and nulls the single
+ * location_id a scheduled alert (Daily Summary, Threshold, Lightning) depends
+ * on -- the alert survives but never fires again, with no warning. The subscriber panel's delete actions refuse while this returns
  * anything and name the alerts; staff in the admin panel are deliberately not
  * guarded.
  */
@@ -58,7 +58,8 @@ final class LocationDeletionGuard
             ->where('user_id', $userId)
             ->where(fn ($query) => $query
                 ->whereIn('location_id', $locationIds)
-                ->orWhereHas('locations', fn ($locations) => $locations->whereIn('locations.id', $locationIds)))
+                ->orWhereHas('locations', fn ($locations) => $locations->whereIn('locations.id', $locationIds))
+                ->orWhereHas('productLocations', fn ($locations) => $locations->whereIn('locations.id', $locationIds)))
             ->with(['products', 'location'])
             ->orderBy('id')
             ->get();
