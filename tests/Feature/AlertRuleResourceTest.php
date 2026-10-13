@@ -1497,3 +1497,122 @@ test('a location added from a row is offered to every row without a reload', fun
     expect($keyBefore)->not->toBeNull()
         ->and($scopeKey($component->html()))->not->toBeNull()->not->toBe($keyBefore);
 });
+
+test('every product table has its own search box and Enable all switch, both handled in the browser', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts']);
+    $html = $component->html();
+    $tableKeys = array_keys($component->get('data.product_settings'));
+
+    expect($tableKeys)->not->toBeEmpty()
+        ->and(substr_count($html, 'data-category-search='))->toBe(count($tableKeys))
+        ->and(substr_count($html, 'data-enable-all='))->toBe(count($tableKeys))
+        ->and($html)->toContain('data-category-search="tornado_and_severe_thunderstorm"')
+        ->and($html)->toContain('data-enable-all="tornado_and_severe_thunderstorm"')
+        ->and($html)->toContain('x-model="search"')
+        ->and($html)->toContain('x-on:click="toggleAll()"')
+        ->and($html)->toContain('Enable all')
+        // Neither makes a request: the search is not a Livewire property and the switch is not wired to a server method.
+        ->and($html)->not->toContain('wire:model="search"');
+
+    preg_match_all('/<input[^>]*data-category-search[^>]*>/s', $html, $searchInputs);
+    preg_match_all('/<button[^>]*data-enable-all[^>]*>/s', $html, $switches);
+
+    expect(implode($searchInputs[0]).implode($switches[0]))->not->toContain('wire:');
+
+    $searchText = e(mb_strtolower($tornadoWarning->name.' '.$tornadoWarning->description));
+
+    expect($html)->toContain('data-search="'.$searchText.'"');
+});
+
+test('enabling every row of one category saves exactly that category\'s products and leaves each row\'s mode and locations alone', function () {
+    $secondLocation = Location::factory()->for($this->user)->create();
+    $category = Product::where('code', 'TO.W')->sole()->category;
+    $inCategory = Product::whereIn('family', BuildAlertRuleOptions::WEATHER_FAMILIES)->where('status', 'active')->where('category', $category->value)->orderBy('id')->get();
+
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts']);
+    $rows = collect($component->get("data.product_settings.{$category->value}"));
+    $rows = $rows->map(fn (array $row): array => $row['matching_mode'] === 'location' ? [...$row, 'location_ids' => [$secondLocation->id]] : $row);
+
+    $component
+        ->fillForm([
+            "product_settings.{$category->value}" => $rows->map(fn (array $row): array => [...$row, 'enabled' => true])->all(),
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($inCategory->count())->toBeGreaterThan(1)
+        ->and($rule->products->pluck('id')->all())->toEqualCanonicalizing($inCategory->pluck('id')->all());
+
+    foreach ($rows as $row) {
+        $settings = $rule->settingsFor($row['product_id']);
+
+        expect($settings->mode->value)->toBe($row['matching_mode'])
+            ->and($settings->locations->pluck('id')->all())->toEqualCanonicalizing($row['location_ids']);
+    }
+});
+
+test('Enable all on one category while editing keeps the products and settings of the others, and Disable all clears only its own', function () {
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'OKX', 'cwa' => 'OKX', 'city' => 'Upton', 'st' => 'NY', 'citystate' => 'Upton NY',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $afd = Product::where('code', 'AFD')->sole();
+    $category = $tornadoWarning->category;
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'weather_alerts',
+        'product_settings' => [
+            ['product_id' => $tornadoWarning->id, 'matching_mode' => 'polygon', 'location_ids' => [$this->location->id]],
+            ['product_id' => $afd->id, 'matching_mode' => 'wfo', 'wfo' => 'OKX'],
+        ],
+        'channel_ids' => [$this->channel->id],
+    ]);
+    $inCategory = Product::whereIn('family', BuildAlertRuleOptions::WEATHER_FAMILIES)->where('status', 'active')->where('category', $category->value)->pluck('id')->all();
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $rows = collect($component->get("data.product_settings.{$category->value}"));
+
+    $component
+        ->fillForm(["product_settings.{$category->value}" => $rows->map(fn (array $row): array => [...$row, 'enabled' => true])->all()])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->products->pluck('id')->all())->toEqualCanonicalizing([...$inCategory, $afd->id])
+        ->and($rule->fresh()->settingsFor($tornadoWarning->id)->mode)->toBe(MatchingMode::Polygon)
+        ->and($rule->fresh()->settingsFor($afd->id)->wfo)->toBe('OKX');
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $rows = collect($component->get("data.product_settings.{$category->value}"));
+
+    $component
+        ->fillForm(["product_settings.{$category->value}" => $rows->map(fn (array $row): array => [...$row, 'enabled' => false])->all()])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->products->pluck('id')->all())->toBe([$afd->id])
+        ->and($rule->fresh()->settingsFor($afd->id)->wfo)->toBe('OKX');
+});
+
+test('switching every product off leaves nothing to save', function () {
+    $category = Product::where('code', 'TO.W')->sole()->category;
+
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts']);
+    $rows = collect($component->get("data.product_settings.{$category->value}"));
+
+    $component
+        ->fillForm([
+            "product_settings.{$category->value}" => $rows->map(fn (array $row): array => [...$row, 'enabled' => false])->all(),
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['product_settings.tornado_and_severe_thunderstorm' => 'Select at least one product.']);
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+});

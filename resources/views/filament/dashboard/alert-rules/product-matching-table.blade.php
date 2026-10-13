@@ -17,6 +17,17 @@
     // Disjoint class lists, so Alpine's object syntax can swap them without dropping a shared class.
     $onClasses = Arr::toCssClasses(['fi-toggle-on', ...get_component_color_classes(ToggleComponent::class, 'primary')]);
     $offClasses = Arr::toCssClasses(['fi-toggle-off', ...get_component_color_classes(ToggleComponent::class, 'gray')]);
+    $allOn = $rows !== [] && collect($rows)->every(fn (array $row): bool => filter_var($row['enabled'] ?? false, FILTER_VALIDATE_BOOL));
+    $categoryKey = $getProductCategory()->value;
+    $categoryLabel = $getProductCategory()->label();
+    // What Enable all writes: each row's state path, and whether its switch refreshes the form.
+    $bulkRows = collect($rows)
+        ->map(fn (array $row, int|string $index): array => [
+            'path' => "{$statePath}.{$index}",
+            'refreshes' => $switchRefreshesForm($products->get((int) $row['product_id'])),
+        ])
+        ->values()
+        ->all();
 @endphp
 
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
@@ -30,6 +41,13 @@
         The scope captures the location list when it starts, so its wire:key changes with the
         list: adding a location from a row makes the morph replace the table and start a new
         scope that offers it (Alpine state is not re-read on a morph).
+
+        Search and Enable all are this scope too, so neither makes a request. Search hides a row
+        (x-show) whose data-search text lacks the typed text; the row keeps its state, so it still
+        saves. Enable all writes every row's `enabled` with a deferred $wire.set(), and reads ON
+        exactly when every row of this table is on. A bulk change that flips an SPC & WPC
+        risk-level product asks for ONE $wire.$refresh() afterwards (the deferred changes travel
+        with it), so the server-rendered risk-level checklist matches what is now switched on.
     --}}
     <div
         wire:key="{{ $statePath }}.locations.{{ md5(json_encode($locationOptions)) }}"
@@ -40,6 +58,32 @@
             locationLabels: @js((object) $locationLabels),
             onClasses: @js($onClasses),
             offClasses: @js($offClasses),
+            rows: @js($bulkRows),
+            search: '',
+            matches(text) {
+                let needle = this.search.trim().toLowerCase()
+
+                return needle === '' || text.includes(needle)
+            },
+            get noMatch() {
+                if (this.search.trim() === '') {
+                    return false
+                }
+
+                return ! [...this.$root.querySelectorAll('tr[data-search]')].some((tr) => this.matches(tr.dataset.search))
+            },
+            isOn(row) { return !! this.$wire.get(row.path + '.enabled') },
+            get allOn() { return this.rows.length > 0 && this.rows.every((row) => this.isOn(row)) },
+            toggleAll() {
+                let on = ! this.allOn
+                let changed = this.rows.filter((row) => this.isOn(row) !== on)
+
+                changed.forEach((row) => this.$wire.set(row.path + '.enabled', on, false))
+
+                if (changed.some((row) => row.refreshes)) {
+                    this.$wire.$refresh()
+                }
+            },
             row(path) {
                 return {
                     path,
@@ -72,6 +116,46 @@
             </datalist>
         @endif
 
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="fi-input-wrp w-full sm:max-w-xs">
+                <div class="fi-input-wrp-content-ctn">
+                    <input
+                        type="search"
+                        class="fi-input"
+                        autocomplete="off"
+                        placeholder="Search {{ $categoryLabel }}"
+                        aria-label="Search {{ $categoryLabel }} products"
+                        data-category-search="{{ $categoryKey }}"
+                        x-model="search"
+                        x-on:keydown.enter.prevent
+                    />
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button
+                    type="button"
+                    role="switch"
+                    id="{{ $statePath }}.enable-all"
+                    aria-label="Enable all {{ $categoryLabel }} products"
+                    data-enable-all="{{ $categoryKey }}"
+                    aria-checked="{{ $allOn ? 'true' : 'false' }}"
+                    x-bind:aria-checked="allOn ? 'true' : 'false'"
+                    x-on:click="toggleAll()"
+                    class="fi-toggle {{ $allOn ? $onClasses : $offClasses }}"
+                    x-bind:class="{ [onClasses]: allOn, [offClasses]: ! allOn }"
+                >
+                    <div>
+                        <div aria-hidden="true"></div>
+                        <div aria-hidden="true"></div>
+                    </div>
+                </button>
+                <label for="{{ $statePath }}.enable-all" class="text-sm font-medium text-gray-950 dark:text-white">Enable all</label>
+            </div>
+        </div>
+
+        <p x-show="noMatch" x-cloak class="py-3 text-sm text-gray-500 dark:text-gray-400">No products match your search.</p>
+
         <table class="w-full table-auto text-start text-sm">
             <thead class="sr-only">
                 <tr>
@@ -95,6 +179,8 @@
                     <tr
                         wire:key="{{ $statePath }}.{{ $index }}.{{ $product->id }}"
                         data-product-id="{{ $product->id }}"
+                        data-search="{{ mb_strtolower(trim($product->name.' '.$product->description)) }}"
+                        x-show="matches($el.dataset.search)"
                         x-data="row(@js($rowPath))"
                         x-bind:class="{ 'opacity-50': ! on }"
                         @class(['align-top transition-opacity', 'opacity-50' => ! $isOn])
