@@ -4,7 +4,6 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Schemas;
 
 use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Enums\AlertCategory;
-use App\Enums\MatchingMode;
 use App\Enums\MessageBodyStyle;
 use App\Enums\ProductCategory;
 use App\Enums\ThresholdDirection;
@@ -13,13 +12,13 @@ use App\Enums\ThresholdVariable;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertTemplates\Schemas\AlertTemplateForm;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
+use App\Models\AlertRule;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use App\Support\Units;
-use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Radio;
@@ -27,19 +26,16 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Schemas\Components\Component;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Exists;
-use Jbuitt\FilamentToggleList\ToggleList;
 
 class AlertRuleForm
 {
@@ -75,41 +71,36 @@ class AlertRuleForm
                     ->descriptions(collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [$c->value => $c->description()]))
                     ->required()
                     ->live()
-                    ->afterStateUpdated(function (Set $set, Get $get): void {
-                        self::seedProductIdsDefaults($set, $get);
+                    ->afterStateUpdated(function (Set $set, Get $get, ?AlertRule $record): void {
+                        self::seedProductSettings($set, $get, $record);
                         self::clearAlertTemplateIfCategoryUnsupported($set, $get);
                     }),
             ]);
     }
 
     /**
-     * `product_ids.{category}` fields only enter the schema once `category`
-     * is picked (detailsStep()'s schema is a `fn (Get $get) => match(...)`
-     * closure) — they don't exist at the wizard's initial mount, so
-     * Filament's normal fill()-time default() application never runs for
-     * them. Left alone, each starts out `null` rather than `[]` the first
-     * time its ToggleList renders, and multiple checkboxes sharing one
-     * wire:model path whose current value is `null` (not an array) get
-     * bound by Livewire as a single boolean toggle instead of a
-     * checkbox-group array — confirmed via a real browser network capture:
-     * checking one box produced `product_ids.tornado_and_severe_thunderstorm
-     * = true`, not `[<id>]`, with every untouched sibling category left as
-     * `null`. Explicitly seeding every category to a real `[]` here, before
-     * the checkboxes ever render for the first time, fixes the binding at
-     * its source. Guarded on the current value already being `null` so
-     * switching categories back and forth never wipes a real selection.
-     * The per-category `risk_levels.{category}` checklists have the same
-     * null-binding problem and are seeded here too.
+     * The product tables (`product_settings.{category}`) only enter the schema once `category` is
+     * picked (detailsStep()'s schema is a `fn (Get $get) => match(...)` closure), so field
+     * defaults never apply to them: every row of the chosen alert category is seeded here, before
+     * the table first renders (see ProductMatchingTable::formState(); rows already in the form
+     * survive switching category away and back, and on Edit the rule's watched products come
+     * back with their stored settings).
+     *
+     * The per-category `risk_levels.{category}` checklists are seeded to `[]`: multiple
+     * checkboxes sharing one wire:model path whose value is `null` bind as a single boolean
+     * instead of an array. Guarded on `null` so a real selection is never wiped.
      */
-    protected static function seedProductIdsDefaults(Set $set, Get $get): void
+    protected static function seedProductSettings(Set $set, Get $get, ?AlertRule $record): void
     {
-        foreach (ProductCategory::cases() as $category) {
-            if ($get("product_ids.{$category->value}") === null) {
-                $set("product_ids.{$category->value}", []);
-            }
+        $category = AlertCategory::tryFrom((string) $get('category'));
 
-            if ($get("risk_levels.{$category->value}") === null) {
-                $set("risk_levels.{$category->value}", []);
+        if (ProductMatchingTable::supports($category)) {
+            $set('product_settings', ProductMatchingTable::formState(auth()->user(), $category, $record, $get('product_settings')));
+        }
+
+        foreach (ProductCategory::cases() as $productCategory) {
+            if ($get("risk_levels.{$productCategory->value}") === null) {
+                $set("risk_levels.{$productCategory->value}", []);
             }
         }
     }
@@ -134,9 +125,8 @@ class AlertRuleForm
     {
         return Step::make('Set it up')
             ->schema(function (Get $get): array {
-                $fields = match (AlertCategory::tryFrom($get('category'))) {
-                    AlertCategory::WeatherAlerts => self::weatherAlertsFields(),
-                    AlertCategory::SpcWpc => self::spcWpcFields(),
+                $fields = match ($category = AlertCategory::tryFrom($get('category'))) {
+                    AlertCategory::WeatherAlerts, AlertCategory::SpcWpc => ProductMatchingTable::sections($category, ProductMatchingTable::productIdsIn($get('product_settings'))),
                     AlertCategory::Threshold => self::thresholdFields(),
                     AlertCategory::DailySummary => self::dailySummaryFields(),
                     AlertCategory::Lightning => self::lightningFields(),
@@ -156,11 +146,11 @@ class AlertRuleForm
     }
 
     /**
-     * Multiple, not CheckboxList: unlike product_ids/location_id, this field
+     * Multiple, not CheckboxList: unlike location_id, this field
      * lives in a STATIC step schema (channelsStep() above is a plain array,
      * not a Step::schema(fn (Get $get) => ...) closure) — it exists on every
      * render from the wizard's first mount onward, so it doesn't hit the
-     * entangle bug documented on locationSelect()/productSections().
+     * entangle bug documented on locationSelect().
      * That's what makes it safe to use Select::multiple() here.
      *
      * One suffix action per channel type, not a single createOptionForm()
@@ -252,8 +242,8 @@ class AlertRuleForm
 
     /**
      * Deliberately native, not ->searchable()/->relationship() -- same
-     * dynamic-Wizard-step entangle bug documented on locationSelect() and
-     * wfoField() above applies here too, since this field's ->visible()
+     * dynamic-Wizard-step entangle bug documented on locationSelect()
+     * applies here too, since this field's ->visible()
      * closure depends on `category`, which is set in an earlier step.
      * Additive alongside message_body_style/custom_subject_template above,
      * not a replacement -- see this field's helperText.
@@ -275,63 +265,23 @@ class AlertRuleForm
     }
 
     /**
-     * @return array<Component>
-     */
-    protected static function weatherAlertsFields(): array
-    {
-        return [
-            ...self::productSections(Product::query()
-                ->whereIn('family', ['warning', 'watch', 'advisory', 'statement', 'informational', 'administrative', 'aviation', 'forecast_discussion'])
-                ->where('status', 'active')),
-            ...self::matchingModeFields(AlertCategory::WeatherAlerts),
-        ];
-    }
-
-    /**
-     * @return array<Component>
-     */
-    protected static function spcWpcFields(): array
-    {
-        return [
-            ...self::productSections(Product::query()
-                ->where('family', 'spc_wpc')
-                ->where('status', 'active'), withRiskLevels: true),
-            ...self::matchingModeFields(AlertCategory::SpcWpc),
-        ];
-    }
-
-    /**
-     * Shared by the per-category risk-level checklists (riskLevelFields())
-     * and matchingModeFields()'s SPC/WPC option set below, so both stay in
-     * lockstep: a rule only ever sees the RiskArea matching mode when it
-     * would also see the risk-level checkboxes that mode's threshold reads
-     * from.
-     */
-    protected static function hasRiskLevelProducts(Get $get): bool
-    {
-        return Product::query()
-            ->whereIn('id', self::selectedProductIds($get))
-            ->whereNotNull('risk_level_options')
-            ->exists();
-    }
-
-    /**
      * A category's own "Risk levels" checklist, shown inside that category's section when
      * any product in it offers risk levels (today: Fire Weather and Convective Outlooks).
-     * State is nested per category, `risk_levels.{category}`, like `product_ids.{category}`,
+     * State is nested per category, `risk_levels.{category}`, like `product_settings.{category}`,
      * so each checklist keeps its own state; the Create/Edit pages flatten it into the
      * stored `risk_levels` column and split it back on edit (see SpcWpcRiskLevels).
-     * Options are the selected products' own `risk_level_options`; the list is hidden unless
-     * a selected product in this category offers some.
+     * Options are the switched-on products' own `risk_level_options`; the list is hidden unless
+     * a switched-on product in this category offers some (the switch of such a product
+     * re-renders the form, see ProductMatchingTable::switchRefreshesForm()).
      *
      * The candidates are the category's SPC & WPC products of ANY status that offer risk
-     * levels, not just the active ones the toggle list shows: matching, hasRiskLevelProducts()
-     * and SpcWpcRiskLevels::split() do not filter by status either, so a rule still attached to
-     * a since-retired product keeps its checklist (and its stored levels on save).
+     * levels, not just the active ones: matching and SpcWpcRiskLevels::split() do not filter by
+     * status either, so a rule still attached to a since-retired product keeps its checklist
+     * (and its stored levels on save).
      *
      * @return array<CheckboxList>
      */
-    protected static function riskLevelFields(ProductCategory $category): array
+    public static function riskLevelFields(ProductCategory $category): array
     {
         $riskProducts = Product::query()
             ->where('family', 'spc_wpc')
@@ -344,7 +294,7 @@ class AlertRuleForm
         }
 
         $selectedRiskProducts = fn (Get $get): Collection => $riskProducts
-            ->whereIn('id', self::selectedProductIds($get, "product_ids.{$category->value}"));
+            ->whereIn('id', self::selectedProductIds($get, $category));
 
         return [
             CheckboxList::make("risk_levels.{$category->value}")
@@ -373,140 +323,14 @@ class AlertRuleForm
     }
 
     /**
-     * Renders the given product query as one collapsible Section per
-     * ProductCategory present in the results, each holding a ToggleList
-     * (jbuitt/filament-toggle-list — a CheckboxList-alike that renders
-     * genuine toggle switches instead of checkboxes, right down to using
-     * plain wire:model on a real <input type="checkbox">, same as
-     * CheckboxList — see locationSelect()'s note on the dynamic-Wizard-step
-     * entangle bug; that's what makes it safe here too) of that category's
-     * products with their descriptions shown inline.
+     * The switched-on products of the product tables (`product_settings.*`), or of one
+     * category's table.
      *
-     * Each ToggleList is named `product_ids.{category}` rather than a
-     * single flat `product_ids` — Filament stores this as a nested array
-     * (`product_ids => ['warning' => [1, 2], 'watch' => [3]]`), so every
-     * category keeps its own field/state without a manual merge step. Callers
-     * needing the flat list of selected IDs (risk_levels above, and the
-     * Create/Edit pages' pivot sync) use selectedProductIds()/flattening.
-     *
-     * Sections start collapsed unless they already hold a selection (so
-     * editing an existing rule doesn't hide what's checked), except Tornado
-     * and Severe Thunderstorm, which always starts expanded — it's the most
-     * commonly used category, so it shouldn't need an extra click on a
-     * fresh Create.
-     *
-     * Only the SPC & WPC form passes `$withRiskLevels`: it adds each category's own
-     * risk-level checklist (see riskLevelFields()) to the section.
-     *
-     * @return array<Section>
+     * @return list<int>
      */
-    protected static function productSections(Builder $query, bool $withRiskLevels = false): array
+    protected static function selectedProductIds(Get $get, ?ProductCategory $only = null): array
     {
-        $productsByCategory = $query->orderBy('sort_order')->get(['id', 'name', 'description', 'category'])
-            ->groupBy(fn (Product $product): ?string => $product->category?->value);
-
-        return collect(ProductCategory::cases())
-            ->filter(fn (ProductCategory $category): bool => $productsByCategory->has($category->value))
-            ->values()
-            ->map(function (ProductCategory $category, int $index) use ($productsByCategory, $withRiskLevels): Section {
-                $fieldName = "product_ids.{$category->value}";
-                $products = $productsByCategory->get($category->value);
-
-                $toggleList = ToggleList::make($fieldName)
-                    ->hiddenLabel()
-                    ->searchable()
-                    ->bulkToggleable()
-                    ->columns(1)
-                    ->live()
-                    ->options($products->pluck('name', 'id'))
-                    ->descriptions($products->pluck('description', 'id'));
-
-                // Only the first section carries the "at least one product"
-                // check — it validates the flattened total across every
-                // section, so attaching it to each one would just repeat the
-                // same error under every category.
-                if ($index === 0) {
-                    $toggleList = $toggleList->rules([
-                        fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
-                            if (self::selectedProductIds($get) === []) {
-                                $fail('Select at least one product.');
-                            }
-                        },
-                    ]);
-                }
-
-                return Section::make($category->label())
-                    ->icon($category->icon())
-                    ->collapsible()
-                    ->collapsed(fn (Get $get): bool => $category !== ProductCategory::TornadoAndSevereThunderstorm
-                        && self::selectedProductIds($get, $fieldName) === [])
-                    ->schema([$toggleList, ...($withRiskLevels ? self::riskLevelFields($category) : [])]);
-            })
-            ->all();
-    }
-
-    /**
-     * @return array<int>
-     */
-    protected static function selectedProductIds(Get $get, ?string $onlyPath = null): array
-    {
-        if ($onlyPath !== null) {
-            return collect($get($onlyPath))->filter(fn ($id): bool => is_numeric($id))->values()->all();
-        }
-
-        return collect($get('product_ids'))->flatten()->filter(fn ($id): bool => is_numeric($id))->unique()->values()->all();
-    }
-
-    /**
-     * Weather Alerts gets all 5 modes, unchanged. SPC/WPC never offers
-     * Location/WFO/County-Zone at all -- SPC/WPC always issues from the
-     * same two offices nationwide, so they're meaningless there -- and
-     * swaps Polygon for RiskArea (or keeps Polygon) depending on whether
-     * the products selected in the step above actually carry categorical
-     * risk levels (see hasRiskLevelProducts()): RiskArea's threshold reads
-     * risk_levels, which only exists for those products, while a plain
-     * event-type SPC/WPC product (Mesoscale Discussion, WPC MPD) has a
-     * real single polygon of its own that Polygon mode already matches
-     * correctly. Known minor gap: switching which products are selected
-     * within the SAME spc_wpc rule, after matching_mode is already set,
-     * can leave a no-longer-offered mode selected with nothing shown
-     * checked -- narrow enough (it needs a product-set change, not just a
-     * category change, which existing dynamic-step patterns already don't
-     * carry state across) not to chase further here.
-     *
-     * @return array<Component>
-     */
-    protected static function matchingModeFields(AlertCategory $category): array
-    {
-        $allowedModes = fn (Get $get): array => match ($category) {
-            AlertCategory::SpcWpc => self::hasRiskLevelProducts($get)
-                ? [MatchingMode::Nationwide, MatchingMode::RiskArea]
-                : [MatchingMode::Nationwide, MatchingMode::Polygon],
-            // RiskArea's threshold reads risk_levels, which only Weather
-            // Alerts' sibling spc_wpc branch above ever populates -- every
-            // other mode is fair game here.
-            default => array_values(array_filter(
-                MatchingMode::cases(),
-                fn (MatchingMode $m): bool => $m !== MatchingMode::RiskArea,
-            )),
-        };
-
-        return [
-            Radio::make('matching_mode')
-                ->label('Matching mode')
-                ->options(fn (Get $get): array => collect($allowedModes($get))->mapWithKeys(fn (MatchingMode $m) => [$m->value => $m->label()])->all())
-                ->descriptions(fn (Get $get): array => collect($allowedModes($get))->mapWithKeys(fn (MatchingMode $m) => [$m->value => $m->helperText()])->all())
-                ->required()
-                ->live(),
-            self::locationsSelect()
-                ->visible(fn (Get $get): bool => in_array($get('matching_mode'), [MatchingMode::Location->value, MatchingMode::Polygon->value, MatchingMode::RiskArea->value], true)),
-            self::wfoField()
-                ->visible(fn (Get $get): bool => $get('matching_mode') === MatchingMode::Wfo->value),
-            self::countyZoneStateField()
-                ->visible(fn (Get $get): bool => $get('matching_mode') === MatchingMode::CountyZone->value),
-            self::countyZoneField()
-                ->visible(fn (Get $get): bool => $get('matching_mode') === MatchingMode::CountyZone->value),
-        ];
+        return ProductMatchingTable::enabledProductIds($get($only === null ? 'product_settings' : "product_settings.{$only->value}"));
     }
 
     /**
@@ -582,8 +406,8 @@ class AlertRuleForm
      *
      * Threshold/DailySummary/Lightning only -- these categories each pick a
      * single location directly (no matching_mode concept), so they keep
-     * this singular location_id field. See locationsSelect() below for the
-     * Weather Alerts/SPC & WPC multi-location field.
+     * this singular location_id field. Weather Alerts and SPC & WPC pick
+     * locations per product in ProductMatchingTable.
      */
     protected static function locationSelect(): Select
     {
@@ -605,78 +429,28 @@ class AlertRuleForm
     }
 
     /**
-     * Weather Alerts/SPC & WPC only -- Threshold/DailySummary/Lightning
-     * keep the separate singular location_id field (daily summary/
-     * threshold/lightning fields aren't built through this method).
-     * ->multiple() is safe in this dynamic Step::schema(fn (Get $get) =>
-     * ...) context because options() below is a plain closure, not
-     * ->relationship() -- see countyZoneField()'s docblock in this same
-     * file, proven safe here in a real browser already for exactly this
-     * reason. ->exists() applied directly to this multiple() field's array
-     * value works with no extra wiring: Laravel's own validateExists()
-     * (Illuminate\Validation\Concerns\ValidatesAttributes) counts unique
-     * values in the submitted array and requires that many matches from
-     * the scoped query, so a single id belonging to another subscriber
-     * fails the whole field -- verified by reading that method directly,
-     * not assumed, and covered by "a subscriber cannot attach another
-     * subscriber's location via location_ids" below.
+     * Every NWS office for the product table's WFO input, from cwa_boundaries (125 real rows,
+     * one per WFO, from the AWIPS Shapefile Management feature), keyed on the natural `cwa`
+     * code (the exact 3-letter identifier this app compares against IngestedProduct.cccc) and
+     * labelled "CODE — City, ST" for a subscriber who doesn't know their office's code.
+     *
+     * @return array<string, string>
      */
-    protected static function locationsSelect(): Select
+    public static function wfoOptions(): array
     {
-        return Select::make('location_ids')
-            ->label('Locations')
-            ->multiple()
-            ->options(fn (): array => auth()->user()->locations()->pluck('label', 'id')->all())
-            ->required()
-            ->exists('locations', 'id', fn (Exists $rule): Exists => $rule->where('user_id', auth()->id()))
-            ->createOptionForm(LocationForm::fields())
-            ->createOptionAction(fn (Action $action): Action => $action
-                ->visible(fn (): bool => auth()->user()->canCreateLocation())
-                ->modalHeading('Add a location'))
-            ->createOptionUsing(fn (array $data): int => auth()->user()->locations()->create($data)->getKey())
-            ->helperText(fn (): ?string => match (true) {
-                auth()->user()->locations()->exists() => null,
-                auth()->user()->canCreateLocation() => 'No saved locations yet — use the + button to add one.',
-                default => 'You\'ve reached your location limit — remove one or upgrade to add another.',
-            });
+        return DB::table('cwa_boundaries')->orderBy('cwa')->get(['cwa', 'city', 'st', 'citystate'])
+            ->mapWithKeys(fn ($row): array => [$row->cwa => filled($row->city) && filled($row->st)
+                ? "{$row->cwa} — {$row->city}, {$row->st}"
+                : "{$row->cwa} — {$row->citystate}"])
+            ->all();
     }
 
     /**
-     * A real picker, not free text: options come from cwa_boundaries (125
-     * real rows, one per WFO, from the AWIPS Shapefile Management feature),
-     * keyed on the natural `cwa` code (already the exact 3-letter identifier
-     * this app compares against IngestedProduct.cccc elsewhere) and labeled
-     * with the office's real city/state for a subscriber who doesn't have
-     * their local office's code memorized. See locationSelect()'s note below
-     * for why ->searchable() is safe here despite this file's documented
-     * dynamic-step entangle bug.
+     * The county/zone picker, shown in the product table's "Choose zones" modal (one row at a
+     * time; see ProductMatchingTable). Searchable/multiple Selects are safe in an action modal:
+     * options() is a plain closure resolved server-side, with no relationship()/AJAX entangle.
      */
-    protected static function wfoField(): Select
-    {
-        return Select::make('wfo')
-            ->label('NWS office (WFO)')
-            ->searchable()
-            ->required()
-            ->options(fn (): array => DB::table('cwa_boundaries')->orderBy('cwa')->get(['cwa', 'citystate'])
-                ->mapWithKeys(fn ($row): array => [$row->cwa => "{$row->cwa} — {$row->citystate}"])
-                ->all());
-    }
-
-    /**
-     * These fields use ->searchable()/->multiple() inside this same dynamic
-     * Step::schema(fn (Get $get) => ...) context that locationSelect()
-     * deliberately avoids those on, per this file's own documented Livewire
-     * entangle bug (see .ai/rules/filament.md). That bug doesn't apply here
-     * (or to wfoField() above): options() is a plain closure resolved and
-     * embedded server-side at render time (no relationship()/live AJAX
-     * round-trip), which is what the entangle failure mode actually depends
-     * on. Verified directly in a real browser (not just Pest's fillForm(),
-     * which sets Livewire state directly and can't detect an entangle
-     * desync): Create, and Edit-then-Save on an existing CountyZone rule,
-     * both hydrate and persist the real stored codes correctly with no
-     * console errors.
-     */
-    protected static function countyZoneStateField(): Select
+    public static function countyZoneStateField(): Select
     {
         return Select::make('county_zone_state')
             ->label('Filter by state')
@@ -687,7 +461,7 @@ class AlertRuleForm
             ->helperText('Narrows the list below to one state at a time — the codes you pick can still span multiple states.');
     }
 
-    protected static function countyZoneField(): Select
+    public static function countyZoneField(): Select
     {
         return Select::make('county_zone_codes')
             ->label('Counties / zones (UGC)')

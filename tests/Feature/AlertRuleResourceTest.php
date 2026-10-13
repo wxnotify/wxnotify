@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Alerts\BuildAlertRuleOptions;
 use App\Actions\Alerts\SaveAlertRule;
 use App\Enums\MatchingMode;
 use App\Enums\ProductStatus;
@@ -8,6 +9,7 @@ use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\EditAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
+use App\Filament\Dashboard\Resources\AlertRules\Schemas\ProductMatchingTable;
 use App\Models\AlertRule;
 use App\Models\AlertTemplate;
 use App\Models\Location;
@@ -21,7 +23,6 @@ use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Jbuitt\FilamentToggleList\ToggleList;
 
 use function Pest\Livewire\livewire;
 
@@ -100,9 +101,7 @@ test('creating a weather alerts rule persists the chosen products and matching m
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
-            'matching_mode' => 'location',
-            'location_ids' => [$this->location->id],
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'location', ['location_ids' => [$this->location->id]])],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -111,8 +110,11 @@ test('creating a weather alerts rule persists the chosen products and matching m
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
     expect($rule->settingsFor($tornadoWarning->id)->mode->value)->toBe('location')
+        ->and($rule->settingsFor($tornadoWarning->id)->inherited)->toBeFalse()
         ->and($rule->settingsFor($tornadoWarning->id)->locations->pluck('id')->all())->toBe([$this->location->id])
         ->and($rule->products->pluck('id')->all())->toBe([$tornadoWarning->id])
+        ->and($rule->only(['matching_mode', 'wfo', 'county_zone_codes']))->toBe(['matching_mode' => null, 'wfo' => null, 'county_zone_codes' => null])
+        ->and($rule->locations)->toBeEmpty()
         ->and($rule->displayName())->toBe('Tornado Warning');
 });
 
@@ -122,8 +124,7 @@ test('creating a nationwide weather alerts rule does not require a location', fu
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
-            'matching_mode' => 'nationwide',
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'nationwide')],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -132,29 +133,25 @@ test('creating a nationwide weather alerts rule does not require a location', fu
     $rule = AlertRule::where('user_id', $this->user->id)->sole();
 
     expect($rule->settingsFor($tornadoWarning->id)->mode->value)->toBe('nationwide')
+        ->and($rule->settingsFor($tornadoWarning->id)->locations)->toBeEmpty()
         ->and($rule->location_id)->toBeNull();
 });
 
-test('a corrupted product_ids shape is rejected by validation instead of crashing or silently creating an empty rule', function () {
-    // Regression: a real browser session hit a Livewire quirk where a
-    // dynamically-appearing ToggleList field (only entering the schema
-    // after `category` is picked — see
-    // AlertRuleForm::seedProductIdsDefaults()'s docblock) started out
-    // `null` instead of `[]`, causing the checkbox to bind as a single
-    // boolean rather than a checkbox-group array. This reproduces the
-    // exact corrupted shape captured from that real network request —
-    // one touched category holding `true`, untouched siblings holding
-    // `null` — and confirms it's now caught by validation, not left to
-    // crash sync() with a Postgres bigint cast error on an empty string.
+test('a corrupted product_settings shape is rejected by validation instead of crashing or silently creating an empty rule', function () {
+    // Regression: a real browser session once hit a Livewire quirk where a
+    // dynamically-appearing product field started out `null` instead of an
+    // array, so a checkbox bound as a single boolean. This reproduces that
+    // corrupted shape (one touched category holding `true`, untouched
+    // siblings holding `null`, plus a row that is not an array) and confirms
+    // it is caught by validation, not left to crash the render or the sync.
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [
+            'product_settings' => [
                 'tornado_and_severe_thunderstorm' => true,
                 'flooding_and_hydrological' => null,
-                'winter_weather' => null,
+                'winter_weather' => ['not a row'],
             ],
-            'matching_mode' => 'nationwide',
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -176,8 +173,7 @@ test('a weather alerts rule can select products outside the graduated warning/wa
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$civilDanger->category->value => [$civilDanger->id]],
-            'matching_mode' => 'nationwide',
+            "product_settings.{$civilDanger->category->value}" => [alertWizardRow($civilDanger, 'nationwide')],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -194,9 +190,8 @@ test('creating an spc wpc rule persists the chosen risk levels', function () {
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'spc_wpc',
-            'product_ids' => [$outlook->category->value => [$outlook->id]],
+            "product_settings.{$outlook->category->value}" => [alertWizardRow($outlook, 'nationwide')],
             'risk_levels' => ['convective_outlooks' => ['Enhanced', 'Moderate', 'High']],
-            'matching_mode' => 'nationwide',
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -215,10 +210,8 @@ test('an spc wpc rule for the Convective Outlook can use RiskArea matching mode 
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'spc_wpc',
-            'product_ids' => [$outlook->category->value => [$outlook->id]],
+            "product_settings.{$outlook->category->value}" => [alertWizardRow($outlook, 'risk_area', ['location_ids' => [$location->id]])],
             'risk_levels' => ['convective_outlooks' => ['Moderate']],
-            'matching_mode' => 'risk_area',
-            'location_ids' => [$location->id],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -231,20 +224,23 @@ test('an spc wpc rule for the Convective Outlook can use RiskArea matching mode 
 });
 
 test('RiskArea is not offered as a matching mode for weather_alerts -- it only applies to spc_wpc', function () {
-    // Regression: matchingModeFields()'s default branch (every non-spc_wpc
-    // category) used to return MatchingMode::cases() unfiltered, which
-    // started including RiskArea the moment that case was added for SPC/WPC
-    // -- "By risk area at my location" leaked into Weather Alerts' picker
-    // even though its threshold logic (risk_levels) only exists on the
-    // spc_wpc branch.
-    livewire(CreateAlertRule::class)
-        ->fillForm(['category' => 'weather_alerts'])
-        ->assertFormFieldExists('matching_mode', function (Radio $field): bool {
-            $optionValues = array_keys($field->getOptions());
+    // Regression: the Weather Alerts mode picker once returned
+    // MatchingMode::cases() unfiltered, which started including RiskArea the
+    // moment that case was added for SPC/WPC -- "By risk area at my location"
+    // leaked into Weather Alerts even though its threshold logic
+    // (risk_levels) only exists for SPC & WPC. Every row is checked.
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts']);
 
-            return ! in_array(MatchingMode::RiskArea->value, $optionValues, true)
-                && in_array(MatchingMode::Polygon->value, $optionValues, true);
+    foreach (Product::whereIn('family', BuildAlertRuleOptions::WEATHER_FAMILIES)->where('status', 'active')->pluck('category')->unique() as $category) {
+        $component->assertFormFieldExists("product_settings.{$category->value}", function (ProductMatchingTable $field): bool {
+            return collect($field->getState())->every(function (array $row) use ($field): bool {
+                $optionValues = array_keys($field->modeOptionsFor($row));
+
+                return ! in_array(MatchingMode::RiskArea->value, $optionValues, true)
+                    && in_array(MatchingMode::Polygon->value, $optionValues, true);
+            });
         });
+    }
 });
 
 test('creating a lightning alert rejects a radius below the enforced minimum', function () {
@@ -291,9 +287,7 @@ test('creating a Weather Alerts rule for the Area Forecast Discussion picks a re
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$afd->category->value => [$afd->id]],
-            'matching_mode' => 'wfo',
-            'wfo' => 'OKX',
+            "product_settings.{$afd->category->value}" => [alertWizardRow($afd, 'wfo', ['wfo' => 'OKX'])],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -321,13 +315,14 @@ test('the WFO picker rejects an office not in the real cwa_boundaries table', fu
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$afd->category->value => [$afd->id]],
-            'matching_mode' => 'wfo',
-            'wfo' => 'ZZZ',
+            "product_settings.{$afd->category->value}" => [alertWizardRow($afd, 'wfo', ['wfo' => 'ZZZ'])],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
-        ->assertHasFormErrors(['wfo']);
+        ->assertHasFormErrors(["product_settings.{$afd->category->value}"])
+        ->assertSee('Choose a known NWS office for Area Forecast Discussion.');
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
 });
 
 test('a Wfo-mode weather alerts rule persists the office selected from the picker', function () {
@@ -342,9 +337,8 @@ test('a Wfo-mode weather alerts rule persists the office selected from the picke
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
-            'matching_mode' => 'wfo',
-            'wfo' => 'BUF',
+            // Typed in lower case into the datalist input: stored as the office's code.
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'wfo', ['wfo' => ' buf'])],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -474,7 +468,7 @@ test('channel types that cannot be created inline get no suffix action on the ch
         ->assertFormComponentActionExists('channel_ids', 'connect_discord');
 });
 
-test('the CountyZone picker options include real counties and zones for the filtered state', function () {
+test('the Choose zones modal offers real counties and zones for the filtered state and writes them to that row', function () {
     DB::table('counties')->insert([
         'state' => 'NY', 'cwa' => 'OKX', 'countyname' => 'Suffolk', 'fips' => '36103',
         'lon' => -72.5, 'lat' => 40.9,
@@ -488,16 +482,27 @@ test('the CountyZone picker options include real counties and zones for the filt
         'created_at' => now(), 'updated_at' => now(),
     ]);
     $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $severe = Product::where('code', 'SV.W')->sole();
+    $table = "product_settings.{$tornadoWarning->category->value}";
 
-    livewire(CreateAlertRule::class)
-        ->fillForm([
-            'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
-            'matching_mode' => 'county_zone',
-            'county_zone_state' => 'NY',
-            'county_zone_codes' => ['NYC103', 'NYZ072'],
-            'channel_ids' => [$this->channel->id],
-        ])
+    $component = livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id]])
+        ->mountFormComponentAction($table, 'chooseZones', ['product' => $tornadoWarning->id])
+        ->assertFormFieldExists('county_zone_codes', 'mountedActionSchema0', fn (Select $field): bool => $field->getOptions() === [])
+        ->fillForm(['county_zone_state' => 'NY'], 'mountedActionSchema0')
+        ->assertFormFieldExists('county_zone_codes', 'mountedActionSchema0', fn (Select $field): bool => array_keys($field->getOptions()) === ['NYC103', 'NYZ072'])
+        ->fillForm(['county_zone_codes' => ['NYC103', 'NYZ072']], 'mountedActionSchema0')
+        ->callMountedFormComponentAction()
+        ->assertHasNoFormComponentActionErrors();
+
+    $tornadoIndex = alertWizardRowIndex($component, $tornadoWarning);
+
+    expect($component->get("data.{$table}.{$tornadoIndex}.county_zone_codes"))->toBe(['NYC103', 'NYZ072'])
+        ->and($component->get("data.{$table}.".alertWizardRowIndex($component, $severe).'.county_zone_codes'))->toBe([]);
+
+    $component
+        ->set("data.{$table}.{$tornadoIndex}.enabled", true)
+        ->set("data.{$table}.{$tornadoIndex}.matching_mode", 'county_zone')
         ->call('create')
         ->assertHasNoFormErrors();
 
@@ -512,26 +517,25 @@ test('the CountyZone picker requires at least one code', function () {
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
-            'matching_mode' => 'county_zone',
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'county_zone')],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
-        ->assertHasFormErrors(['county_zone_codes']);
+        ->assertHasFormErrors(["product_settings.{$tornadoWarning->category->value}"])
+        ->assertSee('Choose at least one county or zone for Tornado Warning.');
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
 });
 
 test('editing a CountyZone rule preserves its stored codes without requiring them to be re-picked', function () {
-    // Regression: county_zone_codes is a multi-select over a plain
-    // comma-joined string column, not an array/JSON-cast one -- Filament's
-    // default multiple() state cast runs json_decode() on the stored value
-    // during hydration, which silently turns a real string like
-    // "NYZ072,NYC061" into [] (not valid JSON), wiping the field and
-    // blocking save with a false "required" error. See
-    // EditAlertRule::mutateFormDataBeforeFill() for the fix.
+    // Regression: county_zone_codes are stored as a comma-joined string, and
+    // an earlier hydration turned "NYZ072,NYC061" into [] (not valid JSON),
+    // wiping the codes and blocking save with a false "required" error. The
+    // rule here is an old-style one (its products inherit the rule's own
+    // codes), so this also proves the inherited codes reach the row.
     //
-    // The picker's Select validates submitted values against its live
-    // options() list, so the stored codes need matching real shapefile
-    // rows to be considered valid on save -- not just for display.
+    // Saving validates every code against the real shapefile rows, so the
+    // stored codes need matching rows to be valid on save.
     DB::table('public_zones')->insert([
         'state' => 'NY', 'cwa' => 'OKX', 'zone' => '072', 'name' => 'Suffolk', 'state_zone' => 'NY072',
         'lon' => -72.5, 'lat' => 40.9,
@@ -554,12 +558,16 @@ test('editing a CountyZone rule preserves its stored codes without requiring the
     $rule->products()->attach($tornadoWarning);
     $rule->notificationChannels()->attach($this->channel);
 
-    livewire(EditAlertRule::class, ['record' => $rule->id])
-        ->assertFormSet(['county_zone_codes' => ['NYZ072', 'NYC061']])
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $index = alertWizardRowIndex($component, $tornadoWarning);
+
+    $component
+        ->assertFormSet(["product_settings.{$tornadoWarning->category->value}.{$index}" => alertWizardRow($tornadoWarning, 'county_zone', ['county_zone_codes' => ['NYZ072', 'NYC061']])])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($rule->fresh()->settingsFor($tornadoWarning->id)->countyZoneCodes)->toBe(['NYZ072', 'NYC061']);
+    expect($rule->fresh()->settingsFor($tornadoWarning->id)->countyZoneCodes)->toBe(['NYZ072', 'NYC061'])
+        ->and($rule->fresh()->settingsFor($tornadoWarning->id)->inherited)->toBeFalse();
 });
 
 test('the Area Forecast Discussion is offered under Weather Alerts, in the Other Forecasts group', function () {
@@ -567,7 +575,8 @@ test('the Area Forecast Discussion is offered under Weather Alerts, in the Other
 
     livewire(CreateAlertRule::class)
         ->fillForm(['category' => 'weather_alerts'])
-        ->assertFormFieldExists("product_ids.{$afd->category->value}", fn (ToggleList $field): bool => array_key_exists($afd->id, $field->getOptions()));
+        ->assertFormFieldExists("product_settings.{$afd->category->value}", fn (ProductMatchingTable $field): bool => $field->getProducts()->has($afd->id)
+            && collect($field->getState())->contains('product_id', $afd->id));
 });
 
 test('Forecast Discussions is no longer a category in the wizard', function () {
@@ -637,8 +646,7 @@ test('the alert_template_id select only offers templates matching the rule\'s ow
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
-            'matching_mode' => 'nationwide',
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'nationwide')],
             'channel_ids' => [$channel->id],
         ])
         // No assertFormFieldOptionsExist()/assertFormFieldOptionsDoNotExist()
@@ -690,9 +698,8 @@ test('creating a weather alerts rule with two locations persists both via the pi
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
-            'matching_mode' => 'location',
-            'location_ids' => [$this->location->id, $secondLocation->id],
+            // Ids arrive from the browser as strings.
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'location', ['location_ids' => [(string) $this->location->id, (string) $secondLocation->id]])],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -712,8 +719,11 @@ test('editing an existing multi-location rule pre-fills every attached location,
     $rule->locations()->attach([$this->location->id, $secondLocation->id]);
     $rule->notificationChannels()->attach($this->channel);
 
-    livewire(EditAlertRule::class, ['record' => $rule->id])
-        ->assertFormSet(['location_ids' => [$this->location->id, $secondLocation->id]])
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $index = alertWizardRowIndex($component, $tornadoWarning);
+
+    $component
+        ->assertFormSet(["product_settings.{$tornadoWarning->category->value}.{$index}" => alertWizardRow($tornadoWarning, 'location', ['location_ids' => [$this->location->id, $secondLocation->id]])])
         ->call('save')
         ->assertHasNoFormErrors();
 
@@ -721,7 +731,7 @@ test('editing an existing multi-location rule pre-fills every attached location,
         ->toBe(collect([$this->location->id, $secondLocation->id])->sort()->values()->all());
 });
 
-test('editing a rule saved per product pre-fills its products\' shared mode and locations, and saving keeps them', function () {
+test('editing a rule saved per product pre-fills its product\'s row with its mode and locations, and saving keeps them', function () {
     $tornadoWarning = Product::where('code', 'TO.W')->sole();
     $secondLocation = Location::factory()->for($this->user)->create();
     $rule = app(SaveAlertRule::class)($this->user, [
@@ -732,8 +742,11 @@ test('editing a rule saved per product pre-fills its products\' shared mode and 
         'channel_ids' => [$this->channel->id],
     ]);
 
-    livewire(EditAlertRule::class, ['record' => $rule->id])
-        ->assertFormSet(['matching_mode' => 'polygon', 'location_ids' => [$this->location->id, $secondLocation->id]])
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $index = alertWizardRowIndex($component, $tornadoWarning);
+
+    $component
+        ->assertFormSet(["product_settings.{$tornadoWarning->category->value}.{$index}" => alertWizardRow($tornadoWarning, 'polygon', ['location_ids' => [$this->location->id, $secondLocation->id]])])
         ->call('save')
         ->assertHasNoFormErrors();
 
@@ -752,32 +765,34 @@ test('editing a multi-location rule down to one location detaches the rest', fun
     $rule->locations()->attach([$this->location->id, $secondLocation->id]);
     $rule->notificationChannels()->attach($this->channel);
 
-    livewire(EditAlertRule::class, ['record' => $rule->id])
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $index = alertWizardRowIndex($component, $tornadoWarning);
+
+    $component
         // ->set('data.X', value), not ->fillForm([...]) -- this file's own
         // EditAlertRule tests consistently change one field this way (see
         // 'alert_template_id gets cleared' further down), not fillForm(),
         // which this file reserves for CreateAlertRule's initial fill.
-        ->set('data.location_ids', [$this->location->id])
+        ->set("data.product_settings.{$tornadoWarning->category->value}.{$index}.location_ids", [(string) $this->location->id])
         ->call('save')
         ->assertHasNoFormErrors();
 
     expect($rule->fresh()->settingsFor($tornadoWarning->id)->locations->pluck('id')->all())->toBe([$this->location->id]);
 });
 
-test('a subscriber cannot attach another subscriber\'s location via location_ids', function () {
+test('a subscriber cannot attach another subscriber\'s location to a product', function () {
     $tornadoWarning = Product::where('code', 'TO.W')->sole();
     $othersLocation = Location::factory()->for(User::factory())->create();
 
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'weather_alerts',
-            'product_ids' => [$tornadoWarning->category->value => [$tornadoWarning->id]],
-            'matching_mode' => 'location',
-            'location_ids' => [$othersLocation->id],
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'polygon', ['location_ids' => [$this->location->id, $othersLocation->id]])],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
-        ->assertHasFormErrors(['location_ids']);
+        ->assertHasFormErrors(["product_settings.{$tornadoWarning->category->value}"])
+        ->assertSee('Choose only your own saved locations for Tornado Warning.');
 
     expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
 });
@@ -831,7 +846,8 @@ test('each SPC & WPC category with risk-level products lists its own risk option
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'spc_wpc',
-            'product_ids' => ['fire_weather' => [$fire->id], 'convective_outlooks' => [$outlook->id]],
+            'product_settings.fire_weather' => [alertWizardRow($fire, 'nationwide')],
+            'product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide')],
         ])
         ->assertFormFieldExists('risk_levels.fire_weather', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['Elevated', 'Critical', 'Extremely Critical', 'Isolated Dry T-Storms', 'Scattered Dry T-Storms'])
         ->assertFormFieldExists('risk_levels.convective_outlooks', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['Marginal', 'Slight', 'Enhanced', 'Moderate', 'High'])
@@ -845,13 +861,13 @@ test('a category\'s risk levels appear only while a product with risk levels is 
     $fire = Product::where('code', 'SPC.FIRE')->sole();
 
     livewire(CreateAlertRule::class)
-        ->fillForm(['category' => 'spc_wpc', 'product_ids' => ['convective_outlooks' => [$day2->id]]])
+        ->fillForm(['category' => 'spc_wpc', 'product_settings.convective_outlooks' => [alertWizardRow($day2, 'nationwide'), alertWizardRow($outlook, 'nationwide', ['enabled' => false])]])
         ->assertFormFieldHidden('risk_levels.convective_outlooks')
         ->assertFormFieldHidden('risk_levels.fire_weather')
-        ->fillForm(['product_ids' => ['convective_outlooks' => [$outlook->id]]])
+        ->fillForm(['product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide')]])
         ->assertFormFieldVisible('risk_levels.convective_outlooks')
         ->assertFormFieldHidden('risk_levels.fire_weather')
-        ->fillForm(['product_ids' => ['convective_outlooks' => [], 'fire_weather' => [$fire->id]]])
+        ->fillForm(['product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide', ['enabled' => false])], 'product_settings.fire_weather' => [alertWizardRow($fire, 'nationwide')]])
         ->assertFormFieldHidden('risk_levels.convective_outlooks')
         ->assertFormFieldVisible('risk_levels.fire_weather');
 });
@@ -861,7 +877,7 @@ test('the Fire Weather list says fire levels do not filter yet, the Convective l
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
 
     livewire(CreateAlertRule::class)
-        ->fillForm(['category' => 'spc_wpc', 'product_ids' => ['fire_weather' => [$fire->id], 'convective_outlooks' => [$outlook->id]]])
+        ->fillForm(['category' => 'spc_wpc', 'product_settings.fire_weather' => [alertWizardRow($fire, 'nationwide')], 'product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide')]])
         ->assertSee("Fire risk levels are saved, but they don't filter alerts yet.")
         ->assertSee('Risk levels apply to the Day 1 Convective Outlook.');
 });
@@ -880,9 +896,9 @@ test('creating an SPC & WPC rule with ticks in two categories stores one flat li
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'spc_wpc',
-            'product_ids' => ['fire_weather' => [$fire->id], 'convective_outlooks' => [$outlook->id]],
+            'product_settings.fire_weather' => [alertWizardRow($fire, 'nationwide')],
+            'product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide')],
             'risk_levels' => ['fire_weather' => ['Critical'], 'convective_outlooks' => ['Moderate', 'High']],
-            'matching_mode' => 'nationwide',
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -898,12 +914,12 @@ test('ticks in a category whose products were deselected are not stored', functi
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'spc_wpc',
-            'product_ids' => ['fire_weather' => [$fire->id], 'convective_outlooks' => [$outlook->id]],
+            'product_settings.fire_weather' => [alertWizardRow($fire, 'nationwide')],
+            'product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide')],
             'risk_levels' => ['fire_weather' => ['Critical'], 'convective_outlooks' => ['High']],
-            'matching_mode' => 'nationwide',
             'channel_ids' => [$this->channel->id],
         ])
-        ->fillForm(['product_ids' => ['fire_weather' => [], 'convective_outlooks' => [$outlook->id]]])
+        ->fillForm(['product_settings.fire_weather' => [alertWizardRow($fire, 'nationwide', ['enabled' => false])]])
         ->call('create')
         ->assertHasNoFormErrors();
 
@@ -952,8 +968,7 @@ test('an SPC & WPC rule with no ticks stores an empty list, meaning every level'
     livewire(CreateAlertRule::class)
         ->fillForm([
             'category' => 'spc_wpc',
-            'product_ids' => ['convective_outlooks' => [$outlook->id]],
-            'matching_mode' => 'nationwide',
+            'product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide')],
             'channel_ids' => [$this->channel->id],
         ])
         ->call('create')
@@ -973,11 +988,12 @@ test('deselecting every product with risk levels while editing clears the stored
     $rule->notificationChannels()->attach($this->channel);
 
     livewire(EditAlertRule::class, ['record' => $rule->id])
-        ->fillForm(['product_ids' => ['convective_outlooks' => [$day2->id]]])
+        ->fillForm(['product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide', ['enabled' => false]), alertWizardRow($day2, 'nationwide')]])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($rule->refresh()->risk_levels)->toBe([]);
+    expect($rule->refresh()->risk_levels)->toBe([])
+        ->and($rule->products->pluck('id')->all())->toBe([$day2->id]);
 });
 
 test('a product without risk levels selected beside one with them adds no options to the Convective list', function () {
@@ -985,7 +1001,7 @@ test('a product without risk levels selected beside one with them adds no option
     $day2 = Product::where('code', 'DY2')->sole();
 
     livewire(CreateAlertRule::class)
-        ->fillForm(['category' => 'spc_wpc', 'product_ids' => ['convective_outlooks' => [$outlook->id, $day2->id]]])
+        ->fillForm(['category' => 'spc_wpc', 'product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide'), alertWizardRow($day2, 'nationwide')]])
         ->assertFormFieldVisible('risk_levels.convective_outlooks')
         ->assertFormFieldExists('risk_levels.convective_outlooks', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['Marginal', 'Slight', 'Enhanced', 'Moderate', 'High']);
 });
@@ -995,7 +1011,7 @@ test('the Weather Alerts form never offers a risk checklist, even for a product 
     $tornado->update(['risk_level_options' => ['Low', 'High']]);
 
     livewire(CreateAlertRule::class)
-        ->fillForm(['category' => 'weather_alerts', 'product_ids' => [$tornado->category->value => [$tornado->id]]])
+        ->fillForm(['category' => 'weather_alerts', "product_settings.{$tornado->category->value}" => [alertWizardRow($tornado, 'polygon')]])
         ->assertFormFieldDoesNotExist("risk_levels.{$tornado->category->value}");
 });
 
@@ -1025,4 +1041,340 @@ test('the Set it up step has a scroll-to-bottom button for every category and no
 test('the scroll-to-bottom button is absent until a category is chosen', function () {
     livewire(CreateAlertRule::class)
         ->assertDontSeeHtml('aria-label="Scroll to bottom"');
+});
+
+test('choosing Weather Alerts gives every active product a switched-off row at its default mode, with the first saved location', function () {
+    Location::factory()->for($this->user)->create(['label' => 'Cabin']);
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $tornadoWatch = Product::where('code', 'TO.A')->sole();
+    expect($tornadoWarning->has_polygon)->toBeTrue()->and($tornadoWatch->has_polygon)->toBeFalse();
+
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts']);
+    $rows = collect($component->get('data.product_settings'))->flatten(1);
+
+    expect($rows->pluck('product_id')->sort()->values()->all())
+        ->toBe(Product::whereIn('family', BuildAlertRuleOptions::WEATHER_FAMILIES)->where('status', 'active')->orderBy('id')->pluck('id')->all())
+        ->and($rows->every(fn (array $row): bool => $row['enabled'] === false))->toBeTrue();
+
+    $component->assertFormSet([
+        "product_settings.{$tornadoWarning->category->value}.".alertWizardRowIndex($component, $tornadoWarning) => alertWizardRow($tornadoWarning, 'polygon', ['enabled' => false, 'location_ids' => [$this->location->id]]),
+        "product_settings.{$tornadoWatch->category->value}.".alertWizardRowIndex($component, $tornadoWatch) => alertWizardRow($tornadoWatch, 'location', ['enabled' => false, 'location_ids' => [$this->location->id]]),
+    ]);
+});
+
+test('a subscriber with no saved locations gets rows with no location and is told how to add one', function () {
+    $this->location->delete();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts']);
+
+    $component
+        ->assertFormSet(["product_settings.{$tornadoWarning->category->value}.".alertWizardRowIndex($component, $tornadoWarning).'.location_ids' => []])
+        ->assertSee('No saved locations yet — use the + button to add one.');
+});
+
+test('choosing SPC & WPC defaults a risk-level product to risk area and any other product to polygon', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $mesoscale = Product::where('code', 'SPC.MD')->sole();
+    $day2 = Product::where('code', 'DY2')->sole();
+
+    $component = livewire(CreateAlertRule::class)->fillForm(['category' => 'spc_wpc']);
+
+    $component->assertFormSet([
+        'product_settings.convective_outlooks.'.alertWizardRowIndex($component, $outlook) => alertWizardRow($outlook, 'risk_area', ['enabled' => false, 'location_ids' => [$this->location->id]]),
+        "product_settings.{$mesoscale->category->value}.".alertWizardRowIndex($component, $mesoscale) => alertWizardRow($mesoscale, 'polygon', ['enabled' => false, 'location_ids' => [$this->location->id]]),
+        'product_settings.convective_outlooks.'.alertWizardRowIndex($component, $day2) => alertWizardRow($day2, 'polygon', ['enabled' => false, 'location_ids' => [$this->location->id]]),
+    ]);
+
+    expect(collect($component->get('data.product_settings'))->flatten(1)->pluck('product_id')->sort()->values()->all())
+        ->toBe(Product::where('family', 'spc_wpc')->where('status', 'active')->orderBy('id')->pluck('id')->all());
+});
+
+test('one rule saves a different mode and its own inputs for each product it watches', function () {
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'OKX', 'cwa' => 'OKX', 'city' => 'Upton', 'st' => 'NY', 'citystate' => 'Upton NY',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $secondLocation = Location::factory()->for($this->user)->create();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $tornadoWatch = Product::where('code', 'TO.A')->sole();
+    $afd = Product::where('code', 'AFD')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            "product_settings.{$tornadoWarning->category->value}" => [
+                alertWizardRow($tornadoWarning, 'polygon', ['location_ids' => [(string) $secondLocation->id], 'wfo' => 'OKX']),
+                alertWizardRow($tornadoWatch, 'location', ['location_ids' => [$this->location->id], 'enabled' => false]),
+            ],
+            "product_settings.{$afd->category->value}" => [alertWizardRow($afd, 'wfo', ['wfo' => 'OKX', 'location_ids' => [$this->location->id]])],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+    $polygon = $rule->settingsFor($tornadoWarning->id);
+    $office = $rule->settingsFor($afd->id);
+
+    expect($rule->products->pluck('id')->all())->toEqualCanonicalizing([$tornadoWarning->id, $afd->id])
+        ->and([$polygon->mode, $polygon->wfo, $polygon->locations->pluck('id')->all()])->toBe([MatchingMode::Polygon, null, [$secondLocation->id]])
+        ->and([$office->mode, $office->wfo, $office->locations->all()])->toBe([MatchingMode::Wfo, 'OKX', []])
+        ->and($rule->only(['matching_mode', 'wfo', 'county_zone_codes']))->toBe(['matching_mode' => null, 'wfo' => null, 'county_zone_codes' => null]);
+});
+
+test('editing hydrates each watched product\'s stored settings and leaves every other product switched off at its default', function () {
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'OKX', 'cwa' => 'OKX', 'city' => 'Upton', 'st' => 'NY', 'citystate' => 'Upton NY',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $secondLocation = Location::factory()->for($this->user)->create();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $severe = Product::where('code', 'SV.W')->sole();
+    $afd = Product::where('code', 'AFD')->sole();
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'weather_alerts',
+        'product_settings' => [
+            ['product_id' => $tornadoWarning->id, 'matching_mode' => 'polygon', 'location_ids' => [$secondLocation->id]],
+            ['product_id' => $afd->id, 'matching_mode' => 'wfo', 'wfo' => 'OKX'],
+        ],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+
+    $component->assertFormSet([
+        "product_settings.{$tornadoWarning->category->value}.".alertWizardRowIndex($component, $tornadoWarning) => alertWizardRow($tornadoWarning, 'polygon', ['location_ids' => [$secondLocation->id]]),
+        "product_settings.{$afd->category->value}.".alertWizardRowIndex($component, $afd) => alertWizardRow($afd, 'wfo', ['wfo' => 'OKX']),
+        "product_settings.{$severe->category->value}.".alertWizardRowIndex($component, $severe) => alertWizardRow($severe, 'polygon', ['enabled' => false, 'location_ids' => [$this->location->id]]),
+    ]);
+
+    $component->call('save')->assertHasNoFormErrors();
+
+    expect($rule->fresh()->products->pluck('id')->all())->toEqualCanonicalizing([$tornadoWarning->id, $afd->id])
+        ->and($rule->fresh()->settingsFor($afd->id)->wfo)->toBe('OKX');
+});
+
+test('a stored mode the table no longer offers for a product is shown as stored and still saves', function () {
+    $mesoscale = Product::where('code', 'SPC.MD')->sole();
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'spc_wpc',
+        'product_settings' => [['product_id' => $mesoscale->id, 'matching_mode' => 'risk_area', 'location_ids' => [$this->location->id]]],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $table = "product_settings.{$mesoscale->category->value}";
+    $index = alertWizardRowIndex($component, $mesoscale);
+
+    $component
+        ->assertFormSet(["{$table}.{$index}" => alertWizardRow($mesoscale, 'risk_area', ['location_ids' => [$this->location->id]])])
+        ->assertFormFieldExists($table, fn (ProductMatchingTable $field): bool => array_keys($field->modeOptionsFor($field->getState()[$index])) === ['nationwide', 'polygon', 'risk_area']
+            && array_keys($field->modeOptionsFor(['product_id' => $mesoscale->id, 'matching_mode' => 'polygon'])) === ['nationwide', 'polygon'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->settingsFor($mesoscale->id)->mode)->toBe(MatchingMode::RiskArea);
+});
+
+test('an old-style rule edits as its inherited mode on every watched product and saves into per-product rows', function () {
+    $secondLocation = Location::factory()->for($this->user)->create();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $severe = Product::where('code', 'SV.W')->sole();
+    $rule = AlertRule::factory()->for($this->user)->create(['category' => 'weather_alerts', 'matching_mode' => 'polygon', 'location_id' => null]);
+    $rule->products()->attach([$tornadoWarning->id, $severe->id]);
+    $rule->locations()->attach([$secondLocation->id, $this->location->id]);
+    $rule->notificationChannels()->attach($this->channel);
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $table = "product_settings.{$tornadoWarning->category->value}";
+
+    $component
+        ->assertFormSet([
+            "{$table}.".alertWizardRowIndex($component, $tornadoWarning) => alertWizardRow($tornadoWarning, 'polygon', ['location_ids' => [$this->location->id, $secondLocation->id]]),
+            "{$table}.".alertWizardRowIndex($component, $severe) => alertWizardRow($severe, 'polygon', ['location_ids' => [$this->location->id, $secondLocation->id]]),
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $rule = $rule->fresh();
+
+    foreach ([$tornadoWarning, $severe] as $product) {
+        $settings = $rule->settingsFor($product->id);
+
+        expect($settings->inherited)->toBeFalse()
+            ->and($settings->mode)->toBe(MatchingMode::Polygon)
+            ->and($settings->locations->pluck('id')->all())->toBe([$this->location->id, $secondLocation->id]);
+    }
+
+    expect($rule->matching_mode)->toBeNull()->and($rule->locations)->toBeEmpty();
+});
+
+test('each enabled product must have what its mode needs', function (string $code, string $mode, array $overrides, string $message) {
+    $product = Product::where('code', $code)->sole();
+    $overrides = collect($overrides)->map(fn ($value) => $value === 'LOCATION' ? [$this->location->id] : $value)->all();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            "product_settings.{$product->category->value}" => [alertWizardRow($product, $mode, $overrides)],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(["product_settings.{$product->category->value}"])
+        ->assertSee($message);
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+})->with([
+    'location without a location' => ['TO.A', 'location', [], 'Choose at least one location for Tornado Watch.'],
+    'polygon without a location' => ['TO.W', 'polygon', [], 'Choose at least one location for Tornado Warning.'],
+    'office without an office' => ['AFD', 'wfo', ['wfo' => ' '], 'Choose a known NWS office for Area Forecast Discussion.'],
+    'county/zone without codes' => ['TO.W', 'county_zone', [], 'Choose at least one county or zone for Tornado Warning.'],
+    'county/zone with an unknown code' => ['TO.W', 'county_zone', ['county_zone_codes' => ['ZZZ999']], 'Choose known counties or zones for Tornado Warning.'],
+    'a mode Weather Alerts does not allow' => ['TO.W', 'risk_area', ['location_ids' => 'LOCATION'], 'Choose a matching mode for Tornado Warning.'],
+    'a mode that does not exist' => ['TO.W', 'mixed', [], 'Choose a matching mode for Tornado Warning.'],
+]);
+
+test('a switched-off row needs nothing, but at least one product must be switched on', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'county_zone', ['enabled' => false])],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['product_settings.tornado_and_severe_thunderstorm'])
+        ->assertSee('Select at least one product.')
+        ->assertDontSee('Choose at least one county or zone for Tornado Warning.');
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+});
+
+test('a row may only name a product of its own table', function () {
+    $mesoscale = Product::where('code', 'SPC.MD')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            'product_settings.tornado_and_severe_thunderstorm' => [alertWizardRow($mesoscale, 'nationwide')],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['product_settings.tornado_and_severe_thunderstorm']);
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+});
+
+test('adding a location from a row creates it and selects it on that row only', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $severe = Product::where('code', 'SV.W')->sole();
+    $table = "product_settings.{$tornadoWarning->category->value}";
+
+    $component = livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'weather_alerts'])
+        ->callFormComponentAction($table, 'addLocation', data: [
+            'label' => 'Office',
+            'lat' => 38.8976,
+            'lng' => -77.0365,
+            'address' => '1600 Pennsylvania Ave NW, Washington, DC',
+            'timezone' => 'America/New_York',
+        ], arguments: ['product' => $tornadoWarning->id])
+        ->assertHasNoFormComponentActionErrors();
+
+    $office = Location::where('user_id', $this->user->id)->where('label', 'Office')->sole();
+
+    expect($component->get("data.{$table}.".alertWizardRowIndex($component, $tornadoWarning).'.location_ids'))->toBe([$this->location->id, $office->id])
+        ->and($component->get("data.{$table}.".alertWizardRowIndex($component, $severe).'.location_ids'))->toBe([$this->location->id]);
+});
+
+test('adding a location from a row works while editing an alert too', function () {
+    // Regression: the modal's location form once resolved its `$record` to the alert rule
+    // being edited and threw a TypeError in LocationForm's Traccar fields.
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'weather_alerts',
+        'product_settings' => [['product_id' => $tornadoWarning->id, 'matching_mode' => 'polygon', 'location_ids' => [$this->location->id]]],
+        'channel_ids' => [$this->channel->id],
+    ]);
+    $table = "product_settings.{$tornadoWarning->category->value}";
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->mountFormComponentAction($table, 'addLocation', ['product' => $tornadoWarning->id])
+        ->fillForm([
+            'label' => 'Office',
+            'lat' => 38.8976,
+            'lng' => -77.0365,
+            'address' => '1600 Pennsylvania Ave NW, Washington, DC',
+            'timezone' => 'America/New_York',
+        ], 'mountedActionSchema0')
+        ->callMountedFormComponentAction()
+        ->assertHasNoFormComponentActionErrors();
+
+    $office = Location::where('user_id', $this->user->id)->where('label', 'Office')->sole();
+
+    $component->call('save')->assertHasNoFormErrors();
+
+    expect($rule->fresh()->settingsFor($tornadoWarning->id)->locations->pluck('id')->all())->toBe([$this->location->id, $office->id]);
+});
+
+test('the add-a-location action is hidden once a Free subscriber is at their location limit', function () {
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => 'weather_alerts'])
+        ->assertFormComponentActionHidden('product_settings.tornado_and_severe_thunderstorm', 'addLocation');
+});
+
+test('the WFO input offers every office from one list per form', function () {
+    DB::table('cwa_boundaries')->insert([
+        'wfo' => 'OKX', 'cwa' => 'OKX', 'city' => 'Upton', 'st' => 'NY', 'citystate' => 'Upton NY',
+        'lon' => -72.5, 'lat' => 40.9,
+        'boundary' => DB::raw("ST_SetSRID(ST_Multi(ST_GeomFromText('POLYGON((-73 40, -72 40, -72 41, -73 41, -73 40))')), 4269)"),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $html = livewire(CreateAlertRule::class)->fillForm(['category' => 'weather_alerts'])->html();
+
+    expect(substr_count($html, '<datalist'))->toBe(1)
+        ->and($html)->toContain('<option value="OKX">OKX — Upton, NY</option>');
+});
+
+test('a failed save leaves the stored rule unchanged', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $rule = AlertRule::factory()->for($this->user)->create(['category' => 'weather_alerts', 'matching_mode' => 'location', 'location_id' => null, 'name' => 'Before']);
+    $rule->products()->attach($tornadoWarning);
+    $rule->locations()->attach($this->location);
+    $rule->notificationChannels()->attach($this->channel);
+
+    app()->bind(SaveAlertRule::class, fn () => new class extends SaveAlertRule
+    {
+        public function syncRelations(AlertRule $rule, array $data): void
+        {
+            throw new RuntimeException('The pivot sync failed.');
+        }
+    });
+
+    expect(fn () => livewire(EditAlertRule::class, ['record' => $rule->id])->set('data.name', 'After')->call('save'))
+        ->toThrow(RuntimeException::class, 'The pivot sync failed.');
+
+    $rule = $rule->fresh();
+
+    expect($rule->name)->toBe('Before')
+        ->and($rule->matching_mode)->toBe(MatchingMode::Location)
+        ->and($rule->locations->pluck('id')->all())->toBe([$this->location->id])
+        ->and($rule->settingsFor($tornadoWarning->id)->inherited)->toBeTrue();
+
+    expect(fn () => livewire(CreateAlertRule::class)->fillForm([
+        'category' => 'weather_alerts',
+        "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'nationwide')],
+        'channel_ids' => [$this->channel->id],
+    ])->call('create'))->toThrow(RuntimeException::class);
+
+    expect(AlertRule::where('user_id', $this->user->id)->count())->toBe(1);
 });

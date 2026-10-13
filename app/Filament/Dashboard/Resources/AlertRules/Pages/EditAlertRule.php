@@ -6,7 +6,7 @@ use App\Actions\Alerts\SaveAlertRule;
 use App\Enums\AlertCategory;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
-use App\Models\Product;
+use App\Filament\Dashboard\Resources\AlertRules\Schemas\ProductMatchingTable;
 use App\Support\AlertRuleFormUnits;
 use App\Support\SpcWpcRiskLevels;
 use App\Support\Units;
@@ -20,6 +20,12 @@ class EditAlertRule extends EditRecord
     use HasWizard;
 
     protected static string $resource = AlertRuleResource::class;
+
+    /**
+     * The rule row (which nulls its own matching columns) is written before afterSave() syncs
+     * the per-product settings; one transaction keeps a failed sync from leaving it half-saved.
+     */
+    protected ?bool $hasDatabaseTransactions = true;
 
     /**
      * @return array<Step>
@@ -43,41 +49,15 @@ class EditAlertRule extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $data['product_ids'] = $this->record->products
-            ->groupBy(fn (Product $product): ?string => $product->category?->value)
-            ->map(fn ($products) => $products->pluck('id')->all())
-            ->all();
         $data['channel_ids'] = $this->record->notificationChannels->pluck('id')->all();
-        $data['location_ids'] = $this->record->locations->pluck('id')->all();
 
-        // The form still edits one rule-level mode: a rule saved per product fills it from its first
-        // product's settings (an old-style rule's products inherit the rule's own, so it reads the same).
-        $firstProduct = $this->record->products->first();
-        $settings = $firstProduct === null ? null : $this->record->settingsFor($firstProduct->id);
-
-        if ($settings !== null) {
-            $data['matching_mode'] = $settings->mode?->value;
-            $data['location_ids'] = $settings->locations->pluck('id')->all();
-            $data['wfo'] = $settings->wfo;
-            $data['county_zone_codes'] = implode(',', $settings->countyZoneCodes);
+        if (ProductMatchingTable::supports($this->record->category)) {
+            $data['product_settings'] = ProductMatchingTable::formState(auth()->user(), $this->record->category, $this->record);
         }
 
         if (($data['category'] ?? null) === AlertCategory::SpcWpc->value) {
             $data['risk_levels'] = SpcWpcRiskLevels::split($data['risk_levels'] ?? []);
         }
-
-        // county_zone_codes is a multi-select over a plain comma-joined
-        // string column (not an array/JSON-cast one like product_ids), so
-        // Filament's default OptionsArrayStateCast for multiple() selects
-        // runs json_decode() on it during hydration -- a non-JSON string
-        // like "NYZ072,NYC061" fails to decode and silently becomes [],
-        // wiping the field and blocking save with a false "required" error.
-        // Pre-splitting into a real array here, the same way product_ids
-        // and channel_ids are already pre-shaped above, sidesteps the cast
-        // entirely since is_array() is already true by the time it runs.
-        $data['county_zone_codes'] = filled($data['county_zone_codes'] ?? null)
-            ? explode(',', $data['county_zone_codes'])
-            : [];
 
         return AlertRuleFormUnits::toDisplay($data, Units::for(auth()->user()));
     }
@@ -90,11 +70,11 @@ class EditAlertRule extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        return app(SaveAlertRule::class)->attributes(auth()->user(), $data, $this->record);
+        return app(SaveAlertRule::class)->attributes(auth()->user(), ProductMatchingTable::toSaveInput($data), $this->record);
     }
 
     protected function afterSave(): void
     {
-        app(SaveAlertRule::class)->syncRelations($this->record, $this->data);
+        app(SaveAlertRule::class)->syncRelations($this->record, ProductMatchingTable::toSaveInput($this->data));
     }
 }

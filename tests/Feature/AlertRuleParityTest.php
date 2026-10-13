@@ -58,27 +58,27 @@ function parityPayloads($test, string $scenario, int $location, int $channel): a
             ['category' => 'lightning', 'location_id' => $location, 'radius' => 24, ...$common],
         ],
         'weather nationwide' => [
-            ['category' => 'weather_alerts', 'product_ids' => [$tornado->category->value => [$tornado->id]], 'matching_mode' => 'nationwide', ...$common],
+            ['category' => 'weather_alerts', 'product_settings' => [$tornado->category->value => [alertWizardRow($tornado, 'nationwide')]], ...$common],
             ['category' => 'weather_alerts', 'product_ids' => [$tornado->id], 'matching_mode' => 'nationwide', ...$common],
         ],
         'weather nationwide with stray locations' => [
-            ['category' => 'weather_alerts', 'product_ids' => [$tornado->category->value => [$tornado->id]], 'matching_mode' => 'nationwide', 'location_ids' => [$location], ...$common],
+            ['category' => 'weather_alerts', 'product_settings' => [$tornado->category->value => [alertWizardRow($tornado, 'nationwide', ['location_ids' => [$location]])]], ...$common],
             ['category' => 'weather_alerts', 'product_ids' => [$tornado->id], 'matching_mode' => 'nationwide', 'location_ids' => [$location], ...$common],
         ],
         'weather by location' => [
-            ['category' => 'weather_alerts', 'product_ids' => [$tornado->category->value => [$tornado->id]], 'matching_mode' => 'location', 'location_ids' => [$location], ...$common],
+            ['category' => 'weather_alerts', 'product_settings' => [$tornado->category->value => [alertWizardRow($tornado, 'location', ['location_ids' => [(string) $location]])]], ...$common],
             ['category' => 'weather_alerts', 'product_ids' => [$tornado->id], 'matching_mode' => 'location', 'location_ids' => [$location], ...$common],
         ],
         'weather by office' => [
-            ['category' => 'weather_alerts', 'product_ids' => [$tornado->category->value => [$tornado->id]], 'matching_mode' => 'wfo', 'wfo' => 'OKX', ...$common],
+            ['category' => 'weather_alerts', 'product_settings' => [$tornado->category->value => [alertWizardRow($tornado, 'wfo', ['wfo' => 'OKX'])]], ...$common],
             ['category' => 'weather_alerts', 'product_ids' => [$tornado->id], 'matching_mode' => 'wfo', 'wfo' => 'OKX', ...$common],
         ],
         'weather by county and zone' => [
-            ['category' => 'weather_alerts', 'product_ids' => [$tornado->category->value => [$tornado->id]], 'matching_mode' => 'county_zone', 'county_zone_state' => 'NY', 'county_zone_codes' => ['NYC103', 'NYZ072'], ...$common],
+            ['category' => 'weather_alerts', 'product_settings' => [$tornado->category->value => [alertWizardRow($tornado, 'county_zone', ['county_zone_codes' => ['NYC103', 'NYZ072']])]], ...$common],
             ['category' => 'weather_alerts', 'product_ids' => [$tornado->id], 'matching_mode' => 'county_zone', 'county_zone_codes' => ['NYC103', 'NYZ072'], ...$common],
         ],
         'spc by risk area' => [
-            ['category' => 'spc_wpc', 'product_ids' => [$risk->category->value => [$risk->id]], 'matching_mode' => 'risk_area', 'location_ids' => [$location], 'risk_levels' => [$risk->category->value => $levels], ...$common],
+            ['category' => 'spc_wpc', 'product_settings' => [$risk->category->value => [alertWizardRow($risk, 'risk_area', ['location_ids' => [$location]])]], 'risk_levels' => [$risk->category->value => $levels], ...$common],
             ['category' => 'spc_wpc', 'product_ids' => [$risk->id], 'matching_mode' => 'risk_area', 'location_ids' => [$location], 'risk_levels' => $levels, ...$common],
         ],
     };
@@ -209,6 +209,9 @@ function editStartData(string $start, int $location, int $channel, array $templa
 }
 
 /**
+ * The form changes may address the Tornado Warning's row of the product table as `TORNADO_ROW`
+ * (resolved to its `product_settings.{category}.{index}` path when set).
+ *
  * @return array{0: array<string, mixed>, 1: array<string, mixed>} the Livewire `data.*` changes and the full PUT body
  */
 function editPayloads(string $scenario, int $location, int $channel, array $templates, $test): array
@@ -226,11 +229,11 @@ function editPayloads(string $scenario, int $location, int $channel, array $temp
             ['category' => 'threshold', 'variable' => 'temperature', 'direction' => 'below', 'threshold_value' => 32, 'timeframe' => 'overnight', 'location_id' => $location, 'delivery_time' => '06:00', ...$common],
         ],
         'weather location to nationwide' => [
-            ['matching_mode' => 'nationwide'],
+            ['TORNADO_ROW.matching_mode' => 'nationwide'],
             ['category' => 'weather_alerts', 'product_ids' => [$tornado->id], 'matching_mode' => 'nationwide', 'location_ids' => [$location], 'alert_template_id' => $templates['weather_alerts'], ...$common],
         ],
         'threshold to weather alerts' => [
-            ['category' => 'weather_alerts', 'product_ids' => [$tornado->category->value => [$tornado->id]], 'matching_mode' => 'nationwide'],
+            ['category' => 'weather_alerts', 'TORNADO_ROW.enabled' => true, 'TORNADO_ROW.matching_mode' => 'nationwide'],
             ['category' => 'weather_alerts', 'product_ids' => [$tornado->id], 'matching_mode' => 'nationwide', ...$common],
         ],
     };
@@ -254,6 +257,10 @@ test('the dashboard and the API store the same rule when an existing rule change
     $page = livewire(EditAlertRule::class, ['record' => $formRule->id]);
 
     foreach ($formChanges as $key => $value) {
+        if (str_contains($key, 'TORNADO_ROW')) {
+            $key = str_replace('TORNADO_ROW', "product_settings.{$this->tornado->category->value}.".alertWizardRowIndex($page, $this->tornado), $key);
+        }
+
         $page->set("data.{$key}", $value);
     }
 

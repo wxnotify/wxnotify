@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\NotificationChannel;
+use App\Models\Product;
 use App\Settings\IntegrationSettings;
 use App\Support\Delivery\HeartbeatUrlGuard;
 use App\Support\Delivery\Pauser;
@@ -84,6 +85,39 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * One switched-on row of the alert wizard's product table (`product_settings.{category}`), as
+ * the form holds it. Overrides replace any key (e.g. `location_ids`, `wfo`, `enabled`).
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}
+ */
+function alertWizardRow(Product $product, string $mode, array $overrides = []): array
+{
+    return [
+        'product_id' => $product->id,
+        'enabled' => true,
+        'matching_mode' => $mode,
+        'location_ids' => [],
+        'wfo' => null,
+        'county_zone_codes' => [],
+        ...$overrides,
+    ];
+}
+
+/**
+ * Where a product's row sits in its category's list in the alert wizard's form state.
+ */
+function alertWizardRowIndex(Testable $component, Product $product): int
+{
+    $index = collect($component->get("data.product_settings.{$product->category->value}"))
+        ->search(fn (array $row): bool => (int) $row['product_id'] === $product->id);
+
+    expect($index)->not->toBeFalse();
+
+    return $index;
 }
 
 /**
