@@ -7,6 +7,7 @@ use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
@@ -1095,4 +1096,127 @@ test('a County/Zone-mode rule with AFD attached still never matches, since it as
     (new MatchWeatherAlertRules)($ingested);
 
     Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
+/**
+ * A weather alerts rule whose products each carry their own matching settings (the pivot row) and
+ * their own locations, the way the per-product table saves them. $products maps a catalog code to
+ * ['mode' => ..., 'wfo' => ..., 'locations' => [Location, ...]].
+ */
+function perProductRule(array $products): AlertRule
+{
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+
+    foreach ($products as $code => $settings) {
+        $product = Product::where('code', $code)->sole();
+        $rule->products()->attach($product->id, ['matching_mode' => $settings['mode'], 'wfo' => $settings['wfo'] ?? null, 'county_zone_codes' => null]);
+
+        foreach ($settings['locations'] ?? [] as $location) {
+            DB::table('alert_rule_product_location')->insert(['alert_rule_id' => $rule->id, 'product_id' => $product->id, 'location_id' => $location->id]);
+        }
+    }
+
+    return $rule;
+}
+
+test('each product of a rule is matched by its own mode and locations', function () {
+    Queue::fake();
+    $home = Location::factory()->create(['lat' => 40.5, 'lng' => -74.0, 'forecast_zone_ugc' => 'NYZ072']);
+    $cabin = Location::factory()->create(['lat' => 30.0, 'lng' => -90.0, 'forecast_zone_ugc' => 'LAZ040']);
+    $rule = perProductRule([
+        'TO.W' => ['mode' => 'polygon', 'locations' => [$home]],
+        'FF.W' => ['mode' => 'location', 'locations' => [$cabin]],
+    ]);
+    $polygon = [
+        ['lat' => 40.0, 'lon' => -74.5], ['lat' => 41.0, 'lon' => -74.5],
+        ['lat' => 41.0, 'lon' => -73.5], ['lat' => 40.0, 'lon' => -73.5],
+    ];
+    $tornado = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'TO.W')->sole()->id, 'polygon' => $polygon, 'ugc_codes' => ['NYZ072']]);
+    $flood = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'FF.W')->sole()->id, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($flood);
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+
+    (new MatchWeatherAlertRules)($tornado);
+    Queue::assertPushed(DeliverWeatherAlert::class, 1);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->ruleId === $rule->id && $job->ingestedProductId === $tornado->id && $job->locationId === $home->id);
+});
+
+test('each product of a rule is matched by its own office or nationwide setting', function () {
+    Queue::fake();
+    perProductRule([
+        'TO.W' => ['mode' => 'wfo', 'wfo' => 'TBW'],
+        'FF.W' => ['mode' => 'nationwide'],
+    ]);
+    $tornadoElsewhere = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'TO.W')->sole()->id, 'cccc' => 'KOKX']);
+    $floodElsewhere = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'FF.W')->sole()->id, 'cccc' => 'KOKX']);
+
+    (new MatchWeatherAlertRules)($tornadoElsewhere);
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+
+    (new MatchWeatherAlertRules)($floodElsewhere);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->ingestedProductId === $floodElsewhere->id);
+});
+
+test('a bulletin whose segments belong to products with different settings delivers once with the matching segments', function () {
+    Queue::fake();
+    $home = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
+    $cabin = Location::factory()->create(['forecast_zone_ugc' => 'LAZ040']);
+    perProductRule([
+        'TO.W' => ['mode' => 'location', 'locations' => [$home]],
+        'FF.W' => ['mode' => 'location', 'locations' => [$cabin]],
+    ]);
+    $bulletin = createIngestedProductWithoutMatching();
+    $tornado = IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('TO.W')->create(['position' => 0, 'ugc_codes' => ['NYZ072']]);
+    $flood = IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('FF.W')->create(['position' => 1, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($bulletin);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, 1);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->segmentIds === [$tornado->id]);
+
+    Queue::fake();
+    $flood->update(['ugc_codes' => ['LAZ040']]);
+
+    (new MatchWeatherAlertRules)($bulletin);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, 1);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->segmentIds === [$tornado->id, $flood->id]);
+});
+
+test('a product whose pivot row has no mode matches exactly as the rule\'s own mode and locations', function () {
+    Queue::fake();
+    $location = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
+    $product = Product::where('code', 'TO.W')->sole();
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'location']);
+    $rule->locations()->attach($location);
+    $rule->products()->attach($product->id, ['matching_mode' => null, 'wfo' => null, 'county_zone_codes' => null]);
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+    $elsewhere = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['LAZ040']]);
+    $overLocation = createIngestedProductWithoutMatching(['product_id' => $product->id, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($elsewhere);
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+
+    (new MatchWeatherAlertRules)($overLocation);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->ingestedProductId === $overLocation->id && $job->locationId === $location->id);
+});
+
+test('the matched location is the lowest-id location among the matching products\' own locations', function () {
+    Queue::fake();
+    $low = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
+    $high = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
+    perProductRule([
+        'TO.W' => ['mode' => 'location', 'locations' => [$high]],
+        'FF.W' => ['mode' => 'location', 'locations' => [$low]],
+    ]);
+    $bulletin = createIngestedProductWithoutMatching();
+    IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('TO.W')->create(['position' => 0, 'ugc_codes' => ['NYZ072']]);
+    IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('FF.W')->create(['position' => 1, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($bulletin);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, 1);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->locationId === $low->id);
 });

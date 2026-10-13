@@ -18,6 +18,7 @@ use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -34,10 +35,11 @@ use Throwable;
  * events, stored as IngestedProductSegment rows (see BuildBulletinSegments). A bulletin that has
  * segments is matched segment by segment, in bulletin order, through IngestedProduct::asSegment():
  * a segment matches a rule when its own catalog product is one the rule watches and its own zones
- * and polygon satisfy the rule's matching mode, so every geography method below keeps taking an
+ * and polygon satisfy the matching mode the rule holds for that product (its own mode, office, codes
+ * and locations, else the rule's: see AlertRule::settingsFor()), so every geography method below keeps taking an
  * IngestedProduct and none of them knows the difference. A rule with any matching segment gets ONE
  * delivery per channel, carrying every matching segment id; its matched location is the matching
- * location with the lowest id. A bulletin without segments (non-VTEC products, factory rows) is
+ * location with the lowest id among the matching products' own locations. A bulletin without segments (non-VTEC products, factory rows) is
  * matched on its own columns, exactly as before.
  */
 class MatchWeatherAlertRules
@@ -61,7 +63,7 @@ class MatchWeatherAlertRules
                 ->where('is_active', true)
                 ->whereIn('category', self::PRODUCT_MATCHED_CATEGORIES)
                 ->whereHas('products', fn (Builder $q) => $q->whereKey($productIds))
-                ->when($segments->isNotEmpty(), fn (Builder $query) => $query->with('products'))
+                ->with(['products', 'locations', 'productLocations'])
                 ->when($product->is_test, fn (Builder $query) => $query->whereHas('user', fn (Builder $q) => $q->where('is_test_account', true)))
                 ->get();
         } catch (Throwable $e) {
@@ -96,7 +98,7 @@ class MatchWeatherAlertRules
      * The segments of this bulletin a rule matches, in bulletin order, and the matching location
      * with the lowest id among them (null for a rule with no locations to check). A segment counts
      * when its own catalog product is one the rule watches and its own geography passes the rule's
-     * mode and risk-level filter; each is checked through asSegment()'s copy of the bulletin.
+     * product's matching mode and the rule's risk-level filter; each is checked through asSegment()'s copy of the bulletin.
      *
      * @param  Collection<int, IngestedProductSegment>  $segments
      * @return array{0: list<int>, 1: ?Location}
@@ -224,30 +226,42 @@ class MatchWeatherAlertRules
         });
     }
 
+    /**
+     * Matches the product by the settings the rule holds for it (AlertRule::settingsFor()): its own mode,
+     * office, county/zone codes and locations, else the rule's when it has none of its own. A product the
+     * rule does not watch never matches.
+     */
     private function matchesGeography(AlertRule $rule, IngestedProduct $product): GeographyMatch
     {
-        return match ($rule->matching_mode) {
+        $settings = $product->product_id === null ? null : $rule->settingsFor((int) $product->product_id);
+
+        if ($settings === null) {
+            return GeographyMatch::notMatched();
+        }
+
+        return match ($settings->mode) {
             MatchingMode::Nationwide => GeographyMatch::matched(),
-            MatchingMode::Wfo => $this->matchesWfo($rule->wfo, $product->cccc) ? GeographyMatch::matched() : GeographyMatch::notMatched(),
-            MatchingMode::CountyZone => $this->matchesCountyZone($rule, $product) ? GeographyMatch::matched() : GeographyMatch::notMatched(),
-            MatchingMode::Location => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesLocationZones($location, $product) || $this->matchesLocationOffice($rule, $location, $product)),
-            MatchingMode::Polygon => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesPolygon($location, $product) ?? ($this->matchesLocationZones($location, $product) || $this->matchesLocationOffice($rule, $location, $product))),
-            MatchingMode::RiskArea => $this->matchesAnyLocation($rule, fn (Location $location): bool => $this->matchesRiskArea($rule, $location, $product) ?? $this->matchesLocationZones($location, $product)),
+            MatchingMode::Wfo => $this->matchesWfo($settings->wfo, $product->cccc) ? GeographyMatch::matched() : GeographyMatch::notMatched(),
+            MatchingMode::CountyZone => $this->matchesCountyZone($settings->countyZoneCodes, $product) ? GeographyMatch::matched() : GeographyMatch::notMatched(),
+            MatchingMode::Location => $this->matchesAnyLocation($settings->locations, fn (Location $location): bool => $this->matchesLocationZones($location, $product) || $this->matchesLocationOffice($rule, $location, $product)),
+            MatchingMode::Polygon => $this->matchesAnyLocation($settings->locations, fn (Location $location): bool => $this->matchesPolygon($location, $product) ?? ($this->matchesLocationZones($location, $product) || $this->matchesLocationOffice($rule, $location, $product))),
+            MatchingMode::RiskArea => $this->matchesAnyLocation($settings->locations, fn (Location $location): bool => $this->matchesRiskArea($rule, $location, $product) ?? $this->matchesLocationZones($location, $product)),
             null => GeographyMatch::notMatched(),
         };
     }
 
     /**
-     * "Any attached location matches -> the rule fires": the first location,
-     * ordered by location id (AlertRule::locations()'s explicit orderBy),
-     * not attachment order, whose check succeeds wins and is the one
-     * downstream code (quiet hours, {location} subject rendering) treats as
-     * "the" match for this delivery. A rule with zero attached locations
-     * never matches in these three modes -- there is nothing to check.
+     * "Any of the product's locations matches -> the rule fires for it": the first location, ordered
+     * by location id (the relations' explicit orderBy), not attachment order, whose check succeeds wins
+     * and is the one downstream code (quiet hours, {location} subject rendering) treats as "the" match
+     * for this delivery. A product with zero locations never matches in these three modes -- there is
+     * nothing to check.
+     *
+     * @param  SupportCollection<int, Location>  $locations
      */
-    private function matchesAnyLocation(AlertRule $rule, Closure $matchesLocation): GeographyMatch
+    private function matchesAnyLocation(SupportCollection $locations, Closure $matchesLocation): GeographyMatch
     {
-        foreach ($rule->locations as $location) {
+        foreach ($locations as $location) {
             if ($matchesLocation($location)) {
                 return GeographyMatch::matched($location);
             }
@@ -301,8 +315,8 @@ class MatchWeatherAlertRules
     }
 
     /**
-     * Takes the specific `Location` being checked (one of the rule's
-     * possibly several attached locations), not the rule itself. Returns
+     * Takes the specific `Location` being checked (one of the product's
+     * possibly several locations), not the rule itself. Returns
      * null (not false) when the product has no polygon, so the caller can
      * fall back to matchesLocationZones() — most VTEC products don't carry a
      * polygon, and a subscriber in Polygon mode shouldn't be silently missed
@@ -394,8 +408,8 @@ class MatchWeatherAlertRules
      * silently never matching a rule that mixes a risk-area product with a
      * plain event-type one.
      *
-     * Takes the specific location being checked (one of the rule's possibly
-     * several attached locations) rather than reading $rule->location.
+     * Takes the specific location being checked (one of the product's possibly
+     * several locations) rather than reading $rule->location.
      */
     private function matchesRiskArea(AlertRule $rule, Location $location, IngestedProduct $product): ?bool
     {
@@ -533,15 +547,16 @@ class MatchWeatherAlertRules
         return null;
     }
 
-    private function matchesCountyZone(AlertRule $rule, IngestedProduct $product): bool
+    /**
+     * @param  list<string>  $codes  the county/zone codes the product's settings name
+     */
+    private function matchesCountyZone(array $codes, IngestedProduct $product): bool
     {
-        if ($rule->county_zone_codes === null || $product->ugc_codes === null) {
+        if ($codes === [] || $product->ugc_codes === null) {
             return false;
         }
 
-        $ruleCodes = explode(',', $rule->county_zone_codes);
-
-        return array_intersect($ruleCodes, $product->ugc_codes) !== [];
+        return array_intersect($codes, $product->ugc_codes) !== [];
     }
 
     private function ensureZonesResolved(Location $location): Location
@@ -565,8 +580,8 @@ class MatchWeatherAlertRules
     }
 
     /**
-     * Nationwide/Wfo/CountyZone rules, and a
-     * Location/Polygon/RiskArea rule with zero attached locations or none
+     * Nationwide/Wfo/CountyZone matches, and a
+     * Location/Polygon/RiskArea match with zero locations or none
      * that matched, pass $matchedLocation = null -- "quiet hours" implicitly
      * means "my nighttime", which has no well-defined answer without a
      * specific location. These always deliver regardless of any
@@ -576,8 +591,8 @@ class MatchWeatherAlertRules
      * profile timezone; if neither resolves, the rule is not suppressed.
      *
      * Uses the location that actually matched THIS delivery, not an
-     * arbitrary or aggregated location across every location the rule has
-     * attached -- see the design spec for why that's the only well-defined
+     * arbitrary or aggregated location across every location the rule's
+     * products have -- see the design spec for why that's the only well-defined
      * choice once a rule can have more than one.
      */
     private function isWithinQuietHours(AlertRule $rule, ?Location $matchedLocation): bool
