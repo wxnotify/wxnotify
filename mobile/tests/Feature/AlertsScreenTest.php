@@ -64,17 +64,19 @@ function activeEvent(int $id, array $overrides = []): array
 }
 
 /**
- * The rows of the "Alerts sent to you" section (the list's only section; the current watches sit in the panel above it).
+ * The rows of the alerts list (a flat list: the "Alerts sent to you" heading and the current-watches panel sit above it).
  *
  * @param  array<string, mixed>  $tree
  * @return array<int, array<string, mixed>>
  */
 function sentAlertRows(array $tree): array
 {
-    $sections = [];
-    $collect = function (array $node) use (&$collect, &$sections): void {
-        if (($node['type'] ?? null) === 'list_section') {
-            $sections[$node['props']['header'] ?? ''] = $node;
+    $rows = [];
+    $collect = function (array $node) use (&$collect, &$rows): void {
+        if (($node['type'] ?? null) === 'list') {
+            $rows = findRows($node);
+
+            return;
         }
 
         foreach ($node['children'] ?? [] as $child) {
@@ -83,7 +85,7 @@ function sentAlertRows(array $tree): array
     };
     $collect($tree);
 
-    return array_values(findRows($sections['Alerts sent to you'] ?? []));
+    return array_values($rows);
 }
 
 beforeEach(function () {
@@ -139,9 +141,9 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
             && $list['style']['bg_color'] === '#F8FAFC'
             && $list['props']['dark_bg_color'] === '#0F172A'
             && $list['props']['plain'] === true
-            && array_column(array_column($list['children'], 'props'), 'header') === ['Alerts sent to you']
-            && count(findRows($list['children'][0])) === 2
-            && count(array_filter(findRows($list['children'][0]), fn (array $row) => array_key_exists('trailing_badges_json', $row['props']))) === 1)
+            && array_column($list['children'], 'type') === ['list_item', 'list_item']
+            && count(findRows($list)) === 2
+            && count(array_filter(findRows($list), fn (array $row) => array_key_exists('trailing_badges_json', $row['props']))) === 1)
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 1'
             && $item['props']['overline'] === 'Weather Alerts · 5 minutes ago'
             && $item['props']['supporting'] === 'Sent via Discord'
@@ -227,7 +229,7 @@ test('an empty feed says there are no alerts yet', function () {
         ->assertSee('No alerts yet')
         ->assertSee('Alerts you receive show up here')
         ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh'])
-            && array_column(array_column(findRows($list['children'][0]), 'props'), 'headline') === ['No alerts yet']);
+            && array_column(array_column(findRows($list), 'props'), 'headline') === ['No alerts yet']);
 });
 
 test('load more appends the next page with the cursor and stops when there is none', function () {
@@ -244,7 +246,7 @@ test('load more appends the next page with the cursor and stops when there is no
         ->assertSet('nextCursor', null)
         ->assertSet('pagedBeyondFirst', true)
         ->assertMissingElement('button')
-        ->assertElement('list', fn (array $list) => count(findRows($list['children'][0])) === 2);
+        ->assertElement('list', fn (array $list) => count(findRows($list)) === 2);
 
     Http::assertSent(fn (Request $r) => str_contains($r->url(), 'before=CURSOR1'));
 });
@@ -510,8 +512,8 @@ test('the panel lists the events in effect behind their family emoji with their 
 
     Native::test(AlertsScreen::class)
         ->assertSee('Current watches, warnings and advisories')
-        ->assertElement('list_section', fn (array $section) => $section['props']['header'] === 'Alerts sent to you')
-        ->assertMissingElement('list_section', fn (array $section) => $section['props']['header'] === 'Current watches, warnings and advisories')
+        ->assertSee('Alerts sent to you')
+        ->assertMissingElement('list_section')
         ->assertSee('🚨 Tornado Warning 1')
         ->assertSee('Warning · Ends 3 hours from now')
         ->assertSee('👀 Tornado Warning 2')

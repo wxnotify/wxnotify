@@ -52,22 +52,25 @@
         </native:column>
     </native:column>
 
-    {{-- Un-prefixed on purpose: native:validate's element list does not know list, list-section or list-item (<native:list> renders the same tree). --}}
+    {{-- A plain heading, not a list-section header: iOS draws a pinned section header transparent, so rows slid up under its text. --}}
+    <native:row class="w-full px-4 py-2 bg-theme-background">
+        <native:text class="text-sm text-theme-on-surface-variant">Alerts sent to you</native:text>
+    </native:row>
+
+    {{-- Un-prefixed on purpose: native:validate's element list does not know list or list-item (<native:list> renders the same tree). --}}
     <list separator plain="true" on-refresh="refresh" on-end-reached="loadMore" :end-reached-buffer="5" class="w-full flex-1 bg-theme-background">
-        <list-section header="Alerts sent to you">
-            @forelse ($alerts as $alert)
-                {{-- Rows must NOT be keyed (no native:key): Android's LazyColumn keeps the previously first keyed row anchored when items are inserted above it, hiding newly arrived alerts after a refresh. refresh() replaces the whole list and the rows hold no state. --}}
-                <list-item
-                    headline="{{ $alert['subject'] }}"
-                    overline="{{ $this->subtitle($alert) }}"
-                    :supporting="$this->supporting($alert)"
-                    :trailing-badges="$this->failureBadges($alert)"
-                    @tap="open({{ $alert['id'] }})"
-                    @longPress="openDetail({{ $alert['id'] }})"
-                ></list-item>
-            @empty
-                <list-item headline="No alerts yet" supporting="Alerts you receive show up here once one of your rules matches."></list-item>
-            @endforelse
-        </list-section>
+        @forelse ($alerts as $alert)
+            {{-- Rows must NOT be keyed (no native:key): Android's LazyColumn keeps the previously first keyed row anchored when items are inserted above it, hiding newly arrived alerts after a refresh. refresh() replaces the whole list and the rows hold no state. --}}
+            <list-item
+                headline="{{ $alert['subject'] }}"
+                overline="{{ $this->subtitle($alert) }}"
+                :supporting="$this->supporting($alert)"
+                :trailing-badges="$this->failureBadges($alert)"
+                @tap="open({{ $alert['id'] }})"
+                @longPress="openDetail({{ $alert['id'] }})"
+            ></list-item>
+        @empty
+            <list-item headline="No alerts yet" supporting="Alerts you receive show up here once one of your rules matches."></list-item>
+        @endforelse
     </list>
 </native:column>
