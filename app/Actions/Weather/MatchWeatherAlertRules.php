@@ -17,6 +17,7 @@ use App\Support\Timezones;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
@@ -63,7 +64,11 @@ class MatchWeatherAlertRules
                 ->where('is_active', true)
                 ->whereIn('category', self::PRODUCT_MATCHED_CATEGORIES)
                 ->whereHas('products', fn (Builder $q) => $q->whereKey($productIds))
-                ->with(['products', 'locations', 'productLocations'])
+                ->with([
+                    'products',
+                    'locations',
+                    'productLocations' => fn (BelongsToMany $query) => $query->wherePivotIn('product_id', $productIds),
+                ])
                 ->when($product->is_test, fn (Builder $query) => $query->whereHas('user', fn (Builder $q) => $q->where('is_test_account', true)))
                 ->get();
         } catch (Throwable $e) {

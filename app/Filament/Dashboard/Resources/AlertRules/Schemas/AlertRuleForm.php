@@ -82,9 +82,11 @@ class AlertRuleForm
      * The product tables (`product_settings.{category}`) only enter the schema once `category` is
      * picked (detailsStep()'s schema is a `fn (Get $get) => match(...)` closure), so field
      * defaults never apply to them: every row of the chosen alert category is seeded here, before
-     * the table first renders (see ProductMatchingTable::formState(); rows already in the form
-     * survive switching category away and back, and on Edit the rule's watched products come
-     * back with their stored settings).
+     * the table first renders (see ProductMatchingTable::formState()). Choosing a category replaces
+     * `product_settings` wholesale with that category's catalog: on Create, unsaved picks are lost when
+     * the category is switched, except the rows of a product both categories list (Weather Alerts and
+     * SPC & WPC share some product-category keys); on Edit the rule's watched products come back with
+     * their stored settings.
      *
      * The per-category `risk_levels.{category}` checklists are seeded to `[]`: multiple
      * checkboxes sharing one wire:model path whose value is `null` bind as a single boolean

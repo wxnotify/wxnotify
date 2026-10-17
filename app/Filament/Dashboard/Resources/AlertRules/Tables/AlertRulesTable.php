@@ -95,6 +95,11 @@ class AlertRulesTable
      * reads as before, differing modes read "Mixed" followed by the union of
      * the products' own locations.
      *
+     * This compares the MODE only, as the spec asks for the list: products that share a mode but hold
+     * different locations are still one mode and list the union of their locations. Do not unify it
+     * with AlertRuleResource::matching() (the API), which compares the FULL settings so the mobile app
+     * never mistakes a mixed rule for a uniform one.
+     *
      * @return list<string>
      */
     private static function locationLabels(AlertRule $record): array

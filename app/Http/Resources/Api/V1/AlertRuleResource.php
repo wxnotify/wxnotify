@@ -98,6 +98,11 @@ class AlertRuleResource extends JsonResource
      * when every product matches the same way, else `mixed` with the other fields empty; a rule with
      * no products reads its own columns.
      *
+     * This compares the FULL settings (mode, locations, office and zone codes) and must stay lossless
+     * for the mobile app: two products that share a mode but differ in locations read `mixed`, so the
+     * app never edits and re-saves a rule as if it were uniform. Do not unify it with
+     * AlertRulesTable::locationLabels() (My Alerts), which deliberately compares the mode only.
+     *
      * @param  list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}>  $productSettings
      * @return array{matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}
      */

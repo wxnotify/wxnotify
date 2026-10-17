@@ -70,7 +70,7 @@
                     return false
                 }
 
-                return ! [...this.$root.querySelectorAll('tr[data-search]')].some((tr) => this.matches(tr.dataset.search))
+                return ! [...(this.$root?.querySelectorAll('tr[data-search]') ?? [])].some((tr) => this.matches(tr.dataset.search))
             },
             isOn(row) { return !! this.$wire.get(row.path + '.enabled') },
             get allOn() { return this.rows.length > 0 && this.rows.every((row) => this.isOn(row)) },
@@ -318,6 +318,7 @@
                                 <span class="min-w-0 flex-1 break-words text-gray-700 dark:text-gray-300">{{ $zones !== '' ? $zones : 'No counties or zones chosen' }}</span>
                                 <button
                                     type="button"
+                                    aria-label="Choose zones for {{ $product->name }}"
                                     x-on:click="action('chooseZones', {{ $product->id }})"
                                     class="fi-link fi-size-sm shrink-0 font-semibold text-primary-600 dark:text-primary-400"
                                 >

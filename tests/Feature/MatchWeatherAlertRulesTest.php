@@ -1220,3 +1220,75 @@ test('the matched location is the lowest-id location among the matching products
     Queue::assertPushed(DeliverWeatherAlert::class, 1);
     Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->locationId === $low->id);
 });
+
+/**
+ * The number of Location models the matcher hydrates while handling one bulletin, counted through
+ * Eloquent's retrieved event (every eager-loaded relation row is one).
+ */
+function locationsHydratedWhileMatching(IngestedProduct $bulletin): int
+{
+    $hydrated = 0;
+    Location::retrieved(function () use (&$hydrated): void {
+        $hydrated++;
+    });
+
+    (new MatchWeatherAlertRules)($bulletin);
+
+    return $hydrated;
+}
+
+test('the matcher loads only the locations of the products the bulletin carries', function () {
+    Queue::fake();
+    $mine = Location::factory()->count(2)->create(['forecast_zone_ugc' => 'NYZ072']);
+    $others = Location::factory()->count(3)->create(['forecast_zone_ugc' => 'LAZ040']);
+    perProductRule([
+        'TO.W' => ['mode' => 'location', 'locations' => $mine->all()],
+        'FF.W' => ['mode' => 'location', 'locations' => $others->all()],
+        'SV.W' => ['mode' => 'location', 'locations' => $others->all()],
+    ]);
+    $plain = createIngestedProductWithoutMatching(['product_id' => Product::where('code', 'TO.W')->sole()->id, 'ugc_codes' => ['NYZ072']]);
+    $bulletin = createIngestedProductWithoutMatching();
+    IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('TO.W')->create(['position' => 0, 'ugc_codes' => ['NYZ072']]);
+
+    expect(locationsHydratedWhileMatching($plain))->toBe(2);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->ingestedProductId === $plain->id && $job->locationId === $mine->first()->id);
+
+    Queue::fake();
+
+    expect(locationsHydratedWhileMatching($bulletin))->toBe(2);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->ingestedProductId === $bulletin->id && $job->locationId === $mine->first()->id);
+});
+
+test('a bulletin carrying two products loads both products\' locations and no others', function () {
+    Queue::fake();
+    $home = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
+    $cabin = Location::factory()->create(['forecast_zone_ugc' => 'LAZ040']);
+    $unrelated = Location::factory()->count(2)->create(['forecast_zone_ugc' => 'TXZ001']);
+    perProductRule([
+        'TO.W' => ['mode' => 'location', 'locations' => [$home]],
+        'FF.W' => ['mode' => 'location', 'locations' => [$cabin]],
+        'SV.W' => ['mode' => 'location', 'locations' => $unrelated->all()],
+    ]);
+    $bulletin = createIngestedProductWithoutMatching();
+    IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('TO.W')->create(['position' => 0, 'ugc_codes' => ['NYZ072']]);
+    IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('FF.W')->create(['position' => 1, 'ugc_codes' => ['LAZ040']]);
+
+    expect(locationsHydratedWhileMatching($bulletin))->toBe(2);
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => count($job->segmentIds) === 2);
+});
+
+test('a product that inherits the rule\'s locations still matches when the product locations are constrained', function () {
+    Queue::fake();
+    $location = Location::factory()->create(['forecast_zone_ugc' => 'NYZ072']);
+    $otherProductLocation = Location::factory()->create(['forecast_zone_ugc' => 'LAZ040']);
+    $rule = perProductRule(['FF.W' => ['mode' => 'location', 'locations' => [$otherProductLocation]]]);
+    $inheriting = Product::where('code', 'TO.W')->sole();
+    $rule->update(['matching_mode' => 'location']);
+    $rule->locations()->attach($location);
+    $rule->products()->attach($inheriting->id, ['matching_mode' => null, 'wfo' => null, 'county_zone_codes' => null]);
+    $bulletin = createIngestedProductWithoutMatching(['product_id' => $inheriting->id, 'ugc_codes' => ['NYZ072']]);
+
+    (new MatchWeatherAlertRules)($bulletin);
+
+    Queue::assertPushed(DeliverWeatherAlert::class, fn ($job) => $job->ingestedProductId === $bulletin->id && $job->locationId === $location->id);
+});

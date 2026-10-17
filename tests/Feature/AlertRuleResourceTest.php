@@ -1584,7 +1584,10 @@ test('every product table has its own search box and Enable all switch, both han
 
     $searchText = e(mb_strtolower($tornadoWarning->name.' '.$tornadoWarning->description));
 
-    expect($html)->toContain('data-search="'.$searchText.'"');
+    expect($html)->toContain('data-search="'.$searchText.'"')
+        ->and($html)->toContain('aria-label="Choose zones for '.e($tornadoWarning->name).'"')
+        // A morph can replace the table root, so the no-match check must not assume $root exists.
+        ->and($html)->toContain('this.$root?.querySelectorAll(');
 });
 
 test('enabling every row of one category saves exactly that category\'s products and leaves each row\'s mode and locations alone', function () {

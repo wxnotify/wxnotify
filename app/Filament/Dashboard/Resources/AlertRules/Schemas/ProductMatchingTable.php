@@ -150,9 +150,11 @@ class ProductMatchingTable extends Field
 
     /**
      * The `product_settings` state for an alert category: every product's row, by product
-     * category. A row already in the form is kept (the category was switched away and back); a
-     * product the rule watches is switched on with its stored settings (an old-style rule's
-     * products read the rule's own); anything else starts switched off at its default.
+     * category. A row already in the form is kept only for a product this alert category also lists
+     * (Weather Alerts and SPC & WPC share some product categories), so on Create other unsaved picks
+     * are lost when the category is switched. On Edit a product the rule watches is switched on with
+     * its stored settings (an old-style rule's products read the rule's own); anything else starts
+     * switched off at its default.
      *
      * @return array<string, list<array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}>>
      */
