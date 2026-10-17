@@ -53,7 +53,7 @@
     </native:column>
 
     {{-- A plain heading, not a list-section header: iOS draws a pinned section header transparent, so rows slid up under its text. --}}
-    <native:row class="w-full px-4 py-2 bg-theme-background">
+    <native:row class="w-full px-4 pt-6 pb-2 bg-theme-background">
         <native:text class="text-sm text-theme-on-surface-variant">Alerts sent to you</native:text>
     </native:row>
 
