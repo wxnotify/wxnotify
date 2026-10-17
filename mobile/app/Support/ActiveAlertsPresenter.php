@@ -11,7 +11,22 @@ class ActiveAlertsPresenter
 {
     public const FAMILY_LABELS = ['warning' => 'Warning', 'watch' => 'Watch', 'advisory' => 'Advisory'];
 
+    /** The owner asked for emojis here (the app otherwise uses icons only): one per family, none for an unknown one. */
+    public const FAMILY_EMOJIS = ['warning' => '🚨', 'watch' => '👀', 'advisory' => '⚠️'];
+
     private const SHOWN = 5;
+
+    /**
+     * The event's name behind its family's emoji: "🚨 Tornado Warning".
+     *
+     * @param  array<string, mixed>  $event
+     */
+    public static function headline(array $event): string
+    {
+        $emoji = self::FAMILY_EMOJIS[$event['family'] ?? ''] ?? null;
+
+        return $emoji === null ? (string) $event['event'] : "{$emoji} {$event['event']}";
+    }
 
     /**
      * "Warning · Ends 3 hours from now", or "Watch · No end time given".

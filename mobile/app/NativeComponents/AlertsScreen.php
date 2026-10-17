@@ -278,6 +278,14 @@ class AlertsScreen extends NativeComponent
     /**
      * @param  array<string, mixed>  $event
      */
+    public function activeHeadline(array $event): string
+    {
+        return ActiveAlertsPresenter::headline($event);
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
     public function activeOverline(array $event): string
     {
         return ActiveAlertsPresenter::overline($event);

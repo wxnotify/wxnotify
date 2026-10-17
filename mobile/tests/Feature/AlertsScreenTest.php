@@ -64,7 +64,7 @@ function activeEvent(int $id, array $overrides = []): array
 }
 
 /**
- * The rows of the "Alerts sent to you" section (the second section of the list).
+ * The rows of the "Alerts sent to you" section (the list's only section; the current watches sit in the panel above it).
  *
  * @param  array<string, mixed>  $tree
  * @return array<int, array<string, mixed>>
@@ -139,9 +139,9 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
             && $list['style']['bg_color'] === '#F8FAFC'
             && $list['props']['dark_bg_color'] === '#0F172A'
             && $list['props']['plain'] === true
-            && array_column(array_column($list['children'], 'props'), 'header') === ['Current watches, warnings and advisories', 'Alerts sent to you']
-            && count(findRows($list['children'][1])) === 2
-            && count(array_filter(findRows($list['children'][1]), fn (array $row) => array_key_exists('trailing_badges_json', $row['props']))) === 1)
+            && array_column(array_column($list['children'], 'props'), 'header') === ['Alerts sent to you']
+            && count(findRows($list['children'][0])) === 2
+            && count(array_filter(findRows($list['children'][0]), fn (array $row) => array_key_exists('trailing_badges_json', $row['props']))) === 1)
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 1'
             && $item['props']['overline'] === 'Weather Alerts · 5 minutes ago'
             && $item['props']['supporting'] === 'Sent via Discord'
@@ -227,7 +227,7 @@ test('an empty feed says there are no alerts yet', function () {
         ->assertSee('No alerts yet')
         ->assertSee('Alerts you receive show up here')
         ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh'])
-            && array_column(array_column(findRows($list['children'][1]), 'props'), 'headline') === ['No alerts yet']);
+            && array_column(array_column(findRows($list['children'][0]), 'props'), 'headline') === ['No alerts yet']);
 });
 
 test('load more appends the next page with the cursor and stops when there is none', function () {
@@ -244,7 +244,7 @@ test('load more appends the next page with the cursor and stops when there is no
         ->assertSet('nextCursor', null)
         ->assertSet('pagedBeyondFirst', true)
         ->assertMissingElement('button')
-        ->assertElement('list', fn (array $list) => count(findRows($list['children'][1])) === 2);
+        ->assertElement('list', fn (array $list) => count(findRows($list['children'][0])) === 2);
 
     Http::assertSent(fn (Request $r) => str_contains($r->url(), 'before=CURSOR1'));
 });
@@ -503,17 +503,20 @@ test('opening the feed while location sharing is off sends nothing about it', fu
     Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'location-sharing'));
 });
 
-test('the section lists the events in effect with their end and places, above the sent alerts under their own headers', function () {
+test('the panel lists the events in effect behind their family emoji with their end and places, above the sent alerts', function () {
     $this->freezeSecond();
-    $this->activeAlerts = ['data' => [activeEvent(1), activeEvent(2, ['family' => 'watch', 'places' => ['Cabin', 'Home'], 'expires' => null])], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
+    $this->activeAlerts = ['data' => [activeEvent(1), activeEvent(2, ['family' => 'watch', 'places' => ['Cabin', 'Home'], 'expires' => null]), activeEvent(3, ['family' => 'advisory'])], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]];
     Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(7)]))]);
 
     Native::test(AlertsScreen::class)
-        ->assertElement('list_section', fn (array $section) => $section['props']['header'] === 'Current watches, warnings and advisories')
+        ->assertSee('Current watches, warnings and advisories')
         ->assertElement('list_section', fn (array $section) => $section['props']['header'] === 'Alerts sent to you')
+        ->assertMissingElement('list_section', fn (array $section) => $section['props']['header'] === 'Current watches, warnings and advisories')
+        ->assertSee('🚨 Tornado Warning 1')
         ->assertSee('Warning · Ends 3 hours from now')
-        ->assertSee('Tornado Warning 1')
+        ->assertSee('👀 Tornado Warning 2')
         ->assertSee('Watch · No end time given')
+        ->assertSee('⚠️ Tornado Warning 3')
         ->assertSee('Cabin, Home')
         ->assertSee('Tornado Warning 7');
 });
@@ -523,8 +526,9 @@ test('an event row opens its product page, and a row without a page has no tap',
     Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
 
     $screen = Native::test(AlertsScreen::class);
-    $screen->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 1' && isset($item['on_press']))
-        ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 2' && ! isset($item['on_press']));
+    $screen->assertElement('pressable', fn (array $row) => str_contains(json_encode($row), 'Tornado Warning 1') && isset($row['on_press']))
+        ->assertMissingElement('pressable', fn (array $row) => str_contains(json_encode($row), 'Tornado Warning 2'))
+        ->assertSee('Tornado Warning 2');
 
     $screen->call('openActive', 1);
     $screen->call('openActive', 2);

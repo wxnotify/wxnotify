@@ -45,3 +45,10 @@ test('as-of reads in the subscriber timezone when known, else how long ago', fun
     expect(ActiveAlertsPresenter::asOf($iso, 'America/Chicago'))->toBe('As of Oct 12, 2:14 PM CDT')
         ->and(ActiveAlertsPresenter::asOf(now()->subMinutes(5)->toIso8601String(), null))->toBe('As of 5 minutes ago');
 });
+
+test('the headline puts the family\'s emoji before the event name, and an unknown family gets none', function () {
+    expect(ActiveAlertsPresenter::headline(presenterEvent(['event' => 'Tornado Warning', 'family' => 'warning'])))->toBe('🚨 Tornado Warning')
+        ->and(ActiveAlertsPresenter::headline(presenterEvent(['event' => 'Flood Watch', 'family' => 'watch'])))->toBe('👀 Flood Watch')
+        ->and(ActiveAlertsPresenter::headline(presenterEvent(['event' => 'Wind Advisory', 'family' => 'advisory'])))->toBe('⚠️ Wind Advisory')
+        ->and(ActiveAlertsPresenter::headline(presenterEvent(['event' => 'Special Statement', 'family' => 'statement'])))->toBe('Special Statement');
+});

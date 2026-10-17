@@ -15,41 +15,45 @@
         </native:row>
     @endif
 
-    {{-- Un-prefixed on purpose: native:validate's element list does not know list, list-section or list-item (<native:list> renders the same tree). --}}
-    <list separator plain="true" on-refresh="refresh" on-end-reached="loadMore" :end-reached-buffer="5" class="w-full flex-1 bg-theme-background">
-        <list-section header="Current watches, warnings and advisories">
+    {{-- The current watches, warnings and advisories sit in a bordered panel ABOVE the list: a native list section cannot be bordered. Un-prefixed <pressable> on purpose: native:validate does not know it (a bare tag compiles the same). --}}
+    <native:column class="w-full px-3 pt-3">
+        <native:column class="w-full p-3 gap-2 rounded-xl border-2 border-theme-accent bg-theme-surface">
+            <native:text class="text-sm font-semibold text-theme-on-surface-variant">Current watches, warnings and advisories</native:text>
+
             @if ($this->activeNote())
-                <list-item supporting="{{ $this->activeNote() }}"></list-item>
+                <native:text class="text-sm text-theme-on-surface-variant">{{ $this->activeNote() }}</native:text>
             @endif
 
-            @foreach ($this->activeRows() as $event)
-                @if (filled($event['view_url'] ?? null))
-                    <list-item
-                        headline="{{ $event['event'] }}"
-                        overline="{{ $this->activeOverline($event) }}"
-                        supporting="{{ $this->activePlaces($event) }}"
-                        @tap="openActive({{ $event['id'] }})"
-                    ></list-item>
-                @else
-                    <list-item
-                        headline="{{ $event['event'] }}"
-                        overline="{{ $this->activeOverline($event) }}"
-                        supporting="{{ $this->activePlaces($event) }}"
-                    ></list-item>
-                @endif
-            @endforeach
+            @if ($showAllActive && $this->canShowFewerActive())
+                <native:scroll-view class="w-full h-[300]">
+                    <native:column class="w-full gap-2">
+                        @include('native.partials.active-alert-rows', ['screen' => $this])
+                    </native:column>
+                </native:scroll-view>
+            @else
+                <native:column class="w-full gap-2">
+                    @include('native.partials.active-alert-rows', ['screen' => $this])
+                </native:column>
+            @endif
 
             @if ($this->activeEmptyLine())
-                <list-item headline="{{ $this->activeEmptyLine() }}"></list-item>
+                <native:text class="text-base text-theme-on-background">{{ $this->activeEmptyLine() }}</native:text>
             @endif
 
             @if ($this->activeHiddenCount() > 0)
-                <list-item headline="Show all ({{ $this->activeHiddenCount() }})" @tap="toggleActive"></list-item>
+                <pressable @tap="toggleActive" ref="toggle-active" class="w-full">
+                    <native:text class="text-sm font-semibold text-theme-primary py-1">Show all ({{ $this->activeHiddenCount() }})</native:text>
+                </pressable>
             @elseif ($this->canShowFewerActive())
-                <list-item headline="Show fewer" @tap="toggleActive"></list-item>
+                <pressable @tap="toggleActive" ref="toggle-active" class="w-full">
+                    <native:text class="text-sm font-semibold text-theme-primary py-1">Show fewer</native:text>
+                </pressable>
             @endif
-        </list-section>
+        </native:column>
+    </native:column>
 
+    {{-- Un-prefixed on purpose: native:validate's element list does not know list, list-section or list-item (<native:list> renders the same tree). --}}
+    <list separator plain="true" on-refresh="refresh" on-end-reached="loadMore" :end-reached-buffer="5" class="w-full flex-1 bg-theme-background">
         <list-section header="Alerts sent to you">
             @forelse ($alerts as $alert)
                 {{-- Rows must NOT be keyed (no native:key): Android's LazyColumn keeps the previously first keyed row anchored when items are inserted above it, hiding newly arrived alerts after a refresh. refresh() replaces the whole list and the rows hold no state. --}}
