@@ -40,7 +40,7 @@ use WeakMap;
  * table-mode Repeater was about 46,000 DOM nodes and a 9.6 MB response for the 143 Weather
  * Alerts rows (see `.ai/rules/filament.md`). The view binds with deferred `wire:model` /
  * `$wire.set(..., false)`, so a switch, a mode change or a location tick makes no request;
- * the mode's inputs, its helper text and the dimming of a switched-off row are Alpine. Only the
+ * the mode's inputs and its helper text are Alpine (a switched-off row looks like any other; only its switch says it is off). Only the
  * county/zone picker and "add a location" are server actions (modals), since they need the
  * existing Filament fields.
  */

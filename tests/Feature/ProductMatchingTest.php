@@ -20,7 +20,7 @@ dataset('product matching cases', [
         AlertCategory::WeatherAlerts,
         ['has_polygon' => false],
         MatchingMode::Location,
-        [MatchingMode::Nationwide, MatchingMode::Location, MatchingMode::Wfo, MatchingMode::CountyZone, MatchingMode::Polygon],
+        [MatchingMode::Nationwide, MatchingMode::Location, MatchingMode::Wfo, MatchingMode::CountyZone],
         [MatchingMode::Nationwide, MatchingMode::Location, MatchingMode::Wfo, MatchingMode::CountyZone, MatchingMode::Polygon],
     ],
     'SPC product with risk levels' => [
@@ -30,18 +30,25 @@ dataset('product matching cases', [
         [MatchingMode::Nationwide, MatchingMode::RiskArea],
         [MatchingMode::Nationwide, MatchingMode::Polygon, MatchingMode::RiskArea],
     ],
-    'SPC product with an empty risk level list' => [
+    'SPC product with a polygon' => [
         AlertCategory::SpcWpc,
-        ['risk_level_options' => []],
+        ['has_polygon' => true, 'risk_level_options' => null],
         MatchingMode::Polygon,
         [MatchingMode::Nationwide, MatchingMode::Polygon],
         [MatchingMode::Nationwide, MatchingMode::Polygon, MatchingMode::RiskArea],
     ],
+    'SPC product with an empty risk level list and no polygon' => [
+        AlertCategory::SpcWpc,
+        ['has_polygon' => false, 'risk_level_options' => []],
+        MatchingMode::Nationwide,
+        [MatchingMode::Nationwide],
+        [MatchingMode::Nationwide, MatchingMode::Polygon, MatchingMode::RiskArea],
+    ],
     'plain SPC product' => [
         AlertCategory::SpcWpc,
-        ['risk_level_options' => null],
-        MatchingMode::Polygon,
-        [MatchingMode::Nationwide, MatchingMode::Polygon],
+        ['has_polygon' => false, 'risk_level_options' => null],
+        MatchingMode::Nationwide,
+        [MatchingMode::Nationwide],
         [MatchingMode::Nationwide, MatchingMode::Polygon, MatchingMode::RiskArea],
     ],
 ]);
@@ -109,7 +116,7 @@ it('returns no locations for a user who has none', function () {
         ->and($row['enabled'])->toBeFalse();
 });
 
-it('carries the location for every product whose default mode is location-based', function (
+it('carries the location only for a product whose default mode is location-based', function (
     AlertCategory $category,
     array $attributes,
     MatchingMode $default,
@@ -120,8 +127,10 @@ it('carries the location for every product whose default mode is location-based'
 
     $row = ProductMatching::defaultRow($user, $category, $product);
 
+    $locationBased = in_array($default, [MatchingMode::Location, MatchingMode::Polygon, MatchingMode::RiskArea], true);
+
     expect($row['matching_mode'])->toBe($default->value)
-        ->and($row['location_ids'])->toBe([$location->id]);
+        ->and($row['location_ids'])->toBe($locationBased ? [$location->id] : []);
 })->with('product matching cases');
 
 it('uses a first location id passed in without querying locations', function () {

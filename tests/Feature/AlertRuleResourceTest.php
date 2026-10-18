@@ -223,7 +223,7 @@ test('an spc wpc rule for the Convective Outlook can use RiskArea matching mode 
         ->and($rule->settingsFor($outlook->id)->locations->pluck('id')->all())->toBe([$location->id]);
 });
 
-test('RiskArea is not offered as a matching mode for weather_alerts -- it only applies to spc_wpc', function () {
+test('RiskArea is not offered as a matching mode for weather_alerts -- it only applies to spc_wpc -- and By product polygon only for a product with a polygon', function () {
     // Regression: the Weather Alerts mode picker once returned
     // MatchingMode::cases() unfiltered, which started including RiskArea the
     // moment that case was added for SPC/WPC -- "By risk area at my location"
@@ -235,9 +235,10 @@ test('RiskArea is not offered as a matching mode for weather_alerts -- it only a
         $component->assertFormFieldExists("product_settings.{$category->value}", function (ProductMatchingTable $field): bool {
             return collect($field->getState())->every(function (array $row) use ($field): bool {
                 $optionValues = array_keys($field->modeOptionsFor($row));
+                $hasPolygon = (bool) Product::findOrFail($row['product_id'])->has_polygon;
 
                 return ! in_array(MatchingMode::RiskArea->value, $optionValues, true)
-                    && in_array(MatchingMode::Polygon->value, $optionValues, true);
+                    && in_array(MatchingMode::Polygon->value, $optionValues, true) === $hasPolygon;
             });
         });
     }
@@ -1073,7 +1074,7 @@ test('a subscriber with no saved locations gets rows with no location and is tol
         ->assertSee('No saved locations yet — use the + button to add one.');
 });
 
-test('choosing SPC & WPC defaults a risk-level product to risk area and any other product to polygon', function () {
+test('choosing SPC & WPC defaults a risk-level product to risk area, a polygon product to polygon and any other product to nationwide', function () {
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
     $mesoscale = Product::where('code', 'SPC.MD')->sole();
     $day2 = Product::where('code', 'DY2')->sole();
@@ -1083,7 +1084,7 @@ test('choosing SPC & WPC defaults a risk-level product to risk area and any othe
     $component->assertFormSet([
         'product_settings.convective_outlooks.'.alertWizardRowIndex($component, $outlook) => alertWizardRow($outlook, 'risk_area', ['enabled' => false, 'location_ids' => [$this->location->id]]),
         "product_settings.{$mesoscale->category->value}.".alertWizardRowIndex($component, $mesoscale) => alertWizardRow($mesoscale, 'polygon', ['enabled' => false, 'location_ids' => [$this->location->id]]),
-        'product_settings.convective_outlooks.'.alertWizardRowIndex($component, $day2) => alertWizardRow($day2, 'polygon', ['enabled' => false, 'location_ids' => [$this->location->id]]),
+        'product_settings.convective_outlooks.'.alertWizardRowIndex($component, $day2) => alertWizardRow($day2, 'nationwide', ['enabled' => false]),
     ]);
 
     expect(collect($component->get('data.product_settings'))->flatten(1)->pluck('product_id')->sort()->values()->all())

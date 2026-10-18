@@ -17,17 +17,24 @@ use InvalidArgumentException;
 final class ProductMatching
 {
     /**
-     * The modes the product table offers as options for this product.
+     * The modes the product table offers as options for this product. "By product polygon" is offered only for a
+     * product that has a polygon (`has_polygon`); a rule that already stores it for another product keeps it
+     * (acceptedModes() still allows it, and the table shows a stored mode as stored).
      *
      * @return list<MatchingMode>
      */
     public static function offeredModes(AlertCategory $category, Product $product): array
     {
         return match ($category) {
-            AlertCategory::WeatherAlerts => self::weatherAlertModes(),
-            AlertCategory::SpcWpc => self::hasRiskLevels($product)
-                ? [MatchingMode::Nationwide, MatchingMode::RiskArea]
-                : [MatchingMode::Nationwide, MatchingMode::Polygon],
+            AlertCategory::WeatherAlerts => array_values(array_filter(
+                self::weatherAlertModes(),
+                fn (MatchingMode $mode): bool => $mode !== MatchingMode::Polygon || $product->has_polygon,
+            )),
+            AlertCategory::SpcWpc => match (true) {
+                self::hasRiskLevels($product) => [MatchingMode::Nationwide, MatchingMode::RiskArea],
+                (bool) $product->has_polygon => [MatchingMode::Nationwide, MatchingMode::Polygon],
+                default => [MatchingMode::Nationwide],
+            },
             default => throw self::unsupported($category),
         };
     }
@@ -50,7 +57,11 @@ final class ProductMatching
     {
         return match ($category) {
             AlertCategory::WeatherAlerts => $product->has_polygon ? MatchingMode::Polygon : MatchingMode::Location,
-            AlertCategory::SpcWpc => self::hasRiskLevels($product) ? MatchingMode::RiskArea : MatchingMode::Polygon,
+            AlertCategory::SpcWpc => match (true) {
+                self::hasRiskLevels($product) => MatchingMode::RiskArea,
+                (bool) $product->has_polygon => MatchingMode::Polygon,
+                default => MatchingMode::Nationwide,
+            },
             default => throw self::unsupported($category),
         };
     }

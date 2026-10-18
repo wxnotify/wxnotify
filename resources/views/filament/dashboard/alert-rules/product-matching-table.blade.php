@@ -182,8 +182,7 @@
                         data-search="{{ mb_strtolower(trim($product->name.' '.$product->description)) }}"
                         x-show="matches($el.dataset.search)"
                         x-data="row(@js($rowPath))"
-                        x-bind:class="{ 'opacity-50': ! on }"
-                        @class(['align-top transition-opacity', 'opacity-50' => ! $isOn])
+                        class="align-top"
                     >
                         <td class="w-14 py-3 pe-3">
                             <button

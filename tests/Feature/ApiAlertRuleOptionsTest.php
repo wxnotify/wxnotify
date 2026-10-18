@@ -120,7 +120,10 @@ test('every product carries the modes its row offers and its default mode', func
     $tornado = Product::where('code', 'TO.W')->sole();
     $risk = Product::where('family', 'spc_wpc')->whereNotNull('risk_level_options')->orderBy('id')->firstOrFail();
     $plain = Product::where('family', 'spc_wpc')->whereNull('risk_level_options')->orderBy('id')->firstOrFail();
+    $noPolygonSpc = Product::where('family', 'spc_wpc')->whereNull('risk_level_options')->where('id', '!=', $plain->id)->orderBy('id')->firstOrFail();
     $tornado->forceFill(['has_polygon' => true])->save();
+    $plain->forceFill(['has_polygon' => true])->save();
+    $noPolygonSpc->forceFill(['has_polygon' => false])->save();
     $noPolygon = Product::where('family', 'warning')->where('has_polygon', false)->where('status', 'active')->firstOrFail();
 
     $response = optionsCall($this)->assertOk();
@@ -128,9 +131,12 @@ test('every product carries the modes its row offers and its default mode', func
 
     expect($find('weather_alerts', $tornado)['modes'])->toBe(['nationwide', 'location', 'wfo', 'county_zone', 'polygon'])
         ->and($find('weather_alerts', $tornado)['default_mode'])->toBe('polygon')
+        ->and($find('weather_alerts', $noPolygon)['modes'])->toBe(['nationwide', 'location', 'wfo', 'county_zone'])
         ->and($find('weather_alerts', $noPolygon)['default_mode'])->toBe('location')
         ->and($find('spc_wpc', $risk)['modes'])->toBe(['nationwide', 'risk_area'])
         ->and($find('spc_wpc', $risk)['default_mode'])->toBe('risk_area')
         ->and($find('spc_wpc', $plain)['modes'])->toBe(['nationwide', 'polygon'])
-        ->and($find('spc_wpc', $plain)['default_mode'])->toBe('polygon');
+        ->and($find('spc_wpc', $plain)['default_mode'])->toBe('polygon')
+        ->and($find('spc_wpc', $noPolygonSpc)['modes'])->toBe(['nationwide'])
+        ->and($find('spc_wpc', $noPolygonSpc)['default_mode'])->toBe('nationwide');
 });
