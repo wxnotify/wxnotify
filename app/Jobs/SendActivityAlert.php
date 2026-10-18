@@ -34,6 +34,7 @@ class SendActivityAlert implements ShouldQueue
         public readonly int $userId,
         public readonly Carbon $occurredAt,
         public readonly ?string $ipAddress = null,
+        public readonly ?string $via = null,
     ) {}
 
     public function backoff(): array
@@ -50,12 +51,13 @@ class SendActivityAlert implements ShouldQueue
             return;
         }
 
-        // A job queued before ipAddress existed unserializes with it uninitialized, not null.
+        // A job queued before ipAddress or via existed unserializes with it uninitialized, not null.
         $ipAddress = $this->ipAddress ?? null;
+        $via = $this->via ?? null;
 
         $delivered = $client->notify(
             url: $rule->apprise_target,
-            body: "{$this->type->label()}: {$user->email} at {$this->occurredAt->toDayDateTimeString()} UTC".($ipAddress !== null ? " from {$ipAddress}" : ''),
+            body: "{$this->type->label()}: {$user->email} at {$this->occurredAt->toDayDateTimeString()} UTC".($ipAddress !== null ? " from {$ipAddress}" : '').($via !== null ? " via {$via}" : ''),
             title: MessagePrefix::apply('WxNotify Activity Alert'),
         );
 

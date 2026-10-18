@@ -27,6 +27,21 @@ test('it sends an apprise notification for an active rule', function () {
         && $request['title'] === 'WxNotify Activity Alert');
 });
 
+test('the message says how the subscriber was accessing the app, after the address when there is one', function (?string $ip, ?string $via, string $expected) {
+    Http::fake();
+    $rule = ActivityAlertRule::factory()->create(['apprise_target' => 'slack://token/botname/channel', 'is_active' => true]);
+    $user = User::factory()->create(['email' => 'subscriber@example.com']);
+
+    (new SendActivityAlert($rule->id, ActivityAlertType::SignedIn, $user->id, Carbon::parse('2026-09-05 12:00:00'), $ip, $via))->handle(app(AppriseApiClient::class));
+
+    Http::assertSent(fn ($request) => $request['body'] === "Signed in: subscriber@example.com at {$expected}");
+})->with([
+    'web with an address' => ['203.0.113.9', 'web', 'Sat, Sep 5, 2026 12:00 PM UTC from 203.0.113.9 via web'],
+    'mobile app with an address' => ['203.0.113.9', 'mobile app', 'Sat, Sep 5, 2026 12:00 PM UTC from 203.0.113.9 via mobile app'],
+    'mobile app without an address' => [null, 'mobile app', 'Sat, Sep 5, 2026 12:00 PM UTC via mobile app'],
+    'neither' => [null, null, 'Sat, Sep 5, 2026 12:00 PM UTC'],
+]);
+
 test('the title is prefixed when the message prefix is enabled', function () {
     Http::fake();
     $settings = app(GeneralSettings::class);

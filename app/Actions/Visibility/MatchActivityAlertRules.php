@@ -7,6 +7,7 @@ use App\Enums\ActivityAlertType;
 use App\Jobs\SendActivityAlert;
 use App\Models\ActivityAlertRule;
 use App\Models\User;
+use App\Support\AccessChannel;
 use App\Support\ClientIp;
 use Illuminate\Database\Eloquent\Builder;
 use Throwable;
@@ -17,6 +18,7 @@ class MatchActivityAlertRules
     {
         $occurredAt = now();
         $ipAddress = ClientIp::forActivity($user);
+        $via = AccessChannel::forActivity($user);
 
         try {
             $rules = ActivityAlertRule::query()
@@ -40,9 +42,9 @@ class MatchActivityAlertRules
             return;
         }
 
-        $rules->each(function (ActivityAlertRule $rule) use ($type, $user, $occurredAt, $ipAddress) {
+        $rules->each(function (ActivityAlertRule $rule) use ($type, $user, $occurredAt, $ipAddress, $via) {
             try {
-                SendActivityAlert::dispatch($rule->id, $type, $user->id, $occurredAt, $ipAddress);
+                SendActivityAlert::dispatch($rule->id, $type, $user->id, $occurredAt, $ipAddress, $via);
             } catch (Throwable $e) {
                 logger()->error('Failed to dispatch SendActivityAlert', [
                     'rule_id' => $rule->id,
