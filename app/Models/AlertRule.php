@@ -97,9 +97,18 @@ class AlertRule extends Model
             || Carbon::parse($original)->format('H:i') !== Carbon::parse($this->delivery_time)->format('H:i');
     }
 
+    /**
+     * The rule's own matching_mode, wfo and county_zone_codes are legacy columns: product-based rules keep
+     * their matching per product (see settingsFor()), and SaveAlertRule empties these on the first save
+     * after the per-product settings arrived, which would read as "matching cleared" in the history.
+     */
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logAll()->logOnlyDirty()->dontLogEmptyChanges();
+        return LogOptions::defaults()
+            ->logAll()
+            ->logExcept(['matching_mode', 'wfo', 'county_zone_codes'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
     }
 
     protected function casts(): array

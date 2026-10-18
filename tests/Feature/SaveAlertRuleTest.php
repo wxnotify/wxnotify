@@ -360,6 +360,29 @@ test('the write is logged with the subscriber as the causer although there is no
     expect($activity->causer_id)->toBe($this->user->id);
 });
 
+test('saving an old-style rule through the per-product settings does not log its own matching columns going to null', function () {
+    $rule = AlertRule::factory()->for($this->user)->create(['category' => 'weather_alerts', 'matching_mode' => 'wfo', 'wfo' => 'TBW', 'location_id' => null]);
+    $rule->products()->attach($this->tornado->id);
+    Activity::query()->delete();
+
+    ($this->save)([
+        'category' => 'weather_alerts',
+        'name' => 'Renamed',
+        'channel_ids' => [$this->channel->id],
+        'product_settings' => [['product_id' => $this->tornado->id, 'matching_mode' => 'nationwide']],
+    ], $rule);
+
+    $logged = Activity::query()->where('subject_type', AlertRule::class)->where('subject_id', $rule->id)->get()
+        ->flatMap(fn (Activity $activity): array => array_keys($activity->attribute_changes['attributes'] ?? []))
+        ->unique()
+        ->all();
+
+    expect($logged)->toContain('name')
+        ->and($logged)->not->toContain('matching_mode')
+        ->and($logged)->not->toContain('wfo')
+        ->and($logged)->not->toContain('county_zone_codes');
+});
+
 test('a product\'s locations are only ever the rule owner\'s own', function () {
     $othersLocation = Location::factory()->for(User::factory())->create();
 
