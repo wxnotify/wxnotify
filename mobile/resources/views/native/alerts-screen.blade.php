@@ -24,16 +24,18 @@
                 <native:text class="text-sm text-theme-on-surface-variant">{{ $this->activeNote() }}</native:text>
             @endif
 
-            @if ($showAllActive && $this->canShowFewerActive())
-                <native:scroll-view class="w-full h-[300]">
+            @if (count($this->activeRows()) > 0)
+                @if ($showAllActive && $this->canShowFewerActive())
+                    <native:scroll-view class="w-full h-[300]">
+                        <native:column class="w-full gap-2">
+                            @include('native.partials.active-alert-rows', ['screen' => $this])
+                        </native:column>
+                    </native:scroll-view>
+                @else
                     <native:column class="w-full gap-2">
                         @include('native.partials.active-alert-rows', ['screen' => $this])
                     </native:column>
-                </native:scroll-view>
-            @else
-                <native:column class="w-full gap-2">
-                    @include('native.partials.active-alert-rows', ['screen' => $this])
-                </native:column>
+                @endif
             @endif
 
             @if ($this->activeEmptyLine())
