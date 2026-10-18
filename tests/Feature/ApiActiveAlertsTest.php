@@ -3,6 +3,7 @@
 use App\Models\ActiveWwa;
 use App\Models\ActiveWwaArea;
 use App\Models\IngestedProduct;
+use App\Models\IngestedProductSegment;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\User;
@@ -152,6 +153,44 @@ test('view_url is the latest bulletin page, and the payload carries nothing but 
     expect($response->json('data.0.view_url'))->toBe($bulletin->fresh()->viewUrl())->not->toBeNull()
         ->and(array_keys($response->json('data.0')))->toBe(['id', 'event', 'family', 'places', 'expires', 'view_url'])
         ->and($response->getContent())->not->toContain('SECRET-HEADLINE')->not->toContain('SECRET-BULLETIN-BODY')->not->toContain('COZ040');
+});
+
+test('view_url is the bulletin covering the caller\'s own zone, not the event\'s latest bulletin for other zones', function () {
+    ($this->place)('Home', 'COZ040');
+    $advisory = ($this->event)('Wind Advisory', 'advisory', 'COZ040');
+    $ours = IngestedProduct::factory()->createQuietly(['view_slug' => 'kbou-wi-ours']);
+    $elsewhere = IngestedProduct::factory()->createQuietly(['view_slug' => 'kbou-wi-cancelled-elsewhere']);
+    $oursSegment = IngestedProductSegment::factory()->create(['ingested_product_id' => $ours->id]);
+    $elsewhereSegment = IngestedProductSegment::factory()->create(['ingested_product_id' => $elsewhere->id]);
+    ActiveWwaArea::factory()->create(['active_wwa_id' => $advisory->id, 'ugc_code' => 'COZ040', 'latest_segment_id' => $oursSegment->id]);
+    ActiveWwaArea::factory()->create(['active_wwa_id' => $advisory->id, 'ugc_code' => 'COZ888', 'latest_segment_id' => $elsewhereSegment->id]);
+    $advisory->forceFill(['latest_ingested_product_id' => $elsewhere->id])->save();
+
+    expect(($this->call)()->assertOk()->json('data.0.view_url'))->toBe($ours->fresh()->viewUrl());
+});
+
+test('view_url falls back to the event\'s latest bulletin when the covering zone rows name no bulletin', function () {
+    ($this->place)('Home', 'COZ040');
+    $advisory = ($this->event)('Wind Advisory', 'advisory', 'COZ040');
+    $latest = IngestedProduct::factory()->createQuietly(['view_slug' => 'kbou-wi-latest']);
+    ActiveWwaArea::factory()->create(['active_wwa_id' => $advisory->id, 'ugc_code' => 'COZ040', 'latest_segment_id' => null]);
+    $advisory->forceFill(['latest_ingested_product_id' => $latest->id])->save();
+
+    expect(($this->call)()->assertOk()->json('data.0.view_url'))->toBe($latest->fresh()->viewUrl());
+});
+
+test('with several places covered by different bulletins, view_url is the newest of them', function () {
+    ($this->place)('Home', 'COZ040');
+    ($this->place)('Cabin', 'COZ041');
+    $advisory = ($this->event)('Wind Advisory', 'advisory', 'COZ040');
+    $older = IngestedProduct::factory()->createQuietly(['view_slug' => 'kbou-wi-older']);
+    $newer = IngestedProduct::factory()->createQuietly(['view_slug' => 'kbou-wi-newer']);
+    $olderSegment = IngestedProductSegment::factory()->create(['ingested_product_id' => $older->id]);
+    $newerSegment = IngestedProductSegment::factory()->create(['ingested_product_id' => $newer->id]);
+    ActiveWwaArea::factory()->create(['active_wwa_id' => $advisory->id, 'ugc_code' => 'COZ040', 'latest_segment_id' => $olderSegment->id]);
+    ActiveWwaArea::factory()->create(['active_wwa_id' => $advisory->id, 'ugc_code' => 'COZ041', 'latest_segment_id' => $newerSegment->id]);
+
+    expect(($this->call)()->assertOk()->json('data.0.view_url'))->toBe($newer->fresh()->viewUrl());
 });
 
 test('the result is cached for 60 seconds per subscriber', function () {

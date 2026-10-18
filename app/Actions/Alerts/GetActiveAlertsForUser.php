@@ -4,6 +4,7 @@ namespace App\Actions\Alerts;
 
 use App\Actions\Weather\GetActiveAlertsForLocation;
 use App\Models\ActiveWwa;
+use App\Models\IngestedProduct;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -49,7 +50,7 @@ class GetActiveAlertsForUser
 
         $lookup = app(GetActiveAlertsForLocation::class);
 
-        /** @var array<int, array{wwa: ActiveWwa, places: list<string>, ends: list<?CarbonInterface>}> $grouped */
+        /** @var array<int, array{wwa: ActiveWwa, places: list<string>, ends: list<?CarbonInterface>, bulletins: list<?int>}> $grouped */
         $grouped = [];
 
         foreach ($locations as $location) {
@@ -61,6 +62,7 @@ class GetActiveAlertsForUser
                 $grouped[$wwa->id]['wwa'] ??= $wwa;
                 $grouped[$wwa->id]['places'][] = (string) $location->label;
                 $grouped[$wwa->id]['ends'][] = $wwa->expires;
+                $grouped[$wwa->id]['bulletins'][] = $wwa->getAttribute('covering_ingested_product_id');
             }
         }
 
@@ -72,8 +74,14 @@ class GetActiveAlertsForUser
 
         $wwas->load('latestIngestedProduct');
 
+        $coveringBulletins = IngestedProduct::query()
+            ->select(['id', 'view_slug'])
+            ->whereIn('id', collect($grouped)->pluck('bulletins')->flatten()->filter()->unique()->all())
+            ->get()
+            ->keyBy('id');
+
         $events = GetActiveAlertsForLocation::sorted($wwas)
-            ->map(function (ActiveWwa $wwa) use ($grouped): array {
+            ->map(function (ActiveWwa $wwa) use ($grouped, $coveringBulletins): array {
                 $places = collect($grouped[$wwa->id]['places'])->unique()->sort(SORT_NATURAL | SORT_FLAG_CASE)->values()->all();
 
                 return [
@@ -82,12 +90,27 @@ class GetActiveAlertsForUser
                     'family' => (string) $wwa->eventFamily(),
                     'places' => $places,
                     'expires' => $wwa->expires?->toIso8601String(),
-                    'view_url' => $wwa->latestIngestedProduct?->viewUrl(),
+                    'view_url' => $this->viewUrl($wwa, $grouped[$wwa->id]['bulletins'], $coveringBulletins),
                 ];
             })
             ->values()
             ->all();
 
         return ['events' => $events, 'has_places' => true, 'generated_at' => now()->toIso8601String()];
+    }
+
+    /**
+     * The page of the newest bulletin that covers one of the subscriber's places (an event issued as many
+     * bulletins can have its latest one cancel zones elsewhere while theirs is still in effect), else the
+     * event's own latest bulletin.
+     *
+     * @param  list<?int>  $coveringIds  the covering bulletin of each place the event affects
+     * @param  EloquentCollection<int, IngestedProduct>  $coveringBulletins
+     */
+    private function viewUrl(ActiveWwa $wwa, array $coveringIds, EloquentCollection $coveringBulletins): ?string
+    {
+        $newest = collect($coveringIds)->filter()->max();
+
+        return $coveringBulletins->get($newest)?->viewUrl() ?? $wwa->latestIngestedProduct?->viewUrl();
     }
 }

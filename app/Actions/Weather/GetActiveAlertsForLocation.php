@@ -4,6 +4,7 @@ namespace App\Actions\Weather;
 
 use App\Models\ActiveWwa;
 use App\Models\ActiveWwaArea;
+use App\Models\IngestedProductSegment;
 use App\Models\Location;
 use App\Support\Timezones;
 use Illuminate\Database\Eloquent\Builder;
@@ -78,7 +79,7 @@ class GetActiveAlertsForLocation
             })
             ->get();
 
-        $this->useCoveringExpiry($alerts, $zones, $lng, $lat);
+        $this->useCoveringZones($alerts, $zones, $lng, $lat);
 
         return self::sorted($alerts);
     }
@@ -134,13 +135,14 @@ class GetActiveAlertsForLocation
 
     /**
      * Replaces each event's end with the latest end of the zone rows that cover the location (none
-     * when any covering row has none). The models are never saved; an event read from its own
-     * columns (no covering rows) keeps its own end.
+     * when any covering row has none), and sets `covering_ingested_product_id` to the bulletin that last
+     * wrote one of those rows (the most recently applied; null when none names one). The models are never
+     * saved; an event read from its own columns (no covering rows) keeps its own end and gets no bulletin.
      *
      * @param  Collection<int, ActiveWwa>  $alerts
      * @param  array<int, string>  $zones
      */
-    private function useCoveringExpiry(Collection $alerts, array $zones, float $lng, float $lat): void
+    private function useCoveringZones(Collection $alerts, array $zones, float $lng, float $lat): void
     {
         if ($alerts->isEmpty()) {
             return;
@@ -148,14 +150,25 @@ class GetActiveAlertsForLocation
 
         $covering = $this->coveringAreas(ActiveWwaArea::query(), $zones, $lng, $lat)
             ->whereIn('active_wwa_areas.active_wwa_id', $alerts->modelKeys())
-            ->get(['active_wwa_areas.active_wwa_id', 'active_wwa_areas.expires'])
+            ->get(['active_wwa_areas.active_wwa_id', 'active_wwa_areas.expires', 'active_wwa_areas.latest_segment_id', 'active_wwa_areas.applied_at'])
             ->groupBy('active_wwa_id');
+
+        $bulletinOfSegment = IngestedProductSegment::query()
+            ->whereIn('id', $covering->flatten()->pluck('latest_segment_id')->filter()->unique()->all())
+            ->pluck('ingested_product_id', 'id');
 
         foreach ($alerts as $wwa) {
             $rows = $covering->get($wwa->id);
 
             if ($rows !== null) {
                 $wwa->expires = $rows->contains(fn (ActiveWwaArea $row): bool => $row->expires === null) ? null : $rows->max('expires');
+
+                $latest = $rows
+                    ->filter(fn (ActiveWwaArea $row): bool => $bulletinOfSegment->has($row->latest_segment_id))
+                    ->sortByDesc(fn (ActiveWwaArea $row): int => $row->applied_at?->getTimestamp() ?? 0)
+                    ->first();
+
+                $wwa->setAttribute('covering_ingested_product_id', $latest === null ? null : $bulletinOfSegment[$latest->latest_segment_id]);
             }
         }
     }

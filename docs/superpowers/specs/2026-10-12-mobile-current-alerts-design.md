@@ -32,7 +32,7 @@ meta: { has_places, generated_at }
 - `id` is the active event's id. `event` is `eventName()`. `family` is `eventFamily()`, one of `warning`, `watch`, `advisory`: other families are excluded. Test products (`is_test`) are excluded.
 - `places` is the labels of the affected places, sorted, without duplicates.
 - `expires` is the latest end of the zone rows that cover the affected places (null if any has none), as an ISO 8601 string. It is the same value `GetActiveAlertsForLocation` computes for each place; across places the latest wins, none if any is none.
-- `view_url` is the latest ingested product's `viewUrl()` (null when it has none).
+- `view_url` is the page of the newest bulletin that last wrote a zone row covering one of the affected places (via `active_wwa_areas.latest_segment_id`), else the event's latest ingested product's `viewUrl()` (null when it has none). Amended 2026-10-18: an event issued as many bulletins can have its latest bulletin cancel zones elsewhere while the subscriber's own zones are still in effect (seen on the dev data: a Wind Advisory at Destin whose latest bulletin cancelled Alabama zones).
 - Order: family rank (warning, watch, advisory), then `expires` ascending (none last), then id. There is no server-side cap on the list.
 - `meta.has_places` is false when the user has no location with a position (the app then asks for a place or location sharing instead of "Nothing in effect"). `meta.generated_at` is when the response was built.
 - Cached 60 seconds per user, as `GetActiveNowAtMyLocations` is. No zone codes, polygons, bulletin text, coordinates or other users' places leave the action.
