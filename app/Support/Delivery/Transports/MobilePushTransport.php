@@ -30,12 +30,11 @@ class MobilePushTransport implements Transport
             return DeliveryResult::failed('This device channel has no push token; open the app to register it again.');
         }
 
-        // The tap target is always the feed: the delivery-log row (the alert's id) does not exist yet.
         $result = $this->fcm->send(
             $token,
             $title ?? 'WxNotify',
             Str::limit($body, 200, preserveWords: true),
-            ['url' => '/', 'type' => (string) ($meta['type'] ?? 'alert')],
+            ['url' => $this->tapTarget($meta), 'type' => (string) ($meta['type'] ?? 'alert')],
         );
 
         if ($result->success) {
@@ -47,5 +46,24 @@ class MobilePushTransport implements Transport
         }
 
         return DeliveryResult::failed((string) $result->error);
+    }
+
+    /**
+     * Where a tap on the notification goes: the product page of the bulletin the alert is about, as an app
+     * link (`wxnotify://product/{base64url of the page address}`, an https address is not used because Android
+     * would open the phone's browser), else the feed. The delivery-log row (the alert's id) does not exist yet.
+     * Only a public View Product page address is ever carried.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function tapTarget(array $meta): string
+    {
+        $page = $meta['url'] ?? null;
+
+        if (! is_string($page) || preg_match('#^https://[^/\s?\#]+/view-product/[a-z0-9-]+$#', $page) !== 1) {
+            return '/';
+        }
+
+        return rtrim((string) config('wxnotify.app_product_uri'), '/').'/'.rtrim(strtr(base64_encode($page), '+/', '-_'), '=');
     }
 }

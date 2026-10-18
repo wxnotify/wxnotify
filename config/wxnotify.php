@@ -73,6 +73,13 @@ return [
         'token_days' => 90,
     ],
 
+    /*
+    | The app link a push for a stored bulletin carries, so tapping it opens that bulletin's View Product
+    | page in the app. Must equal the scheme and host the app registers (mobile/routes/mobile.php: /product/{link});
+    | the bulletin's public page address follows as one base64url path segment.
+    */
+    'app_product_uri' => 'wxnotify://product',
+
     'map' => [
         'warning_radius_miles' => 150,
         'max_warnings' => 100,

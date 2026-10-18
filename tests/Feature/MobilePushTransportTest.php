@@ -31,6 +31,34 @@ test('an alert is pushed to the device with its subject as the title and the fee
         && ((array) $request['message']['data'])['url'] === '/');
 });
 
+test('an alert about a stored bulletin carries an app link to its product page, as one base64url segment', function () {
+    fcmFakeGoogle();
+    $page = 'https://app.example.test/view-product/kbou-tor-202610121500';
+    $encoded = rtrim(strtr(base64_encode($page), '+/', '-_'), '=');
+
+    app(ChannelDispatcher::class)->send($this->channel, 'Body', 'Tornado Warning', ['type' => 'alert', 'url' => $page]);
+
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && ((array) $request['message']['data'])['url'] === "wxnotify://product/{$encoded}"
+        && preg_match('/^[A-Za-z0-9_-]+$/', $encoded) === 1);
+});
+
+test('only a public View Product page address becomes an app link; anything else opens the feed', function (?string $url) {
+    fcmFakeGoogle();
+
+    app(ChannelDispatcher::class)->send($this->channel, 'Body', 'Title', ['url' => $url]);
+
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && ((array) $request['message']['data'])['url'] === '/');
+})->with([
+    'no address' => [null],
+    'another site' => ['https://evil.example/login'],
+    'not a product page' => ['https://app.example.test/dashboard'],
+    'plain http' => ['http://app.example.test/view-product/abc'],
+    'a query string' => ['https://app.example.test/view-product/abc?x=1'],
+    'an upper-case slug' => ['https://app.example.test/view-product/ABC'],
+]);
+
 test('a long message is cut to about 200 characters', function () {
     fcmFakeGoogle();
 

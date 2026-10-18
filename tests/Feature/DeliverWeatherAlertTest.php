@@ -139,6 +139,23 @@ test('a custom subject template is used as the Apprise title instead of displayN
     Http::assertSent(fn ($request) => $request['title'] === 'Alert: Tornado Warning');
 });
 
+test('a weather alert pushed to a phone carries an app link to the bulletin\'s product page', function () {
+    config(['app.url' => 'https://app.example.test', 'wxnotify.product_domain' => null]);
+    $credentials = fcmUseCredentials();
+    fcmFakeGoogle();
+
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->for($rule->user)->mobilePush('device-token-1')->create();
+    $ingested = IngestedProduct::factory()->create();
+    $encoded = rtrim(strtr(base64_encode($ingested->fresh()->viewUrl()), '+/', '-_'), '=');
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $ingested->id))->handle(app(ChannelDispatcher::class));
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'messages:send')
+        && ((array) $request['message']['data'])['url'] === "wxnotify://product/{$encoded}");
+    @unlink($credentials['path']);
+});
+
 test('message_body_style Brief truncates the body to 280 characters', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
