@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\PipelineFeed;
 use App\Enums\ProductCategory;
 use App\Models\DidYouKnow;
 use App\Models\Product;
@@ -37,7 +38,11 @@ function setupConditionCases(): array
         'feed_product_received' => [
             'feed_product_received',
             fn () => PipelineHeartbeat::record('nwws'),
-            fn () => Cache::forget('pipeline.heartbeat.nwws'),
+            function () {
+                foreach (PipelineFeed::cases() as $feed) {
+                    Cache::forget("pipeline.heartbeat.{$feed->value}");
+                }
+            },
         ],
         'reference_data_installed' => [
             'reference_data_installed',
@@ -164,7 +169,10 @@ it('counts the scheduler and queue as not running with no heartbeat', function (
 
 it('answers no, without throwing, when the queue heartbeat holds garbage', function (mixed $garbage) {
     Cache::forever('setup.queue-heartbeat', $garbage);
-    Cache::forever('pipeline.heartbeat.nwws', $garbage);
+
+    foreach (PipelineFeed::cases() as $feed) {
+        Cache::forever("pipeline.heartbeat.{$feed->value}", $garbage);
+    }
 
     $user = User::factory()->create();
 
@@ -174,6 +182,19 @@ it('answers no, without throwing, when the queue heartbeat holds garbage', funct
         expect($condition->isCompleted($user))->toBeFalse();
     }
 })->with(['not a date', [['nested']]]);
+
+it('counts a product from any one pipeline feed as a product from the weather feed', function (PipelineFeed $feed) {
+    PipelineHeartbeat::record($feed->value);
+
+    expect(setupConditionPasses('feed_product_received'))->toBeTrue();
+})->with(PipelineFeed::cases());
+
+it('counts a good heartbeat on one feed even when another feed holds garbage', function () {
+    Cache::forever('pipeline.heartbeat.nwws', 'not a date');
+    PipelineHeartbeat::record('emwin');
+
+    expect(setupConditionPasses('feed_product_received'))->toBeTrue();
+});
 
 it('does not count a missing, empty or unreadable firebase file as push configured', function (?string $path) {
     config([

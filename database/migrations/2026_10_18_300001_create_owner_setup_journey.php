@@ -69,7 +69,7 @@ return new class extends Migration
             [
                 'key' => 'weather-feed',
                 'title' => 'Connect the weather feed',
-                'description' => 'WxNotify gets its weather products from the NWWS feed. Put your NWWS login in .env as NWWS_USERNAME and NWWS_PASSWORD: the NWWS container reads them, not this app, so restart that container after a change. This ticks once the first NWWS product arrives, which proves the login and the container work.',
+                'description' => 'WxNotify gets its weather products from a feed: NWWS, or EMWIN if that is your feed. For NWWS, put your login in .env as NWWS_USERNAME and NWWS_PASSWORD: the NWWS container reads them, not this app, so restart that container after a change. This ticks once the first product arrives from the weather feed, which proves the feed and its container work.',
                 'icon' => 'heroicon-o-signal',
                 'condition_key' => 'feed_product_received',
             ],

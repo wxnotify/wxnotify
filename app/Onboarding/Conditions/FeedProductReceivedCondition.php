@@ -2,11 +2,14 @@
 
 namespace App\Onboarding\Conditions;
 
+use App\Enums\PipelineFeed;
 use App\Support\Pipeline\PipelineHeartbeat;
 use Illuminate\Database\Eloquent\Model;
+use Throwable;
 
 /**
- * A NWWS heartbeat exists, so at least one product has been received.
+ * Any pipeline feed (NWWS, EMWIN Byteblaster or the EMWIN HTTP backup) has a heartbeat, so at
+ * least one product has been received. A feed whose heartbeat cannot be read counts as not received.
  */
 final class FeedProductReceivedCondition extends SafeCondition
 {
@@ -17,6 +20,16 @@ final class FeedProductReceivedCondition extends SafeCondition
 
     protected function check(Model $subject): bool
     {
-        return PipelineHeartbeat::lastReceivedAt('nwws') !== null;
+        foreach (PipelineFeed::cases() as $feed) {
+            try {
+                if (PipelineHeartbeat::lastReceivedAt($feed->value) !== null) {
+                    return true;
+                }
+            } catch (Throwable) {
+                continue;
+            }
+        }
+
+        return false;
     }
 }

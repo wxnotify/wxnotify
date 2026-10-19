@@ -32,14 +32,14 @@ The solution is a **setup checklist in the Admin panel**, built on the already-i
 - **Plugin on the Admin panel**, with the launcher and progress page, and `manageFlows()` so the owner can edit the text. Flows are per panel (the flow's panel is `admin`); the existing Dashboard-panel registration stays for the later user journey.
 - **Visibility:** owners only (`users.is_owner`), in both modes. Cloud-only steps carry a "cloud mode only" visibility condition. Self-hosters see no cloud steps.
 - **Self-completing steps** use the plugin's "Condition" completion (named classes in `app/Onboarding/Conditions`, found automatically). A step an owner can only confirm themselves is Manual.
-- **NWWS credentials stay in `.env`.** They are read by the NWWS container, so the app cannot check them directly. The step completes when a first NWWS product has been received (proof the credentials and container work).
+- **NWWS credentials stay in `.env`.** They are read by the NWWS container, so the app cannot check them directly. The step completes when a first product has been received from any pipeline feed (NWWS, EMWIN Byteblaster or the EMWIN HTTP backup), so a self-hoster on EMWIN only ticks too; for NWWS that is proof the credentials and container work.
 - **Firebase:** the step says to mount the service-account JSON and set `FIREBASE_SERVICE_ACCOUNT` to its path. It does not mention the App Settings Secrets field (unused, and, as read, saving a value there would replace the path with JSON text and break push; fixed separately).
 - **The user triggers the job.** "Install reference data" is a button on a new admin section; it is not run by the image.
 
 ## The checklist (draft; order matters)
 
 1. **Basics in the Compose file / `.env`** — `APP_KEY`, `APP_URL`, `WXNOTIFY_MODE`, trusted proxies if behind a load balancer or Cloudflare. Manual tick.
-2. **Weather feed login** — `NWWS_USERNAME` / `NWWS_PASSWORD` in `.env` for the NWWS container. Completes when a first NWWS product exists.
+2. **Weather feed login** — `NWWS_USERNAME` / `NWWS_PASSWORD` in `.env` for the NWWS container. Completes when a first product from any pipeline feed exists.
 3. **Install reference data** — the new action. Completes when the product catalog, the "Did you know" tips and the tracked shapefile layers are present.
 4. **Import boundaries** — run the first shapefile scan, then review and activate each layer (Shapefile Layers). Completes when every tracked layer has an active version.
 5. **Scheduler and queue worker running** — completes from their heartbeats (the app already runs a schedule health check and a heartbeat queue).
