@@ -15,6 +15,7 @@ use App\Rules\KnownUgcCode;
 use App\Settings\TierThresholdSettings;
 use App\Support\ProductMatching;
 use App\Support\Units;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
@@ -32,6 +33,9 @@ class SaveAlertRuleRequest extends FormRequest
 
     /** Any of these on a PUT means the client is setting products or matching, not keeping them. */
     private const PRODUCT_KEYS = ['product_settings', 'risk_levels', ...self::FLAT_PRODUCT_KEYS];
+
+    /** @var array<int, list<string>>|null */
+    private ?array $riskLevelOptionsByProduct = null;
 
     public function authorize(): bool
     {
@@ -153,7 +157,7 @@ class SaveAlertRuleRequest extends FormRequest
             'product_settings.*.county_zone_codes.*' => ['string', new KnownUgcCode],
             ...($category === AlertCategory::SpcWpc ? [
                 'product_settings.*.risk_levels' => ['nullable', 'array'],
-                'product_settings.*.risk_levels.*' => ['string', Rule::in($this->riskLevelOptions())],
+                'product_settings.*.risk_levels.*' => ['string', $this->offeredByEntryProduct(...)],
             ] : []),
         ];
     }
@@ -268,7 +272,31 @@ class SaveAlertRuleRequest extends FormRequest
      */
     private function riskLevelOptions(): array
     {
-        return Product::query()->where('family', 'spc_wpc')->whereNotNull('risk_level_options')
-            ->pluck('risk_level_options')->flatten()->unique()->values()->all();
+        return collect($this->riskLevelOptionsByProduct())->flatten()->unique()->values()->all();
+    }
+
+    /**
+     * Each SPC & WPC product's own levels, by id, read once per request.
+     *
+     * @return array<int, list<string>>
+     */
+    private function riskLevelOptionsByProduct(): array
+    {
+        return $this->riskLevelOptionsByProduct ??= Product::query()->where('family', 'spc_wpc')->whereNotNull('risk_level_options')
+            ->pluck('risk_level_options', 'id')->map(fn (mixed $options): array => is_array($options) ? $options : [])->all();
+    }
+
+    /**
+     * A `product_settings.{n}.risk_levels.{m}` level must be one that entry's own product offers (a product
+     * without risk levels takes none).
+     */
+    private function offeredByEntryProduct(string $attribute, mixed $value, Closure $fail): void
+    {
+        $index = explode('.', $attribute)[1] ?? '';
+        $options = $this->riskLevelOptionsByProduct()[(int) $this->input("product_settings.{$index}.product_id")] ?? [];
+
+        if (! in_array($value, $options, true)) {
+            $fail('The selected :attribute is not a risk level of this product.');
+        }
     }
 }

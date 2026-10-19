@@ -514,6 +514,54 @@ test('SPC and WPC risk levels are taken and read back per product, with the flat
         ->toBe([$outlook->id => ['Enhanced'], $rainfall->id => ['Moderate']]);
 });
 
+test('a flat-only save that repeats the stored levels keeps each product\'s own levels', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rainfall = Product::where('code', 'WPC.ERO')->sole();
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', ['category' => 'spc_wpc', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+        ['product_id' => $outlook->id, 'matching_mode' => 'nationwide', 'risk_levels' => ['Moderate']],
+        ['product_id' => $rainfall->id, 'matching_mode' => 'nationwide', 'risk_levels' => []],
+    ]])->assertCreated()->json('data.id');
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", [
+        'category' => 'spc_wpc', 'name' => 'Renamed', 'channel_ids' => [$this->channel->id],
+        'product_ids' => [$outlook->id, $rainfall->id], 'matching_mode' => 'nationwide', 'risk_levels' => ['Moderate'],
+    ])->assertOk()->assertJsonPath('data.name', 'Renamed');
+
+    $rule = AlertRule::find($id);
+    expect($rule->riskLevelsFor($outlook->id))->toBe(['Moderate'])
+        ->and($rule->riskLevelsFor($rainfall->id))->toBe([])
+        ->and($rule->risk_levels)->toBe(['Moderate']);
+});
+
+test('a flat-only save with different levels applies them to every product', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rainfall = Product::where('code', 'WPC.ERO')->sole();
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', ['category' => 'spc_wpc', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+        ['product_id' => $outlook->id, 'matching_mode' => 'nationwide', 'risk_levels' => ['Moderate']],
+        ['product_id' => $rainfall->id, 'matching_mode' => 'nationwide', 'risk_levels' => []],
+    ]])->assertCreated()->json('data.id');
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", [
+        'category' => 'spc_wpc', 'channel_ids' => [$this->channel->id],
+        'product_ids' => [$outlook->id, $rainfall->id], 'matching_mode' => 'nationwide', 'risk_levels' => ['High'],
+    ])->assertOk();
+
+    $rule = AlertRule::find($id);
+    expect($rule->riskLevelsFor($outlook->id))->toBe(['High'])
+        ->and($rule->riskLevelsFor($rainfall->id))->toBe(['High']);
+});
+
+test('a product setting\'s risk level that the product itself does not offer is refused', function () {
+    $rainfall = Product::where('code', 'WPC.ERO')->sole();
+    $body = ['category' => 'spc_wpc', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+        ['product_id' => $rainfall->id, 'matching_mode' => 'nationwide', 'risk_levels' => ['Enhanced']],
+    ]];
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertUnprocessable()->assertJsonValidationErrorFor('product_settings.0.risk_levels.0');
+
+    expect(AlertRule::count())->toBe(0);
+});
+
 test('a product setting\'s risk level that no product offers is refused', function () {
     $body = ['category' => 'spc_wpc', 'channel_ids' => [$this->channel->id], 'product_settings' => [
         ['product_id' => $this->riskProduct->id, 'matching_mode' => 'nationwide', 'risk_levels' => ['NOT-A-LEVEL']],

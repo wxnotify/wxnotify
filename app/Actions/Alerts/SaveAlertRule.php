@@ -104,7 +104,7 @@ class SaveAlertRule
             }
 
             if ($category === AlertCategory::SpcWpc) {
-                $attributes['risk_levels'] = collect($this->riskLevelsByProduct($category, $data, $this->productSettings($data) ?? []))
+                $attributes['risk_levels'] = collect($this->riskLevelsByProduct($category, $data, $this->productSettings($data) ?? [], $stored))
                     ->flatten()->unique()->values()->all();
             }
         }
@@ -133,7 +133,7 @@ class SaveAlertRule
             if (! $this->keepsProducts($rule->category, $data)) {
                 $settings = self::usesProducts($rule->category) ? ($this->productSettings($data) ?? []) : [];
 
-                $riskLevels = $this->riskLevelsByProduct($rule->category, $data, $settings);
+                $riskLevels = $this->riskLevelsByProduct($rule->category, $data, $settings, $rule);
 
                 $rule->products()->sync(collect($settings)->mapWithKeys(fn (array $entry): array => [$entry['product_id'] => [
                     'matching_mode' => $entry['matching_mode'],
@@ -223,25 +223,53 @@ class SaveAlertRule
      * which is how an old client keeps working; either way limited to the levels that product offers, in
      * its option order. Empty for every other category.
      *
+     * A flat-only save that repeats the stored levels (see storedRiskLevelsToKeep()) keeps each stored
+     * product's own levels, so a client that only knows the flat list (the mobile editor sends it on every
+     * save) cannot merge them by renaming the rule; only a product it adds takes the flat list.
+     *
      * @param  array<string, mixed>  $data
      * @param  list<array{product_id: int, risk_levels: ?list<string>}>  $settings
      * @return array<int, list<string>>
      */
-    private function riskLevelsByProduct(?AlertCategory $category, array $data, array $settings): array
+    private function riskLevelsByProduct(?AlertCategory $category, array $data, array $settings, ?AlertRule $stored): array
     {
         if ($category !== AlertCategory::SpcWpc || $settings === []) {
             return [];
         }
 
         $shared = SpcWpcRiskLevels::flatten($data['risk_levels'] ?? []);
+        $kept = $this->storedRiskLevelsToKeep($stored, $settings, $shared);
         $products = Product::query()->whereKey(array_column($settings, 'product_id'))->get(['id', 'risk_level_options'])->keyBy('id');
 
         return collect($settings)
             ->filter(fn (array $entry): bool => $products->has($entry['product_id']))
             ->mapWithKeys(fn (array $entry): array => [
-                $entry['product_id'] => SpcWpcRiskLevels::forProduct($products->get($entry['product_id']), $entry['risk_levels'] ?? $shared),
+                $entry['product_id'] => $kept[$entry['product_id']]
+                    ?? SpcWpcRiskLevels::forProduct($products->get($entry['product_id']), $entry['risk_levels'] ?? $shared),
             ])
             ->all();
+    }
+
+    /**
+     * The stored SPC & WPC rule's levels by product id, when the input names no product's own levels and
+     * its flat list is, as a set, the union of the stored products' levels: the client is echoing back
+     * what it read, not changing it. Empty otherwise (the flat list then applies to every product).
+     *
+     * @param  list<array{product_id: int, risk_levels: ?list<string>}>  $settings
+     * @param  list<string>  $shared
+     * @return array<int, list<string>>
+     */
+    private function storedRiskLevelsToKeep(?AlertRule $stored, array $settings, array $shared): array
+    {
+        if ($stored === null || ! $stored->exists || $stored->category !== AlertCategory::SpcWpc
+            || collect($settings)->contains(fn (array $entry): bool => $entry['risk_levels'] !== null)) {
+            return [];
+        }
+
+        $storedLevels = $stored->products->mapWithKeys(fn (Product $product): array => [$product->id => $stored->riskLevelsFor($product->id)]);
+        $union = $storedLevels->flatten()->unique()->sort()->values()->all();
+
+        return $union === collect($shared)->unique()->sort()->values()->all() ? $storedLevels->all() : [];
     }
 
     /**

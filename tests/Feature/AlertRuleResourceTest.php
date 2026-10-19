@@ -883,11 +883,19 @@ test('the Fire Weather list says fire levels do not filter yet, the Convective l
         ->assertSee('Risk levels apply to the Day 1 Convective Outlook.');
 });
 
-test('categories without risk levels never get a risk list', function () {
+test('a category whose products offer no risk levels never gets a risk list; Flooding gets the Excessive Rainfall Outlook\'s', function () {
+    $discussion = Product::where('code', 'SPC.MD')->sole();
+    $rainfall = Product::where('code', 'WPC.ERO')->sole();
+
     livewire(CreateAlertRule::class)
-        ->fillForm(['category' => 'spc_wpc'])
-        ->assertFormFieldDoesNotExist('risk_levels.flooding_and_hydrological')
-        ->assertFormFieldDoesNotExist('risk_levels.other_discussions_reports_and_outlooks');
+        ->fillForm([
+            'category' => 'spc_wpc',
+            'product_settings.other_discussions_reports_and_outlooks' => [alertWizardRow($discussion, 'nationwide')],
+            'product_settings.flooding_and_hydrological' => [alertWizardRow($rainfall, 'nationwide')],
+        ])
+        ->assertSchemaComponentDoesNotExist('risk_levels.other_discussions_reports_and_outlooks')
+        ->assertFormFieldExists('risk_levels.flooding_and_hydrological', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['Marginal', 'Slight', 'Moderate', 'High'])
+        ->assertFormFieldVisible('risk_levels.flooding_and_hydrological');
 });
 
 test('creating an SPC & WPC rule with ticks in two categories stores one flat list', function () {

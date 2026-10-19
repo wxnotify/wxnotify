@@ -202,10 +202,11 @@ class ProductMatchingTable extends Field
      * The form data SaveAlertRule reads: for a product-based rule, `product_settings` becomes the
      * flat list of switched-on rows across every category (ids as ints, the office code trimmed
      * and upper-cased); for SPC & WPC each row carries its category's ticked risk levels
-     * (`risk_levels.{category}`), which SaveAlertRule limits to the levels that product offers. The pages call it once, on the validated, dehydrated form data (which
-     * holds only the form's own tables), and reuse the result after the record is written: never
-     * on the raw `$this->data`, where a tampered request can add keys no table validated. Only
-     * keys named after a product category are read.
+     * (`risk_levels.{category}`), which SaveAlertRule limits to the levels that product offers.
+     * The pages call it once, on the validated, dehydrated form data (which holds only the form's
+     * own tables), and reuse the result after the record is written: never on the raw
+     * `$this->data`, where a tampered request can add keys no table validated. Only keys named
+     * after a product category are read.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>

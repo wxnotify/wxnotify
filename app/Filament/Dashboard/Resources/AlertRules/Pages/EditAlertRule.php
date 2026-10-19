@@ -72,7 +72,7 @@ class EditAlertRule extends EditRecord
     }
 
     /**
-     * Persistence rules (units, risk-level flattening, clearing columns and the template that
+     * Persistence rules (units, per-product risk levels, clearing columns and the template that
      * the saved category does not own) live in SaveAlertRule, which the mobile API shares. A
      * hidden field is dropped from the dehydrated data, so the action, not the form state, is
      * what keeps a stale value from surviving a category change.

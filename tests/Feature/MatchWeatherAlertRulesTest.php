@@ -952,7 +952,7 @@ function perProductRiskRule(array $levelsByCode, array $attributes = []): AlertR
 test('a level ticked for the Excessive Rainfall Outlook does not filter the Day 1 outlook, though both offer it', function () {
     Queue::fake();
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
-    perProductRiskRule(['SPC.OUTLOOK' => [], 'WPC.ERO' => ['Moderate']]);
+    perProductRiskRule(['SPC.OUTLOOK' => [], 'WPC.ERO' => ['Moderate']], ['risk_levels' => ['Moderate']]);
 
     (new MatchWeatherAlertRules)(createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Marginal']]));
 
