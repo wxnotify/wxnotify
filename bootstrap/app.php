@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\VerifyPipelineWebhookToken;
+use App\Jobs\RecordQueueHeartbeat;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('traccar:poll-positions')->everyFiveMinutes()->withoutOverlapping();
         $schedule->command('pipeline:prune-deliveries')->hourly();
         $schedule->command('sanctum:prune-expired --hours=24')->daily();
+        $schedule->job(new RecordQueueHeartbeat)->everyMinute();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
