@@ -131,7 +131,8 @@ class SaveAlertRuleRequest extends FormRequest
     }
 
     /**
-     * One entry per watched product, each with its own mode and that mode's inputs. A mode must be
+     * One entry per watched product, each with its own mode and that mode's inputs (and, for SPC & WPC,
+     * optionally its own `risk_levels`, which win over the flat list for that product). A mode must be
      * one the category accepts, so a client echoing back a read rule's `mixed` is refused rather
      * than stored as "inherit".
      *
@@ -150,6 +151,10 @@ class SaveAlertRuleRequest extends FormRequest
             'product_settings.*.wfo' => ['exclude_unless:product_settings.*.matching_mode,'.MatchingMode::Wfo->value, 'required', 'string', Rule::exists('cwa_boundaries', 'cwa')],
             'product_settings.*.county_zone_codes' => ['required_if:product_settings.*.matching_mode,'.MatchingMode::CountyZone->value, 'nullable', 'array'],
             'product_settings.*.county_zone_codes.*' => ['string', new KnownUgcCode],
+            ...($category === AlertCategory::SpcWpc ? [
+                'product_settings.*.risk_levels' => ['nullable', 'array'],
+                'product_settings.*.risk_levels.*' => ['string', Rule::in($this->riskLevelOptions())],
+            ] : []),
         ];
     }
 

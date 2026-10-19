@@ -269,16 +269,17 @@ class AlertRuleForm
 
     /**
      * A category's own "Risk levels" checklist, shown inside that category's section when
-     * any product in it offers risk levels (today: Fire Weather and Convective Outlooks).
+     * any product in it offers risk levels (today: Flooding, Fire Weather and Convective Outlooks).
      * State is nested per category, `risk_levels.{category}`, like `product_settings.{category}`,
-     * so each checklist keeps its own state; the Create/Edit pages flatten it into the
-     * stored `risk_levels` column and split it back on edit (see SpcWpcRiskLevels).
+     * so each checklist keeps its own state; the ticks are stored on that category's products
+     * only (ProductMatchingTable::toSaveInput(), SaveAlertRule) and read back per category on
+     * edit (SpcWpcRiskLevels::forForm()).
      * Options are the switched-on products' own `risk_level_options`; the list is hidden unless
      * a switched-on product in this category offers some (the switch of such a product
      * re-renders the form, see ProductMatchingTable::switchRefreshesForm()).
      *
      * The candidates are the category's SPC & WPC products of ANY status that offer risk
-     * levels, not just the active ones: matching and SpcWpcRiskLevels::split() do not filter by
+     * levels, not just the active ones: matching and SpcWpcRiskLevels::forForm() do not filter by
      * status either, so a rule still attached to a since-retired product keeps its checklist
      * (and its stored levels on save).
      *

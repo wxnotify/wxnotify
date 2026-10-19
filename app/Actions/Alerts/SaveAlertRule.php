@@ -7,6 +7,7 @@ use App\Enums\MatchingMode;
 use App\Enums\MessageBodyStyle;
 use App\Enums\Tier;
 use App\Models\AlertRule;
+use App\Models\Product;
 use App\Models\User;
 use App\Support\AlertRuleFormUnits;
 use App\Support\SpcWpcRiskLevels;
@@ -18,7 +19,7 @@ use Spatie\Activitylog\Support\CauserResolver;
 /**
  * Persists an alert rule the way the dashboard's Create and Edit pages always have, for both the
  * dashboard and the mobile API: the user's units become the stored imperial values (without
- * drifting an untouched number), SPC & WPC risk levels are stored flat, columns that belong to
+ * drifting an untouched number), SPC & WPC risk levels are stored per product, columns that belong to
  * another category are cleared, and the product, location and channel pivots are synced.
  * Validation stays with the caller (the form's field rules, or SaveAlertRuleRequest).
  *
@@ -27,8 +28,11 @@ use Spatie\Activitylog\Support\CauserResolver;
  * and zones, and `alert_rule_product_location`): they come from `product_settings`, or from the
  * flat `product_ids` with `matching_mode`, `location_ids`, `wfo` and `county_zone_codes`, which
  * apply to every product. The rule's own `matching_mode`, `wfo`, `county_zone_codes` and
- * `alert_rule_location` are no longer written for such a rule. A stored product-based rule saved
- * with neither key keeps its products, their settings and its product-based columns as stored.
+ * `alert_rule_location` are no longer written for such a rule. An SPC & WPC product's risk levels
+ * (the pivot's `risk_levels`) come from its entry's own `risk_levels`, else the flat `risk_levels`,
+ * limited to the levels that product offers; the rule's own `risk_levels` holds their union for
+ * older readers. A stored product-based rule saved with neither key keeps its products, their
+ * settings and its product-based columns as stored.
  */
 class SaveAlertRule
 {
@@ -100,7 +104,8 @@ class SaveAlertRule
             }
 
             if ($category === AlertCategory::SpcWpc) {
-                $attributes['risk_levels'] = SpcWpcRiskLevels::flatten($data['risk_levels'] ?? []);
+                $attributes['risk_levels'] = collect($this->riskLevelsByProduct($category, $data, $this->productSettings($data) ?? []))
+                    ->flatten()->unique()->values()->all();
             }
         }
 
@@ -128,10 +133,13 @@ class SaveAlertRule
             if (! $this->keepsProducts($rule->category, $data)) {
                 $settings = self::usesProducts($rule->category) ? ($this->productSettings($data) ?? []) : [];
 
+                $riskLevels = $this->riskLevelsByProduct($rule->category, $data, $settings);
+
                 $rule->products()->sync(collect($settings)->mapWithKeys(fn (array $entry): array => [$entry['product_id'] => [
                     'matching_mode' => $entry['matching_mode'],
                     'wfo' => $entry['wfo'],
                     'county_zone_codes' => $entry['county_zone_codes'],
+                    'risk_levels' => isset($riskLevels[$entry['product_id']]) ? json_encode($riskLevels[$entry['product_id']]) : null,
                 ]])->all());
 
                 // Only the rule owner's own locations, whatever the caller validated.
@@ -161,7 +169,7 @@ class SaveAlertRule
      * `product_ids` with one shared mode; null when the input carries neither (the keep path).
      *
      * @param  array<string, mixed>  $data
-     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string}>|null
+     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string, risk_levels: ?list<string>}>|null
      */
     public function productSettings(array $data): ?array
     {
@@ -189,7 +197,7 @@ class SaveAlertRule
 
     /**
      * @param  array<string, mixed>  $entry
-     * @return array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string}
+     * @return array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string, risk_levels: ?list<string>}
      */
     private static function normaliseEntry(array $entry): array
     {
@@ -205,7 +213,35 @@ class SaveAlertRule
                 : [],
             'wfo' => $mode === MatchingMode::Wfo && filled($entry['wfo'] ?? null) ? (string) $entry['wfo'] : null,
             'county_zone_codes' => is_array($codes) ? (filled($codes) ? implode(',', $codes) : null) : (filled($codes) ? (string) $codes : null),
+            'risk_levels' => is_array($entry['risk_levels'] ?? null) ? SpcWpcRiskLevels::flatten($entry['risk_levels']) : null,
         ];
+    }
+
+    /**
+     * The risk levels each watched product of an SPC & WPC rule keeps, by product id: the entry's own
+     * `risk_levels`, else the flat (or per-category nested) `risk_levels` input applied to every product,
+     * which is how an old client keeps working; either way limited to the levels that product offers, in
+     * its option order. Empty for every other category.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  list<array{product_id: int, risk_levels: ?list<string>}>  $settings
+     * @return array<int, list<string>>
+     */
+    private function riskLevelsByProduct(?AlertCategory $category, array $data, array $settings): array
+    {
+        if ($category !== AlertCategory::SpcWpc || $settings === []) {
+            return [];
+        }
+
+        $shared = SpcWpcRiskLevels::flatten($data['risk_levels'] ?? []);
+        $products = Product::query()->whereKey(array_column($settings, 'product_id'))->get(['id', 'risk_level_options'])->keyBy('id');
+
+        return collect($settings)
+            ->filter(fn (array $entry): bool => $products->has($entry['product_id']))
+            ->mapWithKeys(fn (array $entry): array => [
+                $entry['product_id'] => SpcWpcRiskLevels::forProduct($products->get($entry['product_id']), $entry['risk_levels'] ?? $shared),
+            ])
+            ->all();
     }
 
     /**

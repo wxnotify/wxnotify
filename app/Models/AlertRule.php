@@ -12,6 +12,7 @@ use App\Enums\Tier;
 use App\Enums\UnitSystem;
 use App\Models\Concerns\BlockedDuringMaintenance;
 use App\Support\ProductMatchSettings;
+use App\Support\SpcWpcRiskLevels;
 use App\Support\Timezones;
 use App\Support\Units;
 use Database\Factories\AlertRuleFactory;
@@ -146,7 +147,7 @@ class AlertRule extends Model
 
     public function products(): BelongsToMany
     {
-        return $this->belongsToMany(Product::class)->withPivot(['matching_mode', 'wfo', 'county_zone_codes']);
+        return $this->belongsToMany(Product::class)->withPivot(['matching_mode', 'wfo', 'county_zone_codes', 'risk_levels']);
     }
 
     /**
@@ -188,6 +189,32 @@ class AlertRule extends Model
             $this->productLocations->filter(fn (Location $location): bool => (int) $location->pivot->product_id === $productId)->values(),
             false,
         );
+    }
+
+    /**
+     * The risk levels this rule selected for one of its products, in that product's option order and limited
+     * to the levels the product offers (an empty list means every level). They are the product's own
+     * (`alert_rule_product.risk_levels`), else, for a pivot row that holds none (a rule from before
+     * per-product levels, or attached the old way), the rule's own flat `risk_levels`.
+     *
+     * @return list<string>
+     */
+    public function riskLevelsFor(int $productId): array
+    {
+        $product = $this->products->firstWhere('id', $productId);
+
+        if ($product === null) {
+            return [];
+        }
+
+        $own = $product->pivot->risk_levels;
+        $selected = $own === null ? ($this->risk_levels ?? []) : (is_string($own) ? json_decode($own, true) : $own);
+
+        if (! is_array($selected)) {
+            return [];
+        }
+
+        return SpcWpcRiskLevels::forProduct($product, $selected);
     }
 
     public function notificationChannels(): BelongsToMany

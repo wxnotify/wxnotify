@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\AlertRule;
+use App\Models\Product;
 use App\Support\SpcWpcRiskLevels;
 use Database\Seeders\ProductCatalogSeeder;
 
@@ -15,21 +17,29 @@ test('only the Flooding, Fire Weather and Convective Outlooks categories offer r
     ]);
 });
 
-test('split gives each category the stored levels it offers, in option order', function () {
-    expect(SpcWpcRiskLevels::split(['High', 'Elevated', 'Marginal', 'Scattered Dry T-Storms']))->toBe([
-        'flooding_and_hydrological' => ['Marginal', 'High'],
-        'fire_weather' => ['Elevated', 'Scattered Dry T-Storms'],
-        'convective_outlooks' => ['Marginal', 'High'],
+test('each category\'s ticks are the levels its own watched products hold, in option order', function () {
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $rule->products()->attach([
+        Product::where('code', 'SPC.OUTLOOK')->value('id') => ['matching_mode' => 'nationwide', 'risk_levels' => json_encode(['High', 'Moderate'])],
+        Product::where('code', 'WPC.ERO')->value('id') => ['matching_mode' => 'nationwide', 'risk_levels' => json_encode(['Slight'])],
+    ]);
+
+    expect(SpcWpcRiskLevels::forForm($rule->fresh()))->toBe([
+        'flooding_and_hydrological' => ['Slight'],
+        'fire_weather' => [],
+        'convective_outlooks' => ['Moderate', 'High'],
     ]);
 });
 
-test('split of nothing gives empty lists for every category', function () {
-    expect(SpcWpcRiskLevels::split(null))->toBe(['flooding_and_hydrological' => [], 'fire_weather' => [], 'convective_outlooks' => []])
-        ->and(SpcWpcRiskLevels::split([]))->toBe(['flooding_and_hydrological' => [], 'fire_weather' => [], 'convective_outlooks' => []]);
-});
+test('a rule saved before per-product levels shows its flat levels only under the categories of the products it watches', function () {
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null, 'risk_levels' => ['High', 'Elevated', 'Nonsense']]);
+    $rule->products()->attach(Product::whereIn('code', ['SPC.OUTLOOK', 'SPC.FIRE'])->pluck('id')->all());
 
-test('split drops a stored level no category offers', function () {
-    expect(SpcWpcRiskLevels::split(['Nonsense', 'Slight']))->toBe(['flooding_and_hydrological' => ['Slight'], 'fire_weather' => [], 'convective_outlooks' => ['Slight']]);
+    expect(SpcWpcRiskLevels::forForm($rule->fresh()))->toBe([
+        'flooding_and_hydrological' => [],
+        'fire_weather' => ['Elevated'],
+        'convective_outlooks' => ['High'],
+    ]);
 });
 
 test('flatten merges the per-category lists into one unique list', function () {

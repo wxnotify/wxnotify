@@ -115,6 +115,42 @@ test('SPC and WPC risk levels are stored flat whether they arrive flat or per pr
         ->and($nested->settingsFor($this->riskProduct->id)->locations->pluck('id')->all())->toBe([$this->location->id]);
 });
 
+test('flat risk levels are stored on each product, limited to the levels that product offers', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rainfall = Product::where('code', 'WPC.ERO')->sole();
+
+    $saved = ($this->save)([
+        'category' => 'spc_wpc',
+        'product_ids' => [$outlook->id, $rainfall->id],
+        'matching_mode' => 'nationwide',
+        'risk_levels' => ['Moderate', 'Enhanced'],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    expect($saved->riskLevelsFor($outlook->id))->toBe(['Enhanced', 'Moderate'])
+        ->and($saved->riskLevelsFor($rainfall->id))->toBe(['Moderate']);
+});
+
+test('a product\'s own risk levels in product_settings are stored for that product alone', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rainfall = Product::where('code', 'WPC.ERO')->sole();
+    $data = [
+        'category' => 'spc_wpc',
+        'product_settings' => [
+            ['product_id' => $outlook->id, 'matching_mode' => 'nationwide', 'risk_levels' => ['High']],
+            ['product_id' => $rainfall->id, 'matching_mode' => 'nationwide', 'risk_levels' => ['Moderate', 'Enhanced']],
+        ],
+        'risk_levels' => ['Slight'],
+        'channel_ids' => [$this->channel->id],
+    ];
+
+    $saved = ($this->save)($data);
+
+    expect($saved->riskLevelsFor($outlook->id))->toBe(['High'])
+        ->and($saved->riskLevelsFor($rainfall->id))->toBe(['Moderate'])
+        ->and($saved->risk_levels)->toBe(['High', 'Moderate']);
+});
+
 test('the matching mode decides whether the office and the county/zone codes are kept', function () {
     $wfo = ($this->save)(($this->weatherData)(['matching_mode' => 'wfo', 'wfo' => 'OKX', 'county_zone_codes' => ['NYC103']]));
     $codes = ($this->save)(($this->weatherData)(['matching_mode' => 'county_zone', 'wfo' => 'OKX', 'county_zone_codes' => ['NYC103', 'NYZ072']]));

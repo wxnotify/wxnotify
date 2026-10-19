@@ -3,13 +3,14 @@
 namespace App\Support;
 
 use App\Enums\ProductCategory;
+use App\Models\AlertRule;
 use App\Models\Product;
 
 /**
- * Converts between the flat `alert_rules.risk_levels` column and the per-category
- * state the SPC & WPC alert form keeps (`risk_levels.{category}`, one checklist per
- * category section whose products offer risk levels). Which levels belong to which
- * category is read from the products' own `risk_level_options`, never hardcoded.
+ * Converts between the risk levels an SPC & WPC rule stores per product (`alert_rule_product.risk_levels`)
+ * and the per-category state the alert form keeps (`risk_levels.{category}`, one checklist per category
+ * section whose products offer risk levels). Which levels a product or category offers is read from the
+ * products' own `risk_level_options`, never hardcoded.
  */
 final class SpcWpcRiskLevels
 {
@@ -43,19 +44,37 @@ final class SpcWpcRiskLevels
     }
 
     /**
-     * The form state for a stored flat list: every category that offers risk levels,
-     * with the stored levels it offers (in option order). Levels no category offers drop.
+     * The form state for a stored rule: every category that offers risk levels, ticked with the levels
+     * the rule selected for its own watched products of that category (AlertRule::riskLevelsFor()), in
+     * option order. A category whose products the rule does not watch starts empty.
      *
-     * @param  list<string>|null  $flat
      * @return array<string, list<string>>
      */
-    public static function split(?array $flat): array
+    public static function forForm(AlertRule $rule): array
     {
-        $flat ??= [];
+        $selectedByCategory = $rule->products
+            ->filter(fn (Product $product): bool => $product->category !== null)
+            ->groupBy(fn (Product $product): string => $product->category->value)
+            ->map(fn ($products): array => $products->flatMap(fn (Product $product): array => $rule->riskLevelsFor($product->id))->all());
 
         return collect(self::optionsByCategory())
-            ->map(fn (array $options): array => array_values(array_filter($options, fn (string $level): bool => in_array($level, $flat, true))))
+            ->map(fn (array $options, string $category): array => array_values(array_filter(
+                $options,
+                fn (string $level): bool => in_array($level, $selectedByCategory->get($category, []), true),
+            )))
             ->all();
+    }
+
+    /**
+     * The levels to store for one product: the given selection limited to the levels the product offers,
+     * in its option order (an empty list means every level).
+     *
+     * @param  list<string>  $levels
+     * @return list<string>
+     */
+    public static function forProduct(Product $product, array $levels): array
+    {
+        return array_values(array_filter($product->risk_level_options ?? [], fn (string $level): bool => in_array($level, $levels, true)));
     }
 
     /**

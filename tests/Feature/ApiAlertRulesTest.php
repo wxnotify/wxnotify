@@ -498,6 +498,32 @@ test('each SPC and WPC product setting accepts polygon and risk area, never loca
     ruleCall($this, 'POST', '/api/v1/alert-rules', $body('location', $plain))->assertUnprocessable()->assertJsonValidationErrorFor('product_settings.0.matching_mode');
 });
 
+test('SPC and WPC risk levels are taken and read back per product, with the flat list as every product\'s levels together', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rainfall = Product::where('code', 'WPC.ERO')->sole();
+    $body = ['category' => 'spc_wpc', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+        ['product_id' => $outlook->id, 'matching_mode' => 'nationwide', 'risk_levels' => ['Enhanced']],
+        ['product_id' => $rainfall->id, 'matching_mode' => 'nationwide', 'risk_levels' => ['Moderate']],
+    ]];
+
+    $response = ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertCreated()
+        ->assertJsonPath('data.matching_mode', 'nationwide')
+        ->assertJsonPath('data.risk_levels', ['Enhanced', 'Moderate']);
+
+    expect(collect($response->json('data.product_settings'))->pluck('risk_levels', 'product_id')->all())
+        ->toBe([$outlook->id => ['Enhanced'], $rainfall->id => ['Moderate']]);
+});
+
+test('a product setting\'s risk level that no product offers is refused', function () {
+    $body = ['category' => 'spc_wpc', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+        ['product_id' => $this->riskProduct->id, 'matching_mode' => 'nationwide', 'risk_levels' => ['NOT-A-LEVEL']],
+    ]];
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertUnprocessable()->assertJsonValidationErrorFor('product_settings.0.risk_levels.0');
+
+    expect(AlertRule::count())->toBe(0);
+});
+
 test('a PUT with no product or matching fields keeps a mixed rule exactly as stored', function () {
     $id = ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->json('data.id');
     $before = ruleCall($this, 'GET', "/api/v1/alert-rules/{$id}")->json('data');

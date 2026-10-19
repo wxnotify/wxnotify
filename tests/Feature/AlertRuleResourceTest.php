@@ -927,7 +927,7 @@ test('ticks in a category whose products were deselected are not stored', functi
     expect(AlertRule::where('user_id', $this->user->id)->sole()->risk_levels)->toBe(['High']);
 });
 
-test('editing an SPC & WPC rule restores each category\'s ticks from the flat list, and saves them back flat', function () {
+test('editing an SPC & WPC rule restores each category\'s ticks from its own products, and saves them per product', function () {
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
     $fire = Product::where('code', 'SPC.FIRE')->sole();
     $rule = AlertRule::factory()->for($this->user)->create([
@@ -938,12 +938,15 @@ test('editing an SPC & WPC rule restores each category\'s ticks from the flat li
     $rule->notificationChannels()->attach($this->channel);
 
     livewire(EditAlertRule::class, ['record' => $rule->id])
-        ->assertFormSet(['risk_levels' => ['flooding_and_hydrological' => ['Moderate'], 'fire_weather' => ['Elevated'], 'convective_outlooks' => ['Moderate']]])
+        ->assertFormSet(['risk_levels' => ['flooding_and_hydrological' => [], 'fire_weather' => ['Elevated'], 'convective_outlooks' => ['Moderate']]])
         ->fillForm(['risk_levels' => ['flooding_and_hydrological' => [], 'fire_weather' => ['Elevated'], 'convective_outlooks' => ['Moderate', 'High']]])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($rule->refresh()->risk_levels)->toBe(['Elevated', 'Moderate', 'High']);
+    $rule->refresh();
+    expect($rule->riskLevelsFor($outlook->id))->toBe(['Moderate', 'High'])
+        ->and($rule->riskLevelsFor($fire->id))->toBe(['Elevated'])
+        ->and($rule->risk_levels)->toBe(['Elevated', 'Moderate', 'High']);
 });
 
 test('a rule saved before this change with only Convective levels edits and saves unchanged', function () {
@@ -956,11 +959,34 @@ test('a rule saved before this change with only Convective levels edits and save
     $rule->notificationChannels()->attach($this->channel);
 
     livewire(EditAlertRule::class, ['record' => $rule->id])
-        ->assertFormSet(['risk_levels' => ['flooding_and_hydrological' => ['High'], 'fire_weather' => [], 'convective_outlooks' => ['Enhanced', 'High']]])
+        ->assertFormSet(['risk_levels' => ['flooding_and_hydrological' => [], 'fire_weather' => [], 'convective_outlooks' => ['Enhanced', 'High']]])
         ->call('save')
         ->assertHasNoFormErrors();
 
     expect($rule->refresh()->risk_levels)->toBe(['Enhanced', 'High']);
+});
+
+test('a level ticked under Convective Outlooks is not ticked under Flooding, though the Excessive Rainfall Outlook offers it too', function () {
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $rainfall = Product::where('code', 'WPC.ERO')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'spc_wpc',
+            'product_settings.flooding_and_hydrological' => [alertWizardRow($rainfall, 'nationwide')],
+            'product_settings.convective_outlooks' => [alertWizardRow($outlook, 'nationwide')],
+            'risk_levels' => ['flooding_and_hydrological' => ['High'], 'convective_outlooks' => ['Moderate']],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+    expect($rule->riskLevelsFor($outlook->id))->toBe(['Moderate'])
+        ->and($rule->riskLevelsFor($rainfall->id))->toBe(['High']);
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertFormSet(['risk_levels' => ['flooding_and_hydrological' => ['High'], 'fire_weather' => [], 'convective_outlooks' => ['Moderate']]]);
 });
 
 test('an SPC & WPC rule with no ticks stores an empty list, meaning every level', function () {

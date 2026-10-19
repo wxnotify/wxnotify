@@ -65,7 +65,7 @@ class EditAlertRule extends EditRecord
         }
 
         if (($data['category'] ?? null) === AlertCategory::SpcWpc->value) {
-            $data['risk_levels'] = SpcWpcRiskLevels::split($data['risk_levels'] ?? []);
+            $data['risk_levels'] = SpcWpcRiskLevels::forForm($this->record);
         }
 
         return AlertRuleFormUnits::toDisplay($data, Units::for(auth()->user()));

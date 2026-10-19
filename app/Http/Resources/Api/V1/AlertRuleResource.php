@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Enums\AlertCategory;
 use App\Models\AlertRule;
 use App\Models\Product;
 use App\Support\AlertRuleFormUnits;
@@ -48,7 +49,7 @@ class AlertRuleResource extends JsonResource
             'location_id' => $rule->location_id,
             'wfo' => $matching['wfo'],
             'county_zone_codes' => $matching['county_zone_codes'],
-            'risk_levels' => $rule->risk_levels ?? [],
+            'risk_levels' => $this->riskLevels($rule),
             'variable' => $rule->variable?->value,
             'direction' => $rule->direction?->value,
             'threshold_value' => is_numeric($display['threshold_value']) ? (float) $display['threshold_value'] : null,
@@ -67,16 +68,35 @@ class AlertRuleResource extends JsonResource
     }
 
     /**
-     * Every watched product's matching settings (AlertRule::settingsFor()), in the order the rule lists its products.
+     * Every watched product's matching settings (AlertRule::settingsFor()), in the order the rule lists its products,
+     * with an SPC & WPC product's own risk levels.
      *
-     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}>
+     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>, risk_levels?: list<string>}>
      */
     private function productSettings(AlertRule $rule): array
     {
         return $rule->products
-            ->map(fn (Product $product): array => $this->entry($product->id, $rule->settingsFor($product->id)))
+            ->map(fn (Product $product): array => [
+                ...$this->entry($product->id, $rule->settingsFor($product->id)),
+                ...($rule->category === AlertCategory::SpcWpc ? ['risk_levels' => $rule->riskLevelsFor($product->id)] : []),
+            ])
             ->values()
             ->all();
+    }
+
+    /**
+     * The flat `risk_levels` older clients read: every level the rule selected for any of its products
+     * (AlertRule::riskLevelsFor()); each product's own levels are in its `product_settings` entry.
+     *
+     * @return list<string>
+     */
+    private function riskLevels(AlertRule $rule): array
+    {
+        if ($rule->category !== AlertCategory::SpcWpc) {
+            return [];
+        }
+
+        return $rule->products->flatMap(fn (Product $product): array => $rule->riskLevelsFor($product->id))->unique()->values()->all();
     }
 
     /**
@@ -98,7 +118,8 @@ class AlertRuleResource extends JsonResource
      * when every product matches the same way, else `mixed` with the other fields empty; a rule with
      * no products reads its own columns.
      *
-     * This compares the FULL settings (mode, locations, office and zone codes) and must stay lossless
+     * This compares the FULL settings (mode, locations, office and zone codes; never the risk levels, which have
+     * their own flat field) and must stay lossless
      * for the mobile app: two products that share a mode but differ in locations read `mixed`, so the
      * app never edits and re-saves a rule as if it were uniform. Do not unify it with
      * AlertRulesTable::locationLabels() (My Alerts), which deliberately compares the mode only.
@@ -109,7 +130,7 @@ class AlertRuleResource extends JsonResource
     private function matching(AlertRule $rule, array $productSettings): array
     {
         $distinct = collect($productSettings)
-            ->map(fn (array $entry): array => Arr::except($entry, 'product_id'))
+            ->map(fn (array $entry): array => Arr::except($entry, ['product_id', 'risk_levels']))
             ->unique(fn (array $fields): string => serialize($fields))
             ->values();
 

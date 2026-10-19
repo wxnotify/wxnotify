@@ -931,6 +931,64 @@ test('levels that belong to none of the rule\'s product options apply no filter'
     Queue::assertPushed(DeliverWeatherAlert::class);
 });
 
+/**
+ * A nationwide SPC & WPC rule whose products each hold their own risk levels, keyed by product code.
+ *
+ * @param  array<string, list<string>>  $levelsByCode
+ */
+function perProductRiskRule(array $levelsByCode, array $attributes = []): AlertRule
+{
+    $rule = AlertRule::factory()->create(['category' => 'spc_wpc', 'matching_mode' => 'nationwide', 'location_id' => null, 'risk_levels' => null, ...$attributes]);
+
+    foreach ($levelsByCode as $code => $levels) {
+        $rule->products()->attach(Product::where('code', $code)->sole()->id, ['matching_mode' => $attributes['matching_mode'] ?? 'nationwide', 'risk_levels' => json_encode($levels)]);
+    }
+
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
+
+    return $rule;
+}
+
+test('a level ticked for the Excessive Rainfall Outlook does not filter the Day 1 outlook, though both offer it', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    perProductRiskRule(['SPC.OUTLOOK' => [], 'WPC.ERO' => ['Moderate']]);
+
+    (new MatchWeatherAlertRules)(createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Marginal']]));
+
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('the Day 1 outlook is filtered by its own levels, not by the rule\'s or the Excessive Rainfall Outlook\'s', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    perProductRiskRule(['SPC.OUTLOOK' => ['High'], 'WPC.ERO' => ['Moderate']], ['risk_levels' => ['Moderate']]);
+
+    (new MatchWeatherAlertRules)(createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Slight', 'Moderate']]));
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+
+    (new MatchWeatherAlertRules)(createIngestedProductWithoutMatching(['product_id' => $outlook->id, 'risk_levels' => ['Moderate', 'High']]));
+    Queue::assertPushed(DeliverWeatherAlert::class);
+});
+
+test('the risk-area threshold comes from the product\'s own levels', function () {
+    Queue::fake();
+    $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
+    $location = Location::factory()->create(['lat' => 31, 'lng' => -99]); // inside Slight only
+    $rule = perProductRiskRule(['SPC.OUTLOOK' => ['Moderate'], 'WPC.ERO' => ['Slight']], ['matching_mode' => 'risk_area', 'risk_levels' => ['Slight']]);
+    DB::table('alert_rule_product_location')->insert(['alert_rule_id' => $rule->id, 'product_id' => $outlook->id, 'location_id' => $location->id]);
+    $ingested = createIngestedProductWithoutMatching([
+        'product_id' => $outlook->id,
+        'risk_level_polygons' => [
+            'Slight' => [['lat' => 30, 'lon' => -100], ['lat' => 30, 'lon' => -90], ['lat' => 40, 'lon' => -90], ['lat' => 40, 'lon' => -100]],
+        ],
+    ]);
+
+    (new MatchWeatherAlertRules)($ingested);
+
+    Queue::assertNotPushed(DeliverWeatherAlert::class);
+});
+
 test('the risk-area threshold ignores a ticked level from another category', function () {
     Queue::fake();
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();

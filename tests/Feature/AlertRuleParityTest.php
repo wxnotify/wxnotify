@@ -101,7 +101,7 @@ function storedShape(AlertRule $rule): array
         'product_settings' => $rule->products->sortBy('code')->map(function (Product $product) use ($rule): array {
             $settings = $rule->settingsFor($product->id);
 
-            return [$product->code, $settings->mode?->value, $settings->wfo, $settings->countyZoneCodes, $settings->locations->count(), $settings->inherited];
+            return [$product->code, $settings->mode?->value, $settings->wfo, $settings->countyZoneCodes, $settings->locations->count(), $settings->inherited, $rule->riskLevelsFor($product->id)];
         })->values()->all(),
         'locations' => $rule->locations->count(),
         'channels' => $rule->notificationChannels->count(),

@@ -201,7 +201,8 @@ class ProductMatchingTable extends Field
     /**
      * The form data SaveAlertRule reads: for a product-based rule, `product_settings` becomes the
      * flat list of switched-on rows across every category (ids as ints, the office code trimmed
-     * and upper-cased). The pages call it once, on the validated, dehydrated form data (which
+     * and upper-cased); for SPC & WPC each row carries its category's ticked risk levels
+     * (`risk_levels.{category}`), which SaveAlertRule limits to the levels that product offers. The pages call it once, on the validated, dehydrated form data (which
      * holds only the form's own tables), and reuse the result after the record is written: never
      * on the raw `$this->data`, where a tampered request can add keys no table validated. Only
      * keys named after a product category are read.
@@ -211,7 +212,9 @@ class ProductMatchingTable extends Field
      */
     public static function toSaveInput(array $data): array
     {
-        if (! self::supports(AlertCategory::tryFrom((string) ($data['category'] ?? '')))) {
+        $alertCategory = AlertCategory::tryFrom((string) ($data['category'] ?? ''));
+
+        if (! self::supports($alertCategory)) {
             unset($data['product_settings']);
 
             return $data;
@@ -220,14 +223,16 @@ class ProductMatchingTable extends Field
         $tables = collect(is_array($data['product_settings'] ?? null) ? $data['product_settings'] : [])
             ->filter(fn (mixed $rows, int|string $key): bool => ProductCategory::tryFrom((string) $key) !== null);
 
-        $data['product_settings'] = $tables->flatMap(fn (mixed $rows): array => self::enabledRows($rows))
+        $data['product_settings'] = $tables->flatMap(fn (mixed $rows, string $category): array => collect(self::enabledRows($rows))
             ->map(fn (array $row): array => [
                 'product_id' => (int) $row['product_id'],
                 'matching_mode' => (string) ($row['matching_mode'] ?? ''),
                 'location_ids' => self::ids($row['location_ids'] ?? []),
                 'wfo' => self::officeCode($row['wfo'] ?? null),
                 'county_zone_codes' => self::codes($row['county_zone_codes'] ?? []),
+                ...($alertCategory === AlertCategory::SpcWpc ? ['risk_levels' => self::levels($data['risk_levels'][$category] ?? [])] : []),
             ])
+            ->all())
             ->values()
             ->all();
 
@@ -720,6 +725,18 @@ class ProductMatchingTable extends Field
         return collect(is_array($codes) ? $codes : [])
             ->filter(fn (mixed $code): bool => is_string($code) && trim($code) !== '')
             ->map(fn (string $code): string => strtoupper(trim($code)))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function levels(mixed $levels): array
+    {
+        return collect(is_array($levels) ? $levels : [])
+            ->filter(fn (mixed $level): bool => is_string($level) && $level !== '')
             ->unique()
             ->values()
             ->all();

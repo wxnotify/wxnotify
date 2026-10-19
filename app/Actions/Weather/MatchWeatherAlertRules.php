@@ -30,7 +30,7 @@ use Throwable;
  *
  * AlertCategory::SpcWpc shares WeatherAlerts' product-based matching and
  * geography rules (see matchesGeography()); it additionally filters on
- * risk_levels (see matchesRiskLevel()), which WeatherAlerts doesn't have.
+ * each product's own risk levels (see matchesRiskLevel()), which WeatherAlerts doesn't have.
  *
  * A VTEC bulletin is a list of sections, each with its own zones, polygon and one or more VTEC
  * events, stored as IngestedProductSegment rows (see BuildBulletinSegments). A bulletin that has
@@ -291,32 +291,24 @@ class MatchWeatherAlertRules
      * attempted and found no categorical risk stated today, which is a
      * genuine non-match for any specific-level filter.
      *
-     * Only the levels in the product's own `risk_level_options` count: a rule watching both the
-     * Convective Outlook and the Fire Weather Outlook holds both categories' ticks in one list, and
-     * a level ticked for one category must not filter the other's products. `matchesRiskArea()`
-     * already ranks only levels found in the product's options, so it needs no equivalent change.
+     * The levels are the ones the rule selected for THIS product (AlertRule::riskLevelsFor()): each
+     * product holds its own, so a level ticked for the Excessive Rainfall Outlook never filters the
+     * Day 1 Convective Outlook although both offer "Moderate". Only levels in the product's own
+     * `risk_level_options` count, and none means no filter.
      */
     private function matchesRiskLevel(AlertRule $rule, IngestedProduct $product): bool
     {
-        if ($rule->category !== AlertCategory::SpcWpc || $rule->risk_levels === null || $rule->risk_levels === []) {
+        if ($rule->category !== AlertCategory::SpcWpc || $product->product_id === null) {
             return true;
         }
 
-        // The rule's levels are one flat list across every category it watches (the form
-        // keeps a checklist per category), so only the levels this product itself offers
-        // count for it. None of them belonging to it means the subscriber ticked nothing
-        // for this product's category: no filter, i.e. every level.
-        $relevant = array_values(array_intersect($rule->risk_levels, $product->product?->risk_level_options ?? []));
+        $selected = $rule->riskLevelsFor((int) $product->product_id);
 
-        if ($relevant === []) {
+        if ($selected === [] || $product->risk_levels === null) {
             return true;
         }
 
-        if ($product->risk_levels === null) {
-            return true;
-        }
-
-        return array_intersect($relevant, $product->risk_levels) !== [];
+        return array_intersect($selected, $product->risk_levels) !== [];
     }
 
     /**
@@ -397,8 +389,8 @@ class MatchWeatherAlertRules
 
     /**
      * "At or above" a threshold, not "exactly the checked level(s)": the
-     * threshold is the LOWEST-ranked level among the rule's own risk_levels
-     * selection (rank = position in Product::risk_level_options, already
+     * threshold is the LOWEST-ranked level among the levels the rule selected
+     * for this product (AlertRule::riskLevelsFor()) (rank = position in Product::risk_level_options, already
      * ordered low-to-high in the seed data) -- checking "Moderate" also
      * matches a High-risk area, mirroring how these outlooks are actually
      * read. An empty/null risk_levels means "every level" (rank 0), matching
@@ -427,7 +419,7 @@ class MatchWeatherAlertRules
         }
 
         $order = $product->product?->risk_level_options ?? [];
-        $selectedRanks = collect($rule->risk_levels ?? [])
+        $selectedRanks = collect($product->product_id === null ? [] : $rule->riskLevelsFor((int) $product->product_id))
             ->map(fn (string $level): int|false => array_search($level, $order, true))
             ->filter(fn (int|false $rank): bool => $rank !== false);
         $thresholdRank = $selectedRanks->isEmpty() ? 0 : $selectedRanks->min();
