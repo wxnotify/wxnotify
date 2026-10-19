@@ -33,8 +33,9 @@ class FcmClient
 
     /**
      * @param  array<string, string>  $data  string values only (an FCM requirement)
+     * @param  int|null  $badge  the iOS app-icon badge number; null leaves the badge alone
      */
-    public function send(string $deviceToken, string $title, string $body, array $data = []): FcmResult
+    public function send(string $deviceToken, string $title, string $body, array $data = [], ?int $badge = null): FcmResult
     {
         $credentials = $this->credentials();
 
@@ -62,7 +63,7 @@ class FcmClient
                     ],
                     'apns' => [
                         'headers' => ['apns-expiration' => (string) (now()->timestamp + self::TTL_SECONDS)],
-                        'payload' => ['aps' => ['sound' => 'default']],
+                        'payload' => ['aps' => ['sound' => 'default'] + ($badge !== null ? ['badge' => $badge] : [])],
                     ],
                 ]],
             );

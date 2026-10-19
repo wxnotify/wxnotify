@@ -151,3 +151,21 @@ test('an unreachable Firebase fails with a fixed message that carries nothing fr
 
     expect($result->success)->toBeFalse()->and($result->error)->toBe('Firebase could not be reached.');
 });
+
+test('send puts the badge in the apns aps block when one is given', function () {
+    fcmFakeGoogle();
+
+    app(FcmClient::class)->send('device-token-1', 'a', 'b', [], 3);
+
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['apns']['payload']['aps'] === ['sound' => 'default', 'badge' => 3]);
+});
+
+test('send without a badge leaves the apns block with only the sound', function () {
+    fcmFakeGoogle();
+
+    app(FcmClient::class)->send('device-token-1', 'a', 'b');
+
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['apns']['payload']['aps'] === ['sound' => 'default']);
+});
