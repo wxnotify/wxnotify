@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\LocationType;
 use App\Enums\MobileSource;
+use App\Exceptions\LocationLimitReached;
 use App\Models\Concerns\BlockedDuringMaintenance;
 use App\Support\Geography\GreatCircle;
 use Carbon\CarbonInterface;
@@ -41,6 +42,8 @@ class Location extends Model
     protected static function booted(): void
     {
         static::saving(function (Location $location): void {
+            $location->guardAllowanceClass();
+
             if ($location->type === LocationType::Stationary) {
                 $location->forceFill([
                     'mobile_source' => null,
@@ -62,6 +65,44 @@ class Location extends Model
                 $location->forceFill(['traccar_device_missing_at' => null]);
             }
         });
+    }
+
+    /**
+     * Whether this location is kept current by a phone running the app, as it is saved now.
+     */
+    public function isPhoneApp(): bool
+    {
+        return $this->type === LocationType::Mobile && $this->mobile_source === MobileSource::App;
+    }
+
+    /**
+     * A saved location never moves between the phone-app class and the rest: that would free a
+     * slot of one allowance without using one of the other. Becoming a phone-app location is never
+     * allowed (only EnableLocationSharing creates those, as new rows); leaving the class needs room
+     * in the general limit.
+     *
+     * @throws LocationLimitReached
+     */
+    private function guardAllowanceClass(): void
+    {
+        if (! $this->exists || ! ($this->isDirty('type') || $this->isDirty('mobile_source'))) {
+            return;
+        }
+
+        $wasPhoneApp = $this->getOriginal('type') === LocationType::Mobile
+            && $this->getOriginal('mobile_source') === MobileSource::App;
+
+        if ($wasPhoneApp === $this->isPhoneApp()) {
+            return;
+        }
+
+        if (! $wasPhoneApp) {
+            throw new LocationLimitReached('A saved location cannot become a phone location.');
+        }
+
+        if (! (User::query()->find($this->user_id)?->canCreateLocation() ?? false)) {
+            throw new LocationLimitReached('The saved-location limit has no room for this phone location.');
+        }
     }
 
     public function getActivitylogOptions(): LogOptions
