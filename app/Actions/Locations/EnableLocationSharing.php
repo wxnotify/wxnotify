@@ -18,9 +18,9 @@ use Spatie\Activitylog\Support\CauserResolver;
  * narrow beacon token the native beacon uses. Order: the Location already linked to this app
  * token; else this user's unlinked app Location with the same device name (so signing in again
  * on the same phone does not duplicate it); else, only when the user cannot create another
- * Location and has exactly one unlinked app Location, that one (the phone or the Location was
- * renamed, and refusing would be a dead end); else a new one, which must fit the tier's location
- * limit. Any earlier beacon token of this phone is revoked, so a phone has exactly one. The
+ * phone location and has exactly one unlinked app Location, that one (the phone or the Location
+ * was renamed, and refusing would be a dead end); else a new one, which must fit the tier's separate phone-location
+ * allowance (saved places and Traccar devices do not count against it). Any earlier beacon token of this phone is revoked, so a phone has exactly one. The
  * request has no session user, so writes pin the subscriber as the activity causer.
  */
 class EnableLocationSharing
@@ -67,7 +67,7 @@ class EnableLocationSharing
 
     private function relinkedAtLimit(User $user, PersonalAccessToken $appToken): ?Location
     {
-        if ($user->canCreateLocation()) {
+        if ($user->canCreatePhoneLocation()) {
             return null;
         }
 
@@ -97,8 +97,8 @@ class EnableLocationSharing
 
     private function created(User $user, PersonalAccessToken $appToken): Location
     {
-        if (! $user->canCreateLocation()) {
-            throw new LocationLimitReached;
+        if (! $user->canCreatePhoneLocation()) {
+            throw new LocationLimitReached('The phone-location allowance of the tier is used up.');
         }
 
         $location = new Location([

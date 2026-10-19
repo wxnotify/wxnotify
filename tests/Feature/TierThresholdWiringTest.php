@@ -28,6 +28,37 @@ test('the location limits follow the settings and Pro stays unlimited', function
         ->and(User::factory()->create(['tier_override' => Tier::Pro])->locationLimit())->toBeNull();
 });
 
+test('the phone location limits follow the settings and Pro stays unlimited', function () {
+    setTierSetting('free_phone_locations', 3);
+    setTierSetting('plus_phone_locations', 4);
+
+    expect(User::factory()->create(['tier_override' => Tier::Free])->phoneLocationLimit())->toBe(3)
+        ->and(User::factory()->create(['tier_override' => Tier::Plus])->phoneLocationLimit())->toBe(4)
+        ->and(User::factory()->create(['tier_override' => Tier::Pro])->phoneLocationLimit())->toBeNull();
+});
+
+test('phone locations count against the phone allowance only, and every other location against the general limit only', function () {
+    setTierSetting('free_locations', 1);
+    setTierSetting('free_phone_locations', 1);
+    $user = User::factory()->create(['tier_override' => Tier::Free]);
+
+    Location::factory()->for($user)->mobileApp()->create();
+
+    expect($user->canCreateLocation())->toBeTrue()
+        ->and($user->canCreatePhoneLocation())->toBeFalse();
+
+    Location::factory()->for($user)->mobile()->create();
+
+    expect($user->canCreateLocation())->toBeFalse()
+        ->and($user->canCreatePhoneLocation())->toBeFalse();
+
+    $other = User::factory()->create(['tier_override' => Tier::Free]);
+    Location::factory()->for($other)->create();
+
+    expect($other->canCreateLocation())->toBeFalse()
+        ->and($other->canCreatePhoneLocation())->toBeTrue();
+});
+
 test('a Free user can create locations up to the configured limit', function () {
     setTierSetting('free_locations', 2);
     $user = User::factory()->create(['tier_override' => Tier::Free]);

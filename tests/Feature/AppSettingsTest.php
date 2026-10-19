@@ -16,6 +16,8 @@ test('tier and threshold settings default to the limits the app shipped with', f
 
     expect($settings->free_locations)->toBe(1)
         ->and($settings->plus_locations)->toBe(5)
+        ->and($settings->free_phone_locations)->toBe(1)
+        ->and($settings->plus_phone_locations)->toBe(2)
         ->and($settings->free_no_cost_channels)->toBe(1)
         ->and($settings->free_traccar_servers)->toBe(0)
         ->and($settings->plus_traccar_servers)->toBe(1)

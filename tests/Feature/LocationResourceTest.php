@@ -84,6 +84,20 @@ test('a Free subscriber cannot create a second location', function () {
     expect(Location::where('user_id', $this->user->id)->count())->toBe(1);
 });
 
+test('a Free subscriber whose phone is sharing can still create a saved place', function () {
+    Location::factory()->for($this->user)->mobileApp()->create();
+
+    expect($this->user->canCreateLocation())->toBeTrue();
+
+    livewire(CreateLocation::class)
+        ->fillForm(['label' => 'Home', 'lat' => 39.8, 'lng' => -98.5, 'timezone' => 'America/Chicago'])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Location::where('user_id', $this->user->id)->count())->toBe(2)
+        ->and($this->user->fresh()->canCreateLocation())->toBeFalse();
+});
+
 test('a Plus subscriber can create up to five locations', function () {
     $this->user->forceFill(['tier_override' => Tier::Plus])->save();
     Location::factory(4)->for($this->user)->create();

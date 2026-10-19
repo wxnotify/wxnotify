@@ -66,7 +66,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Maximum number of locations this user's tier allows, or null for unlimited.
+     * Maximum number of locations other than phone-app ones (saved places and Traccar devices)
+     * this user's tier allows, or null for unlimited.
      */
     public function locationLimit(): ?int
     {
@@ -83,7 +84,28 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         $limit = $this->locationLimit();
 
-        return $limit === null || $this->locations()->count() < $limit;
+        return $limit === null || $this->locations()->notPhoneApp()->count() < $limit;
+    }
+
+    /**
+     * Maximum number of phone-app locations this user's tier allows, or null for unlimited.
+     */
+    public function phoneLocationLimit(): ?int
+    {
+        $limits = app(TierThresholdSettings::class);
+
+        return match ($this->tier()) {
+            Tier::Free => $limits->free_phone_locations,
+            Tier::Plus => $limits->plus_phone_locations,
+            Tier::Pro => null,
+        };
+    }
+
+    public function canCreatePhoneLocation(): bool
+    {
+        $limit = $this->phoneLocationLimit();
+
+        return $limit === null || $this->locations()->phoneApp()->count() < $limit;
     }
 
     public function notificationChannels(): HasMany

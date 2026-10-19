@@ -18,6 +18,8 @@ test('the page loads the current values of both settings groups', function () {
         ->assertFormSet([
             'maintenance_mode' => false,
             'plus_locations' => 5,
+            'free_phone_locations' => 1,
+            'plus_phone_locations' => 2,
             'lightning_min_radius_miles' => 10,
             'message_prefix_enabled' => false,
             'message_prefix' => '',
@@ -64,6 +66,7 @@ test('saving writes both groups', function () {
             'maintenance_mode' => true,
             'maintenance_message' => 'Back at 10:00 UTC.',
             'plus_locations' => 8,
+            'plus_phone_locations' => 3,
             'lightning_min_radius_miles' => 12,
         ])
         ->call('save')
@@ -73,6 +76,7 @@ test('saving writes both groups', function () {
     expect(app(GeneralSettings::class)->refresh()->maintenance_mode)->toBeTrue()
         ->and(app(GeneralSettings::class)->maintenance_message)->toBe('Back at 10:00 UTC.')
         ->and(app(TierThresholdSettings::class)->refresh()->plus_locations)->toBe(8)
+        ->and(app(TierThresholdSettings::class)->plus_phone_locations)->toBe(3)
         ->and(app(TierThresholdSettings::class)->lightning_min_radius_miles)->toBe(12);
 });
 
@@ -106,6 +110,8 @@ test('out-of-range and non-integer values are rejected and nothing is saved', fu
     'lightning floor above range' => ['lightning_min_radius_miles', 16],
     'free locations below one' => ['free_locations', 0],
     'plus locations above cap' => ['plus_locations', 101],
+    'free phone locations below one' => ['free_phone_locations', 0],
+    'plus phone locations above cap' => ['plus_phone_locations', 101],
     'negative channel slots' => ['free_no_cost_channels', -1],
     'device limit above cap' => ['pro_traccar_devices_per_server', 101],
     'fractional value' => ['plus_traccar_servers', 1.5],
@@ -116,6 +122,11 @@ test('a higher tier cannot be set below a lower tier', function () {
         ->fillForm(['free_locations' => 6, 'plus_locations' => 5])
         ->call('save')
         ->assertHasFormErrors(['plus_locations']);
+
+    livewire(AppSettings::class)
+        ->fillForm(['free_phone_locations' => 3, 'plus_phone_locations' => 2])
+        ->call('save')
+        ->assertHasFormErrors(['plus_phone_locations']);
 
     livewire(AppSettings::class)
         ->fillForm(['free_traccar_servers' => 2, 'plus_traccar_servers' => 1])

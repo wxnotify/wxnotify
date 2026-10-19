@@ -118,7 +118,11 @@ class AppSettings extends Page implements HasForms
                             Section::make('Locations')->columns(2)->schema([
                                 $this->count('free_locations', 'Free locations', 1, 10),
                                 $this->count('plus_locations', 'Plus locations', 1, 100)->gte('free_locations'),
-                            ])->description('Pro locations are unlimited.'),
+                            ])->description('Saved places and Traccar devices. Pro locations are unlimited.'),
+                            Section::make('Phone locations')->columns(2)->schema([
+                                $this->count('free_phone_locations', 'Free phone locations', 1, 10),
+                                $this->count('plus_phone_locations', 'Plus phone locations', 1, 100)->gte('free_phone_locations'),
+                            ])->description('Phones signed in to the WxNotify app and sharing their location, counted apart from the locations above. Pro phone locations are unlimited.'),
                             Section::make('Notification channels')->schema([
                                 $this->count('free_no_cost_channels', 'Free no-cost channels', 0, 5),
                             ])->description('Email is unlimited at every tier; Plus and Pro have no channel limit.'),

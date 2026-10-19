@@ -9,6 +9,7 @@ use App\Support\Geography\GreatCircle;
 use Carbon\CarbonInterface;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -156,6 +157,33 @@ class Location extends Model
         return $this->mobile_source === MobileSource::App
             ? $this->app_token_id === null
             : $this->traccar_device_missing_at !== null;
+    }
+
+    /**
+     * A location kept current by a phone running the WxNotify app: the only kind the phone
+     * allowance counts.
+     *
+     * @param  Builder<Location>  $query
+     * @return Builder<Location>
+     */
+    public function scopePhoneApp(Builder $query): Builder
+    {
+        return $query->where('type', LocationType::Mobile->value)->where('mobile_source', MobileSource::App->value);
+    }
+
+    /**
+     * Every location except a phone-app one: saved places and Traccar devices, which the general
+     * location limit counts. A null mobile_source is not a phone-app location.
+     *
+     * @param  Builder<Location>  $query
+     * @return Builder<Location>
+     */
+    public function scopeNotPhoneApp(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $inner): Builder => $inner
+            ->where('type', '!=', LocationType::Mobile->value)
+            ->orWhereNull('mobile_source')
+            ->orWhere('mobile_source', '!=', MobileSource::App->value));
     }
 
     public function positionLocatedAt(): ?CarbonInterface

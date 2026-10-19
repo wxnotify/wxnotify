@@ -116,6 +116,23 @@ test('it says whether another location can be created', function () {
     expect(optionsCall($this)->json('data.can_create_location'))->toBeFalse();
 });
 
+test('it says whether another phone location can be shared, apart from saved places', function () {
+    $limits = app(TierThresholdSettings::class);
+    $limits->free_locations = 1;
+    $limits->free_phone_locations = 1;
+    $limits->save();
+
+    Location::factory()->for($this->user)->create();
+
+    expect(optionsCall($this)->json('data.can_share_phone_location'))->toBeTrue();
+
+    Location::factory()->for($this->user)->mobileApp()->create();
+
+    $data = optionsCall($this)->json('data');
+    expect($data['can_share_phone_location'])->toBeFalse()
+        ->and($data['can_create_location'])->toBeFalse();
+});
+
 test('every product carries the modes its row offers and its default mode', function () {
     $tornado = Product::where('code', 'TO.W')->sole();
     $risk = Product::where('family', 'spc_wpc')->whereNotNull('risk_level_options')->orderBy('id')->firstOrFail();

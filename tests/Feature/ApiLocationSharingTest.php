@@ -2,6 +2,7 @@
 
 use App\Enums\LocationType;
 use App\Enums\MobileSource;
+use App\Enums\Tier;
 use App\Filament\Dashboard\Pages\SignedInDevices;
 use App\Models\AlertRule;
 use App\Models\Location;
@@ -17,11 +18,27 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->phone = $this->user->createToken('Pixel 9', ['app']);
 
-    // Room for several locations; the limit test lowers it.
+    // Room for several phone locations; the limit tests lower it.
     $limits = app(TierThresholdSettings::class);
-    $limits->free_locations = 10;
+    $limits->free_phone_locations = 10;
     $limits->save();
 });
+
+function setPhoneAllowance(int $free, int $plus = 2): void
+{
+    $limits = app(TierThresholdSettings::class);
+    $limits->free_phone_locations = $free;
+    $limits->plus_phone_locations = $plus;
+    $limits->save();
+}
+
+/**
+ * A second phone of the user, already sharing, so it uses up one slot of the phone allowance.
+ */
+function otherSharingPhone(User $user, string $name = 'iPad'): Location
+{
+    return Location::factory()->for($user)->mobileApp($user->createToken($name, ['app'])->accessToken)->create(['label' => $name]);
+}
 
 function sharingCall($test, string $method, ?string $bearer = null)
 {
@@ -93,12 +110,9 @@ test('another account\'s unlinked location is never re-linked', function () {
     expect($foreign->fresh()->app_token_id)->toBeNull()->and(Location::count())->toBe(2);
 });
 
-test('at the plan\'s location limit a new location is refused but an existing one is still re-linked', function () {
-    // One location allowed, one already used.
-    $limits = app(TierThresholdSettings::class);
-    $limits->free_locations = 1;
-    $limits->save();
-    Location::factory()->for($this->user)->create();
+test('at the plan\'s phone allowance a new phone location is refused but an existing one is still re-linked', function () {
+    setPhoneAllowance(1);
+    otherSharingPhone($this->user);
 
     sharingCall($this, 'PUT')->assertUnprocessable()->assertJsonPath('error', 'location_limit');
     expect(PersonalAccessToken::query()->where('abilities', json_encode(['location']))->count())->toBe(0);
@@ -108,10 +122,8 @@ test('at the plan\'s location limit a new location is refused but an existing on
     sharingCall($this, 'PUT')->assertOk()->assertJsonPath('data.location_id', $existing->id);
 });
 
-test('at the plan\'s limit the one unlinked phone location is re-linked even when it was renamed', function () {
-    $limits = app(TierThresholdSettings::class);
-    $limits->free_locations = 1;
-    $limits->save();
+test('at the plan\'s phone allowance the one unlinked phone location is re-linked even when it was renamed', function () {
+    setPhoneAllowance(1);
     $renamed = Location::factory()->for($this->user)->mobileApp()->create(['label' => 'Jim\'s phone', 'lat' => 35.2, 'lng' => -97.4]);
     $rule = AlertRule::factory()->for($this->user)->create();
     $rule->locations()->attach($renamed->id);
@@ -124,10 +136,8 @@ test('at the plan\'s limit the one unlinked phone location is re-linked even whe
         ->and($rule->locations()->count())->toBe(1);
 });
 
-test('at the plan\'s limit two unlinked phone locations of other names are ambiguous and refused', function () {
-    $limits = app(TierThresholdSettings::class);
-    $limits->free_locations = 2;
-    $limits->save();
+test('at the plan\'s phone allowance two unlinked phone locations of other names are ambiguous and refused', function () {
+    setPhoneAllowance(2);
     Location::factory()->for($this->user)->mobileApp()->create(['label' => 'iPad']);
     Location::factory()->for($this->user)->mobileApp()->create(['label' => 'Old phone']);
 
@@ -146,11 +156,9 @@ test('below the plan\'s limit an unlinked location of another name is not taken 
         ->and($other->fresh()->app_token_id)->toBeNull();
 });
 
-test('at the plan\'s limit another account\'s unlinked phone location is never taken', function () {
-    $limits = app(TierThresholdSettings::class);
-    $limits->free_locations = 1;
-    $limits->save();
-    Location::factory()->for($this->user)->create();
+test('at the plan\'s phone allowance another account\'s unlinked phone location is never taken', function () {
+    setPhoneAllowance(1);
+    otherSharingPhone($this->user);
     $foreign = Location::factory()->for(User::factory())->mobileApp()->create(['label' => 'Jim\'s phone']);
 
     sharingCall($this, 'PUT')->assertUnprocessable()->assertJsonPath('error', 'location_limit');
@@ -249,12 +257,52 @@ test('a refused PUT leaves the phone\'s existing beacon token in place', functio
 
     // Lose the linked location and fill the plan, so the next PUT would need a new one and is refused.
     Location::query()->delete();
-    Location::factory()->for($this->user)->create();
-    $limits = app(TierThresholdSettings::class);
-    $limits->free_locations = 1;
-    $limits->save();
+    setPhoneAllowance(1);
+    otherSharingPhone($this->user);
 
     sharingCall($this, 'PUT')->assertUnprocessable()->assertJsonPath('error', 'location_limit');
 
     expect(PersonalAccessToken::find($beacon->id))->not->toBeNull();
+});
+
+test('a Free user with a saved place can still share a phone, and the place does not use the phone slot', function () {
+    setPhoneAllowance(1);
+    Location::factory()->for($this->user)->create();
+
+    sharingCall($this, 'PUT')->assertOk();
+
+    expect($this->user->locations()->phoneApp()->count())->toBe(1)
+        ->and($this->user->locations()->count())->toBe(2);
+});
+
+test('a Free user whose one general slot is full by a Traccar device can still share a phone', function () {
+    setPhoneAllowance(1);
+    Location::factory()->for($this->user)->mobile()->create();
+
+    sharingCall($this, 'PUT')->assertOk();
+});
+
+test('a second phone is refused on Free with the phone-allowance message, while the first phone signing in again needs no slot', function () {
+    setPhoneAllowance(1);
+    sharingCall($this, 'PUT')->assertOk();
+    $second = $this->user->createToken('Galaxy', ['app']);
+
+    sharingCall($this, 'PUT', $second->plainTextToken)->assertUnprocessable()
+        ->assertJsonPath('error', 'location_limit')
+        ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'phone-location allowance'));
+    sharingCall($this, 'PUT')->assertOk();
+
+    expect($this->user->locations()->phoneApp()->count())->toBe(1);
+});
+
+test('Plus allows a second phone and refuses a third, and Pro is unlimited', function () {
+    setPhoneAllowance(1, 2);
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+
+    sharingCall($this, 'PUT')->assertOk();
+    sharingCall($this, 'PUT', $this->user->createToken('Galaxy', ['app'])->plainTextToken)->assertOk();
+    sharingCall($this, 'PUT', $this->user->createToken('Moto', ['app'])->plainTextToken)->assertUnprocessable();
+
+    $this->user->forceFill(['tier_override' => Tier::Pro])->save();
+    sharingCall($this, 'PUT', $this->user->createToken('Moto', ['app'])->plainTextToken)->assertOk();
 });

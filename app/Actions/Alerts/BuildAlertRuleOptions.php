@@ -89,6 +89,7 @@ class BuildAlertRuleOptions
             'locations' => $user->locations()->orderBy('label')->orderBy('id')->get(['id', 'label'])
                 ->map(fn ($location): array => ['id' => $location->id, 'label' => $location->label])->all(),
             'can_create_location' => $user->canCreateLocation(),
+            'can_share_phone_location' => $user->canCreatePhoneLocation(),
         ];
     }
 
