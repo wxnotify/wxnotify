@@ -121,6 +121,59 @@ test('other Firebase failures neither queue a prune nor leak anything', function
     Queue::assertNothingPushed();
 });
 
+test('an iOS push carries the running badge total', function () {
+    fcmFakeGoogle();
+    $phone = NotificationChannel::factory()->mobilePush('ios-token-1', 'ios')->create();
+
+    app(ChannelDispatcher::class)->send($phone, 'Body', 'First');
+    app(ChannelDispatcher::class)->send($phone, 'Body', 'Second');
+
+    $badges = collect(Http::recorded())
+        ->filter(fn (array $pair) => str_contains($pair[0]->url(), 'messages:send'))
+        ->map(fn (array $pair) => $pair[0]['message']['apns']['payload']['aps']['badge'])
+        ->values()->all();
+
+    expect($badges)->toBe([1, 2])
+        ->and($phone->fresh()->unread_push_count)->toBe(2);
+});
+
+test('an Android push has no badge and the count stays 0', function () {
+    fcmFakeGoogle();
+    $phone = NotificationChannel::factory()->mobilePush('android-token-1', 'android')->create();
+
+    app(ChannelDispatcher::class)->send($phone, 'Body', 'Title');
+
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && ! array_key_exists('badge', $request['message']['apns']['payload']['aps']));
+    expect($phone->fresh()->unread_push_count)->toBe(0);
+});
+
+test('a failed push still counts', function () {
+    fcmFakeGoogle(Http::response(['error' => ['message' => 'down']], 500));
+    $phone = NotificationChannel::factory()->mobilePush('ios-token-2', 'ios')->create();
+
+    $result = app(ChannelDispatcher::class)->send($phone, 'Body', 'Title');
+
+    expect($result->success)->toBeFalse()
+        ->and($phone->fresh()->unread_push_count)->toBe(1);
+});
+
+test('the badge is never a data field', function () {
+    fcmFakeGoogle();
+    $phone = NotificationChannel::factory()->mobilePush('ios-token-3', 'ios')->create();
+
+    app(ChannelDispatcher::class)->send($phone, 'Body', 'Title');
+
+    Http::assertSent(function (Request $request) {
+        if (! str_contains($request->url(), 'messages:send')) {
+            return false;
+        }
+        $data = (array) $request['message']['data'];
+
+        return ! array_key_exists('badge', $data) && collect($data)->every(fn ($value) => is_string($value));
+    });
+});
+
 test('the prune job deletes the channel that still holds the failed token and keeps the delivery log', function () {
     $log = DeliveryLog::create([
         'user_id' => $this->channel->user_id,

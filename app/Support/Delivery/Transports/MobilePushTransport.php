@@ -30,11 +30,14 @@ class MobilePushTransport implements Transport
             return DeliveryResult::failed('This device channel has no push token; open the app to register it again.');
         }
 
+        $badge = ($channel->config['platform'] ?? null) === 'ios' ? $channel->incrementUnreadPushCount() : null;
+
         $result = $this->fcm->send(
             $token,
             $title ?? 'WxNotify',
             Str::limit($body, 200, preserveWords: true),
             ['url' => $this->tapTarget($meta), 'type' => (string) ($meta['type'] ?? 'alert')],
+            $badge,
         );
 
         if ($result->success) {
