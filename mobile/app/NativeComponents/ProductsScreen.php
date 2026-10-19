@@ -8,6 +8,7 @@ use App\Exceptions\Api\Unauthenticated;
 use App\Exceptions\Api\ValidationFailed;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
+use App\Support\Concerns\ClearsPushBadge;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use App\Support\ProductSearchPresenter;
@@ -21,6 +22,7 @@ use Native\Mobile\Facades\Browser;
  */
 class ProductsScreen extends NativeComponent
 {
+    use ClearsPushBadge;
     use RequiresSignIn;
 
     private const MIN_QUERY_LENGTH = 2;
@@ -76,6 +78,8 @@ class ProductsScreen extends NativeComponent
         if ($this->redirectIfSignedOut()) {
             return;
         }
+
+        $this->clearPushBadgeOnOpen();
 
         $this->recents = app(LocalCache::class)->recentSearches();
 

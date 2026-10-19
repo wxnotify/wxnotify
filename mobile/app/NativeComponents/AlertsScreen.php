@@ -13,6 +13,7 @@ use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\ActiveAlertsPresenter;
 use App\Support\AlertPresenter;
+use App\Support\Concerns\ClearsPushBadge;
 use App\Support\Concerns\HandlesPushToken;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
@@ -28,6 +29,7 @@ use Native\Mobile\Facades\Browser;
  */
 class AlertsScreen extends NativeComponent
 {
+    use ClearsPushBadge;
     use HandlesPushToken;
     use RequiresSignIn;
 
@@ -83,6 +85,8 @@ class AlertsScreen extends NativeComponent
         if ($this->redirectIfSignedOut()) {
             return;
         }
+
+        $this->clearPushBadgeOnOpen();
 
         $cache = app(LocalCache::class);
 

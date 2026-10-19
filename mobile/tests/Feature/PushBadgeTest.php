@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Native\Mobile\Facades\PushNotifications;
 
 beforeEach(function () {
+    app()->forgetInstance(PushBadge::class);
     (new TokenStore)->put('9|secret');
 });
 

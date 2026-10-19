@@ -8,6 +8,7 @@ use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Unauthenticated;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
+use App\Support\Concerns\ClearsPushBadge;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
 use App\Support\MapPage;
@@ -23,6 +24,7 @@ use Native\Mobile\Edge\NativeComponent;
  */
 class MapScreen extends NativeComponent
 {
+    use ClearsPushBadge;
     use RequiresSignIn;
 
     /** The web view's page route, versioned by the page's content; null until a snapshot has been fetched this visit. */
@@ -37,6 +39,8 @@ class MapScreen extends NativeComponent
         if ($this->redirectIfSignedOut()) {
             return;
         }
+
+        $this->clearPushBadgeOnOpen();
 
         $this->refresh();
     }
