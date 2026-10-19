@@ -7,6 +7,7 @@ use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Throwable;
 
 /**
  * Runs the shapefile scan that the owner started from the admin panel, then tells them in the
@@ -15,6 +16,14 @@ use Illuminate\Foundation\Queue\Queueable;
 class ScanShapefileLayersJob implements ShouldQueue
 {
     use Queueable;
+
+    /**
+     * A full scan fetches every layer's page and downloads and imports each staged zip, which
+     * can run well past the worker's 60 second default. It runs once: a retry would re-scan.
+     */
+    public int $timeout = 900;
+
+    public int $tries = 1;
 
     public function __construct(public readonly int $userId) {}
 
@@ -32,6 +41,26 @@ class ScanShapefileLayersJob implements ShouldQueue
             ->title('Shapefile scan finished')
             ->body("{$staged} layer(s) staged a new version. Review and activate them under Shapefile Layers.")
             ->success()
+            ->sendToDatabase($user);
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        logger()->error('ScanShapefileLayersJob failed', [
+            'user_id' => $this->userId,
+            'exception' => $exception?->getMessage(),
+        ]);
+
+        $user = User::find($this->userId);
+
+        if ($user === null) {
+            return;
+        }
+
+        Notification::make()
+            ->title('Shapefile scan failed')
+            ->body('The scan did not finish. Check the logs, then try Check for shapefile updates again.')
+            ->danger()
             ->sendToDatabase($user);
     }
 }

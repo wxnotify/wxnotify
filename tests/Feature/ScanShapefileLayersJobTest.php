@@ -87,3 +87,19 @@ test('the header action queues the job for the current user and says a queue wor
     expect($sent)->not->toBeNull()
         ->and($sent->getBody())->toContain('queue worker');
 });
+
+test('a scan job that fails tells the user the scan did not finish, and has room to run a full scan once', function () {
+    $user = User::factory()->create(['is_staff' => true]);
+    $job = new ScanShapefileLayersJob($user->id);
+
+    $job->failed(new RuntimeException('connection refused'));
+
+    $data = $user->notifications()->sole()->data;
+
+    expect($data['format'])->toBe('filament')
+        ->and($data['title'])->toBe('Shapefile scan failed')
+        ->and($data['body'])->toContain('did not finish')
+        ->and($data['body'])->toContain('logs')
+        ->and($job->tries)->toBe(1)
+        ->and($job->timeout)->toBeGreaterThanOrEqual(900);
+});
