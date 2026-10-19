@@ -12,6 +12,7 @@ use App\Support\TokenStore;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\Facades\PushNotifications;
+use Native\Mobile\Facades\System;
 use Native\Mobile\Testing\Native;
 
 beforeEach(function () {
@@ -117,8 +118,10 @@ test('a failing server never throws into the screen', function (string $screen) 
     expect((new PushState)->resetPending())->toBeTrue();
 })->with($tabScreens);
 
-test('a foreground push flagged by the listener is cleared by the next tick, once', function (string $screen) {
+test('on iOS a foreground push flagged by the listener is cleared by the next tick, once', function (string $screen) {
     $this->freezeTime();
+    System::shouldReceive('isIos')->andReturn(true);
+    System::shouldReceive('isDarkMode')->andReturn(false);
     PushNotifications::shouldReceive('clearBadge')->twice();
     fakeTabScreenRequests();
     $component = Native::test($screen);
@@ -133,8 +136,10 @@ test('a foreground push flagged by the listener is cleared by the next tick, onc
         ->and((new PushState)->pullForegroundPush())->toBeFalse();
 })->with($tabScreens);
 
-test('the dispatched foreground-push event reaches the listener and the next tick clears', function () {
+test('the dispatched foreground-push event reaches the listener and the next tick clears on iOS', function () {
     $this->freezeTime();
+    System::shouldReceive('isIos')->andReturn(true);
+    System::shouldReceive('isDarkMode')->andReturn(false);
     PushNotifications::shouldReceive('clearBadge')->twice();
     fakeTabScreenRequests();
     $component = Native::test(AlertsScreen::class);
@@ -146,18 +151,33 @@ test('the dispatched foreground-push event reaches the listener and the next tic
     expect(badgeResetsSentFromScreens())->toBe(2);
 });
 
-test('a tick with no foreground flag never calls the plugin', function () {
+test('on Android a flagged foreground push is consumed and nothing is cleared', function (string $screen) {
     $this->freezeTime();
+    System::shouldReceive('isIos')->andReturn(false);
+    System::shouldReceive('isDarkMode')->andReturn(false);
     PushNotifications::shouldReceive('clearBadge')->once();
     fakeTabScreenRequests();
+    $component = Native::test($screen);
+
+    app(MarkForegroundPush::class)->handle(new ForegroundPushReceived);
+    $this->travel(5)->seconds();
+    $component->firePoll('pollPushBadge');
+
+    expect(badgeResetsSentFromScreens())->toBe(1)
+        ->and((new PushState)->pullForegroundPush())->toBeFalse();
+})->with($tabScreens);
+
+test('a flagged foreground push with a failing plugin and server never throws into the screen', function () {
+    $this->freezeTime();
+    System::shouldReceive('isIos')->andReturn(true);
+    System::shouldReceive('isDarkMode')->andReturn(false);
+    PushNotifications::shouldReceive('clearBadge')->twice()->andThrow(new RuntimeException('plugin down'));
+    fakeTabScreenRequests(badgeResetStatus: 500);
     $component = Native::test(AlertsScreen::class);
 
+    app(MarkForegroundPush::class)->handle(new ForegroundPushReceived);
     $this->travel(5)->seconds();
-    $component->firePoll('pollPushBadge');
-    $this->travel(5)->seconds();
-    $component->firePoll('pollPushBadge');
-
-    expect(badgeResetsSentFromScreens())->toBe(1);
+    $component->firePoll('pollPushBadge')->assertDontSee('plugin down');
 });
 
 test('signing out forgets a pending foreground-push flag', function () {

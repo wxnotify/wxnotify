@@ -6,6 +6,7 @@ use App\Services\PushBadge;
 use App\Support\PushState;
 use Illuminate\Support\Carbon;
 use Native\Mobile\Attributes\Poll;
+use Native\Mobile\Facades\System;
 
 /**
  * Used by every bottom-nav tab screen (Alerts, Map, Products, Settings), so opening the app on any tab
@@ -20,13 +21,18 @@ use Native\Mobile\Attributes\Poll;
  * in the background, so it clears the badge and resets the server count.
  *
  * Foreground pushes: every push names App\Events\ForegroundPushReceived in its data, which the plugin
- * dispatches only while the app is open; the listener sets a cache flag (PushState) and the next tick
- * consumes it (one cache read per tick) and runs the full clear, on Android removing that push's tray
- * notification too. So such a push is counted and then cleared within about five seconds. If the event
- * never fires on a device, the behaviour is just the gap rule above.
+ * dispatches only while the app is open; the listener sets a cache flag (PushState). The flag is read
+ * each tick and cleared when set. On iOS a set flag runs the full clear, so a push that was counted
+ * while the app was open is cleared and reset within 0-5 seconds. On Android the flag is consumed and
+ * nothing is cleared: Android has no badge number and the server never counts Android channels, so there
+ * is nothing to reset, and cancelAll() would make the push's heads-up banner and tray entry vanish at
+ * once; the OS keeps managing them. If the event never fires on a device, the behaviour is just the gap
+ * rule above.
  *
- * Known limitation: a push that lands while the app is in the background, followed by a return before the
- * loop stopped ticking (no gap), stays on the badge (and the Android tray) until the next tab open or gap.
+ * Known limitations: a push that lands while the app is in the background, followed by a return before
+ * the loop stopped ticking (no gap), stays on the badge (and the Android tray) until the next tab open
+ * or gap. A flag set in the foreground and followed within seconds by a background push can cost one
+ * extra iOS clear while the loop still ticks.
  */
 trait ClearsPushBadge
 {
@@ -48,9 +54,9 @@ trait ClearsPushBadge
     #[Poll(self::PUSH_BADGE_POLL_MS)]
     public function pollPushBadge(): void
     {
-        $foregroundPushReceived = app(PushState::class)->pullForegroundPush();
+        $clearForForegroundPush = app(PushState::class)->pullForegroundPush() && System::isIos();
 
-        if ($foregroundPushReceived || $this->wasInBackgroundSinceLastPushBadgeTick()) {
+        if ($clearForForegroundPush || $this->wasInBackgroundSinceLastPushBadgeTick()) {
             app(PushBadge::class)->clear();
         } else {
             app(PushBadge::class)->retryPendingReset();

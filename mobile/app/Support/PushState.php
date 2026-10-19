@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\Cache;
 /**
  * What the app remembers about push on this phone: whether the subscriber turned it on, said
  * "not now" to the prompt, and when the token was last sent to the server. Signing out forgets
- * all of it, including a pending foreground-push flag. None of it is secret (the FCM token itself is never stored here).
+ * all of it, including a pending foreground-push flag. None of it is secret (the FCM token itself
+ * is never stored here).
  */
 class PushState
 {
@@ -86,10 +87,16 @@ class PushState
         Cache::forever(self::FOREGROUND_PUSH, true);
     }
 
-    /** Whether a foreground push was flagged since the last call; reading it clears it in one step. */
+    /** Whether a foreground push was flagged since the last call: read each tick, cleared (a write) only when set. */
     public function pullForegroundPush(): bool
     {
-        return (bool) Cache::pull(self::FOREGROUND_PUSH, false);
+        if (! Cache::get(self::FOREGROUND_PUSH, false)) {
+            return false;
+        }
+
+        Cache::forget(self::FOREGROUND_PUSH);
+
+        return true;
     }
 
     public function clear(): void
