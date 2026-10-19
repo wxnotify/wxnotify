@@ -30,7 +30,15 @@ class MobilePushTransport implements Transport
             return DeliveryResult::failed('This device channel has no push token; open the app to register it again.');
         }
 
-        $badge = ($channel->config['platform'] ?? null) === 'ios' ? $channel->incrementUnreadPushCount() : null;
+        $badge = null;
+
+        if (($channel->config['platform'] ?? null) === 'ios') {
+            $badge = $channel->incrementUnreadPushCount();
+
+            if ($badge === null) {
+                return DeliveryResult::failed('This device is no longer registered.');
+            }
+        }
 
         $result = $this->fcm->send(
             $token,

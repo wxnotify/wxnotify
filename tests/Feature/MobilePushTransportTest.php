@@ -158,6 +158,18 @@ test('a failed push still counts', function () {
         ->and($phone->fresh()->unread_push_count)->toBe(1);
 });
 
+test('an iOS channel deleted before the send fails cleanly without calling Firebase', function () {
+    Http::fake();
+    $phone = NotificationChannel::factory()->mobilePush('ios-token-3', 'ios')->create();
+    NotificationChannel::query()->whereKey($phone->id)->delete();
+
+    $result = app(ChannelDispatcher::class)->send($phone, 'Body', 'Title');
+
+    expect($result->success)->toBeFalse()
+        ->and($result->error)->toBe('This device is no longer registered.');
+    Http::assertNothingSent();
+});
+
 test('the badge is never a data field', function () {
     fcmFakeGoogle();
     $phone = NotificationChannel::factory()->mobilePush('ios-token-3', 'ios')->create();

@@ -41,3 +41,10 @@ test('a counter change writes no activity-log row', function () {
 
     expect(Activity::query()->count())->toBe($before);
 });
+
+test('incrementUnreadPushCount returns null for a channel deleted after it was loaded', function () {
+    $channel = NotificationChannel::factory()->mobilePush()->create();
+    NotificationChannel::query()->whereKey($channel->id)->delete();
+
+    expect($channel->incrementUnreadPushCount())->toBeNull();
+});

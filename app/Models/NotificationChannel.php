@@ -46,14 +46,19 @@ class NotificationChannel extends Model
 
     /**
      * Adds one to this phone's unread push count in a single atomic statement (no model save, so
-     * no activity-log row and no lost update) and returns the new total.
+     * no activity-log row and no lost update) and returns the new total, or null when the row is gone
+     * (the channel was deleted after it was loaded).
      */
-    public function incrementUnreadPushCount(): int
+    public function incrementUnreadPushCount(): ?int
     {
         $row = DB::selectOne(
             'UPDATE notification_channels SET unread_push_count = unread_push_count + 1 WHERE id = ? RETURNING unread_push_count',
             [$this->getKey()],
         );
+
+        if ($row === null) {
+            return null;
+        }
 
         $this->setRawAttributes(['unread_push_count' => $row->unread_push_count] + $this->attributes, true);
 
