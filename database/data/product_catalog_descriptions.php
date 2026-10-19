@@ -18,6 +18,7 @@ return [
     'FLA' => 'Hydrometeorological conditions favor a threat of areal flooding affecting area streets, rivers, streams, and/or urban storm drains within six to 24 hours.',
     'FLS' => 'Minor general or areal flooding of streets, low-lying areas, urban storm drains, creeks, and small streams is occurring, imminent, or highly likely within the next one to three hours, but is not expected to substantially threaten life and property.',
     'FFG' => 'Indicates the area of concern and any pertinent meteorological features as well as a brief text discussion focused on the mesoscale features supporting the anticipated heavy rainfall. The potential for flash flooding within the area of concern will be highlighted.',
+    'ERO' => 'Shows the chance that rainfall will exceed flash flood guidance over the next one to three days, mapped as Marginal, Slight, Moderate or High risk areas.',
     'AHD' => 'Provides detailed analysis and explanation of current and expected hydrological conditions, including river levels, flooding potential, and water-related weather impacts for a specific geographic area.',
     'RVA' => 'Offers a concise overview of current water conditions, including river stages, reservoir levels, and recent precipitation impacts on local water systems.',
     'HMD' => 'Forecasts potential rainfall amounts and assesses flood risk over the coming days, helping communities prepare for possible flooding events.',

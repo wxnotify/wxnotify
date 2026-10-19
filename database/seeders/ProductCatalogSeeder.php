@@ -19,9 +19,10 @@ use Illuminate\Database\Seeder;
  *    untouched, and only category/description/example/wea_warning are filled in.
  *  - Otherwise, it's inserted as a new product using the legacy `abbr` as-is for `code`.
  *
- * Five existing products have no legacy counterpart (Blizzard Watch, Lake Effect Snow Warning,
- * Wind Chill Warning/Advisory, WPC Excessive Rainfall Outlook) and are removed. Storm Surge Watch
- * and Warning are kept (the NWS still issues them) and are filled in like matched rows from KEPT.
+ * Four existing products have no legacy counterpart (Blizzard Watch, Lake Effect Snow Warning,
+ * Wind Chill Warning/Advisory) and are removed. Storm Surge Watch/Warning and the WPC Excessive
+ * Rainfall Outlook are kept: the NWS still issues them, and they are filled in like matched rows
+ * from KEPT.
  *
  * Re-running this seeder is safe: matched rows are re-updated and new rows use
  * updateOrCreate keyed on `code`, so nothing is duplicated.
@@ -35,7 +36,7 @@ class ProductCatalogSeeder extends Seeder
      *
      * @var list<string>
      */
-    public const ORPHAN_CODES = ['BZ.A', 'LE.W', 'WC.W', 'WC.Y', 'WPC.ERO'];
+    public const ORPHAN_CODES = ['BZ.A', 'LE.W', 'WC.W', 'WC.Y'];
 
     /**
      * Legacy abbr => the existing product `code` it should be merged into.
@@ -96,6 +97,7 @@ class ProductCatalogSeeder extends Seeder
     private const KEPT = [
         'SSW' => ['code' => 'SS.W', 'category' => ProductCategory::HurricaneAndTropicalStorm, 'wea_warning' => true],
         'SSA' => ['code' => 'SS.A', 'category' => ProductCategory::HurricaneAndTropicalStorm, 'wea_warning' => false],
+        'ERO' => ['code' => 'WPC.ERO', 'category' => ProductCategory::FloodingAndHydrological, 'wea_warning' => false],
     ];
 
     /**

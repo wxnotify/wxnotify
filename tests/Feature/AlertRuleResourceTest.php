@@ -938,8 +938,8 @@ test('editing an SPC & WPC rule restores each category\'s ticks from the flat li
     $rule->notificationChannels()->attach($this->channel);
 
     livewire(EditAlertRule::class, ['record' => $rule->id])
-        ->assertFormSet(['risk_levels' => ['fire_weather' => ['Elevated'], 'convective_outlooks' => ['Moderate']]])
-        ->fillForm(['risk_levels' => ['fire_weather' => ['Elevated'], 'convective_outlooks' => ['Moderate', 'High']]])
+        ->assertFormSet(['risk_levels' => ['flooding_and_hydrological' => ['Moderate'], 'fire_weather' => ['Elevated'], 'convective_outlooks' => ['Moderate']]])
+        ->fillForm(['risk_levels' => ['flooding_and_hydrological' => [], 'fire_weather' => ['Elevated'], 'convective_outlooks' => ['Moderate', 'High']]])
         ->call('save')
         ->assertHasNoFormErrors();
 
@@ -956,7 +956,7 @@ test('a rule saved before this change with only Convective levels edits and save
     $rule->notificationChannels()->attach($this->channel);
 
     livewire(EditAlertRule::class, ['record' => $rule->id])
-        ->assertFormSet(['risk_levels' => ['fire_weather' => [], 'convective_outlooks' => ['Enhanced', 'High']]])
+        ->assertFormSet(['risk_levels' => ['flooding_and_hydrological' => ['High'], 'fire_weather' => [], 'convective_outlooks' => ['Enhanced', 'High']]])
         ->call('save')
         ->assertHasNoFormErrors();
 

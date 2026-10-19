@@ -2075,6 +2075,20 @@ return [
         'damage_tag_options' => null,
     ],
     148 => [
+        'code' => 'WPC.ERO',
+        'name' => 'WPC Excessive Rainfall Outlook',
+        'family' => 'spc_wpc',
+        'has_polygon' => false,
+        'risk_level_options' => '["Marginal","Slight","Moderate","High"]',
+        'status' => 'active',
+        'sort_order' => 45,
+        'category' => 'flooding_and_hydrological',
+        'wea_warning' => false,
+        'has_vtec' => false,
+        'has_ugc' => false,
+        'damage_tag_options' => null,
+    ],
+    149 => [
         'code' => 'WPC.MPD',
         'name' => 'WPC Mesoscale Precipitation Discussion',
         'family' => 'spc_wpc',
@@ -2088,7 +2102,7 @@ return [
         'has_ugc' => false,
         'damage_tag_options' => null,
     ],
-    149 => [
+    150 => [
         'code' => 'WRK',
         'name' => 'Work Product',
         'family' => 'administrative',
@@ -2102,7 +2116,7 @@ return [
         'has_ugc' => false,
         'damage_tag_options' => null,
     ],
-    150 => [
+    151 => [
         'code' => 'WS.A',
         'name' => 'Winter Storm Watch',
         'family' => 'watch',
@@ -2116,7 +2130,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    151 => [
+    152 => [
         'code' => 'WS.W',
         'name' => 'Winter Storm Warning',
         'family' => 'warning',
@@ -2130,7 +2144,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    152 => [
+    153 => [
         'code' => 'WW.Y',
         'name' => 'Winter Weather Advisory',
         'family' => 'advisory',
@@ -2144,7 +2158,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    153 => [
+    154 => [
         'code' => 'ZFY',
         'name' => 'Freezing Fog Advisory',
         'family' => 'advisory',

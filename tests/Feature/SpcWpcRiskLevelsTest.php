@@ -7,8 +7,9 @@ beforeEach(function () {
     $this->seed(ProductCatalogSeeder::class);
 });
 
-test('only the Fire Weather and Convective Outlooks categories offer risk levels, from their products\' own options', function () {
+test('only the Flooding, Fire Weather and Convective Outlooks categories offer risk levels, from their products\' own options', function () {
     expect(SpcWpcRiskLevels::optionsByCategory())->toBe([
+        'flooding_and_hydrological' => ['Marginal', 'Slight', 'Moderate', 'High'],
         'fire_weather' => ['Elevated', 'Critical', 'Extremely Critical', 'Isolated Dry T-Storms', 'Scattered Dry T-Storms'],
         'convective_outlooks' => ['Marginal', 'Slight', 'Enhanced', 'Moderate', 'High'],
     ]);
@@ -16,18 +17,19 @@ test('only the Fire Weather and Convective Outlooks categories offer risk levels
 
 test('split gives each category the stored levels it offers, in option order', function () {
     expect(SpcWpcRiskLevels::split(['High', 'Elevated', 'Marginal', 'Scattered Dry T-Storms']))->toBe([
+        'flooding_and_hydrological' => ['Marginal', 'High'],
         'fire_weather' => ['Elevated', 'Scattered Dry T-Storms'],
         'convective_outlooks' => ['Marginal', 'High'],
     ]);
 });
 
 test('split of nothing gives empty lists for every category', function () {
-    expect(SpcWpcRiskLevels::split(null))->toBe(['fire_weather' => [], 'convective_outlooks' => []])
-        ->and(SpcWpcRiskLevels::split([]))->toBe(['fire_weather' => [], 'convective_outlooks' => []]);
+    expect(SpcWpcRiskLevels::split(null))->toBe(['flooding_and_hydrological' => [], 'fire_weather' => [], 'convective_outlooks' => []])
+        ->and(SpcWpcRiskLevels::split([]))->toBe(['flooding_and_hydrological' => [], 'fire_weather' => [], 'convective_outlooks' => []]);
 });
 
 test('split drops a stored level no category offers', function () {
-    expect(SpcWpcRiskLevels::split(['Nonsense', 'Slight']))->toBe(['fire_weather' => [], 'convective_outlooks' => ['Slight']]);
+    expect(SpcWpcRiskLevels::split(['Nonsense', 'Slight']))->toBe(['flooding_and_hydrological' => ['Slight'], 'fire_weather' => [], 'convective_outlooks' => ['Slight']]);
 });
 
 test('flatten merges the per-category lists into one unique list', function () {

@@ -11,7 +11,7 @@ test('merges the legacy catalog into the existing products without duplicating m
 
     $this->seed(ProductCatalogSeeder::class);
 
-    expect(Product::count())->toBe(154);
+    expect(Product::count())->toBe(155);
 
     // Matched product: code/name/family/status are untouched, new columns are filled in.
     $tornadoWarning = Product::where('code', 'TO.W')->sole();
@@ -29,9 +29,9 @@ test('merges the legacy catalog into the existing products without duplicating m
         ->and($civilDanger->category)->toBe(ProductCategory::NonMeteorologicalHazardsAndAdministrativeMessages)
         ->and($civilDanger->status)->toBe(ProductStatus::Active);
 
-    // Orphan product with no legacy counterpart is removed; storm surge products are kept.
+    // Orphan product with no legacy counterpart is removed; storm surge and the excessive rainfall outlook are kept.
     expect(Product::where('code', 'LE.W')->exists())->toBeFalse()
-        ->and(Product::whereIn('code', ['SS.A', 'SS.W'])->count())->toBe(2);
+        ->and(Product::whereIn('code', ['SS.A', 'SS.W', 'WPC.ERO'])->count())->toBe(3);
 
     expect(Product::count())->not->toBe($before);
 });
@@ -40,7 +40,7 @@ test('is idempotent — running it twice does not duplicate or lose rows', funct
     $this->seed(ProductCatalogSeeder::class);
     $this->seed(ProductCatalogSeeder::class);
 
-    expect(Product::count())->toBe(154)
+    expect(Product::count())->toBe(155)
         ->and(Product::where('code', 'TO.W')->count())->toBe(1)
         ->and(Product::where('code', 'CDW')->count())->toBe(1);
 });
@@ -73,11 +73,12 @@ test('sets has_vtec/has_ugc for every new Warning/Watch/Advisory product, with F
         ->and(Product::where('code', 'MAS')->sole()->has_ugc)->toBeFalse();
 });
 
-test('the storm surge products are kept, filled in like matched products, and survive a re-run', function () {
+test('the storm surge products and the excessive rainfall outlook are kept, filled in like matched products, and survive a re-run', function () {
     $this->seed(ProductCatalogSeeder::class);
 
     $warning = Product::where('code', 'SS.W')->sole();
     $watch = Product::where('code', 'SS.A')->sole();
+    $outlook = Product::where('code', 'WPC.ERO')->sole();
 
     expect($warning->category)->toBe(ProductCategory::HurricaneAndTropicalStorm)
         ->and($watch->category)->toBe(ProductCategory::HurricaneAndTropicalStorm)
@@ -86,12 +87,20 @@ test('the storm surge products are kept, filled in like matched products, and su
         ->and($warning->description)->not->toBeEmpty()
         ->and($watch->description)->not->toBeEmpty()
         ->and($warning->example)->not->toBeEmpty()
-        ->and($watch->example)->not->toBeEmpty();
+        ->and($watch->example)->not->toBeEmpty()
+        ->and($outlook->category)->toBe(ProductCategory::FloodingAndHydrological)
+        ->and($outlook->wea_warning)->toBeFalse()
+        ->and($outlook->description)->not->toBeEmpty()
+        ->and($outlook->example)->not->toBeEmpty()
+        ->and($outlook->risk_level_options)->toBe(['Marginal', 'Slight', 'Moderate', 'High']);
 
     Product::where('code', 'SS.W')->update(['name' => 'Staff-Renamed Surge Warning']);
+    Product::where('code', 'WPC.ERO')->update(['name' => 'Staff-Renamed Rainfall Outlook']);
 
     $this->seed(ProductCatalogSeeder::class);
 
     expect(Product::where('code', 'SS.W')->sole()->name)->toBe('Staff-Renamed Surge Warning')
-        ->and(Product::where('code', 'SS.W')->sole()->category)->toBe(ProductCategory::HurricaneAndTropicalStorm);
+        ->and(Product::where('code', 'SS.W')->sole()->category)->toBe(ProductCategory::HurricaneAndTropicalStorm)
+        ->and(Product::where('code', 'WPC.ERO')->sole()->name)->toBe('Staff-Renamed Rainfall Outlook')
+        ->and(Product::where('code', 'WPC.ERO')->sole()->category)->toBe(ProductCategory::FloodingAndHydrological);
 });
