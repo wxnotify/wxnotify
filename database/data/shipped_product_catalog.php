@@ -1739,6 +1739,34 @@ return [
         'damage_tag_options' => null,
     ],
     124 => [
+        'code' => 'SS.A',
+        'name' => 'Storm Surge Watch',
+        'family' => 'watch',
+        'has_polygon' => false,
+        'risk_level_options' => null,
+        'status' => 'active',
+        'sort_order' => 30,
+        'category' => 'hurricane_and_tropical_storm',
+        'wea_warning' => false,
+        'has_vtec' => true,
+        'has_ugc' => true,
+        'damage_tag_options' => null,
+    ],
+    125 => [
+        'code' => 'SS.W',
+        'name' => 'Storm Surge Warning',
+        'family' => 'warning',
+        'has_polygon' => false,
+        'risk_level_options' => null,
+        'status' => 'active',
+        'sort_order' => 14,
+        'category' => 'hurricane_and_tropical_storm',
+        'wea_warning' => true,
+        'has_vtec' => true,
+        'has_ugc' => true,
+        'damage_tag_options' => null,
+    ],
+    126 => [
         'code' => 'STA',
         'name' => 'SPC Tornado and Severe Thunderstorm Reports',
         'family' => 'spc_wpc',
@@ -1752,7 +1780,7 @@ return [
         'has_ugc' => false,
         'damage_tag_options' => null,
     ],
-    125 => [
+    127 => [
         'code' => 'SUW',
         'name' => 'High Surf Warning',
         'family' => 'warning',
@@ -1766,7 +1794,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    126 => [
+    128 => [
         'code' => 'SUY',
         'name' => 'High Surf Advisory',
         'family' => 'advisory',
@@ -1780,7 +1808,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    127 => [
+    129 => [
         'code' => 'SV.A',
         'name' => 'Severe Thunderstorm Watch',
         'family' => 'watch',
@@ -1794,7 +1822,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    128 => [
+    130 => [
         'code' => 'SVS',
         'name' => 'Severe Weather Statement',
         'family' => 'statement',
@@ -1808,7 +1836,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    129 => [
+    131 => [
         'code' => 'SV.W',
         'name' => 'Severe Thunderstorm Warning',
         'family' => 'warning',
@@ -1822,7 +1850,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => '["HAIL THREAT...RADAR INDICATED","HAIL THREAT...OBSERVED","MAX HAIL SIZE...<.75 IN","MAX HAIL SIZE...1.00 IN","MAX HAIL SIZE...1.75 IN","WIND THREAT...RADAR INDICATED","WIND THREAT...OBSERVED","MAX WIND GUST...60 MPH","MAX WIND GUST...70 MPH","THUNDERSTORM DAMAGE THREAT...CONSIDERABLE","THUNDERSTORM DAMAGE THREAT...DESTRUCTIVE"]',
     ],
-    130 => [
+    132 => [
         'code' => 'TAF',
         'name' => 'Terminal Aerodrome Forecast',
         'family' => 'aviation',
@@ -1836,7 +1864,7 @@ return [
         'has_ugc' => false,
         'damage_tag_options' => null,
     ],
-    131 => [
+    133 => [
         'code' => 'TO.A',
         'name' => 'Tornado Watch',
         'family' => 'watch',
@@ -1850,7 +1878,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    132 => [
+    134 => [
         'code' => 'TOE',
         'name' => '911 Telephone Outage',
         'family' => 'administrative',
@@ -1864,7 +1892,7 @@ return [
         'has_ugc' => false,
         'damage_tag_options' => null,
     ],
-    133 => [
+    135 => [
         'code' => 'TO.W',
         'name' => 'Tornado Warning',
         'family' => 'warning',
@@ -1878,7 +1906,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => '["TORNADO...RADAR INDICATED","TORNADO...OBSERVED","TORNADO DAMAGE THREAT...CONSIDERABLE","TORNADO DAMAGE THREAT...CATASTROPHIC","FLASH FLOOD...RADAR INDICATED"]',
     ],
-    134 => [
+    136 => [
         'code' => 'TR.A',
         'name' => 'Tropical Storm Watch',
         'family' => 'watch',
@@ -1892,7 +1920,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    135 => [
+    137 => [
         'code' => 'TR.W',
         'name' => 'Tropical Storm Warning',
         'family' => 'warning',
@@ -1906,7 +1934,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    136 => [
+    138 => [
         'code' => 'TSA',
         'name' => 'Tsunami Watch',
         'family' => 'watch',
@@ -1920,7 +1948,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    137 => [
+    139 => [
         'code' => 'TSW',
         'name' => 'Tsunami Warning',
         'family' => 'warning',
@@ -1934,7 +1962,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    138 => [
+    140 => [
         'code' => 'TSY',
         'name' => 'Tsunami Advisory',
         'family' => 'advisory',
@@ -1948,7 +1976,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    139 => [
+    141 => [
         'code' => 'TYA',
         'name' => 'Typhoon Watch (Guam only)',
         'family' => 'watch',
@@ -1962,7 +1990,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    140 => [
+    142 => [
         'code' => 'TYW',
         'name' => 'Typhoon Warning (Guam only)',
         'family' => 'warning',
@@ -1976,7 +2004,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    141 => [
+    143 => [
         'code' => 'UPA',
         'name' => 'Heavy Freezing Spray Watch',
         'family' => 'watch',
@@ -1990,7 +2018,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    142 => [
+    144 => [
         'code' => 'UPW',
         'name' => 'Heavy Freezing Spray Warning',
         'family' => 'warning',
@@ -2004,7 +2032,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    143 => [
+    145 => [
         'code' => 'UPY',
         'name' => 'Freezing Spray Advisory',
         'family' => 'advisory',
@@ -2018,7 +2046,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    144 => [
+    146 => [
         'code' => 'VOW',
         'name' => 'Volcano Warning',
         'family' => 'administrative',
@@ -2032,7 +2060,7 @@ return [
         'has_ugc' => false,
         'damage_tag_options' => null,
     ],
-    145 => [
+    147 => [
         'code' => 'WI.Y',
         'name' => 'Wind Advisory',
         'family' => 'advisory',
@@ -2046,7 +2074,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    146 => [
+    148 => [
         'code' => 'WPC.MPD',
         'name' => 'WPC Mesoscale Precipitation Discussion',
         'family' => 'spc_wpc',
@@ -2060,7 +2088,7 @@ return [
         'has_ugc' => false,
         'damage_tag_options' => null,
     ],
-    147 => [
+    149 => [
         'code' => 'WRK',
         'name' => 'Work Product',
         'family' => 'administrative',
@@ -2074,7 +2102,7 @@ return [
         'has_ugc' => false,
         'damage_tag_options' => null,
     ],
-    148 => [
+    150 => [
         'code' => 'WS.A',
         'name' => 'Winter Storm Watch',
         'family' => 'watch',
@@ -2088,7 +2116,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    149 => [
+    151 => [
         'code' => 'WS.W',
         'name' => 'Winter Storm Warning',
         'family' => 'warning',
@@ -2102,7 +2130,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    150 => [
+    152 => [
         'code' => 'WW.Y',
         'name' => 'Winter Weather Advisory',
         'family' => 'advisory',
@@ -2116,7 +2144,7 @@ return [
         'has_ugc' => true,
         'damage_tag_options' => null,
     ],
-    151 => [
+    153 => [
         'code' => 'ZFY',
         'name' => 'Freezing Fog Advisory',
         'family' => 'advisory',

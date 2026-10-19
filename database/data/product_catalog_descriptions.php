@@ -72,6 +72,8 @@ return [
     'TYA' => 'Hurricane conditions (sustained winds of 64 knots [74 mph; 119 km/h] or greater) are possible within the specified coastal or inland area within 48 hours in advance of the forecast onset of tropical-storm-force winds.',
     'HFW' => 'Sustained winds or frequent gusts of 64 knots (74 mph; 119 km/h) or greater are being observed or are predicted to occur.',
     'HFA' => 'Sustained winds or frequent gusts of 64 knots (74 mph; 119 km/h) or greater are being observed or are predicted to occur. The wind speeds must not be directly associated with a tropical cyclone.',
+    'SSW' => 'Life-threatening inundation from rising water moving inland from the shoreline is expected within the specified coastal area within 36 hours.',
+    'SSA' => 'Life-threatening inundation from rising water moving inland from the shoreline is possible within the specified coastal area within 48 hours.',
     'EWW' => 'Strong straight-line sustained winds of 74 miles per hour (119 km/h) or above, or wind gusts over 90 miles per hour (140 km/h). Hurricane-like wind damage is expected, and severe structural damage is likely.',
     'CFW' => 'Coastal flooding from ocean water being forced inland from the nearby body (caused by either nor\'easters, tropical cyclones or thunderstorms) is occurring, imminent or highly likely within 12 to 24 hours, and poses a serious threat to life and/or property.',
     'CFA' => 'Coastal flooding from ocean water being forced inland from the nearby body is possible within 12 to 48 hours, creating significant impacts to life and/or property.',

@@ -19,9 +19,9 @@ use Illuminate\Database\Seeder;
  *    untouched, and only category/description/example/wea_warning are filled in.
  *  - Otherwise, it's inserted as a new product using the legacy `abbr` as-is for `code`.
  *
- * Seven existing products have no legacy counterpart at all (Blizzard Watch, Storm Surge Watch/Warning,
- * Lake Effect Snow Warning, Wind Chill Warning/Advisory, WPC Excessive Rainfall Outlook)
- * and are removed, per an explicit decision to match the legacy catalog's exact count.
+ * Five existing products have no legacy counterpart (Blizzard Watch, Lake Effect Snow Warning,
+ * Wind Chill Warning/Advisory, WPC Excessive Rainfall Outlook) and are removed. Storm Surge Watch
+ * and Warning are kept (the NWS still issues them) and are filled in like matched rows from KEPT.
  *
  * Re-running this seeder is safe: matched rows are re-updated and new rows use
  * updateOrCreate keyed on `code`, so nothing is duplicated.
@@ -35,7 +35,7 @@ class ProductCatalogSeeder extends Seeder
      *
      * @var list<string>
      */
-    public const ORPHAN_CODES = ['BZ.A', 'LE.W', 'SS.A', 'SS.W', 'WC.W', 'WC.Y', 'WPC.ERO'];
+    public const ORPHAN_CODES = ['BZ.A', 'LE.W', 'WC.W', 'WC.Y', 'WPC.ERO'];
 
     /**
      * Legacy abbr => the existing product `code` it should be merged into.
@@ -84,6 +84,18 @@ class ProductCatalogSeeder extends Seeder
         'AFD' => ['code' => 'AFD', 'category' => ProductCategory::OtherForecastsOutlooksDiscussionsAndReports, 'wea_warning' => false],
         'DY1' => ['code' => 'SPC.OUTLOOK', 'category' => ProductCategory::ConvectiveOutlooks, 'wea_warning' => false],
         'SWO' => ['code' => 'SPC.MD', 'category' => ProductCategory::OtherDiscussionsReportsAndOutlooks, 'wea_warning' => false],
+    ];
+
+    /**
+     * Existing products with no legacy counterpart that are kept anyway (the NWS still issues them).
+     * Keyed by a pseudo-abbr that names their description entry and product_examples file; they are
+     * filled in exactly like MATCHED rows.
+     *
+     * @var array<string, array{code: string, category: ProductCategory, wea_warning: bool}>
+     */
+    private const KEPT = [
+        'SSW' => ['code' => 'SS.W', 'category' => ProductCategory::HurricaneAndTropicalStorm, 'wea_warning' => true],
+        'SSA' => ['code' => 'SS.A', 'category' => ProductCategory::HurricaneAndTropicalStorm, 'wea_warning' => false],
     ];
 
     /**
@@ -217,7 +229,7 @@ class ProductCatalogSeeder extends Seeder
 
         $nextSortOrder = (int) Product::max('sort_order') + 1;
 
-        foreach (self::MATCHED as $abbr => $data) {
+        foreach ([...self::MATCHED, ...self::KEPT] as $abbr => $data) {
             Product::where('code', $data['code'])->update([
                 'category' => $data['category'],
                 'wea_warning' => $data['wea_warning'],
