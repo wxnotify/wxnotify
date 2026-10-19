@@ -10,11 +10,18 @@ use Native\Mobile\Events\PushNotification\PushNotificationReceived;
 
 /**
  * Used by every bottom-nav tab screen (Alerts, Map, Products, Settings), so opening the app on any tab
- * clears the icon badge and resets the server's unread count. Nothing tells PHP when the app comes back
- * from the background, so a five-second poll stands in: each tick is a cheap local clear (which also
- * retries a failed reset), and a tick that comes more than three intervals after the previous one means
- * the screen was not ticking, i.e. the app was in the background, so it resets the server count too.
- * The using screen calls clearPushBadgeOnOpen() from mount().
+ * clears the icon badge and resets the server's unread count. The using screen calls
+ * clearPushBadgeOnOpen() from mount(); a push received in the foreground clears too.
+ *
+ * Nothing tells PHP when the app comes back from the background, so a five-second poll stands in until
+ * the app-lifecycle plugin's foreground event supports v4. An ordinary tick never calls the plugin (on
+ * Android clearBadge() cancels every tray notification, and the loop can keep ticking for a while in the
+ * background, which would wipe a push before it is seen); it only retries a failed server reset. A tick
+ * more than three intervals after the previous one means the screen was not ticking, i.e. the app was
+ * in the background, so it clears the badge and resets the server count.
+ *
+ * Known limitation: a push that lands while the app is in the background, followed by a return before
+ * the loop stopped ticking (no gap), stays on the badge until the next gap or foreground push.
  */
 trait ClearsPushBadge
 {
@@ -45,7 +52,11 @@ trait ClearsPushBadge
     #[Poll(self::PUSH_BADGE_POLL_MS)]
     public function pollPushBadge(): void
     {
-        app(PushBadge::class)->clear(server: $this->wasInBackgroundSinceLastPushBadgeTick());
+        if ($this->wasInBackgroundSinceLastPushBadgeTick()) {
+            app(PushBadge::class)->clear();
+        } else {
+            app(PushBadge::class)->retryPendingReset();
+        }
 
         $this->pushBadgeTickedAt = now()->toRfc3339String(true);
     }

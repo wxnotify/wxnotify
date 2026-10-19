@@ -105,3 +105,44 @@ test('a failing local clear does not throw or skip the server reset', function (
 
     Http::assertSent(badgeResetSent());
 });
+
+test('retrying with no reset pending sends nothing and leaves the badge alone', function () {
+    PushNotifications::shouldReceive('clearBadge')->never();
+    Http::fake();
+
+    app(PushBadge::class)->retryPendingReset();
+
+    Http::assertNothingSent();
+});
+
+test('retrying a pending reset calls only the server and clears the flag', function () {
+    PushNotifications::shouldReceive('clearBadge')->never();
+    Http::fake(['wx.test/api/v1/*' => Http::response(null, 204)]);
+    (new PushState)->markResetPending();
+
+    app(PushBadge::class)->retryPendingReset();
+
+    Http::assertSent(badgeResetSent());
+    expect((new PushState)->resetPending())->toBeFalse();
+});
+
+test('a failed retry is swallowed and stays pending', function () {
+    PushNotifications::shouldReceive('clearBadge')->never();
+    Http::fake(['wx.test/api/v1/*' => Http::response(null, 500)]);
+    (new PushState)->markResetPending();
+
+    app(PushBadge::class)->retryPendingReset();
+
+    expect((new PushState)->resetPending())->toBeTrue();
+});
+
+test('retrying while signed out sends nothing', function () {
+    (new TokenStore)->forget();
+    (new PushState)->markResetPending();
+    PushNotifications::shouldReceive('clearBadge')->never();
+    Http::fake();
+
+    app(PushBadge::class)->retryPendingReset();
+
+    Http::assertNothingSent();
+});

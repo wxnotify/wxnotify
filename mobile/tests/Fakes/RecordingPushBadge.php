@@ -14,10 +14,13 @@ class RecordingPushBadge extends PushBadge
     /** @var array<int, bool> the argument of each clear, in order */
     public array $clears = [];
 
+    /** Empty on purpose: it skips the parent's promoted API, state and token dependencies. */
     public function __construct() {}
 
     public function clear(bool $server = true): void
     {
         $this->clears[] = $server;
     }
+
+    public function retryPendingReset(): void {}
 }

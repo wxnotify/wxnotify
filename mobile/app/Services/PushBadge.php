@@ -28,7 +28,25 @@ class PushBadge
             Log::info('Push badge local clear failed: '.$e::class);
         }
 
-        if (! ($server || $this->state->resetPending()) || $this->tokens->token() === null) {
+        if ($server || $this->state->resetPending()) {
+            $this->resetServerCount();
+        }
+    }
+
+    /**
+     * Retries a reset that failed earlier, without touching the badge or the tray on this phone. Does
+     * nothing when no reset is pending or the phone is signed out.
+     */
+    public function retryPendingReset(): void
+    {
+        if ($this->state->resetPending()) {
+            $this->resetServerCount();
+        }
+    }
+
+    private function resetServerCount(): void
+    {
+        if ($this->tokens->token() === null) {
             return;
         }
 

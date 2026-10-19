@@ -60,9 +60,9 @@ test('a push received while the screen is mounted clears the badge and resets th
     expect(badgeResetsSentFromScreens())->toBe(2);
 })->with($tabScreens);
 
-test('a poll tick clears locally and does not call the server', function (string $screen) {
+test('an ordinary poll tick neither calls the plugin nor the server', function (string $screen) {
     $this->freezeTime();
-    PushNotifications::shouldReceive('clearBadge')->twice();
+    PushNotifications::shouldReceive('clearBadge')->once();
     fakeTabScreenRequests();
     $component = Native::test($screen);
 
@@ -72,9 +72,9 @@ test('a poll tick clears locally and does not call the server', function (string
     expect(badgeResetsSentFromScreens())->toBe(1);
 })->with($tabScreens);
 
-test('a tick long after the previous one also resets the server count', function (string $screen) {
+test('a tick long after the previous one clears the badge and resets the server count', function (string $screen) {
     $this->freezeTime();
-    PushNotifications::shouldReceive('clearBadge')->times(3);
+    PushNotifications::shouldReceive('clearBadge')->twice();
     fakeTabScreenRequests();
     $component = Native::test($screen);
 
@@ -86,9 +86,9 @@ test('a tick long after the previous one also resets the server count', function
     expect(badgeResetsSentFromScreens())->toBe(2);
 })->with($tabScreens);
 
-test('a tick exactly three intervals after the previous one stays local', function () {
+test('a tick exactly three intervals after the previous one is still ordinary', function () {
     $this->freezeSecond();
-    PushNotifications::shouldReceive('clearBadge')->twice();
+    PushNotifications::shouldReceive('clearBadge')->once();
     fakeTabScreenRequests();
     $component = Native::test(SettingsScreen::class);
 
@@ -98,9 +98,9 @@ test('a tick exactly three intervals after the previous one stays local', functi
     expect(badgeResetsSentFromScreens())->toBe(1);
 });
 
-test('a pending reset is retried on the next tick', function (string $screen) {
+test('a pending reset is retried on the next tick without calling the plugin', function (string $screen) {
     $this->freezeTime();
-    PushNotifications::shouldReceive('clearBadge')->twice();
+    PushNotifications::shouldReceive('clearBadge')->once();
     Http::fake(['wx.test/api/v1/push-token/badge/clear' => Http::sequence()->push(null, 500)->push(null, 204)]);
     fakeTabScreenRequests();
     $component = Native::test($screen);
@@ -115,7 +115,7 @@ test('a pending reset is retried on the next tick', function (string $screen) {
 })->with($tabScreens);
 
 test('a failing server never throws into the screen', function (string $screen) {
-    PushNotifications::shouldReceive('clearBadge')->times(3)->andThrow(new RuntimeException('plugin down'));
+    PushNotifications::shouldReceive('clearBadge')->twice()->andThrow(new RuntimeException('plugin down'));
     fakeTabScreenRequests(badgeResetStatus: 500);
 
     Native::test($screen)
