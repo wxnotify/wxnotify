@@ -17,6 +17,15 @@ class MobilePushTransport implements Transport
     /** Long enough for DeliverWeatherAlert to write its delivery-log row first. */
     public const PRUNE_DELAY_SECONDS = 60;
 
+    /**
+     * Named in the FCM data of every phone push: the firebase plugin dispatches it, with the `payload` below
+     * as its constructor arguments, only when the app is open. The app's listener flags the foreground push.
+     */
+    public const FOREGROUND_PUSH_EVENT = 'App\\Events\\ForegroundPushReceived';
+
+    /** No constructor arguments: without an explicit payload the plugin would pass `url` and `type` by name. */
+    public const FOREGROUND_PUSH_PAYLOAD = '{}';
+
     public function __construct(private readonly FcmClient $fcm) {}
 
     /**
@@ -44,7 +53,12 @@ class MobilePushTransport implements Transport
             $token,
             $title ?? 'WxNotify',
             Str::limit($body, 200, preserveWords: true),
-            ['url' => $this->tapTarget($meta), 'type' => (string) ($meta['type'] ?? 'alert')],
+            [
+                'url' => $this->tapTarget($meta),
+                'type' => (string) ($meta['type'] ?? 'alert'),
+                'event' => self::FOREGROUND_PUSH_EVENT,
+                'payload' => self::FOREGROUND_PUSH_PAYLOAD,
+            ],
             $badge,
         );
 

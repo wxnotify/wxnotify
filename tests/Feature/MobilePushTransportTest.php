@@ -186,6 +186,27 @@ test('the badge is never a data field', function () {
     });
 });
 
+test('every phone push names the foreground-push event with an empty JSON payload, as strings', function (string $platform) {
+    fcmFakeGoogle();
+    $phone = NotificationChannel::factory()->mobilePush("{$platform}-event-token", $platform)->create();
+
+    app(ChannelDispatcher::class)->send($phone, 'Body', 'Title');
+
+    Http::assertSent(function (Request $request) {
+        if (! str_contains($request->url(), 'messages:send')) {
+            return false;
+        }
+        $data = (array) $request['message']['data'];
+
+        return $data['event'] === 'App\\Events\\ForegroundPushReceived'
+            && $data['payload'] === '{}'
+            && $data['url'] === '/'
+            && $data['type'] === 'alert'
+            && ! array_key_exists('content_available', $request['message']['apns']['payload']['aps'])
+            && ! array_key_exists('content-available', $request['message']['apns']['payload']['aps']);
+    });
+})->with(['ios', 'android']);
+
 test('the prune job deletes the channel that still holds the failed token and keeps the delivery log', function () {
     $log = DeliveryLog::create([
         'user_id' => $this->channel->user_id,
