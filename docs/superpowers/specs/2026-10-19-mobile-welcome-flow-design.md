@@ -10,8 +10,8 @@ A subscriber's first sight of the app today is a single "enable push" explainer 
 
 - On the first sign-in on a phone, the subscriber walks through five short screens: **Welcome, What you get, Push, Location, All set**, then lands on Alerts.
 - Each permission screen explains what the app does with the permission and why it is worth allowing, then offers a button that triggers the system dialog, and a "Not now". Declining never blocks the flow, and both can be turned on later from Account.
-- The Location screen is offered only when the subscriber has a free location slot (sharing the phone's location creates a place linked to the phone, which counts against the plan's separate phone-location allowance: Free 1, Plus 2, Pro unlimited); otherwise it is skipped and the "All set" screen carries a one-line note saying the plan's places are full.
-- A permission screen is skipped only when asking cannot help or is already settled: the OS has **denied** it (the app cannot ask again; Account explains how to change it in the phone's settings), or the feature is already **on** in the app (push registered / location sharing running). Where the OS has granted the permission but the app has not turned the feature on (for example a reinstall), the explainer still shows and its button turns the feature on without a system dialog. The flow never turns a feature on silently, and a skipped screen changes no state (it records no decline).
+- The Location screen is offered only when the subscriber has a free location slot (sharing the phone's location creates a place linked to the phone, which counts against the plan's separate phone-location allowance: Free 1, Plus 2, Pro unlimited); otherwise it is skipped and the "All set" screen carries a one-line note: that the plan's phone-location allowance is used up when the server said so, or a neutral "you can share it later from Settings → Account" when the lookup failed, timed out or had no answer (no claim about the plan).
+- A permission screen is skipped only when asking cannot help or is already settled: the OS has **denied** it (the app cannot ask again; Account explains how to change it in the phone's settings), or the feature is already **on** in the app (push registered / location sharing running or waiting). This OS check applies to push only: location's OS permission is read asynchronously by the plugin and is not pre-checked, so the Location screen still shows on a phone that denied location earlier. If the OS then denies it, the start still succeeds on the server (`started`, the phone slot is used), the flow shows no note, and Account shows sharing "Waiting for location permission" (recoverable there with Stop sharing), as on the existing Account path. Where the OS has granted the permission but the app has not turned the feature on (for example a reinstall), the explainer still shows and its button turns the feature on without a system dialog. The flow never turns a feature on silently, and a skipped screen changes no state (it records no decline).
 - The flow can be left at any time with **Skip** (top right): it marks the flow seen and asks for nothing.
 - It shows **once per install of the app**: signing out and back in on the same phone does not show it again; a reinstall or a new phone does. Subscribers already signed in when they update the app do not see it.
 - It can be replayed from a new **Welcome tour** row in Settings.
@@ -51,8 +51,8 @@ A subscriber's first sight of the app today is a single "enable push" explainer 
 1. **Welcome to WxNotify** — Weather alerts for the places you care about, on your phone.
 2. **What you get** — Alerts you set up once. Current warnings and advisories for your places. A map and every National Weather Service product.
 3. **Get alerts instantly** — Allow notifications so a warning reaches you the moment it's issued, even when the app is closed. [Allow notifications] [Not now]
-4. **Follow your phone** — Share this phone's location and we'll watch the weather wherever you are. It uses one of your places. [Share location] [Not now]
-5. **You're set** — Add places and alert rules any time from Settings. [Go to Alerts]. When no slot: "Your plan's places are full, so sharing this phone's location isn't available."
+4. **Follow your phone** — Share this phone's location and we'll watch the weather wherever you are. It uses one of your places. Your phone will ask for location access. To keep sharing after you close the app, choose "Always" or "Allow all the time" if your phone offers it. [Share location] [Not now]
+5. **You're set** — Add places and alert rules any time from Settings. [Go to Alerts]. When the server said no slot (or the start hit the limit): "Your plan's phone-location allowance is used up, so sharing this phone's location isn't available." When the lookup failed, timed out or had no answer: "You can share this phone's location later from Settings → Account."
 
 ## Left to the builder
 
@@ -64,6 +64,7 @@ The component structure (one flow component with steps versus one component per 
 - A phone whose OS permissions were decided earlier skips those screens.
 - Signing out and back in goes straight to Alerts; a reinstall shows the flow again; the Settings "Welcome tour" row replays it.
 - A Free account whose single location slot is taken never sees the Location screen and sees the note on the last screen.
+- A denied location permission leaves sharing 'waiting' in Account; check whether `state()['status']` reads 'waiting' right after a denied start.
 
 ## My calls (for the owner to check)
 
