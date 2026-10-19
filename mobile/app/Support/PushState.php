@@ -18,6 +18,8 @@ class PushState
 
     private const REGISTERED_AT = 'wxnotify.push.registered_at';
 
+    private const RESET_PENDING = 'wxnotify.push.badge_reset_pending';
+
     public function wantsPush(): bool
     {
         return (bool) Cache::get(self::ENABLED, false);
@@ -60,8 +62,25 @@ class PushState
         return $at !== null && now()->subHours($hours)->lessThan(Carbon::parse($at));
     }
 
+    /** The server's unread count still needs resetting because the last attempt failed. */
+    public function resetPending(): bool
+    {
+        return (bool) Cache::get(self::RESET_PENDING, false);
+    }
+
+    public function markResetPending(): void
+    {
+        Cache::forever(self::RESET_PENDING, true);
+    }
+
+    public function clearResetPending(): void
+    {
+        Cache::forget(self::RESET_PENDING);
+    }
+
     public function clear(): void
     {
+        Cache::forget(self::RESET_PENDING);
         Cache::forget(self::ENABLED);
         Cache::forget(self::DECLINED);
         Cache::forget(self::REGISTERED_AT);

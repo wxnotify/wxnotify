@@ -95,6 +95,11 @@ class WxNotifyApi
         $this->send(fn (PendingRequest $request) => $request->delete('/api/v1/push-token'));
     }
 
+    public function clearPushBadge(): void
+    {
+        $this->send(fn (PendingRequest $request) => $request->post('/api/v1/push-token/badge/clear'));
+    }
+
     /**
      * @return array{location_id: int, beacon_token: string, url: string, interval_seconds: int}
      *

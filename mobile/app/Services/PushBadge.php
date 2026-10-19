@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Services;
+
+use App\Support\PushState;
+use App\Support\TokenStore;
+use Illuminate\Support\Facades\Log;
+use Native\Mobile\Facades\PushNotifications;
+use Throwable;
+
+/**
+ * Clears the app icon badge on this phone and resets the server's unread push count. A reset that
+ * could not reach the server is remembered and retried on the next clear. Never throws: the badge
+ * is a courtesy, and sign-out on an expired token is the screens' own calls to handle.
+ */
+class PushBadge
+{
+    public function __construct(private WxNotifyApi $api, private PushState $state, private TokenStore $tokens) {}
+
+    /**
+     * @param  bool  $server  false when only a pending reset should be retried (the badge is already zero on the server)
+     */
+    public function clear(bool $server = true): void
+    {
+        PushNotifications::clearBadge();
+
+        if (! ($server || $this->state->resetPending()) || $this->tokens->token() === null) {
+            return;
+        }
+
+        try {
+            $this->api->clearPushBadge();
+        } catch (Throwable $e) {
+            $this->state->markResetPending();
+            Log::info('Push badge reset failed: '.$e::class);
+
+            return;
+        }
+
+        $this->state->clearResetPending();
+    }
+}
