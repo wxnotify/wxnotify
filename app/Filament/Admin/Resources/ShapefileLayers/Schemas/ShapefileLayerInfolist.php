@@ -15,6 +15,9 @@ class ShapefileLayerInfolist
             ->components([
                 Section::make('Pending review')
                     ->visible(fn (ShapefileLayer $record): bool => $record->pendingVersion !== null)
+                    ->description(fn (ShapefileLayer $record): ?string => $record->pendingVersion?->isImported() === false
+                        ? 'Its import did not finish, so it cannot be activated yet. Press Check for shapefile updates on the Shapefile Layers list to import it again.'
+                        : null)
                     ->schema([
                         TextEntry::make('pendingVersion.filename')->label('File'),
                         TextEntry::make('pendingVersion.effective_at')->label('Effective date')->date(),

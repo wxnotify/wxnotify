@@ -29,4 +29,13 @@ class ShapefileLayerVersion extends Model
     {
         return $this->belongsTo(ShapefileLayer::class);
     }
+
+    /**
+     * ImportShapefileVersion writes the diff summary as its last step, so a version without one
+     * never finished importing: its staging table is empty or still holds older data.
+     */
+    public function isImported(): bool
+    {
+        return $this->diff_summary !== null;
+    }
 }

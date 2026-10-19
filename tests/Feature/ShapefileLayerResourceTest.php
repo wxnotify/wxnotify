@@ -79,6 +79,20 @@ test('the view page shows the pending diff and an Activate action that activates
         ->and($layer->fresh()->active_version_id)->toBe($version->id);
 });
 
+test('the view page hides Activate for a staged version whose import did not finish and says how to finish it', function () {
+    $layer = ShapefileLayer::factory()->create(['key' => 'us_states']);
+    ShapefileLayerVersion::factory()->create([
+        'shapefile_layer_id' => $layer->id,
+        'status' => ShapefileVersionStatus::Staged,
+        'diff_summary' => null,
+    ]);
+
+    livewire(ViewShapefileLayer::class, ['record' => $layer->getRouteKey()])
+        ->assertActionHidden('activate')
+        ->assertActionVisible('dismiss')
+        ->assertSee('Its import did not finish');
+});
+
 test('the Dismiss action rejects a staged version without activating it', function () {
     $layer = ShapefileLayer::factory()->create(['key' => 'counties']);
     $version = ShapefileLayerVersion::factory()->create([

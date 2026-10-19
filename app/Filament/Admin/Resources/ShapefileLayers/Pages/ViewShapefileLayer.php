@@ -33,7 +33,7 @@ class ViewShapefileLayer extends ViewRecord
                 ->label('View map')
                 ->url(fn (): string => static::getResource()::getUrl('map', ['record' => $this->record])),
             Action::make('activate')
-                ->visible(fn (): bool => $this->record->pendingVersion !== null)
+                ->visible(fn (): bool => $this->record->pendingVersion?->isImported() === true)
                 ->requiresConfirmation()
                 ->action(function (): void {
                     app(ActivateShapefileVersion::class)($this->record->pendingVersion);

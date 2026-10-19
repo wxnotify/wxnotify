@@ -59,7 +59,7 @@ class ScanShapefileLayersJob implements ShouldQueue
 
         Notification::make()
             ->title('Shapefile scan failed')
-            ->body('The scan did not finish. Check the logs, then try Check for shapefile updates again.')
+            ->body('The scan did not finish. Check the logs, then press Check for shapefile updates again: it imports again any layer whose import was cut short.')
             ->danger()
             ->sendToDatabase($user);
     }

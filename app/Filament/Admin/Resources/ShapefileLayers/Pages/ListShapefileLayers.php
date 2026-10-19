@@ -27,7 +27,7 @@ class ListShapefileLayers extends ListRecords
 
                     Notification::make()
                         ->title('Scan started')
-                        ->body('The scan runs on the queue, so the queue worker needs to be running. You will get a notification here when it finishes; new versions then wait for your review under Shapefile Layers.')
+                        ->body('The scan runs on the queue, so the queue worker needs to be running. It shares that worker with alert delivery, so alerts wait while it runs: start it at a quiet time. You will get a notification here when it finishes; new versions then wait for your review under Shapefile Layers.')
                         ->success()
                         ->send();
                 }),

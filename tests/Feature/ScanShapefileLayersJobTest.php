@@ -85,7 +85,8 @@ test('the header action queues the job for the current user and says a queue wor
     $sent = $notifications->notifications->first(fn (Notification $notification) => $notification->getTitle() === 'Scan started');
 
     expect($sent)->not->toBeNull()
-        ->and($sent->getBody())->toContain('queue worker');
+        ->and($sent->getBody())->toContain('queue worker')
+        ->and($sent->getBody())->toContain('alerts wait while it runs');
 });
 
 test('a scan job that fails tells the user the scan did not finish, and has room to run a full scan once', function () {
@@ -100,6 +101,69 @@ test('a scan job that fails tells the user the scan did not finish, and has room
         ->and($data['title'])->toBe('Shapefile scan failed')
         ->and($data['body'])->toContain('did not finish')
         ->and($data['body'])->toContain('logs')
+        ->and($data['body'])->toContain('imports again any layer whose import was cut short')
         ->and($job->tries)->toBe(1)
         ->and($job->timeout)->toBeGreaterThanOrEqual(900);
+});
+
+/**
+ * Stages a version on the first scan of each layer and finds no change after that, like NOAA's page
+ * between releases; $import decides what each import of it does.
+ */
+function stubShapefileScanToStageOnce(Closure $import): void
+{
+    test()->mock(ScanShapefileLayer::class, function ($mock): void {
+        $mock->shouldReceive('__invoke')->andReturnUsing(
+            fn (ShapefileLayer $layer) => $layer->versions()->exists()
+                ? null
+                : ShapefileLayerVersion::factory()->for($layer, 'shapefileLayer')->create(),
+        );
+    });
+
+    test()->mock(ImportShapefileVersion::class, function ($mock) use ($import): void {
+        $mock->shouldReceive('__invoke')->andReturnUsing($import);
+    });
+}
+
+test('a version whose import did not finish is imported again by the next scan, and only until it finishes', function () {
+    $layer = ShapefileLayer::factory()->create();
+    $imports = [];
+    stubShapefileScanToStageOnce(function (ShapefileLayerVersion $version) use (&$imports): void {
+        $imports[] = $version->id;
+
+        if (count($imports) === 1) {
+            throw new RuntimeException('worker killed');
+        }
+
+        $version->update(['diff_summary' => ['added' => 1, 'removed' => 0, 'changed' => 0, 'override_conflicts' => []]]);
+    });
+    $lines = [];
+
+    app(ScanAllShapefileLayers::class)();
+    $retried = app(ScanAllShapefileLayers::class)(function (string $message, string $level) use (&$lines): void {
+        $lines[] = [$level, $message];
+    });
+    $afterwards = app(ScanAllShapefileLayers::class)();
+
+    $version = ShapefileLayerVersion::query()->sole();
+
+    expect($imports)->toBe([$version->id, $version->id])
+        ->and($version->diff_summary)->not->toBeNull()
+        ->and($retried)->toBe(1)
+        ->and($lines)->toContain(['info', "Unfinished import completed for {$layer->name}"])
+        ->and($afterwards)->toBe(0);
+});
+
+test('a retried import that fails again is reported as an error', function () {
+    $layer = ShapefileLayer::factory()->create();
+    stubShapefileScanToStageOnce(fn () => throw new RuntimeException('bad zip'));
+    $lines = [];
+
+    app(ScanAllShapefileLayers::class)();
+    $retried = app(ScanAllShapefileLayers::class)(function (string $message, string $level) use (&$lines): void {
+        $lines[] = [$level, $message];
+    });
+
+    expect($retried)->toBe(0)
+        ->and($lines)->toContain(['error', "The unfinished import for {$layer->name} failed again: bad zip"]);
 });

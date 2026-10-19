@@ -53,7 +53,7 @@ function setupConditionCases(): array
             'boundaries_active',
             function () {
                 $layer = ShapefileLayer::factory()->create();
-                $layer->update(['active_version_id' => ShapefileLayerVersion::factory()->create(['shapefile_layer_id' => $layer->id])->id]);
+                $layer->update(['active_version_id' => ShapefileLayerVersion::factory()->create(['shapefile_layer_id' => $layer->id, 'diff_summary' => []])->id]);
             },
             fn () => ShapefileLayer::factory()->create(),
         ],
@@ -140,6 +140,13 @@ it('has no boundaries active when one layer of two has no active version', funct
     $active = ShapefileLayer::factory()->create();
     $active->update(['active_version_id' => ShapefileLayerVersion::factory()->create(['shapefile_layer_id' => $active->id])->id]);
     ShapefileLayer::factory()->create();
+
+    expect(setupConditionPasses('boundaries_active'))->toBeFalse();
+});
+
+it('has no boundaries active when the active version never finished importing', function () {
+    $layer = ShapefileLayer::factory()->create();
+    $layer->update(['active_version_id' => ShapefileLayerVersion::factory()->create(['shapefile_layer_id' => $layer->id, 'diff_summary' => null])->id]);
 
     expect(setupConditionPasses('boundaries_active'))->toBeFalse();
 });
