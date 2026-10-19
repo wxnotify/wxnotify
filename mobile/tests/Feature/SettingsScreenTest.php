@@ -14,7 +14,8 @@ test('Settings lists rules, locations and account under the active Settings tab'
         ->assertSee('Alert rules')
         ->assertSee('Locations')
         ->assertSee('Channels')
-        ->assertSee('Account');
+        ->assertSee('Account')
+        ->assertSee('Welcome tour');
 });
 
 test('each row pushes its page so the back arrow returns to Settings', function (string $method, string $uri) {
@@ -26,6 +27,7 @@ test('each row pushes its page so the back arrow returns to Settings', function 
     ['openLocations', '/locations'],
     ['openChannels', '/channels'],
     ['openAccount', '/account'],
+    ['openWelcomeTour', '/welcome/tour'],
 ]);
 
 test('a signed-out visitor is sent to Sign in', function () {

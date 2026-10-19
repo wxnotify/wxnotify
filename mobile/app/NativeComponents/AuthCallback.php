@@ -4,8 +4,8 @@ namespace App\NativeComponents;
 
 use App\Exceptions\Api\ApiException;
 use App\Exceptions\InvalidSignIn;
-use App\Services\PushRegistration;
 use App\Services\SignIn;
+use App\Services\Welcome;
 use Native\Mobile\Edge\NativeComponent;
 
 /**
@@ -25,7 +25,7 @@ class AuthCallback extends NativeComponent
             return;
         }
 
-        $this->replace(app(PushRegistration::class)->shouldPrompt() ? '/enable-push' : '/');
+        $this->replace(app(Welcome::class)->shouldShow() ? '/welcome' : '/');
     }
 
     public function tryAgain(): void

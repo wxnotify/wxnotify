@@ -8,4 +8,5 @@
     <list-item headline="Locations" supporting="The places and phones you watch" @tap="openLocations"></list-item>
     <list-item headline="Channels" supporting="Where your alerts are sent" @tap="openChannels"></list-item>
     <list-item headline="Account" supporting="Your plan, push, location sharing and sign out" @tap="openAccount"></list-item>
+    <list-item headline="Welcome tour" supporting="See what WxNotify offers again" @tap="openWelcomeTour"></list-item>
 </list>

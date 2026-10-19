@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * What the app remembers about push on this phone: whether the subscriber turned it on, said
- * "not now" to the prompt, and when the token was last sent to the server. Signing out forgets
+ * "not now" in the welcome flow, and when the token was last sent to the server. Signing out forgets
  * all of it, including a pending foreground-push flag. None of it is secret (the FCM token itself
  * is never stored here).
  */
@@ -40,7 +40,7 @@ class PushState
         Cache::forget(self::DECLINED);
     }
 
-    /** Push off by choice: the prompt must not come back by itself. */
+    /** Push off by choice: the welcome flow must not turn it on by itself. */
     public function markDisabled(): void
     {
         Cache::forget(self::ENABLED);

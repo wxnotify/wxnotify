@@ -25,22 +25,6 @@ function pushRegistered(string $token = 'fcm-1', string $platform = 'android'): 
         && $r['platform'] === $platform;
 }
 
-test('the prompt is offered only while undecided and the OS has not refused', function (?string $permission, bool $declined, bool $enabled, bool $expected) {
-    PushNotifications::shouldReceive('checkPermission')->andReturn($permission);
-    $state = new PushState;
-    $declined ? $state->markDeclined() : null;
-    $enabled ? $state->markEnabled() : null;
-
-    expect(app(PushRegistration::class)->shouldPrompt())->toBe($expected);
-})->with([
-    'not asked yet' => ['not_determined', false, false, true],
-    'already granted, never opted in' => ['granted', false, false, true],
-    'said not now' => ['not_determined', true, false, false],
-    'already on' => ['granted', false, true, false],
-    'refused by the OS' => ['denied', false, false, false],
-    'not on a device' => [null, false, false, false],
-]);
-
 test('enabling remembers the choice and asks the OS to enroll', function () {
     PushNotifications::shouldReceive('enroll')->once();
 

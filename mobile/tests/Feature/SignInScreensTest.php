@@ -4,8 +4,8 @@ use App\NativeComponents\AuthCallback;
 use App\NativeComponents\AuthDenied;
 use App\NativeComponents\SignInScreen;
 use App\Support\TokenStore;
+use App\Support\WelcomeState;
 use Illuminate\Support\Facades\Http;
-use Native\Mobile\Facades\PushNotifications;
 use Native\Mobile\Testing\Native;
 
 test('the sign-in screen offers one sign-in button that opens the browser handoff', function () {
@@ -25,8 +25,9 @@ test('the sign-in screen says so when the browser could not be opened', function
         ->assertSee('Could not open the sign-in page');
 });
 
-test('a valid callback signs the subscriber in and replaces the screen with the feed', function () {
+test('a valid callback signs the subscriber in and replaces the screen with the feed once the welcome flow was seen', function () {
     (new TokenStore)->begin('v', 'state-1');
+    (new WelcomeState)->markSeen();
     Http::fake(['*' => Http::response(['token' => '5|abc', 'expires_at' => '2027-01-01T00:00:00+00:00', 'user' => ['id' => 5]])]);
 
     Native::test(AuthCallback::class, ['code' => 'c', 'state' => 'state-1'])->assertReplacedWith('/');
@@ -34,12 +35,11 @@ test('a valid callback signs the subscriber in and replaces the screen with the 
     expect((new TokenStore)->token())->toBe('5|abc');
 });
 
-test('a valid callback goes to the push prompt while the subscriber has not decided', function () {
+test('a valid callback on a fresh install goes to the welcome flow', function () {
     (new TokenStore)->begin('v', 'state-1');
     Http::fake(['*' => Http::response(['token' => '5|abc', 'expires_at' => '2027-01-01T00:00:00+00:00', 'user' => ['id' => 5]])]);
-    PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined');
 
-    Native::test(AuthCallback::class, ['code' => 'c', 'state' => 'state-1'])->assertReplacedWith('/enable-push');
+    Native::test(AuthCallback::class, ['code' => 'c', 'state' => 'state-1'])->assertReplacedWith('/welcome');
 });
 
 test('a callback that cannot complete shows an error with a way back', function () {

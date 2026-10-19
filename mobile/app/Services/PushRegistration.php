@@ -9,7 +9,7 @@ use Native\Mobile\Facades\PushNotifications;
 use Native\Mobile\Facades\System;
 
 /**
- * Everything the app does about push: when to prompt, turning it on and off, and keeping the
+ * Everything the app does about push: turning it on and off, and keeping the
  * server's copy of the FCM token current. Registering never throws at the screens: a server hiccup
  * leaves the token to be sent on a later launch.
  */
@@ -26,13 +26,6 @@ class PushRegistration
     public function permission(): ?string
     {
         return PushNotifications::checkPermission();
-    }
-
-    public function shouldPrompt(): bool
-    {
-        return ! $this->state->declined()
-            && ! $this->state->wantsPush()
-            && in_array($this->permission(), ['not_determined', 'granted', 'provisional'], true);
     }
 
     public function enable(): void

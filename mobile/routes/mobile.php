@@ -14,7 +14,6 @@ use App\NativeComponents\LocationsScreen;
 use App\NativeComponents\MapScreen;
 use App\NativeComponents\ProductLink;
 use App\NativeComponents\ProductsScreen;
-use App\NativeComponents\PushPrompt;
 use App\NativeComponents\RuleEditor;
 use App\NativeComponents\RulesScreen;
 use App\NativeComponents\SettingsScreen;
@@ -41,7 +40,6 @@ Route::native('/channels', ChannelsScreen::class);
 Route::native('/channels/new', ChannelCreator::class);
 Route::native('/channels/{id}', ChannelEditor::class);
 Route::native('/account', AccountScreen::class);
-Route::native('/enable-push', PushPrompt::class);
 Route::native('/share-location', LocationPrompt::class);
 Route::native('/welcome', WelcomeFlow::class);
 /* The replay from Settings: same screen, told by the route's default not to touch the seen flag and to close back to Settings. */

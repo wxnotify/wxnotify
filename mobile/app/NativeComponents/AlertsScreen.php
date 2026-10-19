@@ -10,6 +10,7 @@ use App\Icons\Ios;
 use App\Services\LocationSharing;
 use App\Services\PushRegistration;
 use App\Services\SignOut;
+use App\Services\Welcome;
 use App\Services\WxNotifyApi;
 use App\Support\ActiveAlertsPresenter;
 use App\Support\AlertPresenter;
@@ -85,6 +86,8 @@ class AlertsScreen extends NativeComponent
         if ($this->redirectIfSignedOut()) {
             return;
         }
+
+        app(Welcome::class)->markLegacyInstallSeen();
 
         $this->clearPushBadgeOnOpen();
 

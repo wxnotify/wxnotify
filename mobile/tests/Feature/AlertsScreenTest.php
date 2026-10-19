@@ -5,6 +5,7 @@ use App\Support\LocalCache;
 use App\Support\LocationSharingState;
 use App\Support\PushState;
 use App\Support\TokenStore;
+use App\Support\WelcomeState;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -841,4 +842,22 @@ test('offline with a saved copy that had no events, the section still says nothi
         ->assertSee("You're offline.")
         ->assertSee('Nothing in effect at your places.')
         ->assertDontSee('have ended');
+});
+
+test('an existing signed-in install is marked as having seen the welcome flow when Alerts opens', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([]))]);
+
+    expect((new WelcomeState)->seen())->toBeFalse();
+
+    Native::test(AlertsScreen::class)->assertNoNavigation();
+
+    expect((new WelcomeState)->seen())->toBeTrue();
+});
+
+test('Alerts does not mark a signed-out visitor as having seen the welcome flow', function () {
+    (new TokenStore)->forget();
+
+    Native::test(AlertsScreen::class)->assertReplacedWith('/sign-in');
+
+    expect((new WelcomeState)->seen())->toBeFalse();
 });

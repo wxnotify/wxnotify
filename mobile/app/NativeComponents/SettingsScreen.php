@@ -43,4 +43,10 @@ class SettingsScreen extends NativeComponent
     {
         $this->navigate('/account');
     }
+
+    /** Opened with navigate (never replace): the tour closes with back(). */
+    public function openWelcomeTour(): void
+    {
+        $this->navigate('/welcome/tour');
+    }
 }

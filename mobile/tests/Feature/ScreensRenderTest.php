@@ -9,7 +9,6 @@ use App\NativeComponents\LocationEditor;
 use App\NativeComponents\LocationPrompt;
 use App\NativeComponents\LocationsScreen;
 use App\NativeComponents\ProductsScreen;
-use App\NativeComponents\PushPrompt;
 use App\NativeComponents\RuleEditor;
 use App\NativeComponents\RulesScreen;
 use App\NativeComponents\SignInScreen;
@@ -66,15 +65,6 @@ test('the callback screen renders a spinner while signing in and a retry button 
         ->assertElement('activity_indicator')
         ->assertElement('text')
         ->assertMissingElement('button');
-});
-
-test('the push prompt renders its copy and both choices', function () {
-    (new TokenStore)->put('9|secret');
-
-    Native::test(PushPrompt::class)
-        ->assertElement('text')
-        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Enable notifications')
-        ->assertElement('button', fn (array $button) => $button['props']['label'] === 'Not now');
 });
 
 test('the location prompt renders its copy and both choices', function () {
