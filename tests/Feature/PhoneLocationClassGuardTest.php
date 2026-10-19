@@ -4,6 +4,7 @@ use App\Enums\LocationType;
 use App\Enums\MobileSource;
 use App\Enums\Tier;
 use App\Exceptions\LocationLimitReached;
+use App\Filament\Dashboard\Resources\Locations\Pages\CreateLocation;
 use App\Filament\Dashboard\Resources\Locations\Pages\EditLocation;
 use App\Models\Location;
 use App\Models\User;
@@ -117,4 +118,52 @@ test('a Plus user lowered to Free keeps both phones working but cannot add a thi
     sharePhone($this, $this->user->createToken('Moto', ['app'])->plainTextToken)->assertUnprocessable();
 
     expect($this->user->locations()->phoneApp()->count())->toBe(2);
+});
+
+test('a tampered dashboard create with type mobile and source app makes no phone location', function () {
+    livewire(CreateLocation::class)
+        ->fillForm(['label' => 'Fake phone', 'type' => LocationType::Mobile->value, 'mobile_source' => MobileSource::App->value, 'mobile_update_interval_minutes' => 5])
+        ->call('create');
+
+    expect($this->user->locations()->phoneApp()->count())->toBe(0);
+});
+
+test('the model refuses a new phone location that is not linked to a phone', function () {
+    expect(fn () => Location::query()->create([
+        'user_id' => $this->user->id,
+        'label' => 'Ghost',
+        'type' => LocationType::Mobile,
+        'mobile_source' => MobileSource::App,
+    ]))->toThrow(LocationLimitReached::class);
+
+    expect(Location::query()->count())->toBe(0);
+});
+
+test('a tampered edit of a stationary place to a phone location halts and changes nothing', function () {
+    $place = Location::factory()->for($this->user)->create(['label' => 'Home']);
+
+    livewire(EditLocation::class, ['record' => $place->id])
+        ->fillForm(['type' => LocationType::Mobile->value, 'mobile_source' => MobileSource::App->value, 'mobile_update_interval_minutes' => 5])
+        ->call('save')
+        ->assertNotified();
+
+    expect($place->fresh()->type)->toBe(LocationType::Stationary)
+        ->and($place->fresh()->mobile_source)->toBeNull();
+});
+
+test('pre-created unlinked phone rows cannot take several phones past the allowance', function () {
+    $this->user->forceFill(['tier_override' => Tier::Free])->save();
+
+    expect(fn () => Location::query()->create([
+        'user_id' => $this->user->id, 'label' => 'Galaxy', 'type' => LocationType::Mobile, 'mobile_source' => MobileSource::App,
+    ]))->toThrow(LocationLimitReached::class);
+
+    sharePhone($this, $this->phone->plainTextToken)->assertOk();
+    $galaxy = $this->user->createToken('Galaxy', ['app']);
+    $moto = $this->user->createToken('Moto', ['app']);
+
+    sharePhone($this, $galaxy->plainTextToken)->assertUnprocessable();
+    sharePhone($this, $moto->plainTextToken)->assertUnprocessable();
+
+    expect($this->user->locations()->phoneApp()->count())->toBe(1);
 });

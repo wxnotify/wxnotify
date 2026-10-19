@@ -3,6 +3,7 @@
 namespace App\Filament\Dashboard\Resources\Locations\Pages;
 
 use App\Enums\LocationType;
+use App\Enums\MobileSource;
 use App\Filament\Dashboard\Resources\Locations\LocationResource;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -31,7 +32,19 @@ class CreateLocation extends CreateRecord
             return;
         }
 
-        if (auth()->user()->canAddTraccarDevice((int) $data['traccar_server_id'])) {
+        if (($data['mobile_source'] ?? null) === MobileSource::App->value) {
+            Notification::make()
+                ->title('This location cannot be a phone location')
+                ->body('Phone locations are created by sharing from the WxNotify app.')
+                ->danger()
+                ->send();
+
+            $this->halt();
+
+            return;
+        }
+
+        if (auth()->user()->canAddTraccarDevice((int) ($data['traccar_server_id'] ?? 0))) {
             return;
         }
 
@@ -47,6 +60,9 @@ class CreateLocation extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['user_id'] = auth()->id();
+
+        // Phone locations are only ever created by a phone sharing from the app.
+        $data['mobile_source'] = ($data['type'] ?? null) === LocationType::Mobile->value ? MobileSource::Traccar->value : null;
 
         return $data;
     }

@@ -69,7 +69,18 @@ class LocationFactory extends Factory
      */
     public function mobileApp(?PersonalAccessToken $token = null): static
     {
-        return $this->state(fn () => [
+        return $this->afterMaking(function (Location $location) use ($token): void {
+            // The model refuses a new phone location with no link, so an unlinked one is created
+            // with a throwaway token that is deleted straight after (the column is nulled on delete).
+            if ($token === null) {
+                $location->app_token_id = $location->user->createToken('placeholder', ['app'])->accessToken->id;
+            }
+        })->afterCreating(function (Location $location) use ($token): void {
+            if ($token === null) {
+                PersonalAccessToken::query()->whereKey($location->app_token_id)->delete();
+                $location->refresh();
+            }
+        })->state(fn () => [
             'type' => LocationType::Mobile,
             'address' => null,
             'lat' => null,

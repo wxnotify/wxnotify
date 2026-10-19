@@ -85,7 +85,15 @@ class Location extends Model
      */
     private function guardAllowanceClass(): void
     {
-        if (! $this->exists || ! ($this->isDirty('type') || $this->isDirty('mobile_source'))) {
+        if (! $this->exists) {
+            if ($this->isPhoneApp() && $this->app_token_id === null) {
+                throw new LocationLimitReached('A phone location is only created by a phone sharing its location.');
+            }
+
+            return;
+        }
+
+        if (! ($this->isDirty('type') || $this->isDirty('mobile_source'))) {
             return;
         }
 

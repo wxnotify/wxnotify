@@ -35,6 +35,19 @@ class EditLocation extends EditRecord
      */
     protected function beforeSave(): void
     {
+        $claimsPhoneSource = ($this->data['mobile_source'] ?? null) === MobileSource::App->value
+            || ($this->data['mobile_source'] ?? null) === MobileSource::App;
+
+        if ($claimsPhoneSource && ! $this->record->isPhoneApp()) {
+            Notification::make()
+                ->title('This location cannot become a phone location')
+                ->body('Phone locations are created by sharing from the WxNotify app.')
+                ->danger()
+                ->send();
+
+            $this->halt();
+        }
+
         $becomesStationary = $this->record->isPhoneApp()
             && ($this->data['type'] ?? null) !== LocationType::Mobile->value;
 
