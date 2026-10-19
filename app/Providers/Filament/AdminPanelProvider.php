@@ -65,11 +65,16 @@ class AdminPanelProvider extends PanelProvider
                     ->navigationIcon('heroicon-o-cpu-chip')
                     ->navigationLabel('Application Health'),
                 OneTimeOperationsPlugin::make(),
+                // The owner setup checklist (flow "owner-setup", shipped by migration). Owners only:
+                // nobody else gets the launcher, and nothing of onboarding is read on their requests.
                 FilamentOnboardingPlugin::make()
                     ->manageFlows()
-                    ->launcher(false)
+                    ->launcher()
+                    ->progressPage()
+                    ->progressPageNavigation(label: 'Setup checklist', icon: 'heroicon-o-check-badge', group: 'System')
                     ->tours(false)
-                    ->navigationGroup('Navigation')
+                    ->skipWhen(fn (User $user): bool => ! $user->is_owner)
+                    ->navigationGroup('System')
                     ->navigationIcon('heroicon-o-map')
                     ->navigationSort(70),
             ])
