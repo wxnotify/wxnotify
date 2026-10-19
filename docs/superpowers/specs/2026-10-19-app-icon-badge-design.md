@@ -12,7 +12,7 @@ The Firebase plugin already installed in the mobile app can clear the badge (`Pu
 
 - Each alert push that reaches a phone while the app is not open adds one to that phone's iOS icon badge; the number shown is the count of pushes not yet seen.
 - Opening the app clears the badge on that phone and resets that phone's count on the server, so the next push starts again from 1.
-- A push that arrives while the app is open does not count: the app clears the badge itself.
+- A push that arrives while the app is open does not count: the app clears the badge itself. (Not met in this build: see Known limitation.)
 - Each phone counts on its own; a subscriber with two phones gets two independent badges.
 
 ## Non-goals
@@ -42,7 +42,7 @@ The Firebase plugin already installed in the mobile app can clear the badge (`Pu
 ## What was decided (with the owner)
 
 - Opening the app clears the badge (not "viewing the Alerts screen").
-- A push that arrives while the app is open does not count; the app handles this itself by clearing when such a push lands (no server tracking of open/closed).
+- A push that arrives while the app is open does not count; the app handles this itself by clearing when such a push lands (no server tracking of open/closed). Superseded for now by the Known limitation below: the plugin raises no PHP event for these pushes.
 - Returns from the background are handled with a short repeating check on the Alerts screen, planned now and to be replaced by the app-lifecycle foreground event when that plugin supports v4.
 
 ## The design
@@ -56,12 +56,18 @@ The Firebase plugin already installed in the mobile app can clear the badge (`Pu
 - A small service (next to `PushRegistration`) wraps "clear the badge": it calls `PushNotifications::clearBadge()` and the reset endpoint, swallowing and logging failures (no exception reaches a screen).
 - On mount of the Alerts screen (cold start and after the sign-in flow reaches Alerts), it clears the badge.
 - The Alerts screen has a short `#[Poll]` (the owner's guess: about every 5 seconds). On each tick it clears the badge only when there is something to clear. How the app knows (a remembered "badge may be showing" flag set when a push is received or the count is non-zero, or an unconditional cheap local clear with the server call throttled) is left to the builder, within the anti-goal above.
-- The Alerts screen handles `PushNotificationReceived` by clearing the badge and resetting the server count (a push in the foreground does not count).
+- The Alerts screen handles `PushNotificationReceived` by clearing the badge and resetting the server count (a push in the foreground does not count). The handler exists, but the event does not fire for these pushes (see Known limitation).
 - When the user signs out or turns push off, nothing extra is needed: the channel and its count are removed with the channel.
 
 ## Left to the builder
 
 The column or table that holds the count and its migration; how the increment and the "total to send" stay consistent under concurrent sends; the endpoint's route name, verb and response; the exact poll interval and the "something to clear" mechanism; how the mounted-screen event handler is shared with the existing `HandlesPushToken` trait; tests (backend: payload carries `aps.badge` with the running total, a second push is 2, reset returns to 0, reset is limited to the caller's phone, Android payload unchanged; mobile: screen clears on mount, on the push event, and on poll only when needed, failures never throw) and the per-platform device check; the rule notes.
+
+## Known limitation (accepted by the controller, 2026-10-19)
+
+A push received while the app is open is counted on the server and may leave an iOS badge or an Android tray notification until the next tab open or the next return from the background. The firebase plugin raises a PHP event (`PushNotificationReceived`) only for a data message that carries an `event` key; WxNotify sends a notification block with only `url` and `type`, so the plugin shows it (iOS `willPresent` presents it with `aps.badge`) and no PHP event fires. The app keeps the `#[On(PushNotificationReceived::class)]` handler for a future payload.
+
+Parked follow-up: send `event` = `PushNotificationReceived` plus a `payload` in the FCM data and consume it through a plain listener that records "foreground push at T" in the cache, so the next tick clears and resets. It must be checked on a device first (whether the plugin dispatches it for a notification-plus-data message in the foreground, and that it does not also fire for a push delivered while the app is closed).
 
 ## Device checks owed (cannot be done in tests)
 

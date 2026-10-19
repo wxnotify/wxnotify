@@ -9,9 +9,9 @@ use Native\Mobile\Network;
 use Native\Mobile\SecureStorage;
 use Tests\Fakes\FakeNetwork;
 use Tests\Fakes\InMemorySecureStorage;
+use Tests\Fakes\NullPushBadge;
 use Tests\Fakes\RecordingBrowser;
 use Tests\Fakes\RecordingGeolocation;
-use Tests\Fakes\RecordingPushBadge;
 use Tests\TestCase;
 
 /*
@@ -39,7 +39,7 @@ pest()->extend(TestCase::class)
         app()->instance(Browser::class, $this->browser);
         app()->instance(Network::class, $this->network);
         app()->instance(Geolocation::class, $this->geolocation);
-        app()->instance(PushBadge::class, new RecordingPushBadge);
+        app()->instance(PushBadge::class, new NullPushBadge);
 
         config(['wxnotify.api_url' => 'https://wx.test']);
         Http::preventStrayRequests();

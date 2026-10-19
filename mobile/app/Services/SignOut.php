@@ -6,6 +6,9 @@ use App\Exceptions\Api\ApiException;
 use App\Support\LocalCache;
 use App\Support\PushState;
 use App\Support\TokenStore;
+use Illuminate\Support\Facades\Log;
+use Native\Mobile\Facades\PushNotifications;
+use Throwable;
 
 /**
  * Signs the subscriber out of this phone: best-effort revoke on the server (a failed call
@@ -39,5 +42,19 @@ class SignOut
         $this->tokens->clearPending();
         $this->cache->wipe();
         $this->push->clear();
+        $this->clearIconBadge();
+    }
+
+    /**
+     * A signed-out phone gets no reset from the server, so its badge (and, on Android, the tray) is
+     * cleared here. Best effort: a plugin failure must not stop the sign-out.
+     */
+    private function clearIconBadge(): void
+    {
+        try {
+            PushNotifications::clearBadge();
+        } catch (Throwable $e) {
+            Log::info('Push badge clear on sign-out failed: '.$e::class);
+        }
     }
 }

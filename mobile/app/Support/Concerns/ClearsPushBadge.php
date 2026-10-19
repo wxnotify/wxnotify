@@ -11,7 +11,7 @@ use Native\Mobile\Events\PushNotification\PushNotificationReceived;
 /**
  * Used by every bottom-nav tab screen (Alerts, Map, Products, Settings), so opening the app on any tab
  * clears the icon badge and resets the server's unread count. The using screen calls
- * clearPushBadgeOnOpen() from mount(); a push received in the foreground clears too.
+ * clearPushBadgeOnOpen() from mount().
  *
  * Nothing tells PHP when the app comes back from the background, so a five-second poll stands in until
  * the app-lifecycle plugin's foreground event supports v4. An ordinary tick never calls the plugin (on
@@ -20,8 +20,9 @@ use Native\Mobile\Events\PushNotification\PushNotificationReceived;
  * more than three intervals after the previous one means the screen was not ticking, i.e. the app was
  * in the background, so it clears the badge and resets the server count.
  *
- * Known limitation: a push that lands while the app is in the background, followed by a return before
- * the loop stopped ticking (no gap), stays on the badge until the next gap or foreground push.
+ * Known limitation: a push that lands while the app is open, or while it is in the background followed
+ * by a return before the loop stopped ticking (no gap), stays on the badge (and the Android tray) until
+ * the next tab open or gap.
  */
 trait ClearsPushBadge
 {
@@ -41,7 +42,9 @@ trait ClearsPushBadge
     }
 
     /**
-     * A push that arrives while the app is open has been seen: clear it and its server count.
+     * Meant for a push that arrives while the app is open. The firebase plugin raises this event only
+     * for a data message with an `event` key, which WxNotify's pushes do not carry yet, so on a device
+     * it does not fire today; it is kept for that future payload (see the spec's Known limitation).
      */
     #[On(PushNotificationReceived::class)]
     public function clearPushBadgeOnForegroundPush(): void

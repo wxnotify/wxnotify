@@ -58,26 +58,6 @@ test('the next clear retries and clears the pending flag', function () {
     expect((new PushState)->resetPending())->toBeFalse();
 });
 
-test('with server false and nothing pending only the local clear runs', function () {
-    PushNotifications::shouldReceive('clearBadge')->once();
-    Http::fake();
-
-    app(PushBadge::class)->clear(server: false);
-
-    Http::assertNothingSent();
-});
-
-test('with server false and a reset pending, the pending reset is retried', function () {
-    PushNotifications::shouldReceive('clearBadge')->once();
-    Http::fake(['wx.test/api/v1/*' => Http::response(null, 204)]);
-    (new PushState)->markResetPending();
-
-    app(PushBadge::class)->clear(server: false);
-
-    Http::assertSent(badgeResetSent());
-    expect((new PushState)->resetPending())->toBeFalse();
-});
-
 test('signed out: the local clear only, no request', function () {
     (new TokenStore)->forget();
     PushNotifications::shouldReceive('clearBadge')->once();
@@ -95,6 +75,24 @@ test('signing out forgets the pending flag', function () {
     app(SignOut::class)();
 
     expect((new PushState)->resetPending())->toBeFalse();
+});
+
+test('signing out clears the icon badge on this phone', function () {
+    PushNotifications::shouldReceive('clearBadge')->once();
+    Http::fake(['*' => Http::response(null, 204)]);
+
+    app(SignOut::class)();
+
+    expect((new TokenStore)->token())->toBeNull();
+});
+
+test('a failing badge clear does not stop the sign-out', function () {
+    PushNotifications::shouldReceive('clearBadge')->once()->andThrow(new RuntimeException('plugin down'));
+    Http::fake(['*' => Http::response(null, 204)]);
+
+    app(SignOut::class)();
+
+    expect((new TokenStore)->token())->toBeNull();
 });
 
 test('a failing local clear does not throw or skip the server reset', function () {

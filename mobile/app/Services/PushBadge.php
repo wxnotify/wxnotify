@@ -17,10 +17,7 @@ class PushBadge
 {
     public function __construct(private WxNotifyApi $api, private PushState $state, private TokenStore $tokens) {}
 
-    /**
-     * @param  bool  $server  false when only a pending reset should be retried (the badge is already zero on the server)
-     */
-    public function clear(bool $server = true): void
+    public function clear(): void
     {
         try {
             PushNotifications::clearBadge();
@@ -28,9 +25,7 @@ class PushBadge
             Log::info('Push badge local clear failed: '.$e::class);
         }
 
-        if ($server || $this->state->resetPending()) {
-            $this->resetServerCount();
-        }
+        $this->resetServerCount();
     }
 
     /**
