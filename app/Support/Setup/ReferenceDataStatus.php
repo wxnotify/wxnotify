@@ -53,13 +53,19 @@ final class ReferenceDataStatus
     }
 
     /**
-     * True when every set the install action can fill is installed.
+     * True when every set the install action can fill is installed. Cheap enough to ask on every
+     * request: it short-circuits on the first missing set instead of building sets().
      */
     public static function allInstalled(): bool
     {
-        $installed = collect(self::sets())->pluck('installed', 'key');
+        return self::productCatalogInstalled()
+            && self::tipsInstalled()
+            && self::shapefileLayersInstalled();
+    }
 
-        return $installed['product_catalog'] && $installed['tips'] && $installed['shapefile_layers'];
+    private static function tipsInstalled(): bool
+    {
+        return DidYouKnow::query()->exists();
     }
 
     private static function productCatalogInstalled(): bool
