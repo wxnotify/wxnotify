@@ -54,6 +54,10 @@ class WelcomeFlow extends NativeComponent
         }
     }
 
+    /**
+     * The step on screen. The permission actions check it first: a second tap queued while the first
+     * call ran still reaches its method after the screen has moved on, and must do nothing.
+     */
     public function step(): string
     {
         return $this->steps[$this->index] ?? 'done';
@@ -76,6 +80,10 @@ class WelcomeFlow extends NativeComponent
 
     public function allowPush(): void
     {
+        if ($this->step() !== 'push') {
+            return;
+        }
+
         try {
             app(PushRegistration::class)->enable();
         } catch (Throwable) {
@@ -87,6 +95,10 @@ class WelcomeFlow extends NativeComponent
 
     public function notNowPush(): void
     {
+        if ($this->step() !== 'push') {
+            return;
+        }
+
         app(PushRegistration::class)->decline();
 
         $this->next();
@@ -94,6 +106,10 @@ class WelcomeFlow extends NativeComponent
 
     public function shareLocation(): void
     {
+        if ($this->step() !== 'location') {
+            return;
+        }
+
         $outcome = app(LocationSharing::class)->enable();
 
         match ($outcome) {
@@ -108,6 +124,10 @@ class WelcomeFlow extends NativeComponent
 
     public function notNowLocation(): void
     {
+        if ($this->step() !== 'location') {
+            return;
+        }
+
         $this->next();
     }
 

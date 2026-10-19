@@ -113,10 +113,55 @@ test('Not now on push declines and moves on', function () {
         ->call('next')
         ->call('next')
         ->tap('Not now')
-        ->assertSee('Follow your phone');
+        ->assertSee('Follow your phone')
+        ->assertNoNavigation();
 
     expect((new PushState)->declined())->toBeTrue()
         ->and((new PushState)->wantsPush())->toBeFalse();
+});
+
+test('a double tap on Allow notifications enrols once and stops on the location screen', function () {
+    fakeWelcomeFlowServer();
+    PushNotifications::shouldReceive('enroll')->once();
+
+    Native::test(WelcomeFlow::class)
+        ->call('next')
+        ->call('next')
+        ->call('allowPush')
+        ->call('allowPush')
+        ->assertSee('Follow your phone');
+});
+
+test('a double tap on Share location starts sharing once and shows no full-plan note', function () {
+    fakeWelcomeFlowServer(more: ['wx.test/api/v1/location-sharing' => Http::sequence()
+        ->push(['data' => ['location_id' => 7, 'beacon_token' => '12|b', 'url' => 'https://wx.test/api/v1/location', 'interval_seconds' => 300]])
+        ->push(['error' => 'location_limit', 'message' => 'x'], 422)]);
+
+    Native::test(WelcomeFlow::class)
+        ->call('next')
+        ->call('next')
+        ->call('notNowPush')
+        ->call('shareLocation')
+        ->call('shareLocation')
+        ->assertSee('You\'re set')
+        ->assertSet('noSlot', false)
+        ->assertDontSee('Your plan\'s places are full');
+
+    expect(welcomeFlowLocationStarts())->toBe(1);
+});
+
+test('a double tap on a Not now button moves on only once', function () {
+    fakeWelcomeFlowServer();
+
+    Native::test(WelcomeFlow::class)
+        ->call('next')
+        ->call('next')
+        ->call('notNowPush')
+        ->call('notNowPush')
+        ->assertSee('Follow your phone')
+        ->call('notNowLocation')
+        ->call('notNowLocation')
+        ->assertSee('You\'re set');
 });
 
 test('Share location starts sharing and moves on', function () {
