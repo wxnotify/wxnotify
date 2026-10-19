@@ -67,12 +67,12 @@ The column or table that holds the count and its migration; how the increment an
 
 A push received while the app is open is counted on the server and may leave an iOS badge or an Android tray notification until the next tab open or the next return from the background. The firebase plugin raises a PHP event (`PushNotificationReceived`) only for a data message that carries an `event` key; WxNotify sends a notification block with only `url` and `type`, so the plugin shows it (iOS `willPresent` presents it with `aps.badge`) and no PHP event fires. The app keeps the `#[On(PushNotificationReceived::class)]` handler for a future payload.
 
-Parked follow-up: send `event` = `PushNotificationReceived` plus a `payload` in the FCM data and consume it through a plain listener that records "foreground push at T" in the cache, so the next tick clears and resets. It must be checked on a device first (whether the plugin dispatches it for a notification-plus-data message in the foreground, and that it does not also fire for a push delivered while the app is closed).
+Parked follow-up: send `event` = `PushNotificationReceived` plus a `payload` in the FCM data and consume it through a plain listener that records "foreground push at T" in the cache, so the next tick clears and resets. It must be checked on a device first (whether the plugin dispatches it for a notification-plus-data message in the foreground, that it does not also fire for a push delivered while the app is closed, and on iOS whether delivery needs `content-available`).
 
 ## Device checks owed (cannot be done in tests)
 
-- iOS (physical device; simulators cannot take real pushes): two pushes with the app closed show 2; opening clears; a push while the app is open leaves no badge; a resume from the background clears within the poll interval.
-- Android: a push while the app is closed shows the OS dot/notification; opening the app removes it; a foreground push does not leave a stale tray notification.
+- iOS (physical device; simulators cannot take real pushes): two pushes with the app closed show 2; opening clears; a push while the app is open is expected to leave a badge until the next tab open (see Known limitation); a resume from the background clears within the poll interval.
+- Android: a push while the app is closed shows the OS dot/notification; opening the app removes it; a foreground push is expected to leave its tray notification until the next tab open or return from the background (see Known limitation).
 
 ## My calls (for the owner to check)
 
@@ -84,4 +84,4 @@ Parked follow-up: send `event` = `PushNotificationReceived` plus a `payload` in 
 - The clear logic lives in a shared trait used by every top-level tab screen (Alerts, Map, Products), not only Alerts, so opening the app on any tab clears the badge. The repeating check runs on whichever of those screens is showing.
 - A failed reset is retried: the app keeps a local "reset pending" flag and retries on the next tick until the server call succeeds; the local clear (`clearBadge()`) still happens at once.
 - On Android the clear (cancelling tray notifications) also runs on the repeating check while the flag says a badge may be showing. If the device check shows that a foreground push's banner disappears too abruptly, the fallback is to skip the tray clear for a push received in the foreground and leave the OS to manage it; that decision is made after the device check.
-- `PushNotificationReceived` is treated as foreground-only, as the plugin documents; the device check confirms a push delivered while the app is closed does not fire it on resume.
+- The `PushNotificationReceived` handler is kept for a future payload; today the plugin raises no PHP event for these pushes (see Known limitation).
