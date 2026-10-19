@@ -19,6 +19,7 @@ use App\NativeComponents\RuleEditor;
 use App\NativeComponents\RulesScreen;
 use App\NativeComponents\SettingsScreen;
 use App\NativeComponents\SignInScreen;
+use App\NativeComponents\WelcomeFlow;
 use Illuminate\Support\Facades\Route;
 
 Route::native('/', AlertsScreen::class);
@@ -42,3 +43,6 @@ Route::native('/channels/{id}', ChannelEditor::class);
 Route::native('/account', AccountScreen::class);
 Route::native('/enable-push', PushPrompt::class);
 Route::native('/share-location', LocationPrompt::class);
+Route::native('/welcome', WelcomeFlow::class);
+/* The replay from Settings: same screen, told by the route's default not to touch the seen flag and to close back to Settings. */
+Route::native('/welcome/tour', WelcomeFlow::class)->defaults('replay', true);
