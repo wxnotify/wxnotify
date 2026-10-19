@@ -15,8 +15,8 @@ class CreateLocation extends CreateRecord
     {
         if (! auth()->user()->canCreateLocation()) {
             Notification::make()
-                ->title('Location limit reached')
-                ->body('Your plan allows '.auth()->user()->locationLimit().' location(s). Upgrade to add more.')
+                ->title('Saved-location limit reached')
+                ->body('Your plan allows '.auth()->user()->locationLimit().' saved location(s), not counting phones sharing their location. Upgrade to add more.')
                 ->danger()
                 ->send();
 

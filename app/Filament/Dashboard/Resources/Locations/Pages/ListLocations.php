@@ -21,7 +21,7 @@ class ListLocations extends ListRecords
                 ->disabled(fn (): bool => ! auth()->user()->canCreateLocation())
                 ->tooltip(fn (): ?string => auth()->user()->canCreateLocation()
                     ? null
-                    : 'You\'ve reached your plan\'s location limit — upgrade to add more.'),
+                    : 'You\'ve reached your plan\'s saved-location limit (phones sharing their location are counted separately) — upgrade to add more.'),
         ];
     }
 

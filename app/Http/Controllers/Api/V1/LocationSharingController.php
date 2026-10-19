@@ -26,7 +26,7 @@ class LocationSharingController extends Controller
         } catch (LocationLimitReached) {
             return response()->json([
                 'error' => 'location_limit',
-                'message' => 'Your plan\'s location limit is reached. Remove a location on the dashboard, or upgrade, to share this phone\'s location.',
+                'message' => 'Your plan\'s phone-location allowance is used up. Stop sharing another phone\'s location on the dashboard, or upgrade, to share this phone\'s location.',
             ], 422);
         }
 

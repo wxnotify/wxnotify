@@ -450,7 +450,7 @@ class ProductMatchingTable extends Field
 
         return $this->canCreateLocation()
             ? 'No saved locations yet — use the + button to add one.'
-            : 'You\'ve reached your location limit — remove one or upgrade to add another.';
+            : 'You\'ve reached your saved-location limit — remove one or upgrade to add another.';
     }
 
     /**

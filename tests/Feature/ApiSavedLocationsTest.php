@@ -42,7 +42,7 @@ test('the list is the subscriber\'s own locations by name with the limit informa
     $response = locationCall($this, 'GET', '/api/v1/locations')->assertOk();
 
     expect(collect($response->json('data'))->pluck('label')->all())->toBe(['Home', 'Work'])
-        ->and($response->json('meta'))->toBe(['can_create' => true, 'limit' => 5])
+        ->and($response->json('meta'))->toBe(['can_create' => true, 'limit' => 5, 'can_share_phone' => true, 'phone_limit' => 1])
         ->and(collect($response->json('data'))->firstWhere('id', $home->id))->toMatchArray(['type' => 'stationary', 'source' => null, 'linked' => null, 'stale' => null])
         ->and($response->getContent())->not->toContain('app_token_id')->not->toContain('traccar_server_id');
 });
@@ -102,6 +102,16 @@ test('at the plan limit a new location is refused with location_limit and nothin
         ->assertUnprocessable()->assertJsonPath('error', 'location_limit');
 
     expect(Location::where('user_id', $this->user->id)->count())->toBe(1);
+});
+
+test('a phone location does not use up the saved-location limit', function () {
+    $limits = app(TierThresholdSettings::class);
+    $limits->free_locations = 1;
+    $limits->save();
+    Location::factory()->for($this->user)->mobileApp($this->phone->accessToken)->create();
+
+    locationCall($this, 'POST', '/api/v1/locations', ['label' => 'Cabin', 'lat' => 35.0, 'lng' => -97.0])->assertCreated();
+    locationCall($this, 'GET', '/api/v1/locations')->assertJsonPath('meta.can_share_phone', false);
 });
 
 test('a create is refused when the details are not valid', function (array $body, string $field) {

@@ -27,7 +27,12 @@ class SavedLocationController extends Controller
         $user = $request->user();
 
         return SavedLocationResource::collection($user->locations()->orderBy('label')->orderBy('id')->get())
-            ->additional(['meta' => ['can_create' => $user->canCreateLocation(), 'limit' => $user->locationLimit()]]);
+            ->additional(['meta' => [
+                'can_create' => $user->canCreateLocation(),
+                'limit' => $user->locationLimit(),
+                'can_share_phone' => $user->canCreatePhoneLocation(),
+                'phone_limit' => $user->phoneLocationLimit(),
+            ]]);
     }
 
     public function show(Request $request, int $id): SavedLocationResource
@@ -42,7 +47,7 @@ class SavedLocationController extends Controller
         } catch (LocationLimitReached) {
             return response()->json([
                 'error' => 'location_limit',
-                'message' => 'Your plan\'s location limit is reached. Remove a location, or upgrade, to add another.',
+                'message' => 'Your plan\'s saved-location limit is reached. Remove a saved location, or upgrade, to add another.',
             ], 422);
         }
 

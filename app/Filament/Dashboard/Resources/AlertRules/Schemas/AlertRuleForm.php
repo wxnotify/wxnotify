@@ -427,7 +427,7 @@ class AlertRuleForm
             ->helperText(fn (): ?string => match (true) {
                 auth()->user()->locations()->exists() => null,
                 auth()->user()->canCreateLocation() => 'No saved locations yet — use the + button to add one.',
-                default => 'You\'ve reached your location limit — remove one or upgrade to add another.',
+                default => 'You\'ve reached your saved-location limit — remove one or upgrade to add another.',
             });
     }
 
