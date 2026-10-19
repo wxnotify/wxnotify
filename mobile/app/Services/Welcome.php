@@ -6,6 +6,7 @@ use App\Exceptions\Api\ApiException;
 use App\Support\PushState;
 use App\Support\TokenStore;
 use App\Support\WelcomeState;
+use Throwable;
 
 /**
  * Decides whether the welcome flow shows and which of its steps apply. A permission step is left
@@ -14,6 +15,11 @@ use App\Support\WelcomeState;
  */
 class Welcome
 {
+    /** The slot lookup runs while the first screen waits: a slower answer counts as unknown. */
+    private const SLOT_LOOKUP_TIMEOUT_SECONDS = 4;
+
+    private ?bool $phoneSlot = null;
+
     public function __construct(
         private WelcomeState $state,
         private PushState $push,
@@ -41,9 +47,10 @@ class Welcome
      */
     public function steps(): array
     {
+        $this->phoneSlot = null;
         $steps = ['welcome', 'offer'];
 
-        if (! $this->push->wantsPush() && $this->registration->permission() !== 'denied') {
+        if ($this->pushStepApplies()) {
             $steps[] = 'push';
         }
 
@@ -56,17 +63,48 @@ class Welcome
         return $steps;
     }
 
-    /** Sharing is off and the server has a phone slot free; the server is asked only when sharing is off. */
+    /**
+     * What the last steps() learned from the server about a free phone-location slot: true or
+     * false when it answered, null when it was not asked (sharing not off), failed, timed out or
+     * answered without the key (a backend older than the app).
+     */
+    public function phoneSlot(): ?bool
+    {
+        return $this->phoneSlot;
+    }
+
+    /** Push is not already on and the OS has not refused it; a native failure leaves the step out. */
+    private function pushStepApplies(): bool
+    {
+        try {
+            return ! $this->push->wantsPush() && $this->registration->permission() !== 'denied';
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Sharing is off and the server has a phone slot free; the server is asked only when sharing is
+     * off ("waiting" counts as on), with a short timeout so a slow answer never holds up the screen.
+     */
     private function locationSlotIsFree(): bool
     {
-        if ($this->location->state()['status'] !== 'off') {
+        try {
+            if ($this->location->state()['status'] !== 'off') {
+                return false;
+            }
+        } catch (Throwable) {
             return false;
         }
 
         try {
-            return ($this->api->alertRuleOptions()['can_share_phone_location'] ?? false) === true;
+            $answer = $this->api->alertRuleOptions(self::SLOT_LOOKUP_TIMEOUT_SECONDS)['can_share_phone_location'] ?? null;
         } catch (ApiException) {
             return false;
         }
+
+        $this->phoneSlot = is_bool($answer) ? $answer : null;
+
+        return $this->phoneSlot === true;
     }
 }

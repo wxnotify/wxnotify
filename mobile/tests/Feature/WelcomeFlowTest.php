@@ -55,11 +55,12 @@ test('it walks the five steps with Next and finishes on Alerts', function () {
         ->tap('Not now')
         ->assertSee('Follow your phone')
         ->assertSee('Share this phone\'s location and we\'ll watch the weather wherever you are. It uses one of your places.')
+        ->assertSee('Your phone will ask for location access. To keep sharing after you close the app, choose "Always" or "Allow all the time" if your phone offers it.')
         ->assertSee('Share location')
         ->tap('Not now')
         ->assertSee('You\'re set')
         ->assertSee('Add places and alert rules any time from Settings.')
-        ->assertDontSee('Your plan\'s places are full')
+        ->assertDontSee('allowance is used up')
         ->tap('Go to Alerts')
         ->assertReplacedWith('/');
 
@@ -144,8 +145,8 @@ test('a double tap on Share location starts sharing once and shows no full-plan 
         ->call('shareLocation')
         ->call('shareLocation')
         ->assertSee('You\'re set')
-        ->assertSet('noSlot', false)
-        ->assertDontSee('Your plan\'s places are full');
+        ->assertSet('slotNotice', null)
+        ->assertDontSee('allowance is used up');
 
     expect(welcomeFlowLocationStarts())->toBe(1);
 });
@@ -174,7 +175,7 @@ test('Share location starts sharing and moves on', function () {
         ->tap('Share location')
         ->assertSee('You\'re set')
         ->assertSet('note', null)
-        ->assertDontSee('Your plan\'s places are full');
+        ->assertDontSee('allowance is used up');
 
     expect((new LocationSharingState)->wanted())->toBeTrue()
         ->and($this->geolocation->shared)->toHaveCount(1);
@@ -189,7 +190,7 @@ test('a location limit moves on and the last screen shows the full-plan note', f
         ->call('notNowPush')
         ->tap('Share location')
         ->assertSee('You\'re set')
-        ->assertSee('Your plan\'s places are full, so sharing this phone\'s location isn\'t available.');
+        ->assertSee('Your plan\'s phone-location allowance is used up, so sharing this phone\'s location isn\'t available.');
 
     expect((new LocationSharingState)->wanted())->toBeFalse();
 });
@@ -202,7 +203,7 @@ test('a location start that is offline or fails moves on with a one-line note', 
     $flow->tap('Share location')
         ->assertSee('You\'re set')
         ->assertSee($note)
-        ->assertDontSee('Your plan\'s places are full');
+        ->assertDontSee('allowance is used up');
 
     expect((new LocationSharingState)->wanted())->toBeFalse();
 })->with([
@@ -217,11 +218,69 @@ test('the push and location steps are absent when the rules exclude them', funct
 
     Native::test(WelcomeFlow::class)
         ->assertSet('steps', ['welcome', 'offer', 'done'])
-        ->assertSet('noSlot', true)
+        ->assertSet('slotNotice', 'used_up')
         ->tap('Next')
         ->tap('Next')
         ->assertSee('You\'re set')
-        ->assertSee('Your plan\'s places are full, so sharing this phone\'s location isn\'t available.');
+        ->assertSee('Your plan\'s phone-location allowance is used up, so sharing this phone\'s location isn\'t available.');
+});
+
+test('a slot lookup that failed or had no answer leaves out Location with a neutral note', function (mixed $response) {
+    Http::fake(['wx.test/api/v1/alert-rule-options' => $response]);
+
+    Native::test(WelcomeFlow::class)
+        ->assertSet('steps', ['welcome', 'offer', 'push', 'done'])
+        ->assertSet('slotNotice', 'unknown')
+        ->call('next')
+        ->call('next')
+        ->call('notNowPush')
+        ->assertSee('You\'re set')
+        ->assertSee('You can share this phone\'s location later from Settings → Account.')
+        ->assertDontSee('allowance is used up');
+})->with([
+    'key missing' => fn () => Http::response(['data' => ['can_create_location' => true]]),
+    'server error' => fn () => Http::response([], 500),
+    'rate limited' => fn () => Http::response([], 429),
+    'timed out' => fn () => Http::failedConnection('timed out'),
+]);
+
+test('an offline phone leaves out Location with the neutral note', function () {
+    Http::fake();
+    $this->network->connected = false;
+
+    Native::test(WelcomeFlow::class)
+        ->assertSet('steps', ['welcome', 'offer', 'push', 'done'])
+        ->assertSet('slotNotice', 'unknown');
+
+    Http::assertNothingSent();
+});
+
+test('sharing that is waiting for permission leaves out Location with no note', function () {
+    fakeWelcomeFlowServer();
+    (new LocationSharingState)->markWanted();
+
+    Native::test(WelcomeFlow::class)
+        ->assertSet('steps', ['welcome', 'offer', 'push', 'done'])
+        ->assertSet('slotNotice', null);
+});
+
+test('the dots say which step is showing', function () {
+    fakeWelcomeFlowServer();
+
+    Native::test(WelcomeFlow::class)
+        ->assertElement('row', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Step 1 of 5')
+        ->tap('Next')
+        ->assertElement('row', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Step 2 of 5');
+});
+
+test('a double tap on Next moves on only once', function () {
+    fakeWelcomeFlowServer();
+
+    Native::test(WelcomeFlow::class)
+        ->call('next', 0)
+        ->call('next', 0)
+        ->assertSet('index', 1)
+        ->assertSee('What you get');
 });
 
 test('the location step left out because sharing is already on shows no full-plan note', function () {
@@ -230,7 +289,7 @@ test('the location step left out because sharing is already on shows no full-pla
 
     Native::test(WelcomeFlow::class)
         ->assertSet('steps', ['welcome', 'offer', 'push', 'done'])
-        ->assertSet('noSlot', false);
+        ->assertSet('slotNotice', null);
 });
 
 test('a signed-out visitor is sent to sign in and the flag is left alone', function () {

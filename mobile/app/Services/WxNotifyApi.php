@@ -30,6 +30,9 @@ use Native\Mobile\Facades\Network;
  */
 class WxNotifyApi
 {
+    /** How long a request may take before it counts as offline. */
+    public const TIMEOUT_SECONDS = 15;
+
     public function __construct(private TokenStore $tokens) {}
 
     /**
@@ -175,11 +178,12 @@ class WxNotifyApi
     }
 
     /**
+     * @param  int  $timeoutSeconds  shorter for a caller that must not wait (the welcome flow's slot lookup)
      * @return array<string, mixed>
      */
-    public function alertRuleOptions(): array
+    public function alertRuleOptions(int $timeoutSeconds = self::TIMEOUT_SECONDS): array
     {
-        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/alert-rule-options')));
+        return $this->data($this->send(fn (PendingRequest $request) => $request->get('/api/v1/alert-rule-options'), timeoutSeconds: $timeoutSeconds));
     }
 
     /**
@@ -385,11 +389,11 @@ class WxNotifyApi
      * @param  Closure(PendingRequest): Response  $call
      * @return array<string, mixed>
      */
-    private function send(Closure $call, bool $authenticated = true): array
+    private function send(Closure $call, bool $authenticated = true, int $timeoutSeconds = self::TIMEOUT_SECONDS): array
     {
         $this->assertOnline();
 
-        $request = Http::baseUrl(config('wxnotify.api_url'))->acceptJson()->asJson()->timeout(15);
+        $request = Http::baseUrl(config('wxnotify.api_url'))->acceptJson()->asJson()->timeout($timeoutSeconds);
 
         if ($authenticated) {
             $token = $this->tokens->token();

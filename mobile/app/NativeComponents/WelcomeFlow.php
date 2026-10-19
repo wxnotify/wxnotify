@@ -33,8 +33,14 @@ class WelcomeFlow extends NativeComponent
     /** Set from the /welcome/tour route's default. */
     public bool $replay = false;
 
-    /** The location step was left out (or refused) because the plan has no free phone slot. */
-    public bool $noSlot = false;
+    /**
+     * Why the last screen mentions location sharing when the Location step did not run:
+     * 'used_up' when the server said the plan has no free phone slot (or refused the start with its
+     * limit), 'unknown' when sharing is off but the slot lookup failed, timed out or had no answer.
+     *
+     * @var 'used_up'|'unknown'|null
+     */
+    public ?string $slotNotice = null;
 
     /** Why location sharing did not start, shown on the last screen. */
     public ?string $note = null;
@@ -46,8 +52,9 @@ class WelcomeFlow extends NativeComponent
         }
 
         $this->replay = $this->param('replay') === true;
-        $this->steps = app(Welcome::class)->steps();
-        $this->noSlot = ! in_array('location', $this->steps, true) && $this->sharingIsOff();
+        $welcome = app(Welcome::class);
+        $this->steps = $welcome->steps();
+        $this->slotNotice = $this->slotNoticeFor($welcome->phoneSlot());
 
         if (! $this->replay) {
             app(WelcomeState::class)->markSeen();
@@ -63,8 +70,16 @@ class WelcomeFlow extends NativeComponent
         return $this->steps[$this->index] ?? 'done';
     }
 
-    public function next(): void
+    /**
+     * The view passes the index the tap was made on, so a second tap queued while the first ran
+     * (and still bound to the same callback) does not skip a screen.
+     */
+    public function next(?int $from = null): void
     {
+        if ($from !== null && $from !== $this->index) {
+            return;
+        }
+
         $this->index = min($this->index + 1, max(count($this->steps) - 1, 0));
     }
 
@@ -114,7 +129,7 @@ class WelcomeFlow extends NativeComponent
 
         match ($outcome) {
             'started' => null,
-            'limit' => $this->noSlot = true,
+            'limit' => $this->slotNotice = 'used_up',
             'offline' => $this->note = 'Couldn\'t start sharing: you appear to be offline. You can turn it on later from Account.',
             default => $this->note = 'Couldn\'t start sharing right now. You can turn it on later from Account.',
         };
@@ -144,11 +159,25 @@ class WelcomeFlow extends NativeComponent
     }
 
     /**
-     * Sharing is off on this phone, so a missing location step means the slot lookup said no (or
-     * failed, which Welcome counts as no slot). Read locally: no second server call.
+     * Sharing off and the Location step left out means the slot lookup said no or could not tell.
+     * Sharing on or waiting (or unreadable) needs no notice.
+     *
+     * @return 'used_up'|'unknown'|null
      */
-    private function sharingIsOff(): bool
+    private function slotNoticeFor(?bool $phoneSlot): ?string
     {
-        return app(LocationSharing::class)->state()['status'] === 'off';
+        if (in_array('location', $this->steps, true)) {
+            return null;
+        }
+
+        try {
+            if (app(LocationSharing::class)->state()['status'] !== 'off') {
+                return null;
+            }
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $phoneSlot === false ? 'used_up' : 'unknown';
     }
 }
