@@ -60,7 +60,7 @@ class Setup extends Page
             ->requiresConfirmation()
             ->modalHeading('Install reference data')
             ->modalDescription(fn (): string => 'This installs the product catalog categories and descriptions, the "Did you know" tips and the tracked shapefile layers, but only the ones that are not installed yet. Nothing that already exists is changed. One caution: when the product catalog is not yet installed, the install removes '
-                .count(ProductCatalogSeeder::ORPHAN_CODES).' legacy products that have no counterpart in the catalog ('.$this->orphanProductNames().'). Channel types are not touched.')
+                .count(ProductCatalogSeeder::ORPHAN_CODES).' legacy products that have no counterpart in the catalog ('.$this->orphanProductNames().'), which also removes them from any alert rule that uses them. Channel types are not touched.')
             ->modalSubmitActionLabel('Install')
             ->action(function (): void {
                 abort_unless(self::canAccess(), 403);

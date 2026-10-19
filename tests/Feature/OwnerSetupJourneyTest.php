@@ -60,6 +60,14 @@ test('the migration creates the flow and its nine steps in order with their cond
     expect($keys->reject(fn (string $key): bool => $registry->has($key))->all())->toBe([]);
 });
 
+test('the step texts tell the owner the mode default, the scan cost and where billing keys go', function () {
+    $descriptions = OnboardingStep::query()->pluck('description', 'key')->map(fn (array $description): string => $description['en']);
+
+    expect($descriptions['basics'])->toContain('WXNOTIFY_MODE=selfhost')
+        ->and($descriptions['boundaries'])->toContain('alerts wait while it runs')
+        ->and($descriptions['billing'])->toContain('App Settings > Secrets');
+});
+
 test('running the migration again, or after an owner edited a step title, changes nothing', function () {
     $basics = OnboardingStep::query()->where('key', 'basics')->sole();
     $basics->update(['title' => ['en' => 'My own wording']]);

@@ -8,6 +8,7 @@ use App\Models\ShapefileLayer;
 use App\Models\User;
 use App\Support\Setup\ReferenceDataStatus;
 use App\Support\Shapefiles\ShapefileLayerDefinitions;
+use Database\Seeders\DidYouKnowSeeder;
 
 it('installs the product catalog, the tips and the tracked layers on a fresh database', function () {
     $users = User::count();
@@ -46,6 +47,23 @@ it('installs only the sets that are missing', function () {
         ->and(DidYouKnow::count())->toBe(1)
         ->and($tip->fresh()->body)->toBe('My own tip')
         ->and($tip->fresh()->is_active)->toBeFalse();
+});
+
+it('leaves a set not installed when its seeder fails part way', function () {
+    app()->instance(DidYouKnowSeeder::class, new class extends DidYouKnowSeeder
+    {
+        public function run(): void
+        {
+            parent::run();
+
+            throw new RuntimeException('seeder failed');
+        }
+    });
+
+    expect(fn () => app(InstallReferenceData::class)())->toThrow(RuntimeException::class, 'seeder failed');
+
+    expect(DidYouKnow::count())->toBe(0)
+        ->and(collect(ReferenceDataStatus::sets())->firstWhere('key', 'tips')['installed'])->toBeFalse();
 });
 
 it('status lists the four sets in order with their counts and flags', function () {

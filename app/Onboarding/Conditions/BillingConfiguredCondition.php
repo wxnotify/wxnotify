@@ -2,10 +2,12 @@
 
 namespace App\Onboarding\Conditions;
 
+use App\Enums\Secret;
+use App\Support\Secrets;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A Stripe secret or a Paddle API key is present.
+ * A Stripe secret or a Paddle API key is set, stored in App Settings > Secrets or in .env.
  */
 final class BillingConfiguredCondition extends SafeCondition
 {
@@ -16,6 +18,6 @@ final class BillingConfiguredCondition extends SafeCondition
 
     protected function check(Model $subject): bool
     {
-        return filled(config('services.stripe.secret')) || filled(config('services.paddle.api_key'));
+        return filled(Secrets::get(Secret::StripeSecretKey)) || filled(Secrets::get(Secret::PaddleApiKey));
     }
 }

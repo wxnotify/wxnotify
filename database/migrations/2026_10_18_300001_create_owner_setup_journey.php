@@ -62,7 +62,7 @@ return new class extends Migration
             [
                 'key' => 'basics',
                 'title' => 'Set the basics in .env',
-                'description' => 'WxNotify reads a few settings from the .env file (or your Compose file) when it starts. APP_KEY encrypts sessions and stored secrets, APP_URL is the address used in links and emails, and WXNOTIFY_MODE is cloud or selfhost. If the server sits behind a load balancer or Cloudflare, set WXNOTIFY_TRUSTED_PROXIES so visitor addresses are read correctly. Restart the containers after a change, then tick this off yourself.',
+                'description' => 'WxNotify reads a few settings from the .env file (or your Compose file) when it starts. APP_KEY encrypts sessions and stored secrets, APP_URL is the address used in links and emails, and WXNOTIFY_MODE picks the product: it defaults to cloud, so a self-hosted server must set WXNOTIFY_MODE=selfhost. If the server sits behind a load balancer or Cloudflare, set WXNOTIFY_TRUSTED_PROXIES so visitor addresses are read correctly. Restart the containers after a change, then tick this off yourself.',
                 'icon' => 'heroicon-o-cog-6-tooth',
                 'condition_key' => null,
             ],
@@ -85,7 +85,7 @@ return new class extends Migration
             [
                 'key' => 'boundaries',
                 'title' => 'Import the boundaries',
-                'description' => 'WxNotify uses NWS boundary shapefiles (counties, zones and more) to work out which places a warning covers. On Shapefile Layers, press Check for shapefile updates: the scan runs on the queue, so it needs the worker from the next step. Then review each imported layer and press Activate. If a long first scan fails, run the worker with a longer --timeout (for example 900; queue:listen defaults to 60 seconds) and set DB_QUEUE_RETRY_AFTER above it.',
+                'description' => 'WxNotify uses NWS boundary shapefiles (counties, zones and more) to work out which places a warning covers. On Shapefile Layers, press Check for shapefile updates: the scan runs on the queue, so it needs the worker from the next step, and since that worker also delivers alerts, alerts wait while it runs (start it at a quiet time). Then review each imported layer and press Activate. If a long first scan fails, run the worker with a longer --timeout (for example 900; queue:listen defaults to 60 seconds), set DB_QUEUE_RETRY_AFTER above it and press the button again: it re-imports any layer that did not finish.',
                 'icon' => 'heroicon-o-map',
                 'condition_key' => 'boundaries_active',
                 'cta_label' => 'Open Shapefile Layers',
@@ -116,7 +116,7 @@ return new class extends Migration
             [
                 'key' => 'billing',
                 'title' => 'Set up billing',
-                'description' => 'Subscribers pay for their plans through Stripe or Paddle. Set STRIPE_SECRET and STRIPE_WEBHOOK_SECRET, or PADDLE_API_KEY and PADDLE_WEBHOOK_SECRET, in .env. This ticks when a Stripe secret or a Paddle API key is set.',
+                'description' => 'Subscribers pay for their plans through Stripe or Paddle. Set the Stripe secret key and webhook signing secret, or the Paddle API key and webhook signing secret, in App Settings > Secrets or in .env (STRIPE_SECRET, STRIPE_WEBHOOK_SECRET, PADDLE_API_KEY, PADDLE_WEBHOOK_SECRET); a value saved in App Settings wins. This ticks when a Stripe secret key or a Paddle API key is set.',
                 'icon' => 'heroicon-o-credit-card',
                 'condition_key' => 'billing_configured',
                 'visibility_condition' => 'is_cloud_mode',

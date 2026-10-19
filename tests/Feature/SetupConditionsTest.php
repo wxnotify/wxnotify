@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ShapefileLayer;
 use App\Models\ShapefileLayerVersion;
 use App\Models\User;
+use App\Settings\SecretSettings;
 use App\Support\Pipeline\PipelineHeartbeat;
 use App\Support\Setup\QueueHeartbeat;
 use App\Support\Setup\ReferenceDataStatus;
@@ -195,6 +196,15 @@ it('accepts a paddle key as billing configured', function () {
 
     expect(setupConditionPasses('billing_configured'))->toBeTrue();
 });
+
+it('accepts a billing key stored in App Settings Secrets as billing configured', function (string $property) {
+    config(['services.stripe.secret' => null, 'services.paddle.api_key' => null]);
+    $secrets = app(SecretSettings::class);
+    $secrets->{$property} = 'stored_key';
+    $secrets->save();
+
+    expect(setupConditionPasses('billing_configured'))->toBeTrue();
+})->with(['stripe_secret_key', 'paddle_api_key']);
 
 it('checks that reference data is installed with a handful of cheap queries', function () {
     Product::factory()->create(['category' => ProductCategory::Marine]);

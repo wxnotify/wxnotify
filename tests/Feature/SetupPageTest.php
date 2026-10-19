@@ -1,6 +1,10 @@
 <?php
 
 use App\Filament\Admin\Pages\Setup;
+use App\Models\ChannelType;
+use App\Models\DidYouKnow;
+use App\Models\Product;
+use App\Models\ShapefileLayer;
 use App\Models\User;
 use App\Support\Setup\ReferenceDataStatus;
 use Filament\Actions\Action;
@@ -23,14 +27,15 @@ test('a non-owner, including staff, cannot open the setup page', function () {
 test('the owner sees a card for each set with its count and state', function () {
     $this->actingAs(User::factory()->create(['is_staff' => true, 'is_owner' => true]));
 
-    $component = livewire(Setup::class)->assertSuccessful();
+    DidYouKnow::factory()->count(3)->create();
+    ShapefileLayer::factory()->count(2)->create();
 
-    foreach (ReferenceDataStatus::sets() as $set) {
-        $component->assertSee($set['label'])
-            ->assertSee(number_format($set['count']));
-    }
-
-    $component->assertSee('Not installed');
+    livewire(Setup::class)->assertSeeInOrder([
+        'Product catalog', number_format(Product::count()),
+        'Channel types', number_format(ChannelType::count()),
+        'Did you know tips', '3', 'Installed',
+        'Shapefile layers', '2', 'Not installed',
+    ]);
 });
 
 test('the install action installs the missing sets and says what it installed', function () {
@@ -41,7 +46,8 @@ test('the install action installs the missing sets and says what it installed', 
     livewire(Setup::class)
         ->assertActionExists('installReferenceData', fn (Action $action): bool => str_contains((string) $action->getModalDescription(), 'Nothing that already exists is changed')
             && str_contains((string) $action->getModalDescription(), 'removes 7 legacy products')
-            && str_contains((string) $action->getModalDescription(), 'Blizzard Watch'))
+            && str_contains((string) $action->getModalDescription(), 'Blizzard Watch')
+            && str_contains((string) $action->getModalDescription(), 'also removes them from any alert rule that uses them'))
         ->callAction('installReferenceData')
         ->assertNotified('Installed: Product catalog, Did you know tips, Shapefile layers');
 

@@ -6,10 +6,12 @@ use App\Support\Setup\ReferenceDataStatus;
 use Database\Seeders\DidYouKnowSeeder;
 use Database\Seeders\ProductCatalogSeeder;
 use Database\Seeders\ShapefileLayerSeeder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Installs the reference data a fresh install is missing, and only that: the seeders rewrite
- * existing rows, so each one runs only for a set that is not installed yet. Nothing is deleted.
+ * existing rows, so each one runs only for a set that is not installed yet, in its own transaction so a
+ * failure part way leaves that set not installed rather than half there. Nothing is deleted.
  * Channel types come from a migration and are never touched here.
  */
 final class InstallReferenceData
@@ -34,7 +36,7 @@ final class InstallReferenceData
                 continue;
             }
 
-            app($seeder)->run();
+            DB::transaction(fn () => app($seeder)->run());
             $ran[] = $key;
         }
 
