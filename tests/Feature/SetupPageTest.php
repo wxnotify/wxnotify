@@ -40,7 +40,8 @@ test('the install action installs the missing sets and says what it installed', 
 
     livewire(Setup::class)
         ->assertActionExists('installReferenceData', fn (Action $action): bool => str_contains((string) $action->getModalDescription(), 'Nothing that already exists is changed')
-            && str_contains((string) $action->getModalDescription(), 'removes 7 legacy products'))
+            && str_contains((string) $action->getModalDescription(), 'removes 7 legacy products')
+            && str_contains((string) $action->getModalDescription(), 'Blizzard Watch'))
         ->callAction('installReferenceData')
         ->assertNotified('Installed: Product catalog, Did you know tips, Shapefile layers');
 

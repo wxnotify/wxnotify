@@ -19,7 +19,7 @@ use Illuminate\Database\Seeder;
  *    untouched, and only category/description/example/wea_warning are filled in.
  *  - Otherwise, it's inserted as a new product using the legacy `abbr` as-is for `code`.
  *
- * Seven existing products have no legacy counterpart at all (Storm Surge Watch/Warning,
+ * Seven existing products have no legacy counterpart at all (Blizzard Watch, Storm Surge Watch/Warning,
  * Lake Effect Snow Warning, Wind Chill Warning/Advisory, WPC Excessive Rainfall Outlook)
  * and are removed, per an explicit decision to match the legacy catalog's exact count.
  *
@@ -35,7 +35,7 @@ class ProductCatalogSeeder extends Seeder
      *
      * @var list<string>
      */
-    private const ORPHAN_CODES = ['BZ.A', 'LE.W', 'SS.A', 'SS.W', 'WC.W', 'WC.Y', 'WPC.ERO'];
+    public const ORPHAN_CODES = ['BZ.A', 'LE.W', 'SS.A', 'SS.W', 'WC.W', 'WC.Y', 'WPC.ERO'];
 
     /**
      * Legacy abbr => the existing product `code` it should be merged into.
