@@ -70,6 +70,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/places/reverse', [PlaceController::class, 'reverse'])->middleware('throttle:app-places')->name('api.v1.places.reverse');
         Route::put('/push-token', [PushTokenController::class, 'update'])->name('api.v1.push-token.update');
         Route::delete('/push-token', [PushTokenController::class, 'destroy'])->name('api.v1.push-token.destroy');
+        Route::post('/push-token/badge/clear', [PushTokenController::class, 'clearBadge'])->name('api.v1.push-token.badge.clear');
         Route::put('/location-sharing', [LocationSharingController::class, 'update'])->name('api.v1.location-sharing.update');
         Route::get('/location-sharing', [LocationSharingController::class, 'show'])->name('api.v1.location-sharing.show');
         Route::delete('/location-sharing', [LocationSharingController::class, 'destroy'])->name('api.v1.location-sharing.destroy');

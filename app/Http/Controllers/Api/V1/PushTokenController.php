@@ -6,6 +6,7 @@ use App\Actions\Channels\RegisterMobilePushDevice;
 use App\Actions\Channels\UnregisterMobilePushDevice;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RegisterPushTokenRequest;
+use App\Models\NotificationChannel;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -33,6 +34,21 @@ class PushTokenController extends Controller
     public function destroy(Request $request, UnregisterMobilePushDevice $unregister): Response
     {
         $unregister($request->user(), $this->accessToken($request));
+
+        return response()->noContent();
+    }
+
+    /**
+     * Reset the unread push count (the app icon badge) of this phone only. Takes no id; always 204.
+     */
+    public function clearBadge(Request $request): Response
+    {
+        NotificationChannel::query()
+            ->where('channel_type', 'mobile_push')
+            ->where('personal_access_token_id', $this->accessToken($request)->id)
+            ->get()
+            ->filter(fn (NotificationChannel $channel): bool => ($channel->config['platform'] ?? null) === 'ios')
+            ->each->resetUnreadPushCount();
 
         return response()->noContent();
     }
