@@ -1,5 +1,7 @@
 <?php
 
+use App\Events\ForegroundPushReceived;
+use App\Listeners\MarkForegroundPush;
 use App\NativeComponents\AlertsScreen;
 use App\NativeComponents\MapScreen;
 use App\NativeComponents\ProductsScreen;
@@ -9,7 +11,6 @@ use App\Support\PushState;
 use App\Support\TokenStore;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-use Native\Mobile\Events\PushNotification\PushNotificationReceived;
 use Native\Mobile\Facades\PushNotifications;
 use Native\Mobile\Testing\Native;
 
@@ -49,15 +50,6 @@ test('mounting a tab screen clears the badge and resets the server count', funct
     Native::test($screen);
 
     expect(badgeResetsSentFromScreens())->toBe(1);
-})->with($tabScreens);
-
-test('a push received while the screen is mounted clears the badge and resets the count', function (string $screen) {
-    PushNotifications::shouldReceive('clearBadge')->twice();
-    fakeTabScreenRequests();
-
-    Native::test($screen)->emitNative(PushNotificationReceived::class, ['data' => ['alert_id' => '7']]);
-
-    expect(badgeResetsSentFromScreens())->toBe(2);
 })->with($tabScreens);
 
 test('an ordinary poll tick neither calls the plugin nor the server', function (string $screen) {
@@ -115,13 +107,72 @@ test('a pending reset is retried on the next tick without calling the plugin', f
 })->with($tabScreens);
 
 test('a failing server never throws into the screen', function (string $screen) {
-    PushNotifications::shouldReceive('clearBadge')->twice()->andThrow(new RuntimeException('plugin down'));
+    PushNotifications::shouldReceive('clearBadge')->once()->andThrow(new RuntimeException('plugin down'));
     fakeTabScreenRequests(badgeResetStatus: 500);
 
     Native::test($screen)
-        ->emitNative(PushNotificationReceived::class, ['data' => []])
         ->firePoll('pollPushBadge')
         ->assertDontSee('plugin down');
 
     expect((new PushState)->resetPending())->toBeTrue();
 })->with($tabScreens);
+
+test('a foreground push flagged by the listener is cleared by the next tick, once', function (string $screen) {
+    $this->freezeTime();
+    PushNotifications::shouldReceive('clearBadge')->twice();
+    fakeTabScreenRequests();
+    $component = Native::test($screen);
+
+    app(MarkForegroundPush::class)->handle(new ForegroundPushReceived);
+    $this->travel(5)->seconds();
+    $component->firePoll('pollPushBadge');
+    $this->travel(5)->seconds();
+    $component->firePoll('pollPushBadge');
+
+    expect(badgeResetsSentFromScreens())->toBe(2)
+        ->and((new PushState)->pullForegroundPush())->toBeFalse();
+})->with($tabScreens);
+
+test('the dispatched foreground-push event reaches the listener and the next tick clears', function () {
+    $this->freezeTime();
+    PushNotifications::shouldReceive('clearBadge')->twice();
+    fakeTabScreenRequests();
+    $component = Native::test(AlertsScreen::class);
+
+    event(new ForegroundPushReceived);
+    $this->travel(5)->seconds();
+    $component->firePoll('pollPushBadge');
+
+    expect(badgeResetsSentFromScreens())->toBe(2);
+});
+
+test('a tick with no foreground flag never calls the plugin', function () {
+    $this->freezeTime();
+    PushNotifications::shouldReceive('clearBadge')->once();
+    fakeTabScreenRequests();
+    $component = Native::test(AlertsScreen::class);
+
+    $this->travel(5)->seconds();
+    $component->firePoll('pollPushBadge');
+    $this->travel(5)->seconds();
+    $component->firePoll('pollPushBadge');
+
+    expect(badgeResetsSentFromScreens())->toBe(1);
+});
+
+test('signing out forgets a pending foreground-push flag', function () {
+    $state = new PushState;
+    $state->markForegroundPush();
+
+    $state->clear();
+
+    expect($state->pullForegroundPush())->toBeFalse();
+});
+
+test('pulling the foreground flag reports it once and clears it', function () {
+    $state = new PushState;
+    $state->markForegroundPush();
+
+    expect($state->pullForegroundPush())->toBeTrue()
+        ->and($state->pullForegroundPush())->toBeFalse();
+});

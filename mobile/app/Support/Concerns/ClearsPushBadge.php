@@ -3,10 +3,9 @@
 namespace App\Support\Concerns;
 
 use App\Services\PushBadge;
+use App\Support\PushState;
 use Illuminate\Support\Carbon;
-use Native\Mobile\Attributes\On;
 use Native\Mobile\Attributes\Poll;
-use Native\Mobile\Events\PushNotification\PushNotificationReceived;
 
 /**
  * Used by every bottom-nav tab screen (Alerts, Map, Products, Settings), so opening the app on any tab
@@ -20,9 +19,14 @@ use Native\Mobile\Events\PushNotification\PushNotificationReceived;
  * more than three intervals after the previous one means the screen was not ticking, i.e. the app was
  * in the background, so it clears the badge and resets the server count.
  *
- * Known limitation: a push that lands while the app is open, or while it is in the background followed
- * by a return before the loop stopped ticking (no gap), stays on the badge (and the Android tray) until
- * the next tab open or gap.
+ * Foreground pushes: every push names App\Events\ForegroundPushReceived in its data, which the plugin
+ * dispatches only while the app is open; the listener sets a cache flag (PushState) and the next tick
+ * consumes it (one cache read per tick) and runs the full clear, on Android removing that push's tray
+ * notification too. So such a push is counted and then cleared within about five seconds. If the event
+ * never fires on a device, the behaviour is just the gap rule above.
+ *
+ * Known limitation: a push that lands while the app is in the background, followed by a return before the
+ * loop stopped ticking (no gap), stays on the badge (and the Android tray) until the next tab open or gap.
  */
 trait ClearsPushBadge
 {
@@ -41,21 +45,12 @@ trait ClearsPushBadge
         $this->pushBadgeTickedAt = now()->toRfc3339String(true);
     }
 
-    /**
-     * Meant for a push that arrives while the app is open. The firebase plugin raises this event only
-     * for a data message with an `event` key, which WxNotify's pushes do not carry yet, so on a device
-     * it does not fire today; it is kept for that future payload (see the spec's Known limitation).
-     */
-    #[On(PushNotificationReceived::class)]
-    public function clearPushBadgeOnForegroundPush(): void
-    {
-        app(PushBadge::class)->clear();
-    }
-
     #[Poll(self::PUSH_BADGE_POLL_MS)]
     public function pollPushBadge(): void
     {
-        if ($this->wasInBackgroundSinceLastPushBadgeTick()) {
+        $foregroundPushReceived = app(PushState::class)->pullForegroundPush();
+
+        if ($foregroundPushReceived || $this->wasInBackgroundSinceLastPushBadgeTick()) {
             app(PushBadge::class)->clear();
         } else {
             app(PushBadge::class)->retryPendingReset();
