@@ -67,10 +67,12 @@ class AdminPanelProvider extends PanelProvider
                 OneTimeOperationsPlugin::make(),
                 // The owner setup checklist (flow "owner-setup", shipped by migration). Owners only:
                 // nobody else gets the launcher, and nothing of onboarding is read on their requests.
+                // The progress page is App\Filament\Admin\Pages\SetupChecklist (owner-only), not
+                // ->progressPage(); the flow and condition resources are owner-only through
+                // config('filament-onboarding.policies').
                 FilamentOnboardingPlugin::make()
                     ->manageFlows()
                     ->launcher()
-                    ->progressPage()
                     ->progressPageNavigation(label: 'Setup checklist', icon: 'heroicon-o-check-badge', group: 'System')
                     ->tours(false)
                     ->skipWhen(fn (User $user): bool => ! $user->is_owner)

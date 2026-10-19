@@ -1,8 +1,14 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
-use Wallacemartinss\FilamentOnboarding\Models\{OnboardingCondition, OnboardingFlow, OnboardingFlowProgress, OnboardingPreference, OnboardingStep, OnboardingStepProgress};
+use App\Onboarding\OwnerOnlyOnboardingPolicy;
+use Wallacemartinss\FilamentOnboarding\Models\OnboardingCondition;
+use Wallacemartinss\FilamentOnboarding\Models\OnboardingFlow;
+use Wallacemartinss\FilamentOnboarding\Models\OnboardingFlowProgress;
+use Wallacemartinss\FilamentOnboarding\Models\OnboardingPreference;
+use Wallacemartinss\FilamentOnboarding\Models\OnboardingStep;
+use Wallacemartinss\FilamentOnboarding\Models\OnboardingStepProgress;
 
 return [
 
@@ -64,8 +70,8 @@ return [
     */
 
     'discovery' => [
-        'enabled'   => true,
-        'path'      => null, // defaults to app_path('Onboarding/Conditions')
+        'enabled' => true,
+        'path' => null, // defaults to app_path('Onboarding/Conditions')
         'namespace' => 'App\Onboarding\Conditions',
     ],
 
@@ -89,8 +95,8 @@ return [
     */
 
     'conditions_builder' => [
-        'models'    => [],
-        'path'      => null, // defaults to app_path('Models')
+        'models' => [],
+        'path' => null, // defaults to app_path('Models')
         'namespace' => 'App\Models',
 
         // Whose columns an "attribute" condition asks about. Defaults to the
@@ -110,9 +116,9 @@ return [
 
     'cache' => [
         'enabled' => true,
-        'store'   => null,
-        'ttl'     => 3600,
-        'prefix'  => 'filament-onboarding',
+        'store' => null,
+        'ttl' => 3600,
+        'prefix' => 'filament-onboarding',
     ],
 
     /*
@@ -127,10 +133,10 @@ return [
     */
 
     'media' => [
-        'disk'       => 'public',
-        'directory'  => 'onboarding',
+        'disk' => 'public',
+        'directory' => 'onboarding',
         'visibility' => 'public', // 'private' signs a temporary URL instead
-        'url_ttl'    => 30,       // minutes, for private disks
+        'url_ttl' => 30,       // minutes, for private disks
 
         /*
          * SVG is deliberately absent. An SVG is a document, and it can carry
@@ -188,7 +194,7 @@ return [
 
     'styles' => [
         'enabled' => true,
-        'path'    => null, // resource_path('css/vendor/filament-onboarding/onboarding.css')
+        'path' => null, // resource_path('css/vendor/filament-onboarding/onboarding.css')
     ],
 
     /*
@@ -198,21 +204,21 @@ return [
     */
 
     'tables' => [
-        'flows'         => 'onboarding_flows',
-        'steps'         => 'onboarding_steps',
+        'flows' => 'onboarding_flows',
+        'steps' => 'onboarding_steps',
         'flow_progress' => 'onboarding_flow_progress',
         'step_progress' => 'onboarding_step_progress',
-        'preferences'   => 'onboarding_preferences',
-        'conditions'    => 'onboarding_conditions',
+        'preferences' => 'onboarding_preferences',
+        'conditions' => 'onboarding_conditions',
     ],
 
     'models' => [
-        'flow'          => OnboardingFlow::class,
-        'step'          => OnboardingStep::class,
+        'flow' => OnboardingFlow::class,
+        'step' => OnboardingStep::class,
         'flow_progress' => OnboardingFlowProgress::class,
         'step_progress' => OnboardingStepProgress::class,
-        'preferences'   => OnboardingPreference::class,
-        'condition'     => OnboardingCondition::class,
+        'preferences' => OnboardingPreference::class,
+        'condition' => OnboardingCondition::class,
     ],
 
     /*
@@ -236,9 +242,9 @@ return [
     */
 
     'policies' => [
-        'flow'      => null,
-        'step'      => null,
-        'condition' => null,
+        'flow' => OwnerOnlyOnboardingPolicy::class,
+        'step' => OwnerOnlyOnboardingPolicy::class,
+        'condition' => OwnerOnlyOnboardingPolicy::class,
     ],
 
     /*
@@ -253,9 +259,9 @@ return [
 
     'resource' => [
         'navigation_group' => null,
-        'navigation_sort'  => null,
-        'navigation_icon'  => 'heroicon-o-map',
-        'cluster'          => null,
+        'navigation_sort' => null,
+        'navigation_icon' => 'heroicon-o-map',
+        'cluster' => null,
     ],
 
 ];

@@ -92,17 +92,27 @@ test('the admin panel shows the launcher to an owner and not to a staff user who
     $this->actingAs($staff)->get('/admin')->assertDontSee('class="fio"', false);
 });
 
-test('the progress page lists the steps with their links for an owner and nothing for a staff user who is not an owner', function () {
+test('the progress page lists the steps with their links for an owner and forbids a staff user who is not an owner', function () {
     $owner = User::factory()->create(['is_staff' => true, 'is_owner' => true]);
     $staff = User::factory()->create(['is_staff' => true, 'is_owner' => false]);
 
     $this->actingAs($owner)->get('/admin/onboarding')
-        ->assertSeeInOrder(['Set the basics in .env', 'Connect the weather feed', 'Install the reference data', 'Import the boundaries'])
+        ->assertSeeInOrder(['Setup checklist', 'Set the basics in .env', 'Connect the weather feed', 'Install the reference data', 'Import the boundaries'])
         ->assertSee('href="/admin/setup"', false);
 
-    $this->actingAs($staff)->get('/admin/onboarding')
-        ->assertDontSee('Install the reference data')
-        ->assertDontSee('href="/admin/setup"', false);
+    $this->actingAs($staff)->get('/admin/onboarding')->assertForbidden();
+});
+
+test('only an owner can open the onboarding flows and conditions in the admin panel', function () {
+    $owner = User::factory()->create(['is_staff' => true, 'is_owner' => true]);
+    $staff = User::factory()->create(['is_staff' => true, 'is_owner' => false]);
+    $flowId = OnboardingFlow::query()->where('key', 'owner-setup')->value('id');
+    $urls = ['/admin/onboarding-flows', "/admin/onboarding-flows/{$flowId}", "/admin/onboarding-flows/{$flowId}/edit", '/admin/onboarding-conditions'];
+
+    foreach ($urls as $url) {
+        $this->actingAs($staff)->get($url)->assertForbidden();
+        $this->actingAs($owner)->get($url)->assertOk();
+    }
 });
 
 test('cloud-only steps are hidden when the mode is self-hosted and shown in cloud mode', function () {
