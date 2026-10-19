@@ -95,3 +95,12 @@ test('signing out forgets the pending flag', function () {
 
     expect((new PushState)->resetPending())->toBeFalse();
 });
+
+test('a failing local clear does not throw or skip the server reset', function () {
+    PushNotifications::shouldReceive('clearBadge')->once()->andThrow(new RuntimeException('plugin down'));
+    Http::fake(['wx.test/api/v1/*' => Http::response(null, 204)]);
+
+    app(PushBadge::class)->clear();
+
+    Http::assertSent(badgeResetSent());
+});

@@ -22,7 +22,11 @@ class PushBadge
      */
     public function clear(bool $server = true): void
     {
-        PushNotifications::clearBadge();
+        try {
+            PushNotifications::clearBadge();
+        } catch (Throwable $e) {
+            Log::info('Push badge local clear failed: '.$e::class);
+        }
 
         if (! ($server || $this->state->resetPending()) || $this->tokens->token() === null) {
             return;
