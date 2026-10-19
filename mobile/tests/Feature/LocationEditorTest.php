@@ -392,7 +392,7 @@ test('the plan limit and maintenance each say so on save, beside the buttons', f
         ->assertElement('column', inLocationActions($text))
         ->assertNoNavigation();
 })->with([
-    'the plan limit' => [422, 'application/json', '{"error":"location_limit"}', 'Your plan\'s location limit is reached. Remove a location, or upgrade, to add another.'],
+    'the plan limit' => [422, 'application/json', '{"error":"location_limit"}', 'Your plan\'s saved-place limit is reached. Remove a saved place, or upgrade, to add another.'],
     'maintenance' => [503, 'text/plain', 'Back soon.', 'Back soon.'],
 ]);
 

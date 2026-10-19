@@ -323,7 +323,7 @@ class LocationEditor extends NativeComponent
 
             return;
         } catch (LocationLimitReached) {
-            $this->banner = 'Your plan\'s location limit is reached. Remove a location, or upgrade, to add another.';
+            $this->banner = 'Your plan\'s saved-place limit is reached. Remove a saved place, or upgrade, to add another.';
 
             return;
         } catch (ValidationFailed $e) {

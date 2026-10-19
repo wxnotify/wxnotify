@@ -45,7 +45,7 @@ test('a plan at its limit is explained and nothing starts', function () {
 
     Native::test(LocationPrompt::class)
         ->tap('Share my location')
-        ->assertSee('location limit')
+        ->assertSee('phone-location allowance')
         ->assertNoNavigation();
 
     expect((new LocationSharingState)->wanted())->toBeFalse();

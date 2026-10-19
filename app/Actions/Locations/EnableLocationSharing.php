@@ -19,9 +19,10 @@ use Spatie\Activitylog\Support\CauserResolver;
  * token; else this user's unlinked app Location with the same device name (so signing in again
  * on the same phone does not duplicate it); else, only when the user cannot create another
  * phone location and has exactly one unlinked app Location, that one (the phone or the Location
- * was renamed, and refusing would be a dead end); else a new one, which must fit the tier's separate phone-location
- * allowance (saved places and Traccar devices do not count against it). Any earlier beacon token of this phone is revoked, so a phone has exactly one. The
- * request has no session user, so writes pin the subscriber as the activity causer.
+ * was renamed, and refusing would be a dead end); else a new one, which must fit the tier's
+ * separate phone-location allowance (saved places and Traccar devices do not count against it).
+ * Any earlier beacon token of this phone is revoked, so a phone has exactly one. The request has
+ * no session user, so writes pin the subscriber as the activity causer.
  */
 class EnableLocationSharing
 {
@@ -33,6 +34,9 @@ class EnableLocationSharing
     public function __invoke(User $user, PersonalAccessToken $appToken): array
     {
         return app(CauserResolver::class)->withCauser($user, fn (): array => DB::transaction(function () use ($user, $appToken): array {
+            // Serialises phones sharing at once, so two cannot both pass the allowance count.
+            User::query()->whereKey($user->id)->lockForUpdate()->first();
+
             PersonalAccessToken::query()->where('parent_token_id', $appToken->id)->delete();
 
             $location = $this->linked($user, $appToken) ?? $this->relinked($user, $appToken) ?? $this->relinkedAtLimit($user, $appToken) ?? $this->created($user, $appToken);

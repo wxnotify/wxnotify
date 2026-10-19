@@ -278,6 +278,7 @@ test('a Free user with a saved place can still share a phone, and the place does
 test('a Free user whose one general slot is full by a Traccar device can still share a phone', function () {
     setPhoneAllowance(1);
     Location::factory()->for($this->user)->mobile()->create();
+    expect($this->user->canCreateLocation())->toBeFalse();
 
     sharingCall($this, 'PUT')->assertOk();
 });
@@ -289,7 +290,7 @@ test('a second phone is refused on Free with the phone-allowance message, while 
 
     sharingCall($this, 'PUT', $second->plainTextToken)->assertUnprocessable()
         ->assertJsonPath('error', 'location_limit')
-        ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'phone-location allowance'));
+        ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'Delete a phone location you no longer use'));
     sharingCall($this, 'PUT')->assertOk();
 
     expect($this->user->locations()->phoneApp()->count())->toBe(1);

@@ -34,7 +34,7 @@ class LocationPrompt extends NativeComponent
         }
 
         $this->error = match ($outcome) {
-            'limit' => 'Your plan\'s location limit is reached. Remove a location on the dashboard, or upgrade, to share this phone\'s location.',
+            'limit' => 'Your plan\'s phone-location allowance is used up. Delete a phone location you no longer use on the dashboard, or upgrade your plan, to share this phone\'s location.',
             'offline' => 'Couldn\'t start sharing: you appear to be offline. Try again when you are back online.',
             default => 'Couldn\'t start sharing right now. Please try again.',
         };
