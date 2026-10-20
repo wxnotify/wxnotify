@@ -31,17 +31,7 @@ class PushBadgeCount
 
         $groupIsUnread = DeliveryLog::query()
             ->where('user_id', $user->id)
-            ->when(
-                $ingestedProductId !== null,
-                fn ($query) => $query
-                    ->where('ingested_product_id', $ingestedProductId)
-                    ->when(
-                        $alertRuleId === null,
-                        fn ($query) => $query->whereNull('alert_rule_id'),
-                        fn ($query) => $query->where('alert_rule_id', $alertRuleId),
-                    ),
-                fn ($query) => $query->whereNull('ingested_product_id')->where('batch_key', $batchKey),
-            )
+            ->inAlertGroup($alertRuleId, $ingestedProductId, $batchKey)
             ->pushedToPhone()
             ->unread()
             ->exists();

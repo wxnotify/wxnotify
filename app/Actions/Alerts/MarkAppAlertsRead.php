@@ -4,13 +4,14 @@ namespace App\Actions\Alerts;
 
 use App\Models\DeliveryLog;
 use App\Models\User;
+use App\Support\AlertRef;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Marks the subscriber's app alerts read. An alert is read by stamping `read_at` on every successful push row
  * of its group that exists now (rows added since the list was fetched included), in one UPDATE of the rows
- * still unread, so repeating a call changes nothing. Both methods return the new unread count.
+ * still unread, so repeating a call changes nothing. Every method returns the new unread count.
  */
 class MarkAppAlertsRead
 {
@@ -33,6 +34,30 @@ class MarkAppAlertsRead
             ->unread()
             ->toBase()
             ->update(['read_at' => now()]);
+
+        return ($this->countUnread)($user);
+    }
+
+    /**
+     * Reads the group a push's tap link names (AlertRef), without an id: the push is tapped before or while its
+     * delivery row is written. A reference that matches nothing (the row is not written yet, or it is someone
+     * else's group) changes nothing, so the call always succeeds.
+     *
+     * @return int the new unread count
+     */
+    public function byRef(User $user, string $ref): int
+    {
+        $group = AlertRef::parse($ref);
+
+        if ($group !== null) {
+            DeliveryLog::query()
+                ->where('user_id', $user->id)
+                ->inAlertGroup($group['alert_rule_id'], $group['ingested_product_id'], $group['batch_key'])
+                ->pushedToPhone()
+                ->unread()
+                ->toBase()
+                ->update(['read_at' => now()]);
+        }
 
         return ($this->countUnread)($user);
     }

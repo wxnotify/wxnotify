@@ -80,6 +80,13 @@ return [
     */
     'app_product_uri' => 'wxnotify://product',
 
+    /*
+    | The app link a push with no product page carries for an app build that declared `tap_ref` at registration:
+    | the alert group reference (App\Support\AlertRef) follows as one path segment, so the tap opens Alerts and
+    | marks that alert read. Must equal the app's registered scheme and route (mobile/routes/mobile.php: /alert/{ref}).
+    */
+    'app_alert_uri' => 'wxnotify://alert',
+
     'map' => [
         'warning_radius_miles' => 150,
         'max_warnings' => 100,

@@ -25,13 +25,9 @@ class FindAppAlert
         $rows = DeliveryLog::query()
             ->where('user_id', $user->id)
             ->when(
-                $anchor->ingested_product_id !== null,
-                fn ($query) => $query
-                    ->where('ingested_product_id', $anchor->ingested_product_id)
-                    ->where('alert_rule_id', $anchor->alert_rule_id),
-                fn ($query) => $anchor->batch_key !== null
-                    ? $query->whereNull('ingested_product_id')->where('batch_key', $anchor->batch_key)
-                    : $query->whereKey($anchor->id),
+                $anchor->ingested_product_id !== null || $anchor->batch_key !== null,
+                fn ($query) => $query->inAlertGroup($anchor->alert_rule_id, $anchor->ingested_product_id, $anchor->batch_key),
+                fn ($query) => $query->whereKey($anchor->id),
             )
             ->with(['alertRule.products', 'alertRule.location', 'notificationChannel', 'ingestedProduct'])
             ->orderBy('id')

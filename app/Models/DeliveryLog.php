@@ -36,6 +36,28 @@ class DeliveryLog extends Model
         return $query->where('channel_type', 'mobile_push')->where('status', 'success');
     }
 
+    /**
+     * The rows of one app alert group named by its identity (AppAlert::keyFor()): with a product, the same rule
+     * (NULL-safe) and product; without one, the same batch key. A legacy row with neither is a group of one that
+     * no identity names, so that case matches nothing.
+     */
+    public function scopeInAlertGroup(Builder $query, ?int $alertRuleId, ?int $ingestedProductId, ?string $batchKey): Builder
+    {
+        if ($ingestedProductId !== null) {
+            return $query->where('ingested_product_id', $ingestedProductId)->when(
+                $alertRuleId === null,
+                fn (Builder $query): Builder => $query->whereNull('alert_rule_id'),
+                fn (Builder $query): Builder => $query->where('alert_rule_id', $alertRuleId),
+            );
+        }
+
+        if ($batchKey !== null) {
+            return $query->whereNull('ingested_product_id')->where('batch_key', $batchKey);
+        }
+
+        return $query->whereRaw('false');
+    }
+
     public function scopeUnread(Builder $query): Builder
     {
         return $query->whereNull('read_at');

@@ -13,11 +13,12 @@ use Spatie\Activitylog\Support\CauserResolver;
  * Creates or refreshes the channel for one signed-in phone (one per app token). A request has no
  * session user and the CauserResolver override ignores causedBy(), so each write pins its causer.
  * The FCM token is a secret: it lives only in the encrypted `config`, plus a one-way hash used to
- * find stale holders of the same token.
+ * find stale holders of the same token. `tap_ref` (stored only when true) says the app build opens tap links that
+ * carry an alert reference; every registration replaces it, so a build that no longer declares it gets the old links.
  */
 class RegisterMobilePushDevice
 {
-    public function __invoke(User $user, PersonalAccessToken $accessToken, string $fcmToken, string $platform): NotificationChannel
+    public function __invoke(User $user, PersonalAccessToken $accessToken, string $fcmToken, string $platform, bool $tapRef = false): NotificationChannel
     {
         $hash = hash('sha256', $fcmToken);
         $resolver = app(CauserResolver::class);
@@ -35,7 +36,9 @@ class RegisterMobilePushDevice
 
         $channel = null;
 
-        $resolver->withCauser($user, function () use (&$channel, $user, $accessToken, $fcmToken, $platform, $hash): void {
+        $config = ['fcm_token' => $fcmToken, 'platform' => $platform, ...($tapRef ? ['tap_ref' => true] : [])];
+
+        $resolver->withCauser($user, function () use (&$channel, $user, $accessToken, $config, $hash): void {
             $save = fn (): NotificationChannel => tap(
                 NotificationChannel::query()->firstOrNew(['personal_access_token_id' => $accessToken->id]),
                 fn (NotificationChannel $device) => $device->forceFill([
@@ -44,7 +47,7 @@ class RegisterMobilePushDevice
                     // A label the subscriber renamed on the dashboard survives a token refresh.
                     'label' => $device->exists ? $device->label : Str::limit($accessToken->name, 80, ''),
                     'apprise_url' => null,
-                    'config' => ['fcm_token' => $fcmToken, 'platform' => $platform],
+                    'config' => $config,
                     'device_token_hash' => $hash,
                     // The phone proved itself by enrolling under an authenticated app token.
                     'verified_at' => $device->verified_at ?? now(),

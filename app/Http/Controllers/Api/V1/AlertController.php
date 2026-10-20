@@ -9,6 +9,7 @@ use App\Actions\Alerts\MarkAppAlertsRead;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ListAppAlertsRequest;
 use App\Http\Requests\MarkAllAppAlertsReadRequest;
+use App\Http\Requests\MarkAppAlertReadByRefRequest;
 use App\Http\Resources\Api\V1\AlertDetailResource;
 use App\Http\Resources\Api\V1\AlertResource;
 use Illuminate\Http\JsonResponse;
@@ -40,6 +41,11 @@ class AlertController extends Controller
         $unread = $mark->one($request->user(), $id) ?? abort(404);
 
         return response()->json(['data' => ['unread_count' => $unread]]);
+    }
+
+    public function readByRef(MarkAppAlertReadByRefRequest $request, MarkAppAlertsRead $mark): JsonResponse
+    {
+        return response()->json(['data' => ['unread_count' => $mark->byRef($request->user(), $request->validated('ref'))]]);
     }
 
     public function readAll(MarkAllAppAlertsReadRequest $request, MarkAppAlertsRead $mark): JsonResponse

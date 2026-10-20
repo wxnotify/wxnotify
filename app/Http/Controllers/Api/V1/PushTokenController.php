@@ -22,6 +22,7 @@ class PushTokenController extends Controller
             $this->accessToken($request),
             $request->validated('token'),
             $request->validated('platform'),
+            $request->boolean('tap_ref'),
         );
 
         return response()->noContent();

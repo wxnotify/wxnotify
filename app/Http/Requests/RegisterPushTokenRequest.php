@@ -14,7 +14,8 @@ class RegisterPushTokenRequest extends FormRequest
 
     /**
      * The token rule refuses a raw APNs hex token (iOS getToken() can return it):
-     * FCM registration tokens contain a colon, and FCM rejects a bare hex string.
+     * FCM registration tokens contain a colon, and FCM rejects a bare hex string. `tap_ref` is sent (true) by app
+     * builds that open the tap links carrying an alert reference (MobilePushTransport); older builds omit it.
      *
      * @return array<string, mixed>
      */
@@ -23,6 +24,7 @@ class RegisterPushTokenRequest extends FormRequest
         return [
             'token' => ['required', 'string', 'max:4096', 'not_regex:/^[0-9a-f]{64,}$/i'],
             'platform' => ['required', Rule::in(['ios', 'android'])],
+            'tap_ref' => ['sometimes', 'boolean'],
         ];
     }
 }

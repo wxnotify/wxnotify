@@ -5,6 +5,7 @@ namespace App\Support\Delivery\Transports;
 use App\Actions\Alerts\PushBadgeCount;
 use App\Jobs\PruneMobilePushChannel;
 use App\Models\NotificationChannel;
+use App\Support\AlertRef;
 use App\Support\Delivery\DeliveryResult;
 use App\Support\Delivery\FcmClient;
 use Illuminate\Support\Facades\Log;
@@ -50,7 +51,7 @@ class MobilePushTransport implements Transport
             $title ?? 'WxNotify',
             Str::limit($body, 200, preserveWords: true),
             [
-                'url' => $this->tapTarget($meta),
+                'url' => $this->tapTarget($channel, $meta),
                 'type' => (string) ($meta['type'] ?? 'alert'),
                 'event' => self::FOREGROUND_PUSH_EVENT,
                 'payload' => self::FOREGROUND_PUSH_PAYLOAD,
@@ -102,19 +103,48 @@ class MobilePushTransport implements Transport
     /**
      * Where a tap on the notification goes: the product page of the bulletin the alert is about, as an app
      * link (`wxnotify://product/{base64url of the page address}`, an https address is not used because Android
-     * would open the phone's browser), else the feed. The delivery-log row (the alert's id) does not exist yet.
+     * would open the phone's browser), else the feed. The delivery-log row (the alert's id) does not exist yet,
+     * so for an app build that declared `tap_ref` at registration the alert's group reference (AlertRef) follows
+     * as one more segment (`.../{link}/{ref}`), or, without a product page, the link is `wxnotify://alert/{ref}`;
+     * the app marks that alert read on tap. Older builds have neither route and keep exactly the links above.
      * Only a public View Product page address is ever carried.
      *
      * @param  array<string, mixed>  $meta
      */
-    private function tapTarget(array $meta): string
+    private function tapTarget(NotificationChannel $channel, array $meta): string
     {
         $page = $meta['url'] ?? null;
+        $ref = $this->tapRef($channel, $meta);
 
         if (! is_string($page) || preg_match('#^https://[^/\s?\#]+/view-product/[a-z0-9-]+$#', $page) !== 1) {
-            return '/';
+            return $ref === null ? '/' : rtrim((string) config('wxnotify.app_alert_uri'), '/').'/'.$ref;
         }
 
-        return rtrim((string) config('wxnotify.app_product_uri'), '/').'/'.rtrim(strtr(base64_encode($page), '+/', '-_'), '=');
+        $link = rtrim((string) config('wxnotify.app_product_uri'), '/').'/'.rtrim(strtr(base64_encode($page), '+/', '-_'), '=');
+
+        return $ref === null ? $link : $link.'/'.$ref;
+    }
+
+    /**
+     * The alert's group reference for the tap link: only for an alert (not the test push), only for a phone whose
+     * app declared it opens such links, and only for a group a reference can name (not a job queued before batch keys).
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function tapRef(NotificationChannel $channel, array $meta): ?string
+    {
+        if (($channel->config['tap_ref'] ?? null) !== true || ($meta['type'] ?? 'alert') !== 'alert') {
+            return null;
+        }
+
+        $alertRuleId = $meta['alert_rule_id'] ?? null;
+        $ingestedProductId = $meta['ingested_product_id'] ?? null;
+        $batchKey = $meta['batch_key'] ?? null;
+
+        return AlertRef::forGroup(
+            is_int($alertRuleId) ? $alertRuleId : null,
+            is_int($ingestedProductId) ? $ingestedProductId : null,
+            is_string($batchKey) ? $batchKey : null,
+        );
     }
 }
