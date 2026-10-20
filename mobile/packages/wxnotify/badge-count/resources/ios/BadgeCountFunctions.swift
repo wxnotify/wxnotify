@@ -21,4 +21,15 @@ enum BadgeCountFunctions {
             return BridgeResponse.success(data: ["count": count])
         }
     }
+
+    // MARK: - BadgeCount.Timezone
+
+    /// The phone's current timezone
+    /// Returns:
+    ///   - timezone: string - IANA id, e.g. "America/Chicago"
+    class Timezone: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            return BridgeResponse.success(data: ["timezone": TimeZone.current.identifier])
+        }
+    }
 }

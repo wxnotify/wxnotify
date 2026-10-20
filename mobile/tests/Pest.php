@@ -1,12 +1,14 @@
 <?php
 
 use App\Services\AppBadge;
+use App\Services\DeviceTimezone;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\Browser;
 use Native\Mobile\Geolocation;
 use Native\Mobile\Network;
 use Native\Mobile\SecureStorage;
+use Tests\Fakes\FakeDeviceTimezone;
 use Tests\Fakes\FakeNetwork;
 use Tests\Fakes\InMemorySecureStorage;
 use Tests\Fakes\RecordingAppBadge;
@@ -35,12 +37,14 @@ pest()->extend(TestCase::class)
         $this->network = new FakeNetwork;
         $this->geolocation = new RecordingGeolocation;
         $this->appBadge = new RecordingAppBadge;
+        $this->deviceTimezone = new FakeDeviceTimezone;
 
         app()->instance(SecureStorage::class, $this->secureStorage);
         app()->instance(Browser::class, $this->browser);
         app()->instance(Network::class, $this->network);
         app()->instance(Geolocation::class, $this->geolocation);
         app()->instance(AppBadge::class, $this->appBadge);
+        app()->instance(DeviceTimezone::class, $this->deviceTimezone);
 
         config(['wxnotify.api_url' => 'https://wx.test']);
         Http::preventStrayRequests();

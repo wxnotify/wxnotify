@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static object|null set(int $count)
+ * @method static string|null timezone()
  *
  * @see \Wxnotify\BadgeCount\BadgeCount
  */

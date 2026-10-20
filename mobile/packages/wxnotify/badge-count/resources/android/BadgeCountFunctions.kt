@@ -21,4 +21,13 @@ object BadgeCountFunctions {
             return BridgeResponse.success(mapOf("count" to 0))
         }
     }
+
+    /**
+     * The phone's current IANA timezone id, e.g. "America/Chicago".
+     */
+    class Timezone(private val context: Context) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            return BridgeResponse.success(mapOf("timezone" to java.util.TimeZone.getDefault().id))
+        }
+    }
 }

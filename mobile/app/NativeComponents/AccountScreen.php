@@ -4,6 +4,7 @@ namespace App\NativeComponents;
 
 use App\Exceptions\Api\ApiException;
 use App\Exceptions\Api\Unauthenticated;
+use App\Services\DeviceTimezone;
 use App\Services\LocationSharing;
 use App\Services\PushRegistration;
 use App\Services\SignOut;
@@ -27,6 +28,10 @@ class AccountScreen extends NativeComponent
 
     /** @var array<string, mixed>|null */
     public ?array $profile = null;
+
+    private ?string $deviceTimezone = null;
+
+    private bool $deviceTimezoneRead = false;
 
     public ?string $pushMessage = null;
 
@@ -133,6 +138,19 @@ class AccountScreen extends NativeComponent
         };
     }
 
+    /**
+     * The phone's timezone, read from the bridge once per screen instance rather than on every render.
+     */
+    private function deviceTimezone(): ?string
+    {
+        if (! $this->deviceTimezoneRead) {
+            $this->deviceTimezone = app(DeviceTimezone::class)->id();
+            $this->deviceTimezoneRead = true;
+        }
+
+        return $this->deviceTimezone;
+    }
+
     private function lastSharedSuffix(?string $lastSharedAt): string
     {
         if ($lastSharedAt === null) {
@@ -141,7 +159,7 @@ class AccountScreen extends NativeComponent
 
         try {
             return ' · last shared '.Carbon::parse($lastSharedAt)
-                ->setTimezone($this->profile['timezone'] ?? config('app.timezone'))
+                ->setTimezone($this->deviceTimezone() ?? $this->profile['timezone'] ?? config('app.timezone'))
                 ->format('g:i a');
         } catch (Throwable) {
             return '';

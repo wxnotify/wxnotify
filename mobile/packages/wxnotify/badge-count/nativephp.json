@@ -11,6 +11,12 @@
             "android": "com.wxnotify.plugins.badge_count.BadgeCountFunctions.SetCount",
             "ios": "BadgeCountFunctions.SetCount",
             "description": "Set the app icon badge number (iOS); a no-op that succeeds on Android"
+        },
+        {
+            "name": "BadgeCount.Timezone",
+            "android": "com.wxnotify.plugins.badge_count.BadgeCountFunctions.Timezone",
+            "ios": "BadgeCountFunctions.Timezone",
+            "description": "The phone's current IANA timezone id, e.g. America/Chicago"
         }
     ],
     "android": {

@@ -293,6 +293,48 @@ test('the location row shows the interval, the last shared time and Stop sharing
         ->assertDontSee('Stops when you close the app');
 });
 
+test('the last shared time is in the phone\'s timezone, not the profile\'s', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+    $this->geolocation->status = sharingStatus();
+    $this->deviceTimezone->timezone = 'Asia/Tokyo';
+
+    Native::test(AccountScreen::class)->assertSee('last shared 3:30 am');
+});
+
+test('a phone timezone that is not a real zone falls back to the profile timezone', function (?string $deviceZone) use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+    $this->geolocation->status = sharingStatus();
+    $this->deviceTimezone->timezone = $deviceZone;
+
+    Native::test(AccountScreen::class)->assertSee('last shared 1:30 pm');
+})->with([null, 'Not/AZone']);
+
+test('with no phone or profile timezone the last shared time uses the app timezone', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => ['timezone' => null] + $profile])]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+    config(['app.timezone' => 'UTC']);
+    $this->geolocation->status = sharingStatus();
+
+    Native::test(AccountScreen::class)->assertSee('last shared 6:30 pm');
+});
+
+test('the phone timezone is read once however often the screen renders', function () use ($profile) {
+    Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
+    stubPushOff();
+    (new LocationSharingState)->markWanted();
+    $this->geolocation->status = sharingStatus();
+    $this->deviceTimezone->timezone = 'Asia/Tokyo';
+
+    Native::test(AccountScreen::class)->assertSee('last shared 3:30 am')->call('onResume')->assertSee('last shared 3:30 am');
+
+    expect($this->deviceTimezone->reads)->toBe(1);
+});
+
 test('a rejected share does not show a last shared time', function () use ($profile) {
     Http::fake(['wx.test/api/v1/me' => Http::response(['data' => $profile])]);
     stubPushOff();
