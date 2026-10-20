@@ -1,6 +1,7 @@
 <?php
 
 use App\NativeComponents\AlertsScreen;
+use App\Services\AlertReadState;
 use App\Support\LocalCache;
 use App\Support\LocationSharingState;
 use App\Support\PushState;
@@ -433,6 +434,21 @@ test('coming back refreshes only when the feed is more than a minute old', funct
     $this->travel(2)->minutes();
     $screen->call('onResume');
     Http::assertSentCount(4);
+});
+
+test('coming back right after a push tap read an alert reloads the feed', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts?*' => Http::response(feedResponse([apiEntry(2, ['read' => false])])),
+        'wx.test/api/v1/alerts/read-ref' => Http::response(['data' => ['unread_count' => 0]]),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class);
+    $this->travel(10)->seconds();
+    app(AlertReadState::class)->openByRef('p.7.88');
+
+    $screen->call('onResume');
+
+    expect(Http::recorded(fn (Request $r) => str_contains($r->url(), '/api/v1/alerts?'))->count())->toBe(2);
 });
 
 test('a successful refresh after paging starts the list over from the first page', function () {

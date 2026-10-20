@@ -18,6 +18,9 @@ class PushState
 
     private const REGISTERED_AT = 'wxnotify.push.registered_at';
 
+    /** Set by a registration that declared `tap_ref`; a registration from an earlier build lacks it. */
+    private const REGISTERED_WITH_TAP_REF = 'wxnotify.push.registered_tap_ref';
+
     public function wantsPush(): bool
     {
         return (bool) Cache::get(self::ENABLED, false);
@@ -40,6 +43,7 @@ class PushState
     {
         Cache::forget(self::ENABLED);
         Cache::forget(self::REGISTERED_AT);
+        Cache::forget(self::REGISTERED_WITH_TAP_REF);
         Cache::forever(self::DECLINED, true);
     }
 
@@ -48,9 +52,22 @@ class PushState
         Cache::forever(self::DECLINED, true);
     }
 
+    /**
+     * Every registration this build makes declares `tap_ref`, so it also sets that marker.
+     */
     public function markRegistered(): void
     {
         Cache::forever(self::REGISTERED_AT, now()->toIso8601String());
+        Cache::forever(self::REGISTERED_WITH_TAP_REF, true);
+    }
+
+    /**
+     * False until this build has registered: the server then still sends the older tap links (without an alert
+     * reference) to this phone, so the first launch after the update registers at once.
+     */
+    public function registeredWithTapRef(): bool
+    {
+        return (bool) Cache::get(self::REGISTERED_WITH_TAP_REF, false);
     }
 
     public function registeredWithin(int $hours): bool
@@ -65,5 +82,6 @@ class PushState
         Cache::forget(self::ENABLED);
         Cache::forget(self::DECLINED);
         Cache::forget(self::REGISTERED_AT);
+        Cache::forget(self::REGISTERED_WITH_TAP_REF);
     }
 }

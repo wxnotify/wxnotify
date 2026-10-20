@@ -33,6 +33,9 @@ class WxNotifyApi
     /** How long a request may take before it counts as offline. */
     public const TIMEOUT_SECONDS = 15;
 
+    /** A push tap's read: a slow server only queues it for the next feed load. */
+    public const TAP_READ_TIMEOUT_SECONDS = 5;
+
     public function __construct(private TokenStore $tokens) {}
 
     /**
@@ -96,6 +99,22 @@ class WxNotifyApi
     }
 
     /**
+     * Marks the alert a tapped push named by its reference read (on every phone); idempotent, and a reference that
+     * matches nothing yet is a no-op. Kept short: it runs while a tapped push opens the app.
+     *
+     * @return int the subscriber's unread count afterwards
+     *
+     * @throws ValidationFailed when the server refuses the reference (422)
+     */
+    public function markAlertReadByRef(string $ref): int
+    {
+        return $this->unreadCount($this->send(
+            fn (PendingRequest $request) => $request->post('/api/v1/alerts/read-ref', ['ref' => $ref]),
+            timeoutSeconds: self::TAP_READ_TIMEOUT_SECONDS,
+        ));
+    }
+
+    /**
      * Marks every alert of the subscriber read; idempotent. With `$through` (a feed's `as_of`) the server reads
      * only alerts created at or before it; without it, every alert (the only form an older backend knows).
      *
@@ -122,9 +141,13 @@ class WxNotifyApi
         $this->send(fn (PendingRequest $request) => $request->delete('/api/v1/auth/token'));
     }
 
+    /**
+     * `tap_ref` tells the server this build opens tap links that carry an alert reference (/product/{link}/{ref},
+     * /alert/{ref}); without it the server keeps sending the older links.
+     */
     public function registerPushToken(string $token, string $platform): void
     {
-        $this->send(fn (PendingRequest $request) => $request->put('/api/v1/push-token', ['token' => $token, 'platform' => $platform]));
+        $this->send(fn (PendingRequest $request) => $request->put('/api/v1/push-token', ['token' => $token, 'platform' => $platform, 'tap_ref' => true]));
     }
 
     public function unregisterPushToken(): void

@@ -2,6 +2,7 @@
 
 use App\NativeComponents\AccountScreen;
 use App\NativeComponents\AlertDetail;
+use App\NativeComponents\AlertOpen;
 use App\NativeComponents\AlertsScreen;
 use App\NativeComponents\AuthCallback;
 use App\NativeComponents\AuthDenied;
@@ -30,6 +31,8 @@ Route::native('/settings', SettingsScreen::class);
 Route::native('/map', MapScreen::class);
 Route::native('/products', ProductsScreen::class);
 Route::native('/product/{link}', ProductLink::class);
+Route::native('/product/{link}/{ref}', ProductLink::class);
+Route::native('/alert/{ref}', AlertOpen::class);
 Route::native('/rules', RulesScreen::class);
 Route::native('/rules/new', RuleEditor::class);
 Route::native('/rules/{id}', RuleEditor::class);

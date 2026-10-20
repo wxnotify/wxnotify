@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use App\Exceptions\Api\ApiException;
+use App\Exceptions\Api\Maintenance;
 use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\RateLimited;
 use App\Exceptions\Api\Rejected;
+use App\Exceptions\Api\Retryable;
 use App\Exceptions\Api\Unauthenticated;
+use App\Support\AlertRefFormat;
 use App\Support\LocalCache;
 use App\Support\ReadCutoff;
 
@@ -56,6 +59,29 @@ class AlertReadState
         }
 
         $this->setBadge();
+    }
+
+    /**
+     * Reads the alert a tapped push named by its reference (AlertRefFormat). The phone may not have cached it, and its
+     * delivery row may not even exist yet, so the server decides: its count is stored and shown on the badge, and the
+     * feed reloads on its next showing so the dot goes. A reference in the wrong format is ignored. Offline, a server
+     * error, rate limiting or maintenance keep the reference for retryPending(); any other refusal drops it; a refused
+     * token stops (the feed load that follows signs out). Never throws to a screen.
+     */
+    public function openByRef(string $ref): void
+    {
+        if (! AlertRefFormat::isValid($ref)) {
+            return;
+        }
+
+        try {
+            $this->syncFromServer($this->api->markAlertReadByRef($ref));
+            $this->cache->forgetSyncedAt();
+        } catch (Offline|Retryable|Maintenance) {
+            $this->cache->rememberPendingRefs([...$this->cache->pendingRefs(), $ref]);
+        } catch (ApiException) {
+            return;
+        }
     }
 
     /**
@@ -129,8 +155,9 @@ class AlertReadState
     }
 
     /**
-     * Replays the pending "mark all" and then each pending id. A 404 drops an id (it left the feed);
-     * offline, rate limiting or a refused token stops at once and keeps what is left; any other failure keeps that id.
+     * Replays the pending "mark all", then each pending id, then each pending push-tap reference. A 404 drops an id
+     * (it left the feed); offline, rate limiting or a refused token stops at once and keeps what is left; any other
+     * failure keeps that id.
      */
     public function retryPending(): void
     {
@@ -147,27 +174,58 @@ class AlertReadState
             }
         }
 
-        $this->replayPendingReads();
+        if ($this->replayPendingReads()) {
+            $this->replayPendingRefs();
+        }
+    }
+
+    /**
+     * Replays each queued push-tap reference, storing the server's count after each. Offline, rate limiting or a
+     * refused token stops at once; another server error or maintenance keeps that reference; any other refusal drops it.
+     */
+    private function replayPendingRefs(): void
+    {
+        foreach ($this->cache->pendingRefs() as $ref) {
+            try {
+                $this->cache->rememberUnreadCount($this->api->markAlertReadByRef($ref));
+                $this->forgetPendingRef($ref);
+            } catch (Offline|RateLimited|Unauthenticated) {
+                return;
+            } catch (Retryable|Maintenance) {
+                continue;
+            } catch (ApiException) {
+                $this->forgetPendingRef($ref);
+            }
+        }
+    }
+
+    private function forgetPendingRef(string $ref): void
+    {
+        $this->cache->rememberPendingRefs(array_values(array_diff($this->cache->pendingRefs(), [$ref])));
     }
 
     /**
      * Replays each pending id, storing the server's count after each. A 404 drops an id; offline, rate limiting
      * or a refused token stops at once; any other failure keeps that id.
+     *
+     * @return bool false when it stopped early (offline, rate limited, refused token)
      */
-    private function replayPendingReads(): void
+    private function replayPendingReads(): bool
     {
         foreach ($this->cache->pendingReads() as $id) {
             try {
                 $this->cache->rememberUnreadCount($this->api->markAlertRead($id));
                 $this->forgetPending($id);
             } catch (Offline|RateLimited|Unauthenticated) {
-                return;
+                return false;
             } catch (Rejected) {
                 $this->forgetPending($id);
             } catch (ApiException) {
                 continue;
             }
         }
+
+        return true;
     }
 
     /**

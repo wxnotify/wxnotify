@@ -6,6 +6,7 @@ use App\Services\SignOut;
 use App\Support\PushState;
 use App\Support\TokenStore;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\Events\PushNotification\TokenGenerated;
 use Native\Mobile\Facades\PushNotifications;
@@ -169,4 +170,49 @@ test('signing out forgets every push flag', function () {
     app(SignOut::class)();
 
     expect($state->wantsPush())->toBeFalse()->and($state->declined())->toBeFalse()->and($state->registeredWithin(48))->toBeFalse();
+});
+
+test('every registration tells the server this build opens tap links that carry an alert reference', function () {
+    Http::fake(['wx.test/api/v1/push-token' => Http::response(null, 204)]);
+    (new PushState)->markEnabled();
+
+    event(new TokenGenerated('fcm-1'));
+
+    Http::assertSent(fn (Request $r) => pushRegistered('fcm-1')($r) && $r['tap_ref'] === true);
+    expect((new PushState)->registeredWithTapRef())->toBeTrue();
+});
+
+test('the first launch after the update registers at once when the last registration predates tap references', function () {
+    Cache::forever('wxnotify.push.registered_at', now()->subHour()->toIso8601String());
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    PushNotifications::shouldReceive('enroll')->once();
+    (new PushState)->markEnabled();
+
+    expect((new PushState)->registeredWithin(20))->toBeTrue()
+        ->and((new PushState)->registeredWithTapRef())->toBeFalse();
+
+    app(PushRegistration::class)->refreshIfDue();
+});
+
+test('a recent registration made with tap references waits out the usual day', function () {
+    PushNotifications::shouldReceive('checkPermission')->andReturn('granted');
+    PushNotifications::shouldReceive('enroll')->never();
+    $state = new PushState;
+    $state->markEnabled();
+    $state->markRegistered();
+
+    app(PushRegistration::class)->refreshIfDue();
+});
+
+test('turning push off or signing out forgets the tap reference marker', function () {
+    $state = new PushState;
+    $state->markRegistered();
+    $state->markDisabled();
+
+    expect($state->registeredWithTapRef())->toBeFalse();
+
+    $state->markRegistered();
+    $state->clear();
+
+    expect($state->registeredWithTapRef())->toBeFalse();
 });

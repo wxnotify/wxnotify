@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  * What the app keeps on the phone so it opens instantly and works offline: the latest feed
  * page, any alert detail the subscriber opened, the profile from /me, and when the feed was
  * last refreshed, the read state (each cached alert's flag, the last known unread count, the reads
- * still waiting for the server and the feed's as_of), plus the alert rules, saved locations, notification channels, rule-form options, the map's page, the current watches, warnings and advisories and the recent product searches. Signing out wipes all of it.
+ * still waiting for the server, push-tap reads included, and the feed's as_of), plus the alert rules, saved locations, notification channels, rule-form options, the map's page, the current watches, warnings and advisories and the recent product searches. Signing out wipes all of it.
  */
 class LocalCache
 {
@@ -43,6 +43,11 @@ class LocalCache
     private const PENDING_READ_ALL = 'wxnotify.alerts.pending_read_all';
 
     private const FEED_AS_OF = 'wxnotify.alerts.feed_as_of';
+
+    private const PENDING_REFS = 'wxnotify.alerts.pending_refs';
+
+    /** The most push-tap reads kept for a retry; the oldest go first. */
+    public const MAX_PENDING_REFS = 20;
 
     private const MAX_SEARCHES = 10;
 
@@ -187,6 +192,40 @@ class LocalCache
         }
 
         Cache::forever(self::PENDING_READS, array_values(array_unique($ids)));
+    }
+
+    /**
+     * @return array<int, string> alert references of tapped pushes whose read has not reached the server yet, oldest first
+     */
+    public function pendingRefs(): array
+    {
+        return Cache::get(self::PENDING_REFS, []);
+    }
+
+    /**
+     * Keeps at most MAX_PENDING_REFS distinct references, the newest.
+     *
+     * @param  array<int, string>  $refs
+     */
+    public function rememberPendingRefs(array $refs): void
+    {
+        $refs = array_slice(array_values(array_unique($refs)), -self::MAX_PENDING_REFS);
+
+        if ($refs === []) {
+            Cache::forget(self::PENDING_REFS);
+
+            return;
+        }
+
+        Cache::forever(self::PENDING_REFS, $refs);
+    }
+
+    /**
+     * Makes the Alerts feed reload the next time it is shown (a read made outside it, such as a push tap).
+     */
+    public function forgetSyncedAt(): void
+    {
+        Cache::forget(self::SYNCED_AT);
     }
 
     /**
@@ -429,5 +468,6 @@ class LocalCache
         Cache::forget(self::PENDING_READS);
         Cache::forget(self::PENDING_READ_ALL);
         Cache::forget(self::FEED_AS_OF);
+        Cache::forget(self::PENDING_REFS);
     }
 }

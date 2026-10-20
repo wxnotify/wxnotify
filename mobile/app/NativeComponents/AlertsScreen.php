@@ -149,9 +149,15 @@ class AlertsScreen extends NativeComponent
         }
     }
 
+    /**
+     * A push tap that read an alert forgets the cached sync time (LocalCache::forgetSyncedAt()), so the feed reloads
+     * on the next showing even though this screen loaded it a moment ago.
+     */
     private function feedSyncedRecently(): bool
     {
-        return $this->syncedAt !== null && Carbon::parse($this->syncedAt)->diffInSeconds(now(), true) < self::RESUME_REFRESH_AFTER_SECONDS;
+        return $this->syncedAt !== null
+            && app(LocalCache::class)->syncedAt() !== null
+            && Carbon::parse($this->syncedAt)->diffInSeconds(now(), true) < self::RESUME_REFRESH_AFTER_SECONDS;
     }
 
     /**

@@ -85,11 +85,13 @@ class PushRegistration
      * a token today, ask the OS to enroll again. That shows no dialog (permission is already given),
      * fetches the live FCM token and fires TokenGenerated, which the mounted screen's handler (HandlesPushToken) sends
      * to the server (recreating a channel it pruned). The plugin's cached getToken() value is never
-     * sent: it is not kept current, and on iOS it can hold the APNs token.
+     * sent: it is not kept current, and on iOS it can hold the APNs token. A registration made by a build from before
+     * tap links carried an alert reference does not count, so the first launch after the update registers at once
+     * and the server switches this phone to the new links.
      */
     public function refreshIfDue(): void
     {
-        if (! $this->state->wantsPush() || $this->state->registeredWithin(self::REFRESH_AFTER_HOURS)) {
+        if (! $this->state->wantsPush() || ($this->state->registeredWithin(self::REFRESH_AFTER_HOURS) && $this->state->registeredWithTapRef())) {
             return;
         }
 
