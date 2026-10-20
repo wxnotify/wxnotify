@@ -443,11 +443,16 @@ class AlertsScreen extends NativeComponent
     }
 
     /**
+     * The row's overline, led by "Unread" while the alert is unread: screen readers do not announce the
+     * unread dot, so the state is also in words.
+     *
      * @param  array<string, mixed>  $alert
      */
     public function subtitle(array $alert): string
     {
-        return AlertPresenter::subtitle($alert);
+        $subtitle = AlertPresenter::subtitle($alert);
+
+        return ($alert['read'] ?? true) === false ? 'Unread · '.$subtitle : $subtitle;
     }
 
     /**
@@ -455,6 +460,10 @@ class AlertsScreen extends NativeComponent
      */
     public function markAllRead(): void
     {
+        if (! $this->hasUnread()) {
+            return;
+        }
+
         app(AlertReadState::class)->markAll();
 
         $this->alerts = array_map(fn (array $alert): array => [...$alert, 'read' => true], $this->alerts);

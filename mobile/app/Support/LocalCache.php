@@ -86,7 +86,8 @@ class LocalCache
 
     /**
      * @param  array<string, mixed>  $detail  a detail payload (a superset of the feed entry); its `read` flag, when
-     *                                        present, is the server's and replaces the cached one
+     *                                        present, is the server's and replaces the cached one, except that it never
+     *                                        turns a read still waiting for the server (or a pending mark all) unread
      */
     public function storeDetail(array $detail): void
     {
@@ -96,7 +97,7 @@ class LocalCache
             $alert->fill(['sort_at' => Carbon::parse($detail['dispatched_at']), 'list' => $detail, 'in_feed' => false]);
         }
 
-        if (array_key_exists('read', $detail)) {
+        if (array_key_exists('read', $detail) && ($detail['read'] || ! $this->readIsPending((int) $detail['id']))) {
             $alert->read = (bool) $detail['read'];
         }
 
@@ -112,6 +113,11 @@ class LocalCache
     public function markAlertRead(int $id): bool
     {
         return CachedAlert::query()->whereKey($id)->where('read', false)->update(['read' => true]) > 0;
+    }
+
+    private function readIsPending(int $id): bool
+    {
+        return $this->pendingReadAll() || in_array($id, $this->pendingReads(), true);
     }
 
     public function markAllAlertsRead(): void

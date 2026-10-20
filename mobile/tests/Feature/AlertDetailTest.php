@@ -1,6 +1,7 @@
 <?php
 
 use App\NativeComponents\AlertDetail;
+use App\Services\AlertReadState;
 use App\Support\LocalCache;
 use App\Support\TokenStore;
 use Illuminate\Http\Client\ConnectionException;
@@ -146,4 +147,21 @@ test('an alert that is no longer available is not marked read', function () {
 
     Http::assertSentCount(1);
     expect((new LocalCache)->pendingReads())->toBe([]);
+});
+
+test('a read the server keeps refusing is counted once, even when the detail still says unread', function () {
+    (new LocalCache)->replaceFeed([detailPayload(['read' => false]), detailPayload(['id' => 5, 'read' => false])]);
+    (new LocalCache)->rememberUnreadCount(2);
+    Http::fake([
+        'wx.test/api/v1/alerts/4/read' => Http::response([], 500),
+        'wx.test/api/v1/alerts/4' => Http::response(['data' => detailPayload(['read' => false])]),
+    ]);
+
+    app(AlertReadState::class)->open(4);
+    Native::test(AlertDetail::class, ['id' => 4]);
+
+    expect((new LocalCache)->unreadCount())->toBe(1)
+        ->and($this->appBadge->counts)->toBe([1, 1])
+        ->and((new LocalCache)->isCachedRead(4))->toBeTrue()
+        ->and((new LocalCache)->pendingReads())->toBe([4]);
 });

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\Api\ApiException;
 use App\Exceptions\Api\Offline;
+use App\Exceptions\Api\RateLimited;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\Unauthenticated;
 use App\Support\LocalCache;
@@ -26,6 +27,7 @@ class AlertReadState
     /**
      * Reads one alert. An alert this phone already shows read, with no read waiting for the server, sends
      * nothing (the list tap and the detail screen both call this); an alert it has not cached asks the server.
+     * An id already pending was counted out when it was first read, so it never lowers the count again.
      */
     public function open(int $id): void
     {
@@ -37,7 +39,9 @@ class AlertReadState
             return;
         }
 
-        if ($this->cache->markAlertRead($id)) {
+        $wasPending = in_array($id, $this->cache->pendingReads(), true);
+
+        if ($this->cache->markAlertRead($id) && ! $wasPending) {
             $this->lowerUnreadCount();
         }
 
@@ -111,7 +115,7 @@ class AlertReadState
 
     /**
      * Replays the pending "mark all" and then each pending id. A 404 drops an id (it left the feed);
-     * offline or a refused token stops at once and keeps what is left; any other failure keeps that id.
+     * offline, rate limiting or a refused token stops at once and keeps what is left; any other failure keeps that id.
      */
     public function retryPending(): void
     {
@@ -131,7 +135,7 @@ class AlertReadState
             try {
                 $this->cache->rememberUnreadCount($this->api->markAlertRead($id));
                 $this->forgetPending($id);
-            } catch (Offline|Unauthenticated) {
+            } catch (Offline|RateLimited|Unauthenticated) {
                 return;
             } catch (Rejected) {
                 $this->forgetPending($id);

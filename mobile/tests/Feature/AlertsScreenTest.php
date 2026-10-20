@@ -1049,3 +1049,28 @@ test('a refused token on a pending read does not loop: one try, then the feed si
     expect(Http::recorded(fn (Request $r) => str_ends_with($r->url(), '/read'))->count())->toBe(1)
         ->and((new TokenStore)->token())->toBeNull();
 });
+
+test('an unread row says Unread in its overline, a read row keeps its usual overline', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(1, ['read' => false]), apiEntry(2)]))]);
+
+    $overlines = collect(sentAlertRows(Native::test(AlertsScreen::class)->tree()))->pluck('props.overline', 'props.headline')->sortKeys()->all();
+
+    expect($overlines)->toBe([
+        'Tornado Warning 1' => 'Unread · Weather Alerts · 5 minutes ago',
+        'Tornado Warning 2' => 'Weather Alerts · 5 minutes ago',
+    ]);
+});
+
+test('a second Mark all as read with nothing unread sends nothing and changes nothing', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 0]]),
+        'wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(4, ['read' => false])])),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->call('markAllRead')->call('markAllRead');
+
+    expect(Http::recorded(fn (Request $r) => str_ends_with($r->url(), '/read-all'))->count())->toBe(1)
+        ->and($this->appBadge->counts)->toBe([1, 0])
+        ->and((new LocalCache)->pendingReadAll())->toBeFalse();
+    $screen->assertSet('unreadCount', 0);
+});

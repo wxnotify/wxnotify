@@ -228,3 +228,13 @@ test('a feed without a count leaves the stored count and the badge alone', funct
     expect($this->cache->unreadCount())->toBe(2)
         ->and($this->appBadge->counts)->toBe([]);
 });
+
+test('a rate-limited retry stops at once and keeps the queue', function () {
+    $this->cache->rememberPendingReads([1, 2]);
+    Http::fake(['wx.test/*' => Http::response([], 429)]);
+
+    $this->state->retryPending();
+
+    expect($this->cache->pendingReads())->toBe([1, 2]);
+    Http::assertSentCount(1);
+});

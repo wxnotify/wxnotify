@@ -127,3 +127,12 @@ test('wiping forgets the unread count and every pending read', function () {
         ->and($this->cache->pendingReads())->toBe([])
         ->and($this->cache->pendingReadAll())->toBeFalse();
 });
+
+test('a detail never turns a read still waiting for the server back to unread', function (bool $readAll) {
+    $this->cache->replaceFeed([[...feedEntry(1), 'read' => true]]);
+    $readAll ? $this->cache->rememberPendingReadAll() : $this->cache->rememberPendingReads([1]);
+
+    $this->cache->storeDetail([...feedEntry(1), 'read' => false, 'rule_name' => null]);
+
+    expect($this->cache->isCachedRead(1))->toBeTrue();
+})->with(['a pending read' => [false], 'a pending mark all' => [true]]);
