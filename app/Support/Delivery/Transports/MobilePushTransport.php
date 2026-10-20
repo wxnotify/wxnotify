@@ -19,10 +19,9 @@ class MobilePushTransport implements Transport
     public const PRUNE_DELAY_SECONDS = 60;
 
     /**
-     * Named in the FCM data of every phone push: the firebase plugin dispatches it, with the `payload` below
-     * as its constructor arguments, only when the app is open. The app's listener flags the foreground push.
-     * The class name is duplicated in the app (mobile/app/Events/ForegroundPushReceived.php): change both, a
-     * mismatch silently degrades to the old behaviour (the plugin only logs that the class does not exist).
+     * Named in the FCM data of every phone push for app builds from before read/unread alerts, whose listener
+     * cleared the badge after a foreground push. Current builds have no such class (the firebase plugin just
+     * logs that it does not exist). Harmless; remove it and the payload below in a later release.
      */
     public const FOREGROUND_PUSH_EVENT = 'App\\Events\\ForegroundPushReceived';
 

@@ -182,19 +182,6 @@ test('an Android push has no badge', function () {
         && ! array_key_exists('badge', $request['message']['apns']['payload']['aps']));
 });
 
-test('the transport no longer touches the per-phone unread push count', function (?Closure $googleResponse) {
-    fcmFakeGoogle($googleResponse?->__invoke());
-    $phone = NotificationChannel::factory()->mobilePush('ios-token-2', 'ios')->create();
-
-    app(ChannelDispatcher::class)->send($phone, 'Body', 'First');
-    app(ChannelDispatcher::class)->send($phone, 'Body', 'Second');
-
-    expect($phone->fresh()->unread_push_count)->toBe(0);
-})->with([
-    'delivered' => [null],
-    'failed' => [fn () => Http::response(['error' => ['message' => 'down']], 500)],
-]);
-
 test('an iOS device with no stored token fails without calling Firebase', function () {
     Http::fake();
     $phone = NotificationChannel::factory()->mobilePush()->create(['config' => ['platform' => 'ios']]);
@@ -221,7 +208,7 @@ test('the badge is never a data field', function () {
     });
 });
 
-test('every phone push names the foreground-push event with an empty JSON payload, as strings', function (string $platform) {
+test('every phone push still names the old builds\' foreground-push event with an empty JSON payload, as strings', function (string $platform) {
     fcmFakeGoogle();
     $phone = NotificationChannel::factory()->mobilePush("{$platform}-event-token", $platform)->create();
 

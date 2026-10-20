@@ -175,8 +175,7 @@ test('each weather alert pushed to an iPhone carries the unread alert count incl
         ->map(fn (array $pair) => $pair[0]['message']['apns']['payload']['aps']['badge'])
         ->values()->all();
 
-    expect($badges)->toBe([1, 2, 2])
-        ->and($phone->fresh()->unread_push_count)->toBe(0);
+    expect($badges)->toBe([1, 2, 2]);
     @unlink($credentials['path']);
 });
 
