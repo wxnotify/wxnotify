@@ -6,6 +6,7 @@ use App\Exceptions\Api\ApiException;
 use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\Unauthenticated;
+use App\Services\AlertReadState;
 use App\Services\SignOut;
 use App\Services\WxNotifyApi;
 use App\Support\AlertPresenter;
@@ -16,7 +17,8 @@ use Native\Mobile\Facades\Browser;
 
 /**
  * One alert: what was sent, by which rule, over which channels, and how each delivery went.
- * An alert opened before is kept for offline use.
+ * An alert opened before is kept for offline use. Opening it reads it (also offline, or from a deep
+ * link); an alert the server no longer has, or a refused token, reads nothing.
  */
 class AlertDetail extends NativeComponent
 {
@@ -50,15 +52,21 @@ class AlertDetail extends NativeComponent
         } catch (Unauthenticated) {
             app(SignOut::class)->clearLocal();
             $this->replace('/sign-in');
+
+            return;
         } catch (Offline) {
             $this->offline = true;
             $this->message = $this->alert === null ? 'Connect to the internet to see this alert.' : null;
         } catch (Rejected) {
             $this->alert = null;
             $this->message = 'This alert is no longer available.';
+
+            return;
         } catch (ApiException) {
             $this->message = $this->alert === null ? 'WxNotify could not load this alert. Go back and try again.' : null;
         }
+
+        app(AlertReadState::class)->open($id);
     }
 
     public function openProduct(): void

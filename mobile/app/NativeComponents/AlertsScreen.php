@@ -7,6 +7,7 @@ use App\Exceptions\Api\Offline;
 use App\Exceptions\Api\Unauthenticated;
 use App\Icons\Android;
 use App\Icons\Ios;
+use App\Services\AlertReadState;
 use App\Services\LocationSharing;
 use App\Services\PushRegistration;
 use App\Services\SignOut;
@@ -26,7 +27,8 @@ use Native\Mobile\Facades\Browser;
 
 /**
  * The home screen: the subscriber's recent alerts. Paints from the local cache first, then
- * refreshes; offline it keeps showing what it has, with a banner.
+ * refreshes; offline it keeps showing what it has, with a banner. Unread alerts carry a dot; opening
+ * one reads it and "Mark all as read" reads them all (AlertReadState: local first, server best-effort).
  */
 class AlertsScreen extends NativeComponent
 {
@@ -48,6 +50,9 @@ class AlertsScreen extends NativeComponent
     public ?string $error = null;
 
     public ?string $syncedAt = null;
+
+    /** The subscriber's unread count as this phone last knew it; null until a feed load reported one. */
+    public ?int $unreadCount = null;
 
     /** True once a further page has been appended, so coming back to the screen must not reset the list. */
     public bool $pagedBeyondFirst = false;
@@ -96,6 +101,7 @@ class AlertsScreen extends NativeComponent
         $this->alerts = $cache->feed();
         $this->timezone = $cache->profile()['timezone'] ?? null;
         $this->syncedAt = $cache->syncedAt()?->toIso8601String();
+        $this->unreadCount = $cache->unreadCount();
 
         $savedActive = $cache->activeAlerts();
 
@@ -115,6 +121,8 @@ class AlertsScreen extends NativeComponent
      */
     public function onResume(): void
     {
+        $this->applyCachedReadState();
+
         if (! $this->pagedBeyondFirst && ! $this->feedSyncedRecently()) {
             $this->refreshFeed();
         }
@@ -159,16 +167,25 @@ class AlertsScreen extends NativeComponent
         $this->refreshActive();
     }
 
+    /**
+     * Replays reads that did not reach the server, then loads the first page. The page's unread count
+     * (less reads still pending) becomes the stored count and the icon badge.
+     */
     private function refreshFeed(): void
     {
         $cache = app(LocalCache::class);
+        $readState = app(AlertReadState::class);
 
         try {
+            $readState->retryPending();
+
             $page = app(WxNotifyApi::class)->alerts(limit: (int) config('wxnotify.feed_cache_size'));
+            $entries = $readState->applyFeed($page['data'], $page['meta']['unread_count']);
 
-            $cache->replaceFeed($page['data']);
+            $cache->replaceFeed($entries);
 
-            $this->alerts = $page['data'];
+            $this->alerts = $entries;
+            $this->unreadCount = $cache->unreadCount();
             $this->nextCursor = $page['meta']['next_cursor'] ?? null;
             $this->syncedAt = $cache->syncedAt()?->toIso8601String();
             $this->pagedBeyondFirst = false;
@@ -372,7 +389,7 @@ class AlertsScreen extends NativeComponent
         try {
             $page = app(WxNotifyApi::class)->alerts($this->nextCursor);
 
-            $this->alerts = [...$this->alerts, ...$page['data']];
+            $this->alerts = [...$this->alerts, ...app(AlertReadState::class)->applyFeed($page['data'], null)];
             $this->nextCursor = $page['meta']['next_cursor'] ?? null;
             $this->pagedBeyondFirst = true;
             $this->lastPageLoadedAt = now()->toRfc3339String(true);
@@ -397,11 +414,14 @@ class AlertsScreen extends NativeComponent
     }
 
     /**
-     * Opens the alert's public product page in the in-app browser; an alert with no product page
-     * (a daily summary, say) or a cached row from before the feed carried the link opens its detail.
+     * Reads the alert, then opens its public product page in the in-app browser; an alert with no product
+     * page (a daily summary, say) or a cached row from before the feed carried the link opens its detail.
      */
     public function open(int $id): void
     {
+        app(AlertReadState::class)->open($id);
+        $this->showAsRead($id);
+
         $alert = collect($this->alerts)->firstWhere('id', $id);
 
         if (filled($alert['product_url'] ?? null)) {
@@ -415,7 +435,7 @@ class AlertsScreen extends NativeComponent
 
     /**
      * The long-press action: the alert's detail (rule, channels, delivery status), whether or not it
-     * has a product page.
+     * has a product page. The detail reads the alert; coming back picks the flag up from the cache.
      */
     public function openDetail(int $id): void
     {
@@ -431,39 +451,76 @@ class AlertsScreen extends NativeComponent
     }
 
     /**
-     * @param  array<string, mixed>  $alert
+     * Reads every alert ("Mark all as read").
      */
-    public function channels(array $alert): string
+    public function markAllRead(): void
     {
-        return AlertPresenter::channels($alert);
+        app(AlertReadState::class)->markAll();
+
+        $this->alerts = array_map(fn (array $alert): array => [...$alert, 'read' => true], $this->alerts);
+        $this->unreadCount = app(LocalCache::class)->unreadCount();
     }
 
     /**
-     * The row's supporting text: the channels line, then a "Delivery problem" line when any send failed.
+     * True when anything is unread, so "Mark all as read" is offered.
+     */
+    public function hasUnread(): bool
+    {
+        return ($this->unreadCount ?? 0) > 0
+            || collect($this->alerts)->contains(fn (array $alert): bool => ($alert['read'] ?? true) === false);
+    }
+
+    /**
+     * Shows one alert read straight away (also a row from a further page, which the cache does not hold).
+     */
+    private function showAsRead(int $id): void
+    {
+        $this->alerts = array_map(fn (array $alert): array => $alert['id'] === $id ? [...$alert, 'read' => true] : $alert, $this->alerts);
+        $this->unreadCount = app(LocalCache::class)->unreadCount();
+    }
+
+    /**
+     * Takes the cached read flags and count (a detail opened from here may have read an alert).
+     */
+    private function applyCachedReadState(): void
+    {
+        $flags = collect(app(LocalCache::class)->feed())->pluck('read', 'id');
+
+        $this->alerts = array_map(fn (array $alert): array => $flags->has($alert['id']) ? [...$alert, 'read' => $flags->get($alert['id'])] : $alert, $this->alerts);
+        $this->unreadCount = app(LocalCache::class)->unreadCount();
+    }
+
+    /**
+     * The row's supporting text: "Delivery problem" when a send failed, otherwise none.
      *
      * @param  array<string, mixed>  $alert
      */
-    public function supporting(array $alert): string
+    public function supporting(array $alert): ?string
     {
-        return $alert['has_failure']
-            ? $this->channels($alert)."\nDelivery problem"
-            : $this->channels($alert);
+        return $alert['has_failure'] ? 'Delivery problem' : null;
     }
 
     /**
-     * A warning-triangle badge on rows with a failed send. The words "Delivery problem" are in the
-     * supporting text, so failure is never conveyed by the badge colour alone.
+     * The row's trailing badges: a dot in the theme's primary colour while the alert is unread, and a
+     * warning triangle when a send failed (the words "Delivery problem" are in the supporting text, so
+     * failure is never conveyed by the badge colour alone).
      *
      * @param  array<string, mixed>  $alert
      * @return array<int, array{icon: string, ios: Ios, android: Android, color: string}>
      */
-    public function failureBadges(array $alert): array
+    public function trailingBadges(array $alert): array
     {
-        if (! $alert['has_failure']) {
-            return [];
+        $badges = [];
+
+        if (($alert['read'] ?? true) === false) {
+            $badges[] = ['icon' => 'circle', 'ios' => Ios::CircleFill, 'android' => Android::Circle, 'color' => (string) theme('primary', '#2563EB')];
         }
 
-        return [['icon' => 'warning', 'ios' => Ios::ExclamationmarkTriangleFill, 'android' => Android::Warning, 'color' => '#EF4444']];
+        if ($alert['has_failure']) {
+            $badges[] = ['icon' => 'warning', 'ios' => Ios::ExclamationmarkTriangleFill, 'android' => Android::Warning, 'color' => '#EF4444'];
+        }
+
+        return $badges;
     }
 
     public function syncedLabel(): string

@@ -4,6 +4,7 @@ use App\NativeComponents\AlertDetail;
 use App\Support\LocalCache;
 use App\Support\TokenStore;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\Testing\Native;
 
@@ -15,6 +16,7 @@ function detailPayload(array $overrides = []): array
         'category' => 'weather_alerts',
         'category_label' => 'Weather Alerts',
         'dispatched_at' => now()->subMinutes(5)->toIso8601String(),
+        'read' => true,
         'channels' => [
             ['type' => 'discord', 'type_label' => 'Discord', 'status' => 'success', 'label' => 'Team Discord'],
             ['type' => 'pushover', 'type_label' => 'Pushover', 'status' => 'failure', 'label' => null],
@@ -100,4 +102,48 @@ test('a signed-out visitor is sent to sign in', function () {
     (new TokenStore)->forget();
 
     Native::test(AlertDetail::class, ['id' => 4])->assertReplacedWith('/sign-in');
+});
+
+test('opening an unread alert reads it on the server and sets the badge', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts/4/read' => Http::response(['data' => ['unread_count' => 2]]),
+        'wx.test/api/v1/alerts/4' => Http::response(['data' => detailPayload(['read' => false])]),
+    ]);
+
+    Native::test(AlertDetail::class, ['id' => 4])->assertSee('Tornado Warning');
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://wx.test/api/v1/alerts/4/read');
+    expect($this->appBadge->last())->toBe(2)
+        ->and((new LocalCache)->isCachedRead(4))->toBeTrue();
+});
+
+test('opening an alert already read sends no read call', function () {
+    Http::fake(['wx.test/api/v1/alerts/4' => Http::response(['data' => detailPayload()])]);
+
+    Native::test(AlertDetail::class, ['id' => 4]);
+
+    Http::assertSentCount(1);
+});
+
+test('offline, opening an unread cached alert marks it read on the phone and queues the server call', function () {
+    (new LocalCache)->replaceFeed([detailPayload(['read' => false])]);
+    (new LocalCache)->rememberUnreadCount(1);
+    $this->network->connected = false;
+    Http::fake();
+
+    Native::test(AlertDetail::class, ['id' => 4]);
+
+    expect((new LocalCache)->isCachedRead(4))->toBeTrue()
+        ->and((new LocalCache)->pendingReads())->toBe([4])
+        ->and($this->appBadge->last())->toBe(0);
+    Http::assertNothingSent();
+});
+
+test('an alert that is no longer available is not marked read', function () {
+    Http::fake(['*' => Http::response([], 404)]);
+
+    Native::test(AlertDetail::class, ['id' => 4]);
+
+    Http::assertSentCount(1);
+    expect((new LocalCache)->pendingReads())->toBe([]);
 });

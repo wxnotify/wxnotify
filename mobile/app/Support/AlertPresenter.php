@@ -41,12 +41,4 @@ class AlertPresenter
 
         return $category === '' ? $time : $category.' · '.$time;
     }
-
-    /**
-     * @param  array<string, mixed>  $alert
-     */
-    public static function channels(array $alert): string
-    {
-        return 'Sent via '.implode(', ', array_values(array_unique(array_column($alert['channels'], 'type_label'))));
-    }
 }

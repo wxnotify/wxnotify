@@ -54,9 +54,15 @@
         </native:column>
     </native:column>
 
-    {{-- A plain heading, not a list-section header: iOS draws a pinned section header transparent, so rows slid up under its text. --}}
-    <native:row class="w-full px-4 pt-6 pb-2 bg-theme-background">
-        <native:text class="text-sm text-theme-on-surface-variant">Alerts sent to you</native:text>
+    {{-- A plain heading, not a list-section header: iOS draws a pinned section header transparent, so rows slid up under its text. "Mark all as read" sits here, above the list and within thumb reach, only while something is unread. --}}
+    <native:row class="w-full px-4 pt-4 pb-1 items-center justify-between bg-theme-background">
+        <native:text class="text-sm text-theme-on-surface-variant">{{ ($unreadCount ?? 0) > 0 ? "Alerts sent to you · {$unreadCount} unread" : 'Alerts sent to you' }}</native:text>
+
+        @if ($this->hasUnread())
+            <pressable @tap="markAllRead" ref="mark-all-read" class="py-3 pl-4">
+                <native:text class="text-sm font-semibold text-theme-primary">Mark all as read</native:text>
+            </pressable>
+        @endif
     </native:row>
 
     {{-- Un-prefixed on purpose: native:validate's element list does not know list or list-item (<native:list> renders the same tree). --}}
@@ -67,7 +73,7 @@
                 headline="{{ $alert['subject'] }}"
                 overline="{{ $this->subtitle($alert) }}"
                 :supporting="$this->supporting($alert)"
-                :trailing-badges="$this->failureBadges($alert)"
+                :trailing-badges="$this->trailingBadges($alert)"
                 @tap="open({{ $alert['id'] }})"
                 @longPress="openDetail({{ $alert['id'] }})"
             ></list-item>

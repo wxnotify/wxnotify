@@ -10,7 +10,8 @@ use Wxnotify\BadgeCount\Facades\BadgeCount;
  * Sets the iOS app icon badge to the number of unread alerts through the local badge-count plugin
  * (Android has no badge number; the plugin answers success there). Never throws: the badge is a
  * courtesy, and the app corrects it from the feed's unread count on the next load. Off a device the
- * plugin does nothing.
+ * call goes through the dev bridge fallback, which may try a localhost socket (refused fast), so tests
+ * bind a fake (`Tests\Fakes\RecordingAppBadge`) instead of calling it.
  */
 class AppBadge
 {

@@ -20,7 +20,8 @@ function apiEntry(int $id, array $overrides = []): array
         'category' => 'weather_alerts',
         'category_label' => 'Weather Alerts',
         'dispatched_at' => now()->subMinutes(5)->toIso8601String(),
-        'channels' => [['type' => 'discord', 'type_label' => 'Discord', 'status' => 'success']],
+        'read' => true,
+        'channels' => [['type' => 'mobile_push', 'type_label' => 'Mobile app', 'status' => 'success']],
         'has_failure' => false,
         'product_url' => null,
         ...$overrides,
@@ -42,9 +43,32 @@ function findRows(array $node): array
     return $rows;
 }
 
-function feedResponse(array $entries, ?string $next = null): array
+function feedResponse(array $entries, ?string $next = null, ?int $unread = null): array
 {
-    return ['data' => $entries, 'meta' => ['next_cursor' => $next]];
+    $unread ??= count(array_filter($entries, fn (array $entry): bool => ($entry['read'] ?? true) === false));
+
+    return ['data' => $entries, 'meta' => ['next_cursor' => $next, 'unread_count' => $unread]];
+}
+
+/**
+ * True when the row carries the unread dot (a trailing badge in the theme's primary colour).
+ *
+ * @param  array<string, mixed>  $row
+ */
+function hasUnreadDot(array $row): bool
+{
+    $badges = json_decode($row['props']['trailing_badges_json'] ?? '[]', true);
+
+    return in_array(config('native-ui.theme.light.primary'), array_column($badges, 'color'), true);
+}
+
+/**
+ * @param  array<string, mixed>  $tree
+ * @return array<string, bool> whether each row (by headline) shows the unread dot
+ */
+function unreadDots(array $tree): array
+{
+    return collect(sentAlertRows($tree))->mapWithKeys(fn (array $row): array => [$row['props']['headline'] => hasUnreadDot($row)])->sortKeys()->all();
 }
 
 /**
@@ -133,7 +157,7 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
     Native::test(AlertsScreen::class)
         ->assertSee('Tornado Warning 1')
         ->assertSee('Weather Alerts · 5 minutes ago')
-        ->assertSee('Sent via Discord')
+        ->assertDontSee('Sent via')
         ->assertSee('Tornado Warning 2')
         ->assertSee('Delivery problem')
         ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh'], $list['props']['on_end_reached'])
@@ -147,11 +171,11 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
             && count(array_filter(findRows($list), fn (array $row) => array_key_exists('trailing_badges_json', $row['props']))) === 1)
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 1'
             && $item['props']['overline'] === 'Weather Alerts · 5 minutes ago'
-            && $item['props']['supporting'] === 'Sent via Discord'
+            && ($item['props']['supporting'] ?? '') === ''
             && ! array_key_exists('supporting_color', $item['props'])
             && ! array_key_exists('trailing_badges_json', $item['props']))
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 2'
-            && str_contains($item['props']['supporting'], 'Delivery problem')
+            && $item['props']['supporting'] === 'Delivery problem'
             && ! array_key_exists('supporting_color', $item['props'])
             && json_decode($item['props']['trailing_badges_json'], true)[0]['color'] === '#EF4444'
             && count(json_decode($item['props']['trailing_badges_json'], true)) === 1)
@@ -860,4 +884,168 @@ test('Alerts does not mark a signed-out visitor as having seen the welcome flow'
     Native::test(AlertsScreen::class)->assertReplacedWith('/sign-in');
 
     expect((new WelcomeState)->seen())->toBeFalse();
+});
+
+test('an unread alert shows the dot and a read one does not', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(1, ['read' => false]), apiEntry(2)]))]);
+
+    $screen = Native::test(AlertsScreen::class);
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 1' => true, 'Tornado Warning 2' => false]);
+});
+
+test('an unread alert with a failed send shows both the dot and the warning', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(1, ['read' => false, 'has_failure' => true])]))]);
+
+    Native::test(AlertsScreen::class)->assertElement('list_item', fn (array $item) => hasUnreadDot($item)
+        && in_array('#EF4444', array_column(json_decode($item['props']['trailing_badges_json'], true), 'color'), true));
+});
+
+test('the badge is set from the server\'s unread_count on every feed load', function () {
+    Http::fakeSequence('wx.test/api/v1/alerts*')
+        ->push(feedResponse([apiEntry(1, ['read' => false])], unread: 3))
+        ->push(feedResponse([apiEntry(1, ['read' => false])], unread: 5));
+
+    $screen = Native::test(AlertsScreen::class)->assertSee('3 unread');
+
+    expect($this->appBadge->counts)->toBe([3]);
+
+    $screen->call('refresh')->assertSee('5 unread');
+
+    expect($this->appBadge->counts)->toBe([3, 5])
+        ->and((new LocalCache)->unreadCount())->toBe(5);
+});
+
+test('tapping an unread alert marks it read, lowers the count and sets the badge, then opens it as before', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts/4/read' => Http::response(['data' => ['unread_count' => 1]]),
+        'wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(4, ['read' => false]), apiEntry(5, ['read' => false])])),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->tap('Tornado Warning 4')->assertNavigatedTo('/alerts/4');
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false, 'Tornado Warning 5' => true])
+        ->and($this->appBadge->last())->toBe(1)
+        ->and(collect((new LocalCache)->feed())->pluck('read', 'id')->sortKeys()->all())->toBe([4 => true, 5 => false]);
+    $screen->assertSee('1 unread');
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://wx.test/api/v1/alerts/4/read');
+});
+
+test('tapping an unread alert with a product page reads it and opens the page', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts/4/read' => Http::response(['data' => ['unread_count' => 0]]),
+        'wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(4, ['read' => false, 'product_url' => 'https://wx.test/view-product/abc'])])),
+    ]);
+
+    Native::test(AlertsScreen::class)->tap('Tornado Warning 4')->assertNoNavigation();
+
+    expect($this->browser->inAppUrls)->toBe(['https://wx.test/view-product/abc'])
+        ->and($this->appBadge->last())->toBe(0);
+});
+
+test('a failed read call is queued and retried on the next feed load', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts/4/read' => Http::sequence()->push([], 500)->push(['data' => ['unread_count' => 0]]),
+        'wx.test/api/v1/alerts?*' => Http::sequence()
+            ->push(feedResponse([apiEntry(4, ['read' => false, 'product_url' => 'https://wx.test/view-product/abc'])]))
+            ->push(feedResponse([apiEntry(4)], unread: 0)),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->tap('Tornado Warning 4');
+
+    expect((new LocalCache)->pendingReads())->toBe([4])
+        ->and(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false]);
+
+    $screen->call('refresh');
+
+    expect((new LocalCache)->pendingReads())->toBe([])
+        ->and($this->appBadge->last())->toBe(0);
+    expect(Http::recorded(fn (Request $r) => str_ends_with($r->url(), '/alerts/4/read'))->count())->toBe(2);
+});
+
+test('a read still waiting for the server stays read when a feed load says otherwise', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts/4/read' => Http::response([], 500),
+        'wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(4, ['read' => false, 'product_url' => 'https://wx.test/view-product/abc']), apiEntry(5, ['read' => false])])),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->tap('Tornado Warning 4')->call('refresh');
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false, 'Tornado Warning 5' => true])
+        ->and($this->appBadge->last())->toBe(1);
+});
+
+test('offline, tapping an unread alert still opens it and marks it read on the phone', function () {
+    (new LocalCache)->replaceFeed([apiEntry(4, ['read' => false]), apiEntry(5, ['read' => false])]);
+    (new LocalCache)->rememberUnreadCount(2);
+    $this->network->connected = false;
+    Http::fake();
+
+    $screen = Native::test(AlertsScreen::class)->tap('Tornado Warning 4')->assertNavigatedTo('/alerts/4');
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false, 'Tornado Warning 5' => true])
+        ->and($this->appBadge->last())->toBe(1)
+        ->and((new LocalCache)->pendingReads())->toBe([4]);
+    Http::assertNothingSent();
+});
+
+test('offline, the cached feed keeps each alert\'s read flag', function () {
+    (new LocalCache)->replaceFeed([apiEntry(4, ['read' => false]), apiEntry(5)]);
+    $this->network->connected = false;
+    Http::fake();
+
+    $screen = Native::test(AlertsScreen::class)->assertSet('offline', true);
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => true, 'Tornado Warning 5' => false]);
+});
+
+test('Mark all as read clears every dot and sets the badge to 0', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 0]]),
+        'wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(4, ['read' => false]), apiEntry(5, ['read' => false])])),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->tap('Mark all as read');
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false, 'Tornado Warning 5' => false])
+        ->and($this->appBadge->last())->toBe(0);
+    $screen->assertDontSee('Mark all as read')->assertDontSee('unread');
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://wx.test/api/v1/alerts/read-all');
+});
+
+test('Mark all as read survives a server failure and is retried on the next feed load', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts/read-all' => Http::sequence()->push([], 503)->push(['data' => ['unread_count' => 0]]),
+        'wx.test/api/v1/alerts?*' => Http::sequence()
+            ->push(feedResponse([apiEntry(4, ['read' => false])]))
+            ->push(feedResponse([apiEntry(4)])),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->tap('Mark all as read');
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false])
+        ->and((new LocalCache)->pendingReadAll())->toBeTrue();
+
+    $screen->call('refresh');
+
+    expect((new LocalCache)->pendingReadAll())->toBeFalse()
+        ->and(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false])
+        ->and($this->appBadge->last())->toBe(0);
+    expect(Http::recorded(fn (Request $r) => str_ends_with($r->url(), '/read-all'))->count())->toBe(2);
+});
+
+test('Mark all as read is not offered when nothing is unread', function () {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(4)]))]);
+
+    Native::test(AlertsScreen::class)->assertDontSee('Mark all as read')->assertDontSee('unread');
+});
+
+test('a refused token on a pending read does not loop: one try, then the feed signs out', function () {
+    (new LocalCache)->rememberPendingReads([4, 5]);
+    Http::fake(['wx.test/*' => Http::response([], 401)]);
+
+    Native::test(AlertsScreen::class)->assertReplacedWith('/sign-in');
+
+    expect(Http::recorded(fn (Request $r) => str_ends_with($r->url(), '/read'))->count())->toBe(1)
+        ->and((new TokenStore)->token())->toBeNull();
 });

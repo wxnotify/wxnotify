@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * What the app keeps on the phone so it opens instantly and works offline: the latest feed
  * page, any alert detail the subscriber opened, the profile from /me, and when the feed was
- * last refreshed, plus the alert rules, saved locations, notification channels, rule-form options, the map's page, the current watches, warnings and advisories and the recent product searches. Signing out wipes all of it.
+ * last refreshed, the read state (each cached alert's flag, the last known unread count and the reads
+ * still waiting for the server), plus the alert rules, saved locations, notification channels, rule-form options, the map's page, the current watches, warnings and advisories and the recent product searches. Signing out wipes all of it.
  */
 class LocalCache
 {
@@ -35,6 +36,12 @@ class LocalCache
 
     private const ACTIVE_ALERTS = 'wxnotify.active_alerts';
 
+    private const UNREAD_COUNT = 'wxnotify.alerts.unread_count';
+
+    private const PENDING_READS = 'wxnotify.alerts.pending_reads';
+
+    private const PENDING_READ_ALL = 'wxnotify.alerts.pending_read_all';
+
     private const MAX_SEARCHES = 10;
 
     /**
@@ -48,12 +55,13 @@ class LocalCache
             ->orderByDesc('alert_id')
             ->limit((int) config('wxnotify.feed_cache_size'))
             ->get()
-            ->map(fn (CachedAlert $alert): array => $alert->list)
+            ->map(fn (CachedAlert $alert): array => [...$alert->list, 'read' => $alert->read])
             ->all();
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $entries  as the API returned them; the newest are the ones kept
+     * @param  array<int, array<string, mixed>>  $entries  as the API returned them (each with its `read` flag; an
+     *                                                     entry without one counts as read); the newest are the ones kept
      */
     public function replaceFeed(array $entries): void
     {
@@ -66,7 +74,7 @@ class LocalCache
             foreach (array_slice($entries, 0, (int) config('wxnotify.feed_cache_size')) as $entry) {
                 CachedAlert::query()->updateOrCreate(
                     ['alert_id' => $entry['id']],
-                    ['sort_at' => Carbon::parse($entry['dispatched_at']), 'list' => $entry, 'in_feed' => true],
+                    ['sort_at' => Carbon::parse($entry['dispatched_at']), 'list' => $entry, 'in_feed' => true, 'read' => (bool) ($entry['read'] ?? true)],
                 );
             }
 
@@ -77,7 +85,8 @@ class LocalCache
     }
 
     /**
-     * @param  array<string, mixed>  $detail  a detail payload (a superset of the feed entry)
+     * @param  array<string, mixed>  $detail  a detail payload (a superset of the feed entry); its `read` flag, when
+     *                                        present, is the server's and replaces the cached one
      */
     public function storeDetail(array $detail): void
     {
@@ -87,8 +96,89 @@ class LocalCache
             $alert->fill(['sort_at' => Carbon::parse($detail['dispatched_at']), 'list' => $detail, 'in_feed' => false]);
         }
 
+        if (array_key_exists('read', $detail)) {
+            $alert->read = (bool) $detail['read'];
+        }
+
         $alert->detail = $detail;
         $alert->save();
+    }
+
+    /**
+     * Marks a cached alert read.
+     *
+     * @return bool true when the alert was cached and unread until now
+     */
+    public function markAlertRead(int $id): bool
+    {
+        return CachedAlert::query()->whereKey($id)->where('read', false)->update(['read' => true]) > 0;
+    }
+
+    public function markAllAlertsRead(): void
+    {
+        CachedAlert::query()->where('read', false)->update(['read' => true]);
+    }
+
+    /**
+     * @return bool|null the cached read flag, or null when this phone has not cached the alert
+     */
+    public function isCachedRead(int $id): ?bool
+    {
+        return CachedAlert::query()->find($id)?->read;
+    }
+
+    /**
+     * @return int|null the unread count the server last reported (adjusted by reads made here), null until known
+     */
+    public function unreadCount(): ?int
+    {
+        return Cache::get(self::UNREAD_COUNT);
+    }
+
+    public function rememberUnreadCount(int $count): void
+    {
+        Cache::forever(self::UNREAD_COUNT, max(0, $count));
+    }
+
+    /**
+     * @return array<int, int> ids read on this phone whose read call has not reached the server yet
+     */
+    public function pendingReads(): array
+    {
+        return Cache::get(self::PENDING_READS, []);
+    }
+
+    /**
+     * @param  array<int, int>  $ids
+     */
+    public function rememberPendingReads(array $ids): void
+    {
+        if ($ids === []) {
+            Cache::forget(self::PENDING_READS);
+
+            return;
+        }
+
+        Cache::forever(self::PENDING_READS, array_values(array_unique($ids)));
+    }
+
+    /**
+     * True when a "Mark all as read" made on this phone has not reached the server yet.
+     */
+    public function pendingReadAll(): bool
+    {
+        return (bool) Cache::get(self::PENDING_READ_ALL, false);
+    }
+
+    public function rememberPendingReadAll(bool $pending = true): void
+    {
+        if ($pending) {
+            Cache::forever(self::PENDING_READ_ALL, true);
+
+            return;
+        }
+
+        Cache::forget(self::PENDING_READ_ALL);
     }
 
     /**
@@ -274,5 +364,8 @@ class LocalCache
         Cache::forget(self::MAP_PAGE);
         Cache::forget(self::SEARCHES);
         Cache::forget(self::ACTIVE_ALERTS);
+        Cache::forget(self::UNREAD_COUNT);
+        Cache::forget(self::PENDING_READS);
+        Cache::forget(self::PENDING_READ_ALL);
     }
 }

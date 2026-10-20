@@ -2,6 +2,7 @@
 
 use App\Models\CachedAlert;
 use App\Support\LocalCache;
+use Illuminate\Support\Facades\DB;
 
 function feedEntry(int $id, string $at = '2026-10-04T12:00:00+00:00'): array
 {
@@ -78,4 +79,51 @@ test('wiping removes everything', function () {
         ->and($this->cache->profile())->toBeNull()
         ->and($this->cache->syncedAt())->toBeNull()
         ->and(CachedAlert::count())->toBe(0);
+});
+
+test('the cached feed keeps each alert\'s read flag, and an entry without one counts as read', function () {
+    $this->cache->replaceFeed([[...feedEntry(1), 'read' => false], [...feedEntry(2), 'read' => true], feedEntry(3)]);
+
+    expect(array_column($this->cache->feed(), 'read', 'id'))->toBe([3 => true, 2 => true, 1 => false]);
+});
+
+test('an alert cached before the read flag existed reads as read once the migration runs on the phone', function () {
+    $migration = require database_path('migrations/2026_10_20_120000_add_read_to_cached_alerts_table.php');
+    $migration->down();
+    DB::table('cached_alerts')->insert(['alert_id' => 1, 'sort_at' => now(), 'list' => json_encode(feedEntry(1)), 'in_feed' => true]);
+
+    $migration->up();
+
+    expect($this->cache->feed()[0]['read'])->toBeTrue();
+});
+
+test('marking one alert read says whether it was unread', function () {
+    $this->cache->replaceFeed([[...feedEntry(1), 'read' => false]]);
+
+    expect($this->cache->markAlertRead(1))->toBeTrue()
+        ->and($this->cache->markAlertRead(1))->toBeFalse()
+        ->and($this->cache->markAlertRead(99))->toBeFalse()
+        ->and($this->cache->feed()[0]['read'])->toBeTrue();
+});
+
+test('a detail carries the server\'s read flag into the cache', function () {
+    $this->cache->replaceFeed([[...feedEntry(1), 'read' => true]]);
+
+    $this->cache->storeDetail([...feedEntry(1), 'read' => false, 'rule_name' => null]);
+
+    expect($this->cache->feed()[0]['read'])->toBeFalse()
+        ->and($this->cache->isCachedRead(1))->toBeFalse()
+        ->and($this->cache->isCachedRead(99))->toBeNull();
+});
+
+test('wiping forgets the unread count and every pending read', function () {
+    $this->cache->rememberUnreadCount(3);
+    $this->cache->rememberPendingReads([1, 2]);
+    $this->cache->rememberPendingReadAll();
+
+    $this->cache->wipe();
+
+    expect($this->cache->unreadCount())->toBeNull()
+        ->and($this->cache->pendingReads())->toBe([])
+        ->and($this->cache->pendingReadAll())->toBeFalse();
 });

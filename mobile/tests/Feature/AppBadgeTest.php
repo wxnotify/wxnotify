@@ -5,6 +5,9 @@ use Illuminate\Support\Facades\Log;
 use Native\Mobile\Testing\Native;
 use Wxnotify\BadgeCount\Facades\BadgeCount;
 
+/** The suite binds a recording fake by default; these tests exercise the real service. */
+beforeEach(fn () => app()->forgetInstance(AppBadge::class));
+
 test('set passes the count to the plugin', function () {
     BadgeCount::shouldReceive('set')->once()->with(3);
 

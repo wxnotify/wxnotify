@@ -61,7 +61,10 @@ class WxNotifyApi
     }
 
     /**
-     * @return array{data: array<int, array<string, mixed>>, meta: array{next_cursor: ?string}}
+     * A page of the feed of pushed alerts, each entry with its `read` flag. `meta.unread_count` is the
+     * subscriber's number of unread alerts (all pages), or null when the server did not send a number.
+     *
+     * @return array{data: array<int, array<string, mixed>>, meta: array{next_cursor: ?string, unread_count: ?int}}
      */
     public function alerts(?string $before = null, int $limit = 25): array
     {
@@ -72,7 +75,32 @@ class WxNotifyApi
 
         $this->data($body);
 
+        $meta = is_array($body['meta'] ?? null) ? $body['meta'] : [];
+        $body['meta'] = [...$meta, 'next_cursor' => $meta['next_cursor'] ?? null, 'unread_count' => is_int($meta['unread_count'] ?? null) ? $meta['unread_count'] : null];
+
         return $body;
+    }
+
+    /**
+     * Marks one alert read for the subscriber (on every phone); idempotent.
+     *
+     * @return int the subscriber's unread count afterwards
+     *
+     * @throws Rejected when the alert is not in the subscriber's feed (404)
+     */
+    public function markAlertRead(int $id): int
+    {
+        return $this->unreadCount($this->send(fn (PendingRequest $request) => $request->post("/api/v1/alerts/{$id}/read")));
+    }
+
+    /**
+     * Marks every alert of the subscriber read; idempotent.
+     *
+     * @return int the subscriber's unread count afterwards
+     */
+    public function markAllAlertsRead(): int
+    {
+        return $this->unreadCount($this->send(fn (PendingRequest $request) => $request->post('/api/v1/alerts/read-all')));
     }
 
     /**
@@ -479,6 +507,20 @@ class WxNotifyApi
         }
 
         return $body['data'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    private function unreadCount(array $body): int
+    {
+        $count = $this->data($body)['unread_count'] ?? null;
+
+        if (! is_int($count)) {
+            throw new Retryable;
+        }
+
+        return $count;
     }
 
     private function assertOnline(): void

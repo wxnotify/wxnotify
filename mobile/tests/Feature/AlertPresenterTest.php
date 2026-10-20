@@ -24,9 +24,3 @@ test('the subtitle is just the relative time when the category is null, empty or
         ->toBe('3 minutes ago')
         ->and(AlertPresenter::subtitle(['dispatched_at' => '2026-10-04T11:57:00+00:00']))->toBe('3 minutes ago');
 })->with([null, '', '  ']);
-
-test('channels list each type once', function () {
-    expect(AlertPresenter::channels(['channels' => [
-        ['type_label' => 'Discord'], ['type_label' => 'Pushover'], ['type_label' => 'Discord'],
-    ]]))->toBe('Sent via Discord, Pushover');
-});
