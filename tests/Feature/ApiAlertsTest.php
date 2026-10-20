@@ -27,7 +27,7 @@ beforeEach(function () {
     ]);
 });
 
-test('deliveries of one rule and product collapse into one alert listing its channels', function () {
+test('deliveries of one rule and product collapse into one alert listing its push channel only', function () {
     ($this->log)(['channel_type' => 'discord', 'dispatched_at' => now()->subMinutes(5)]);
     ($this->log)(['channel_type' => 'pushover', 'dispatched_at' => now()->subMinutes(4), 'status' => 'failure', 'error_detail' => 'SECRET-DETAIL']);
     ($this->log)(['dispatched_at' => now()->subMinutes(3)]);
@@ -38,9 +38,9 @@ test('deliveries of one rule and product collapse into one alert listing its cha
         ->assertJsonPath('data.0.subject', 'Tornado Warning')
         ->assertJsonPath('data.0.category', 'weather_alerts')
         ->assertJsonPath('data.0.category_label', 'Weather Alerts')
-        ->assertJsonPath('data.0.has_failure', true)
-        ->assertJsonPath('data.0.channels.0', ['type' => 'discord', 'type_label' => 'Discord', 'status' => 'success'])
-        ->assertJsonPath('data.0.channels.1', ['type' => 'pushover', 'type_label' => 'Pushover', 'status' => 'failure'])
+        ->assertJsonPath('data.0.has_failure', false)
+        ->assertJsonCount(1, 'data.0.channels')
+        ->assertJsonPath('data.0.channels.0', ['type' => 'mobile_push', 'type_label' => 'Mobile app', 'status' => 'success'])
         ->assertJsonPath('meta.next_cursor', null);
 
     expect($response->getContent())->not->toContain('SECRET-DETAIL');
@@ -123,17 +123,19 @@ test('an older row without a subject falls back to the rule name, then to Alert'
 });
 
 test('the detail adds the rule, the channel labels and the product page, and never an error detail', function () {
-    $channel = NotificationChannel::factory()->for($this->user)->create(['channel_type' => 'discord', 'label' => 'Team Discord']);
-    $log = ($this->log)(['channel_type' => 'discord', 'notification_channel_id' => $channel->id, 'status' => 'failure', 'error_detail' => 'SECRET-DETAIL']);
-    ($this->log)();
+    $channel = NotificationChannel::factory()->for($this->user)->create(['channel_type' => 'mobile_push', 'label' => 'Team Discord']);
+    $log = ($this->log)(['channel_type' => 'discord', 'status' => 'failure', 'error_detail' => 'SECRET-DETAIL']);
+    ($this->log)(['notification_channel_id' => $channel->id, 'dispatched_at' => now()->addSecond()]);
 
     $response = $this->withToken($this->token)->getJson("/api/v1/alerts/{$log->id}")->assertOk();
 
     $response->assertJsonPath('data.id', $log->id)
         ->assertJsonPath('data.rule_name', 'Storm warnings')
         ->assertJsonPath('data.product_url', $this->product->viewUrl())
+        ->assertJsonCount(1, 'data.channels')
         ->assertJsonPath('data.channels.0.label', 'Team Discord')
-        ->assertJsonPath('data.channels.0.status', 'failure');
+        ->assertJsonPath('data.channels.0.status', 'success')
+        ->assertJsonPath('data.has_failure', false);
 
     expect($response->getContent())->not->toContain('SECRET-DETAIL');
 });

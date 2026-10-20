@@ -11,7 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * One feed entry. Never carries error_detail, a destination or a URL secret.
+ * One feed entry. `channels` and `has_failure` cover the group's successful push rows only (old app builds
+ * still read both keys; the feed is the phone's). Never carries error_detail, a destination or a URL secret.
  *
  * @property AppAlert $resource
  */
@@ -23,6 +24,7 @@ class AlertResource extends JsonResource
     public function toArray(Request $request): array
     {
         $first = $this->resource->first();
+        $pushRows = $this->resource->pushRows();
         $category = AlertCategory::tryFrom((string) $first->category);
 
         return [
@@ -33,8 +35,9 @@ class AlertResource extends JsonResource
             'category' => $first->category,
             'category_label' => $category?->label() ?? $first->category,
             'dispatched_at' => $this->resource->latestAt()->toIso8601String(),
-            'channels' => $this->resource->rows->map(fn (DeliveryLog $row) => $this->channel($row))->values()->all(),
-            'has_failure' => $this->resource->hasFailure(),
+            'read' => ! $this->resource->isUnread(),
+            'channels' => $pushRows->map(fn (DeliveryLog $row) => $this->channel($row))->values()->all(),
+            'has_failure' => $pushRows->contains('status', 'failure'),
             'product_url' => $first->ingestedProduct?->viewUrl(),
         ];
     }
