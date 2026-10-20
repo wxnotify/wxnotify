@@ -39,6 +39,24 @@ final class AppAlert
     }
 
     /**
+     * The rows that delivered this alert to one of the subscriber's phones (DeliveryLog::scopePushedToPhone()).
+     *
+     * @return Collection<int, DeliveryLog>
+     */
+    public function pushRows(): Collection
+    {
+        return $this->rows->filter(fn (DeliveryLog $row): bool => $row->isPushedToPhone())->values();
+    }
+
+    /**
+     * Unread while any push row is unread, so a new push to an alert already read makes it unread again.
+     */
+    public function isUnread(): bool
+    {
+        return $this->pushRows()->contains(fn (DeliveryLog $row): bool => $row->read_at === null);
+    }
+
+    /**
      * The grouping rule, mirrored in SQL by ListAppAlerts::GROUP_KEY.
      */
     public static function keyFor(DeliveryLog $row): string

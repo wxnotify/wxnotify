@@ -36,6 +36,24 @@ class DeliveryLogFactory extends Factory
         ]);
     }
 
+    /**
+     * A successful push to one of the subscriber's phones: what puts an alert in the app's feed.
+     */
+    public function pushed(): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'mobile_push',
+            'status' => 'success',
+        ]);
+    }
+
+    public function read(): static
+    {
+        return $this->state(fn () => [
+            'read_at' => now(),
+        ]);
+    }
+
     public function skipped(): static
     {
         return $this->state(fn () => [

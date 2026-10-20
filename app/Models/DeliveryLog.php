@@ -4,11 +4,16 @@ namespace App\Models;
 
 use Database\Factories\DeliveryLogFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+/**
+ * `read_at` is the mobile app's read state on a successful `mobile_push` row; it is set only by server code
+ * (forceFill or a query update), never mass-assigned from input.
+ */
 #[Fillable(['alert_rule_id', 'notification_channel_id', 'user_id', 'channel_type', 'status', 'category', 'error_detail', 'subject', 'ingested_product_id', 'dispatched_at'])]
 class DeliveryLog extends Model
 {
@@ -19,7 +24,26 @@ class DeliveryLog extends Model
     {
         return [
             'dispatched_at' => 'datetime',
+            'read_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Rows that delivered to one of the subscriber's phones: these put an alert in the app's feed.
+     */
+    public function scopePushedToPhone(Builder $query): Builder
+    {
+        return $query->where('channel_type', 'mobile_push')->where('status', 'success');
+    }
+
+    public function scopeUnread(Builder $query): Builder
+    {
+        return $query->whereNull('read_at');
+    }
+
+    public function isPushedToPhone(): bool
+    {
+        return $this->channel_type === 'mobile_push' && $this->status === 'success';
     }
 
     public function user(): BelongsTo

@@ -21,7 +21,7 @@ beforeEach(function () {
         'ingested_product_id' => $this->product->id,
         'category' => 'weather_alerts',
         'subject' => 'Tornado Warning',
-        'channel_type' => 'discord',
+        'channel_type' => 'mobile_push',
         'status' => 'success',
         ...$overrides,
     ]);
@@ -30,6 +30,7 @@ beforeEach(function () {
 test('deliveries of one rule and product collapse into one alert listing its channels', function () {
     ($this->log)(['channel_type' => 'discord', 'dispatched_at' => now()->subMinutes(5)]);
     ($this->log)(['channel_type' => 'pushover', 'dispatched_at' => now()->subMinutes(4), 'status' => 'failure', 'error_detail' => 'SECRET-DETAIL']);
+    ($this->log)(['dispatched_at' => now()->subMinutes(3)]);
 
     $response = $this->withToken($this->token)->getJson('/api/v1/alerts')->assertOk();
 
@@ -105,7 +106,7 @@ test('limit is validated and an unreadable cursor is rejected', function (string
 
 test('only the subscriber\'s own alerts are listed', function () {
     ($this->log)();
-    DeliveryLog::factory()->for(User::factory()->create())->create(['subject' => 'Not mine']);
+    DeliveryLog::factory()->for(User::factory()->create())->pushed()->create(['subject' => 'Not mine']);
 
     $this->withToken($this->token)->getJson('/api/v1/alerts')
         ->assertJsonCount(1, 'data')
@@ -123,7 +124,8 @@ test('an older row without a subject falls back to the rule name, then to Alert'
 
 test('the detail adds the rule, the channel labels and the product page, and never an error detail', function () {
     $channel = NotificationChannel::factory()->for($this->user)->create(['channel_type' => 'discord', 'label' => 'Team Discord']);
-    $log = ($this->log)(['notification_channel_id' => $channel->id, 'status' => 'failure', 'error_detail' => 'SECRET-DETAIL']);
+    $log = ($this->log)(['channel_type' => 'discord', 'notification_channel_id' => $channel->id, 'status' => 'failure', 'error_detail' => 'SECRET-DETAIL']);
+    ($this->log)();
 
     $response = $this->withToken($this->token)->getJson("/api/v1/alerts/{$log->id}")->assertOk();
 
@@ -147,7 +149,7 @@ test('the detail tolerates a deleted rule and channel', function () {
 });
 
 test('another subscriber\'s alert and an unknown id are not found', function () {
-    $theirs = DeliveryLog::factory()->for(User::factory()->create())->create();
+    $theirs = DeliveryLog::factory()->for(User::factory()->create())->pushed()->create();
 
     $this->withToken($this->token)->getJson("/api/v1/alerts/{$theirs->id}")->assertNotFound();
     $this->withToken($this->token)->getJson('/api/v1/alerts/999999')->assertNotFound();

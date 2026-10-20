@@ -8,7 +8,8 @@ use App\Support\AppAlert;
 
 /**
  * One of the subscriber's alerts for the mobile app, by the id the feed gave out, or null
- * when it is unknown or belongs to someone else.
+ * when it is unknown, belongs to someone else or never reached a phone (no successful push
+ * row in its group, so it is not in the feed either).
  */
 class FindAppAlert
 {
@@ -33,6 +34,8 @@ class FindAppAlert
             ->orderBy('id')
             ->get();
 
-        return new AppAlert($rows);
+        $alert = new AppAlert($rows);
+
+        return $alert->pushRows()->isEmpty() ? null : $alert;
     }
 }
