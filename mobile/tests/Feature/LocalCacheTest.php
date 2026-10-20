@@ -119,13 +119,50 @@ test('a detail carries the server\'s read flag into the cache', function () {
 test('wiping forgets the unread count and every pending read', function () {
     $this->cache->rememberUnreadCount(3);
     $this->cache->rememberPendingReads([1, 2]);
-    $this->cache->rememberPendingReadAll();
+    $this->cache->rememberPendingReadAll(through: '2026-10-20T12:00:00.123456Z');
+    $this->cache->rememberFeedAsOf('2026-10-20T12:00:00.123456Z');
 
     $this->cache->wipe();
 
     expect($this->cache->unreadCount())->toBeNull()
         ->and($this->cache->pendingReads())->toBe([])
-        ->and($this->cache->pendingReadAll())->toBeFalse();
+        ->and($this->cache->pendingReadAll())->toBeFalse()
+        ->and($this->cache->pendingReadAllCutoff())->toBeNull()
+        ->and($this->cache->feedAsOf())->toBeNull();
+});
+
+test('a pending mark all keeps its cutoff, and one without a cutoff (or from an earlier build) has none', function () {
+    $this->cache->rememberPendingReadAll(through: '2026-10-20T12:00:00.123456Z');
+
+    expect($this->cache->pendingReadAll())->toBeTrue()
+        ->and($this->cache->pendingReadAllCutoff())->toBe('2026-10-20T12:00:00.123456Z');
+
+    $this->cache->rememberPendingReadAll();
+
+    expect($this->cache->pendingReadAll())->toBeTrue()
+        ->and($this->cache->pendingReadAllCutoff())->toBeNull();
+});
+
+test('marking all read with a cutoff reads only cached alerts sent at or before it', function () {
+    $this->cache->replaceFeed([
+        [...feedEntry(1), 'dispatched_at' => '2026-10-20T11:59:00+00:00', 'read' => false],
+        [...feedEntry(2), 'dispatched_at' => '2026-10-20T12:00:00+00:00', 'read' => false],
+        [...feedEntry(3), 'dispatched_at' => '2026-10-20T12:00:01+00:00', 'read' => false],
+    ]);
+
+    $this->cache->markAllAlertsRead('2026-10-20T12:00:00.123456Z');
+
+    expect([1 => $this->cache->isCachedRead(1), 2 => $this->cache->isCachedRead(2), 3 => $this->cache->isCachedRead(3)])
+        ->toBe([1 => true, 2 => true, 3 => false]);
+});
+
+test('a detail sent after a pending mark all\'s cutoff takes the server\'s unread flag', function () {
+    $this->cache->replaceFeed([[...feedEntry(1), 'dispatched_at' => '2026-10-20T12:05:00+00:00', 'read' => true]]);
+    $this->cache->rememberPendingReadAll(through: '2026-10-20T12:00:00.123456Z');
+
+    $this->cache->storeDetail([...feedEntry(1), 'dispatched_at' => '2026-10-20T12:05:00+00:00', 'read' => false, 'rule_name' => null]);
+
+    expect($this->cache->isCachedRead(1))->toBeFalse();
 });
 
 test('a detail never turns a read still waiting for the server back to unread', function (bool $readAll) {

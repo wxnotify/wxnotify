@@ -71,6 +71,22 @@ test('signing out also forgets the cached rules, locations and form options', fu
     expect($cache->rules())->toBeNull()->and($cache->locations())->toBeNull()->and($cache->locationsMeta())->toBeNull()->and($cache->options())->toBeNull();
 });
 
+test('signing out forgets the feed\'s as_of and a pending mark all with its cutoff', function () use ($profile) {
+    $cache = new LocalCache;
+    $cache->rememberFeedAsOf('2026-10-20T12:00:00.123456Z');
+    $cache->rememberPendingReadAll(through: '2026-10-20T12:00:00.123456Z');
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/auth/token' => Http::response(null, 204),
+    ]);
+
+    Native::test(AccountScreen::class)->tap('Sign out')->assertReplacedWith('/sign-in');
+
+    expect($cache->feedAsOf())->toBeNull()
+        ->and($cache->pendingReadAll())->toBeFalse()
+        ->and($cache->pendingReadAllCutoff())->toBeNull();
+});
+
 test('signing out works offline: the phone is cleared even though the server could not be told', function () use ($profile) {
     (new LocalCache)->rememberProfile($profile);
     $this->network->connected = false;

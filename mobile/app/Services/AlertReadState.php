@@ -8,11 +8,12 @@ use App\Exceptions\Api\RateLimited;
 use App\Exceptions\Api\Rejected;
 use App\Exceptions\Api\Unauthenticated;
 use App\Support\LocalCache;
+use App\Support\ReadCutoff;
 
 /**
  * Read and unread alerts on this phone. A read is applied locally first (the cached flag and the unread
  * count), then sent to the server best-effort: a call that fails is kept in a small pending list (one
- * flag for "mark all") and replayed on the next feed load, so opening an alert never waits for or fails
+ * entry for "mark all", holding its cutoff) and replayed on the next feed load, so opening an alert never waits for or fails
  * on the network. Every change ends with the icon badge set to the unread count. Never throws to a screen;
  * a refused token stops a retry and leaves the pending reads for the screen's own sign-out path.
  */
@@ -58,22 +59,31 @@ class AlertReadState
     }
 
     /**
-     * Reads every alert: everything cached turns read and the count drops to zero at once.
+     * Reads every alert the phone had loaded. The cutoff is the `as_of` of the last first-page load: only alerts
+     * sent at or before it turn read, and the count becomes the cached alerts still unread (those that arrived
+     * after it), so a warning the subscriber never saw is not read for them. Without a known `as_of` (an older
+     * backend) everything cached turns read and the count drops to zero, as before. A call that fails is kept
+     * with its cutoff, so the replay reads exactly what this tap read.
+     *
+     * @return string|null the cutoff used, null when everything was read
      */
-    public function markAll(): void
+    public function markAll(): ?string
     {
-        $this->cache->markAllAlertsRead();
-        $this->cache->rememberUnreadCount(0);
+        $through = $this->cache->feedAsOf();
+
+        $this->cache->markAllAlertsRead($through);
+        $this->cache->rememberUnreadCount($through === null ? 0 : $this->cache->unreadInFeed());
 
         try {
-            $this->cache->rememberUnreadCount($this->api->markAllAlertsRead());
-            $this->cache->rememberPendingReads([]);
-            $this->cache->rememberPendingReadAll(false);
+            $this->cache->rememberUnreadCount($this->api->markAllAlertsRead($through));
+            $this->settlePendingReadAll($through);
         } catch (ApiException) {
-            $this->cache->rememberPendingReadAll();
+            $this->cache->rememberPendingReadAll(through: $through);
         }
 
         $this->setBadge();
+
+        return $through;
     }
 
     /**
@@ -96,18 +106,21 @@ class AlertReadState
     public function applyFeed(array $entries, ?int $serverUnread): array
     {
         $readAll = $this->cache->pendingReadAll();
+        $cutoff = $this->cache->pendingReadAllCutoff();
         $pending = $this->cache->pendingReads();
         $locallyRead = 0;
 
         foreach ($entries as $index => $entry) {
-            if (($entry['read'] ?? true) === false && ($readAll || in_array($entry['id'], $pending, true))) {
+            $readByMarkAll = $readAll && ReadCutoff::covers($cutoff, $entry['dispatched_at'] ?? null);
+
+            if (($entry['read'] ?? true) === false && ($readByMarkAll || in_array($entry['id'], $pending, true))) {
                 $entries[$index]['read'] = true;
                 $locallyRead++;
             }
         }
 
         if ($serverUnread !== null) {
-            $this->syncFromServer($readAll ? 0 : max(0, $serverUnread - $locallyRead));
+            $this->syncFromServer($readAll && $cutoff === null ? 0 : max(0, $serverUnread - $locallyRead));
         }
 
         return $entries;
@@ -120,10 +133,11 @@ class AlertReadState
     public function retryPending(): void
     {
         if ($this->cache->pendingReadAll()) {
+            $through = $this->cache->pendingReadAllCutoff();
+
             try {
-                $this->cache->rememberUnreadCount($this->api->markAllAlertsRead());
-                $this->cache->rememberPendingReads([]);
-                $this->cache->rememberPendingReadAll(false);
+                $this->cache->rememberUnreadCount($this->api->markAllAlertsRead($through));
+                $this->settlePendingReadAll($through);
             } catch (Rejected) {
                 $this->cache->rememberPendingReadAll(false);
             } catch (ApiException) {
@@ -143,6 +157,20 @@ class AlertReadState
                 continue;
             }
         }
+    }
+
+    /**
+     * After the server took a mark all: without a cutoff it read everything, so the single reads waiting are
+     * done too; with one they are kept (an alert opened that arrived after the cutoff is still unread there)
+     * and replayed, which is harmless because a read is idempotent.
+     */
+    private function settlePendingReadAll(?string $through): void
+    {
+        if ($through === null) {
+            $this->cache->rememberPendingReads([]);
+        }
+
+        $this->cache->rememberPendingReadAll(false);
     }
 
     private function lowerUnreadCount(): void

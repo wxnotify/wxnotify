@@ -5,6 +5,7 @@ use App\Support\LocalCache;
 use App\Support\TokenStore;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -237,4 +238,81 @@ test('a rate-limited retry stops at once and keeps the queue', function () {
 
     expect($this->cache->pendingReads())->toBe([1, 2]);
     Http::assertSentCount(1);
+});
+
+test('mark all with a known as_of sends it as through and leaves a newer cached alert unread', function () {
+    $this->cache->replaceFeed([readStateEntry(1, false), readStateEntry(2, false), [...readStateEntry(4, false), 'dispatched_at' => '2026-10-04T12:01:00+00:00']]);
+    $this->cache->rememberFeedAsOf('2026-10-04T12:00:00.500000Z');
+    $this->cache->rememberPendingReads([9]);
+    Http::fake(['wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 1]])]);
+
+    $this->state->markAll();
+
+    expect(cachedReadFlags())->toBe([1 => true, 2 => true, 4 => false])
+        ->and($this->cache->unreadCount())->toBe(1)
+        ->and($this->appBadge->counts)->toBe([1])
+        ->and($this->cache->pendingReads())->toBe([9]);
+    Http::assertSent(fn (Request $r) => $r->data() === ['through' => '2026-10-04T12:00:00.500000Z']);
+});
+
+test('an offline mark all counts the newer alerts as unread and keeps its cutoff for the replay', function () {
+    $this->cache->replaceFeed([readStateEntry(1, false), [...readStateEntry(4, false), 'dispatched_at' => '2026-10-04T12:01:00+00:00']]);
+    $this->cache->rememberFeedAsOf('2026-10-04T12:00:00.500000Z');
+    $this->network->connected = false;
+    Http::fake();
+
+    $this->state->markAll();
+
+    expect(cachedReadFlags())->toBe([1 => true, 4 => false])
+        ->and($this->cache->unreadCount())->toBe(1)
+        ->and($this->appBadge->counts)->toBe([1])
+        ->and($this->cache->pendingReadAllCutoff())->toBe('2026-10-04T12:00:00.500000Z');
+    Http::assertNothingSent();
+});
+
+test('a replayed mark all sends its original cutoff, not the latest as_of', function () {
+    $this->cache->rememberPendingReadAll(through: '2026-10-04T12:00:00.500000Z');
+    $this->cache->rememberFeedAsOf('2026-10-04T13:00:00.000000Z');
+    Http::fake(['wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 1]])]);
+
+    $this->state->retryPending();
+
+    Http::assertSent(fn (Request $r) => $r->data() === ['through' => '2026-10-04T12:00:00.500000Z']);
+    expect($this->cache->pendingReadAll())->toBeFalse()
+        ->and($this->cache->unreadCount())->toBe(1);
+});
+
+test('a pending mark all from an earlier build replays without a cutoff', function () {
+    Cache::forever('wxnotify.alerts.pending_read_all', true);
+    $this->cache->rememberFeedAsOf('2026-10-04T13:00:00.000000Z');
+    Http::fake(['wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 0]])]);
+
+    $this->state->retryPending();
+
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/read-all') && $r->data() === []);
+    expect($this->cache->pendingReadAll())->toBeFalse();
+});
+
+test('without an as_of (an older backend) mark all sends no cutoff and reads everything', function () {
+    $this->cache->replaceFeed([readStateEntry(1, false), [...readStateEntry(4, false), 'dispatched_at' => '2026-10-04T12:01:00+00:00']]);
+    Http::fake(['wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 0]])]);
+
+    $this->state->markAll();
+
+    expect(cachedReadFlags())->toBe([1 => true, 4 => true])
+        ->and($this->appBadge->counts)->toBe([0]);
+    Http::assertSent(fn (Request $r) => $r->data() === []);
+});
+
+test('a fresh feed with a pending mark all that has a cutoff keeps a newer alert unread', function () {
+    $this->cache->rememberPendingReadAll(through: '2026-10-04T12:00:00.500000Z');
+
+    $entries = $this->state->applyFeed([
+        [...readStateEntry(4, false), 'dispatched_at' => '2026-10-04T12:01:00+00:00'],
+        readStateEntry(1, false),
+    ], 2);
+
+    expect(array_column($entries, 'read', 'id'))->toBe([4 => false, 1 => true])
+        ->and($this->cache->unreadCount())->toBe(1)
+        ->and($this->appBadge->last())->toBe(1);
 });

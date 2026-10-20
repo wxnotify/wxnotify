@@ -43,11 +43,11 @@ function findRows(array $node): array
     return $rows;
 }
 
-function feedResponse(array $entries, ?string $next = null, ?int $unread = null): array
+function feedResponse(array $entries, ?string $next = null, ?int $unread = null, ?string $asOf = null): array
 {
     $unread ??= count(array_filter($entries, fn (array $entry): bool => ($entry['read'] ?? true) === false));
 
-    return ['data' => $entries, 'meta' => ['next_cursor' => $next, 'unread_count' => $unread]];
+    return ['data' => $entries, 'meta' => ['next_cursor' => $next, 'unread_count' => $unread, ...($asOf === null ? [] : ['as_of' => $asOf])]];
 }
 
 /**
@@ -1063,4 +1063,52 @@ test('a second Mark all as read with nothing unread sends nothing and changes no
         ->and($this->appBadge->counts)->toBe([1, 0])
         ->and((new LocalCache)->pendingReadAll())->toBeFalse();
     $screen->assertSet('unreadCount', 0);
+});
+
+test('the as_of of a first-page load is kept, and a further page does not replace it', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts?limit=50' => Http::response(feedResponse([apiEntry(4)], next: 'c1', asOf: '2026-10-20T12:00:00.123456Z')),
+        'wx.test/api/v1/alerts?limit=25&before=c1' => Http::response(feedResponse([apiEntry(3)], asOf: '2026-10-20T12:09:00.000000Z')),
+    ]);
+
+    Native::test(AlertsScreen::class)->call('loadMore');
+
+    expect((new LocalCache)->feedAsOf())->toBe('2026-10-20T12:00:00.123456Z');
+    expect(Http::recorded(fn (Request $r) => str_contains($r->url(), 'before='))->count())->toBe(1);
+});
+
+test('Mark all as read leaves an alert that arrived after the list loaded unread, in the list, the count and the badge', function () {
+    $cutoff = now()->subMinutes(2)->utc()->format('Y-m-d\\TH:i:s.u\\Z');
+    Http::fake([
+        'wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 1]]),
+        'wx.test/api/v1/alerts*' => Http::response(feedResponse([
+            apiEntry(4, ['read' => false]),
+            apiEntry(5, ['read' => false, 'dispatched_at' => now()->subMinute()->toIso8601String()]),
+        ], asOf: $cutoff)),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->tap('Mark all as read');
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false, 'Tornado Warning 5' => true])
+        ->and($this->appBadge->last())->toBe(1);
+    $screen->assertSet('unreadCount', 1);
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/read-all') && $r->data() === ['through' => $cutoff]);
+});
+
+test('a queued Mark all as read with a cutoff still leaves the newer alert unread after the next feed load', function () {
+    $cutoff = now()->subMinutes(2)->utc()->format('Y-m-d\\TH:i:s.u\\Z');
+    $entries = [apiEntry(4, ['read' => false]), apiEntry(5, ['read' => false, 'dispatched_at' => now()->subMinute()->toIso8601String()])];
+    Http::fake([
+        'wx.test/api/v1/alerts/read-all' => Http::response([], 503),
+        'wx.test/api/v1/alerts?*' => Http::response(feedResponse($entries, asOf: now()->utc()->format('Y-m-d\\TH:i:s.u\\Z'))),
+    ]);
+    (new LocalCache)->rememberPendingReadAll(through: $cutoff);
+
+    $screen = Native::test(AlertsScreen::class);
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false, 'Tornado Warning 5' => true])
+        ->and($this->appBadge->last())->toBe(1)
+        ->and((new LocalCache)->pendingReadAllCutoff())->toBe($cutoff);
+    $screen->assertSet('unreadCount', 1);
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/read-all') && $r->data() === ['through' => $cutoff]);
 });

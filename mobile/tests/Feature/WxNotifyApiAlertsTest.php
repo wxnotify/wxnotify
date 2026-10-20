@@ -27,6 +27,16 @@ test('the feed keeps each entry\'s read flag and surfaces the unread count from 
         ->and($page['meta']['unread_count'])->toBe(4);
 });
 
+test('the feed surfaces the server\'s as_of, or null from a backend that sends none', function (array $meta, ?string $asOf) {
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(['data' => [], 'meta' => $meta])]);
+
+    expect($this->api->alerts()['meta']['as_of'])->toBe($asOf);
+})->with([
+    'sent' => [['next_cursor' => null, 'unread_count' => 0, 'as_of' => '2026-10-20T12:00:00.123456Z'], '2026-10-20T12:00:00.123456Z'],
+    'missing' => [['next_cursor' => null, 'unread_count' => 0], null],
+    'not a string' => [['next_cursor' => null, 'unread_count' => 0, 'as_of' => 5], null],
+]);
+
 test('a feed without a usable unread count reports none rather than a guess', function (mixed $meta) {
     Http::fake(['wx.test/api/v1/alerts*' => Http::response(['data' => [], 'meta' => $meta])]);
 
@@ -50,7 +60,17 @@ test('marking all alerts read posts once and returns the new unread count', func
 
     expect($this->api->markAllAlertsRead())->toBe(0);
 
-    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://wx.test/api/v1/alerts/read-all');
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://wx.test/api/v1/alerts/read-all'
+        && ! array_key_exists('through', $r->data()));
+});
+
+test('marking all alerts read with a cutoff sends it as through', function () {
+    Http::fake(['wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 1]])]);
+
+    expect($this->api->markAllAlertsRead('2026-10-20T12:00:00.123456Z'))->toBe(1);
+
+    Http::assertSent(fn (Request $r) => $r->url() === 'https://wx.test/api/v1/alerts/read-all'
+        && $r->data() === ['through' => '2026-10-20T12:00:00.123456Z']);
 });
 
 test('the read calls map failures like every other call', function (int $status, string $exception) {

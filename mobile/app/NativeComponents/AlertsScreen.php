@@ -18,6 +18,7 @@ use App\Support\AlertPresenter;
 use App\Support\Concerns\HandlesPushToken;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
+use App\Support\ReadCutoff;
 use App\Support\TokenStore;
 use Illuminate\Support\Carbon;
 use Native\Mobile\Attributes\Poll;
@@ -179,6 +180,7 @@ class AlertsScreen extends NativeComponent
             $entries = $readState->applyFeed($page['data'], $page['meta']['unread_count']);
 
             $cache->replaceFeed($entries);
+            $cache->rememberFeedAsOf($page['meta']['as_of'] ?? null);
 
             $this->alerts = $entries;
             $this->unreadCount = $cache->unreadCount();
@@ -452,7 +454,8 @@ class AlertsScreen extends NativeComponent
     }
 
     /**
-     * Reads every alert ("Mark all as read").
+     * Reads every alert the list had loaded ("Mark all as read"): one that arrived after the first page loaded
+     * (later than its `as_of`) keeps its dot.
      */
     public function markAllRead(): void
     {
@@ -460,9 +463,9 @@ class AlertsScreen extends NativeComponent
             return;
         }
 
-        app(AlertReadState::class)->markAll();
+        $through = app(AlertReadState::class)->markAll();
 
-        $this->alerts = array_map(fn (array $alert): array => [...$alert, 'read' => true], $this->alerts);
+        $this->alerts = array_map(fn (array $alert): array => ReadCutoff::covers($through, $alert['dispatched_at'] ?? null) ? [...$alert, 'read' => true] : $alert, $this->alerts);
         $this->unreadCount = app(LocalCache::class)->unreadCount();
     }
 

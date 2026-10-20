@@ -63,8 +63,10 @@ class WxNotifyApi
     /**
      * A page of the feed of pushed alerts, each entry with its `read` flag. `meta.unread_count` is the
      * subscriber's number of unread alerts (all pages), or null when the server did not send a number.
+     * `meta.as_of` is the server time the page was read at (the cutoff "Mark all as read" sends), or null
+     * from a backend that does not report one.
      *
-     * @return array{data: array<int, array<string, mixed>>, meta: array{next_cursor: ?string, unread_count: ?int}}
+     * @return array{data: array<int, array<string, mixed>>, meta: array{next_cursor: ?string, unread_count: ?int, as_of: ?string}}
      */
     public function alerts(?string $before = null, int $limit = 25): array
     {
@@ -76,7 +78,7 @@ class WxNotifyApi
         $this->data($body);
 
         $meta = is_array($body['meta'] ?? null) ? $body['meta'] : [];
-        $body['meta'] = [...$meta, 'next_cursor' => $meta['next_cursor'] ?? null, 'unread_count' => is_int($meta['unread_count'] ?? null) ? $meta['unread_count'] : null];
+        $body['meta'] = [...$meta, 'next_cursor' => $meta['next_cursor'] ?? null, 'unread_count' => is_int($meta['unread_count'] ?? null) ? $meta['unread_count'] : null, 'as_of' => is_string($meta['as_of'] ?? null) ? $meta['as_of'] : null];
 
         return $body;
     }
@@ -94,13 +96,17 @@ class WxNotifyApi
     }
 
     /**
-     * Marks every alert of the subscriber read; idempotent.
+     * Marks every alert of the subscriber read; idempotent. With `$through` (a feed's `as_of`) the server reads
+     * only alerts created at or before it; without it, every alert (the only form an older backend knows).
      *
      * @return int the subscriber's unread count afterwards
      */
-    public function markAllAlertsRead(): int
+    public function markAllAlertsRead(?string $through = null): int
     {
-        return $this->unreadCount($this->send(fn (PendingRequest $request) => $request->post('/api/v1/alerts/read-all')));
+        return $this->unreadCount($this->send(fn (PendingRequest $request) => $request->post(
+            '/api/v1/alerts/read-all',
+            $through === null ? [] : ['through' => $through],
+        )));
     }
 
     /**

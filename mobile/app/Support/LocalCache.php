@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * What the app keeps on the phone so it opens instantly and works offline: the latest feed
  * page, any alert detail the subscriber opened, the profile from /me, and when the feed was
- * last refreshed, the read state (each cached alert's flag, the last known unread count and the reads
- * still waiting for the server), plus the alert rules, saved locations, notification channels, rule-form options, the map's page, the current watches, warnings and advisories and the recent product searches. Signing out wipes all of it.
+ * last refreshed, the read state (each cached alert's flag, the last known unread count, the reads
+ * still waiting for the server and the feed's as_of), plus the alert rules, saved locations, notification channels, rule-form options, the map's page, the current watches, warnings and advisories and the recent product searches. Signing out wipes all of it.
  */
 class LocalCache
 {
@@ -41,6 +41,8 @@ class LocalCache
     private const PENDING_READS = 'wxnotify.alerts.pending_reads';
 
     private const PENDING_READ_ALL = 'wxnotify.alerts.pending_read_all';
+
+    private const FEED_AS_OF = 'wxnotify.alerts.feed_as_of';
 
     private const MAX_SEARCHES = 10;
 
@@ -97,7 +99,7 @@ class LocalCache
             $alert->fill(['sort_at' => Carbon::parse($detail['dispatched_at']), 'list' => $detail, 'in_feed' => false]);
         }
 
-        if (array_key_exists('read', $detail) && ($detail['read'] || ! $this->readIsPending((int) $detail['id']))) {
+        if (array_key_exists('read', $detail) && ($detail['read'] || ! $this->readIsPending((int) $detail['id'], $detail['dispatched_at'] ?? null))) {
             $alert->read = (bool) $detail['read'];
         }
 
@@ -115,14 +117,33 @@ class LocalCache
         return CachedAlert::query()->whereKey($id)->where('read', false)->update(['read' => true]) > 0;
     }
 
-    private function readIsPending(int $id): bool
+    /**
+     * A pending mark all with a cutoff covers only alerts sent at or before it.
+     */
+    private function readIsPending(int $id, mixed $dispatchedAt): bool
     {
-        return $this->pendingReadAll() || in_array($id, $this->pendingReads(), true);
+        return ($this->pendingReadAll() && ReadCutoff::covers($this->pendingReadAllCutoff(), $dispatchedAt))
+            || in_array($id, $this->pendingReads(), true);
     }
 
-    public function markAllAlertsRead(): void
+    /**
+     * Marks the cached alerts read: all of them, or with a cutoff (see ReadCutoff) only those sent at or before it.
+     */
+    public function markAllAlertsRead(?string $through = null): void
     {
-        CachedAlert::query()->where('read', false)->update(['read' => true]);
+        $ids = CachedAlert::query()->where('read', false)->get()
+            ->filter(fn (CachedAlert $alert): bool => ReadCutoff::covers($through, $alert->list['dispatched_at'] ?? null))
+            ->modelKeys();
+
+        CachedAlert::query()->whereKey($ids)->update(['read' => true]);
+    }
+
+    /**
+     * @return int the cached feed alerts still unread
+     */
+    public function unreadInFeed(): int
+    {
+        return count(array_filter($this->feed(), fn (array $alert): bool => $alert['read'] === false));
     }
 
     /**
@@ -176,15 +197,49 @@ class LocalCache
         return (bool) Cache::get(self::PENDING_READ_ALL, false);
     }
 
-    public function rememberPendingReadAll(bool $pending = true): void
+    /**
+     * The cutoff of the pending "Mark all as read", replayed as it was made; null when none is pending or it has
+     * none (an older backend, or `true` stored by an earlier build), which reads everything.
+     */
+    public function pendingReadAllCutoff(): ?string
+    {
+        $value = Cache::get(self::PENDING_READ_ALL);
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @param  string|null  $through  the cutoff the mark all was made with, stored in place of `true`
+     */
+    public function rememberPendingReadAll(bool $pending = true, ?string $through = null): void
     {
         if ($pending) {
-            Cache::forever(self::PENDING_READ_ALL, true);
+            Cache::forever(self::PENDING_READ_ALL, $through ?? true);
 
             return;
         }
 
         Cache::forget(self::PENDING_READ_ALL);
+    }
+
+    /**
+     * The `meta.as_of` of the last first-page feed load: the cutoff a "Mark all as read" sends. Null until a
+     * backend that reports one was loaded.
+     */
+    public function feedAsOf(): ?string
+    {
+        return Cache::get(self::FEED_AS_OF);
+    }
+
+    public function rememberFeedAsOf(?string $asOf): void
+    {
+        if ($asOf === null) {
+            Cache::forget(self::FEED_AS_OF);
+
+            return;
+        }
+
+        Cache::forever(self::FEED_AS_OF, $asOf);
     }
 
     /**
@@ -373,5 +428,6 @@ class LocalCache
         Cache::forget(self::UNREAD_COUNT);
         Cache::forget(self::PENDING_READS);
         Cache::forget(self::PENDING_READ_ALL);
+        Cache::forget(self::FEED_AS_OF);
     }
 }
