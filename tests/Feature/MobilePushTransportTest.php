@@ -2,7 +2,9 @@
 
 use App\Actions\Channels\SendTestNotification;
 use App\Jobs\PruneMobilePushChannel;
+use App\Models\AlertRule;
 use App\Models\DeliveryLog;
+use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Http\Client\Request;
@@ -17,6 +19,19 @@ beforeEach(function () {
 afterEach(function () {
     @unlink($this->credentials['path']);
 });
+
+/**
+ * The `aps.badge` of every FCM send recorded so far, in order.
+ *
+ * @return list<int|null>
+ */
+function mobilePushSentBadges(): array
+{
+    return collect(Http::recorded())
+        ->filter(fn (array $pair) => str_contains($pair[0]->url(), 'messages:send'))
+        ->map(fn (array $pair) => $pair[0]['message']['apns']['payload']['aps']['badge'] ?? null)
+        ->values()->all();
+}
 
 test('an alert is pushed to the device with its subject as the title and the feed as the tap target', function () {
     fcmFakeGoogle();
@@ -121,23 +136,43 @@ test('other Firebase failures neither queue a prune nor leak anything', function
     Queue::assertNothingPushed();
 });
 
-test('an iOS push carries the running badge total', function () {
+test('an iOS push carries the unread alert count including the alert it pushes', function () {
     fcmFakeGoogle();
     $phone = NotificationChannel::factory()->mobilePush('ios-token-1', 'ios')->create();
+    $rule = AlertRule::factory()->for($phone->user)->create();
+    DeliveryLog::factory()->for($phone->user)->for($rule)->for(IngestedProduct::factory())->pushed()->create();
+    $product = IngestedProduct::factory()->create();
 
-    app(ChannelDispatcher::class)->send($phone, 'Body', 'First');
-    app(ChannelDispatcher::class)->send($phone, 'Body', 'Second');
+    app(ChannelDispatcher::class)->send($phone, 'Body', 'Title', ['type' => 'alert', 'alert_rule_id' => $rule->id, 'ingested_product_id' => $product->id]);
 
-    $badges = collect(Http::recorded())
-        ->filter(fn (array $pair) => str_contains($pair[0]->url(), 'messages:send'))
-        ->map(fn (array $pair) => $pair[0]['message']['apns']['payload']['aps']['badge'])
-        ->values()->all();
-
-    expect($badges)->toBe([1, 2])
-        ->and($phone->fresh()->unread_push_count)->toBe(2);
+    expect(mobilePushSentBadges())->toBe([2]);
 });
 
-test('an Android push has no badge and the count stays 0', function () {
+test('an iOS push for an alert that is already unread does not count it twice', function () {
+    fcmFakeGoogle();
+    $phone = NotificationChannel::factory()->mobilePush('ios-token-1', 'ios')->create();
+    $rule = AlertRule::factory()->for($phone->user)->create();
+    $product = IngestedProduct::factory()->create();
+    DeliveryLog::factory()->for($phone->user)->for($rule)->for($product)->pushed()->create();
+    DeliveryLog::factory()->for($phone->user)->for($rule)->for(IngestedProduct::factory())->pushed()->create();
+
+    app(ChannelDispatcher::class)->send($phone, 'Body', 'Title', ['type' => 'alert', 'alert_rule_id' => $rule->id, 'ingested_product_id' => $product->id]);
+
+    expect(mobilePushSentBadges())->toBe([2]);
+});
+
+test('the test push carries the plain unread count', function () {
+    fcmFakeGoogle();
+    $phone = NotificationChannel::factory()->mobilePush('ios-token-1', 'ios')->create();
+    DeliveryLog::factory()->for($phone->user)->for(IngestedProduct::factory())->pushed()->create();
+    DeliveryLog::factory()->for($phone->user)->for(IngestedProduct::factory())->pushed()->create();
+
+    app(SendTestNotification::class)($phone);
+
+    expect(mobilePushSentBadges())->toBe([2]);
+});
+
+test('an Android push has no badge', function () {
     fcmFakeGoogle();
     $phone = NotificationChannel::factory()->mobilePush('android-token-1', 'android')->create();
 
@@ -145,28 +180,28 @@ test('an Android push has no badge and the count stays 0', function () {
 
     Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
         && ! array_key_exists('badge', $request['message']['apns']['payload']['aps']));
-    expect($phone->fresh()->unread_push_count)->toBe(0);
 });
 
-test('a failed push still counts', function () {
-    fcmFakeGoogle(Http::response(['error' => ['message' => 'down']], 500));
+test('the transport no longer touches the per-phone unread push count', function (?Closure $googleResponse) {
+    fcmFakeGoogle($googleResponse?->__invoke());
     $phone = NotificationChannel::factory()->mobilePush('ios-token-2', 'ios')->create();
 
-    $result = app(ChannelDispatcher::class)->send($phone, 'Body', 'Title');
+    app(ChannelDispatcher::class)->send($phone, 'Body', 'First');
+    app(ChannelDispatcher::class)->send($phone, 'Body', 'Second');
 
-    expect($result->success)->toBeFalse()
-        ->and($phone->fresh()->unread_push_count)->toBe(1);
-});
+    expect($phone->fresh()->unread_push_count)->toBe(0);
+})->with([
+    'delivered' => [null],
+    'failed' => [fn () => Http::response(['error' => ['message' => 'down']], 500)],
+]);
 
-test('an iOS channel deleted before the send fails cleanly without calling Firebase', function () {
+test('an iOS device with no stored token fails without calling Firebase', function () {
     Http::fake();
-    $phone = NotificationChannel::factory()->mobilePush('ios-token-3', 'ios')->create();
-    NotificationChannel::query()->whereKey($phone->id)->delete();
+    $phone = NotificationChannel::factory()->mobilePush()->create(['config' => ['platform' => 'ios']]);
 
     $result = app(ChannelDispatcher::class)->send($phone, 'Body', 'Title');
 
-    expect($result->success)->toBeFalse()
-        ->and($result->error)->toBe('This device is no longer registered.');
+    expect($result->success)->toBeFalse()->and($result->error)->toBe('This device channel has no push token; open the app to register it again.');
     Http::assertNothingSent();
 });
 

@@ -6,6 +6,7 @@ use App\Mail\ChannelMessageMail;
 use App\Mail\DailySummaryMail;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
+use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
@@ -34,6 +35,26 @@ test('it delivers via apprise and writes a success DeliveryLog row', function ()
         // "ignored default title" tests below for why displayName() wins.
         ->and($log->subject)->toBe($rule->displayName())
         ->and($log->ingested_product_id)->toBeNull();
+});
+
+test('every summary pushed to an iPhone counts as a new unread alert on top of the unread ones', function () {
+    $credentials = fcmUseCredentials();
+    fcmFakeGoogle();
+
+    $rule = AlertRule::factory()->dailySummary()->create();
+    $phone = NotificationChannel::factory()->for($rule->user)->mobilePush('ios-token-1', 'ios')->create();
+    DeliveryLog::factory()->for($rule->user)->for(IngestedProduct::factory())->pushed()->create();
+
+    (new DeliverScheduledAlert($rule->id, $phone->id, 'Daily summary', 'Today: Sunny.'))->handle(app(ChannelDispatcher::class));
+    (new DeliverScheduledAlert($rule->id, $phone->id, 'Daily summary', 'Tomorrow: Rain.'))->handle(app(ChannelDispatcher::class));
+
+    $badges = collect(Http::recorded())
+        ->filter(fn (array $pair) => str_contains($pair[0]->url(), 'messages:send'))
+        ->map(fn (array $pair) => $pair[0]['message']['apns']['payload']['aps']['badge'])
+        ->values()->all();
+
+    expect($badges)->toBe([2, 3]);
+    @unlink($credentials['path']);
 });
 
 test('a non-delivery from apprise writes a failure DeliveryLog row instead of throwing', function () {

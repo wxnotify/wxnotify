@@ -142,6 +142,8 @@ class DeliverWeatherAlert implements ShouldQueue
             'rule' => $rule->name,
             'product' => $eventNames === [] ? null : implode(' + ', $eventNames),
             'url' => $product->viewUrl(),
+            'alert_rule_id' => $rule->id,
+            'ingested_product_id' => $product->id,
         ]);
 
         $log = DeliveryLog::create([

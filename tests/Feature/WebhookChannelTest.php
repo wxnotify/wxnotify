@@ -100,6 +100,22 @@ test('caller meta can never overwrite the reserved top-level payload keys', func
         ->and($payload['alert'])->toBe(['rule' => 'My rule']);
 });
 
+test('the alert group ids meant for the phone badge never reach a webhook', function () {
+    $history = chanFakeWebhookEndpoint([new Response(200)]);
+    $channel = NotificationChannel::factory()->webhook()->create();
+
+    app(ChannelDispatcher::class)->send($channel, 'body', 'title', [
+        'type' => 'alert',
+        'rule' => 'My rule',
+        'alert_rule_id' => 12,
+        'ingested_product_id' => 34,
+    ]);
+
+    $payload = json_decode((string) $history[0]['request']->getBody(), true);
+
+    expect($payload['alert'])->toBe(['rule' => 'My rule']);
+});
+
 test('a confirmation message carries the code in the payload', function () {
     $history = chanFakeWebhookEndpoint([new Response(200)]);
     $channel = NotificationChannel::factory()->webhook()->create();

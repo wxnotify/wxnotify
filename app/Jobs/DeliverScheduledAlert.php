@@ -93,6 +93,8 @@ class DeliverScheduledAlert implements ShouldQueue
         $meta = [
             'type' => 'alert',
             'rule' => $rule->name,
+            'alert_rule_id' => $rule->id,
+            'ingested_product_id' => null,
         ];
 
         // A job serialized before $report existed (SerializesModels' native

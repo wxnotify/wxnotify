@@ -26,6 +26,14 @@ class WebhookTransport implements Transport
     private const RESERVED_KEYS = ['type', 'title', 'body', 'sent_at'];
 
     /**
+     * Meta keys for our own transports only (the alert's group, for the phone badge in MobilePushTransport):
+     * internal ids that are never sent to a subscriber's endpoint.
+     *
+     * @var list<string>
+     */
+    private const INTERNAL_KEYS = ['alert_rule_id', 'ingested_product_id'];
+
+    /**
      * The top-level keys an alert payload carries, in order. The channel form's
      * "what we send" description is built from this list, and a test asserts a
      * real payload's keys still match it — so the documentation cannot drift
@@ -241,7 +249,8 @@ class WebhookTransport implements Transport
      * The documented webhook body shape.
      *
      * `type`, `title`, `body` and `sent_at` are reserved: they are always the
-     * transport's own values, never a caller's meta key of the same name. An
+     * transport's own values, never a caller's meta key of the same name. The
+     * internal group ids (INTERNAL_KEYS) are dropped. An
      * alert's remaining meta (rule, product, …) is nested under `alert`; a
      * confirmation keeps its `code` at the top level.
      *
@@ -251,7 +260,7 @@ class WebhookTransport implements Transport
     private function payload(string $body, ?string $title, array $meta): array
     {
         $type = is_string($meta['type'] ?? null) ? $meta['type'] : 'alert';
-        $details = array_diff_key($meta, array_flip(self::RESERVED_KEYS));
+        $details = array_diff_key($meta, array_flip([...self::RESERVED_KEYS, ...self::INTERNAL_KEYS]));
 
         $payload = [
             'type' => $type,

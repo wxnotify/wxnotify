@@ -2,6 +2,7 @@
 
 namespace App\Support\Delivery\Transports;
 
+use App\Actions\Alerts\PushBadgeCount;
 use App\Jobs\PruneMobilePushChannel;
 use App\Models\NotificationChannel;
 use App\Support\Delivery\DeliveryResult;
@@ -41,15 +42,7 @@ class MobilePushTransport implements Transport
             return DeliveryResult::failed('This device channel has no push token; open the app to register it again.');
         }
 
-        $badge = null;
-
-        if (($channel->config['platform'] ?? null) === 'ios') {
-            $badge = $channel->incrementUnreadPushCount();
-
-            if ($badge === null) {
-                return DeliveryResult::failed('This device is no longer registered.');
-            }
-        }
+        $badge = ($channel->config['platform'] ?? null) === 'ios' ? $this->badge($channel, $meta) : null;
 
         $result = $this->fcm->send(
             $token,
@@ -73,6 +66,26 @@ class MobilePushTransport implements Transport
         }
 
         return DeliveryResult::failed((string) $result->error);
+    }
+
+    /**
+     * The iOS icon number: the subscriber's unread alerts including this one (PushBadgeCount). The jobs put the
+     * alert's group (`alert_rule_id`, `ingested_product_id`) in the meta; only `type` 'alert' counts as an alert,
+     * so the test push carries the plain unread count.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function badge(NotificationChannel $channel, array $meta): int
+    {
+        $alertRuleId = $meta['alert_rule_id'] ?? null;
+        $ingestedProductId = $meta['ingested_product_id'] ?? null;
+
+        return app(PushBadgeCount::class)(
+            $channel->user,
+            is_int($alertRuleId) ? $alertRuleId : null,
+            is_int($ingestedProductId) ? $ingestedProductId : null,
+            ($meta['type'] ?? 'alert') === 'alert',
+        );
     }
 
     /**

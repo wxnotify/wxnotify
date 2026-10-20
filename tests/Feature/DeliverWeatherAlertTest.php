@@ -156,6 +156,30 @@ test('a weather alert pushed to a phone carries an app link to the bulletin\'s p
     @unlink($credentials['path']);
 });
 
+test('each weather alert pushed to an iPhone carries the unread alert count including itself', function () {
+    $credentials = fcmUseCredentials();
+    fcmFakeGoogle();
+
+    $rule = AlertRule::factory()->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $phone = NotificationChannel::factory()->for($rule->user)->mobilePush('ios-token-1', 'ios')->create();
+    $secondPhone = NotificationChannel::factory()->for($rule->user)->mobilePush('ios-token-2', 'ios')->create();
+    $first = IngestedProduct::factory()->create();
+    $second = IngestedProduct::factory()->create();
+
+    (new DeliverWeatherAlert($rule->id, $phone->id, $first->id))->handle(app(ChannelDispatcher::class));
+    (new DeliverWeatherAlert($rule->id, $phone->id, $second->id))->handle(app(ChannelDispatcher::class));
+    (new DeliverWeatherAlert($rule->id, $secondPhone->id, $second->id))->handle(app(ChannelDispatcher::class));
+
+    $badges = collect(Http::recorded())
+        ->filter(fn (array $pair) => str_contains($pair[0]->url(), 'messages:send'))
+        ->map(fn (array $pair) => $pair[0]['message']['apns']['payload']['aps']['badge'])
+        ->values()->all();
+
+    expect($badges)->toBe([1, 2, 2])
+        ->and($phone->fresh()->unread_push_count)->toBe(0);
+    @unlink($credentials['path']);
+});
+
 test('message_body_style Brief truncates the body to 280 characters', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
