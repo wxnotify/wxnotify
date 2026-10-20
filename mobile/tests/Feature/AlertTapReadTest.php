@@ -39,11 +39,17 @@ function tapReadSentRefs(): array
 }
 
 test('a product tap link with a reference opens the page over Alerts and reads the alert', function () {
-    Http::fake(['wx.test/api/v1/alerts/read-ref' => Http::response(['data' => ['unread_count' => 2]])]);
+    $pageOpenAtRead = null;
+    Http::fake(['wx.test/api/v1/alerts/read-ref' => function () use (&$pageOpenAtRead) {
+        $pageOpenAtRead = $this->browser->inAppUrls !== [];
+
+        return Http::response(['data' => ['unread_count' => 2]]);
+    }]);
 
     Native::visit('/product/'.tapReadPageLink().'/p.7.88')->assertReplacedWith('/');
 
-    expect($this->browser->inAppUrls)->toBe(['https://wx.test/view-product/kbou-tor-202610121500'])
+    expect($pageOpenAtRead)->toBeTrue()
+        ->and($this->browser->inAppUrls)->toBe(['https://wx.test/view-product/kbou-tor-202610121500'])
         ->and(tapReadSentRefs())->toBe(['p.7.88'])
         ->and($this->cache->unreadCount())->toBe(2)
         ->and($this->appBadge->counts)->toBe([2]);
@@ -58,14 +64,35 @@ test('a product tap link without a reference still opens the page and reads noth
     Http::assertNothingSent();
 });
 
-test('an alert tap link reads the alert and replaces itself with Alerts', function () {
-    Http::fake(['wx.test/api/v1/alerts/read-ref' => Http::response(['data' => ['unread_count' => 0]])]);
+test('an alert tap link queues the read and replaces itself with Alerts at once, without a request', function (Closure $response) {
+    Http::fake(['wx.test/*' => $response]);
 
     Native::visit('/alert/'.tapReadBatchRef())->assertReplacedWith('/');
 
-    expect(tapReadSentRefs())->toBe([tapReadBatchRef()])
-        ->and($this->appBadge->counts)->toBe([0])
+    expect($this->cache->pendingRefs())->toBe([tapReadBatchRef()])
         ->and($this->browser->inAppUrls)->toBe([]);
+    Http::assertNothingSent();
+})->with([
+    'a working server' => [fn () => fn () => Http::response(['data' => ['unread_count' => 0]])],
+    'a server that is down' => [fn () => fn () => throw new ConnectionException('timed out')],
+]);
+
+test('the alert tap\'s queued read is replayed when Alerts mounts, before its feed load, and sets the badge', function () {
+    Http::fake([
+        'wx.test/api/v1/alerts/read-ref' => Http::response(['data' => ['unread_count' => 1]]),
+        'wx.test/api/v1/alerts?*' => Http::response([], 500),
+        'wx.test/api/v1/active-alerts' => Http::response(['data' => [], 'meta' => ['has_places' => true, 'generated_at' => now()->toIso8601String()]]),
+    ]);
+
+    Native::visit('/alert/p.7.88')->assertReplacedWith('/');
+    Native::visit('/');
+
+    $paths = collect(Http::recorded())->map(fn (array $pair) => parse_url($pair[0]->url(), PHP_URL_PATH))->values()->all();
+
+    expect(tapReadSentRefs())->toBe(['p.7.88'])
+        ->and(array_search('/api/v1/alerts/read-ref', $paths, true))->toBeLessThan(array_search('/api/v1/alerts', $paths, true))
+        ->and($this->appBadge->counts)->toBe([1])
+        ->and($this->cache->pendingRefs())->toBe([]);
 });
 
 test('an invalid reference is ignored and the page or Alerts still opens', function (string $ref) {
@@ -84,11 +111,17 @@ test('an invalid reference is ignored and the page or Alerts still opens', funct
 ]);
 
 test('a server that is down never stops the page opening, and the read is queued', function (Closure $response) {
-    Http::fake(['wx.test/*' => $response]);
+    $pageOpenAtRead = null;
+    Http::fake(['wx.test/*' => function (Request $request) use ($response, &$pageOpenAtRead) {
+        $pageOpenAtRead = $this->browser->inAppUrls !== [];
+
+        return $response($request);
+    }]);
 
     Native::test(ProductLink::class, ['link' => tapReadPageLink(), 'ref' => 'p.7.88'])->assertReplacedWith('/');
 
-    expect($this->browser->inAppUrls)->toBe(['https://wx.test/view-product/kbou-tor-202610121500'])
+    expect($pageOpenAtRead)->toBeTrue()
+        ->and($this->browser->inAppUrls)->toBe(['https://wx.test/view-product/kbou-tor-202610121500'])
         ->and($this->cache->pendingRefs())->toBe(['p.7.88'])
         ->and($this->cache->unreadCount())->toBe(3);
 })->with([
@@ -117,7 +150,45 @@ test('a queued reference is replayed by the next retry and stores the server cou
 
     expect(tapReadSentRefs())->toBe(['p.7.88', tapReadBatchRef()])
         ->and($this->cache->pendingRefs())->toBe([])
-        ->and($this->cache->unreadCount())->toBe(1);
+        ->and($this->cache->unreadCount())->toBe(1)
+        ->and($this->appBadge->last())->toBe(1);
+});
+
+test('a successful read is replayed exactly once more on the next feed load, then forgotten', function () {
+    Http::fake(['wx.test/api/v1/alerts/read-ref' => Http::response(['data' => ['unread_count' => 0]])]);
+    $state = app(AlertReadState::class);
+
+    $state->openByRef('p.7.88');
+    $state->retryPending();
+    $state->retryPending();
+    $state->retryPending();
+
+    expect(tapReadSentRefs())->toBe(['p.7.88', 'p.7.88'])
+        ->and($this->cache->pendingRefs())->toBe([])
+        ->and($this->cache->secondPassRefs())->toBe([]);
+});
+
+test('a queued read gets its second pass on the feed load after the one that replayed it, not the same one', function () {
+    $this->cache->rememberPendingRefs(['p.7.88']);
+    Http::fake(['wx.test/api/v1/alerts/read-ref' => Http::response(['data' => ['unread_count' => 0]])]);
+    $state = app(AlertReadState::class);
+
+    $state->retryPending();
+    expect(tapReadSentRefs())->toBe(['p.7.88'])->and($this->cache->secondPassRefs())->toBe(['p.7.88']);
+
+    $state->retryPending();
+    $state->retryPending();
+    expect(tapReadSentRefs())->toBe(['p.7.88', 'p.7.88'])->and($this->cache->secondPassRefs())->toBe([]);
+});
+
+test('a second pass that cannot reach the server is kept for the next feed load', function () {
+    Http::fake(['wx.test/api/v1/alerts/read-ref' => Http::response(['data' => ['unread_count' => 0]])]);
+    app(AlertReadState::class)->openByRef('p.7.88');
+    $this->network->connected = false;
+
+    app(AlertReadState::class)->retryPending();
+
+    expect($this->cache->secondPassRefs())->toBe(['p.7.88']);
 });
 
 test('a replay that fails again stops and keeps the queue', function (int $status) {
@@ -181,9 +252,10 @@ test('the queue of references is bounded, keeps the newest and is wiped at sign-
         ->and($this->cache->pendingRefs()[0])->toBe('p.7.6')
         ->and($this->cache->pendingRefs()[19])->toBe('p.7.25');
 
+    $this->cache->rememberSecondPassRefs(['p.7.1']);
     $this->cache->wipe();
 
-    expect($this->cache->pendingRefs())->toBe([]);
+    expect($this->cache->pendingRefs())->toBe([])->and($this->cache->secondPassRefs())->toBe([]);
 });
 
 test('the read call posts the reference to the read-by-reference endpoint with the app token', function () {

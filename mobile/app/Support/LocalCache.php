@@ -46,6 +46,8 @@ class LocalCache
 
     private const PENDING_REFS = 'wxnotify.alerts.pending_refs';
 
+    private const SECOND_PASS_REFS = 'wxnotify.alerts.second_pass_refs';
+
     /** The most push-tap reads kept for a retry; the oldest go first. */
     public const MAX_PENDING_REFS = 20;
 
@@ -218,6 +220,33 @@ class LocalCache
         }
 
         Cache::forever(self::PENDING_REFS, $refs);
+    }
+
+    /**
+     * @return array<int, string> alert references already read once, to be read exactly once more on the next feed load
+     *                            (a row saved after the first read, such as another phone's push, would show the alert unread again)
+     */
+    public function secondPassRefs(): array
+    {
+        return Cache::get(self::SECOND_PASS_REFS, []);
+    }
+
+    /**
+     * Keeps at most MAX_PENDING_REFS distinct references, the newest.
+     *
+     * @param  array<int, string>  $refs
+     */
+    public function rememberSecondPassRefs(array $refs): void
+    {
+        $refs = array_slice(array_values(array_unique($refs)), -self::MAX_PENDING_REFS);
+
+        if ($refs === []) {
+            Cache::forget(self::SECOND_PASS_REFS);
+
+            return;
+        }
+
+        Cache::forever(self::SECOND_PASS_REFS, $refs);
     }
 
     /**
@@ -469,5 +498,6 @@ class LocalCache
         Cache::forget(self::PENDING_READ_ALL);
         Cache::forget(self::FEED_AS_OF);
         Cache::forget(self::PENDING_REFS);
+        Cache::forget(self::SECOND_PASS_REFS);
     }
 }

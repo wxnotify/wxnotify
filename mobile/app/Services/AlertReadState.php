@@ -77,10 +77,22 @@ class AlertReadState
         try {
             $this->syncFromServer($this->api->markAlertReadByRef($ref));
             $this->cache->forgetSyncedAt();
+            $this->scheduleSecondPass($ref);
         } catch (Offline|Retryable|Maintenance) {
             $this->cache->rememberPendingRefs([...$this->cache->pendingRefs(), $ref]);
         } catch (ApiException) {
             return;
+        }
+    }
+
+    /**
+     * Queues the read of a tapped push without calling the server, for a screen that must not wait (the alert tap
+     * link, which hands straight over to Alerts, whose feed load replays it before fetching). Ignores a malformed reference.
+     */
+    public function queueRef(string $ref): void
+    {
+        if (AlertRefFormat::isValid($ref)) {
+            $this->cache->rememberPendingRefs([...$this->cache->pendingRefs(), $ref]);
         }
     }
 
@@ -175,28 +187,72 @@ class AlertReadState
         }
 
         if ($this->replayPendingReads()) {
-            $this->replayPendingRefs();
+            $secondPass = $this->cache->secondPassRefs();
+
+            if ($this->replayPendingRefs()) {
+                $this->replaySecondPass($secondPass);
+            }
         }
     }
 
     /**
      * Replays each queued push-tap reference, storing the server's count after each. Offline, rate limiting or a
      * refused token stops at once; another server error or maintenance keeps that reference; any other refusal drops it.
+     * A reference read here gets its second pass on the next feed load.
+     *
+     * @return bool false when it stopped early (offline, rate limited, refused token)
      */
-    private function replayPendingRefs(): void
+    private function replayPendingRefs(): bool
     {
         foreach ($this->cache->pendingRefs() as $ref) {
             try {
-                $this->cache->rememberUnreadCount($this->api->markAlertReadByRef($ref));
+                $this->syncFromServer($this->api->markAlertReadByRef($ref));
                 $this->forgetPendingRef($ref);
+                $this->scheduleSecondPass($ref);
             } catch (Offline|RateLimited|Unauthenticated) {
-                return;
+                return false;
             } catch (Retryable|Maintenance) {
                 continue;
             } catch (ApiException) {
                 $this->forgetPendingRef($ref);
             }
         }
+
+        return true;
+    }
+
+    /**
+     * Reads once more the references read on an earlier feed load, then forgets them (never a third time): a group is
+     * unread while any of its push rows is, so a row saved after the first read (another phone's push of the same
+     * alert, or the tapped push's own row not yet written) would bring the dot back. Offline, rate limiting or a
+     * refused token stops and keeps what is left; another server error keeps that reference; any other refusal drops it.
+     *
+     * @param  array<int, string>  $refs  the second-pass list as it was before this feed load's first passes
+     */
+    private function replaySecondPass(array $refs): void
+    {
+        foreach ($refs as $ref) {
+            try {
+                $this->syncFromServer($this->api->markAlertReadByRef($ref));
+                $this->forgetSecondPass($ref);
+            } catch (Offline|RateLimited|Unauthenticated) {
+                return;
+            } catch (Retryable|Maintenance) {
+                continue;
+            } catch (ApiException) {
+                $this->forgetSecondPass($ref);
+            }
+        }
+    }
+
+    private function scheduleSecondPass(string $ref): void
+    {
+        $this->cache->rememberSecondPassRefs([...$this->cache->secondPassRefs(), $ref]);
+    }
+
+    private function forgetSecondPass(string $ref): void
+    {
+        $this->cache->rememberSecondPassRefs(array_values(array_diff($this->cache->secondPassRefs(), [$ref])));
     }
 
     private function forgetPendingRef(string $ref): void
