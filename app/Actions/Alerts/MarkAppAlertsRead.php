@@ -4,6 +4,8 @@ namespace App\Actions\Alerts;
 
 use App\Models\DeliveryLog;
 use App\Models\User;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Marks the subscriber's app alerts read. An alert is read by stamping `read_at` on every successful push row
@@ -35,12 +37,23 @@ class MarkAppAlertsRead
         return ($this->countUnread)($user);
     }
 
-    public function all(User $user): int
+    /**
+     * With a cutoff (the feed's `as_of`), only rows created at or before it are read, so an alert that arrived
+     * after the phone loaded its list stays unread. `created_at` is stored to the whole second (truncated), so
+     * a stored second is only known to be before the cutoff when it is earlier than the cutoff's own second:
+     * a row from that same second stays unread, the safe direction for a warning the subscriber may not have seen.
+     */
+    public function all(User $user, ?CarbonInterface $through = null): int
     {
         DeliveryLog::query()
             ->where('user_id', $user->id)
             ->pushedToPhone()
             ->unread()
+            ->when($through !== null, fn (Builder $query): Builder => $query->where(
+                'created_at',
+                '<',
+                $through->copy()->setTimezone(config('app.timezone'))->startOfSecond(),
+            ))
             ->toBase()
             ->update(['read_at' => now()]);
 

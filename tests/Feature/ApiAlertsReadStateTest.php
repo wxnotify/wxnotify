@@ -4,6 +4,7 @@ use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\User;
+use Carbon\CarbonInterface;
 
 beforeEach(function () {
     $this->freezeTime();
@@ -24,12 +25,20 @@ beforeEach(function () {
     ]);
 });
 
-function readStateRequest($test, string $method, string $uri, ?string $bearer = null)
+/**
+ * @param  array<string, mixed>  $data
+ */
+function readStateRequest($test, string $method, string $uri, ?string $bearer = null, array $data = [])
 {
     // The guard caches the first request's user for the rest of the test.
     app('auth')->forgetGuards();
 
-    return ($bearer === null ? $test : $test->withToken($bearer))->json($method, $uri);
+    return ($bearer === null ? $test : $test->withToken($bearer))->json($method, $uri, $data);
+}
+
+function readStateCutoff(CarbonInterface $at): string
+{
+    return $at->copy()->utc()->format('Y-m-d\\TH:i:s.u\\Z');
 }
 
 test('the feed lists read and unread alerts with the unread count in meta', function () {
@@ -43,6 +52,68 @@ test('the feed lists read and unread alerts with the unread count in meta', func
         ->assertJsonPath('data.1.read', false)
         ->assertJsonPath('meta.unread_count', 1)
         ->assertJsonPath('meta.next_cursor', null);
+});
+
+test('every feed page reports the server time as as_of with microseconds', function () {
+    $this->travelTo(now()->startOfSecond()->addMicroseconds(123456));
+    ($this->pushRow)(['dispatched_at' => now()->subMinutes(2)]);
+    ($this->pushRow)(['dispatched_at' => now()->subMinute()]);
+
+    $first = readStateRequest($this, 'GET', '/api/v1/alerts?limit=1', $this->token)->assertOk();
+    $next = readStateRequest($this, 'GET', '/api/v1/alerts?limit=1&before='.urlencode($first->json('meta.next_cursor')), $this->token)->assertOk();
+
+    expect($first->json('meta.as_of'))->toBe(readStateCutoff(now()))->toEndWith('.123456Z')
+        ->and($next->json('meta.as_of'))->toBe(readStateCutoff(now()));
+});
+
+test('mark all with a cutoff reads only rows created before it and counts the newer ones', function () {
+    $through = readStateCutoff(now());
+    $older = ($this->pushRow)(['created_at' => now()->subMinute()]);
+    $sameSecond = ($this->pushRow)(['created_at' => now()]);
+    $newer = ($this->pushRow)(['created_at' => now()->addSeconds(30)]);
+    $theirs = ($this->pushRow)(['created_at' => now()->subMinute()], User::factory()->create());
+
+    readStateRequest($this, 'POST', '/api/v1/alerts/read-all', $this->token, ['through' => $through])
+        ->assertOk()
+        ->assertExactJson(['data' => ['unread_count' => 2]]);
+
+    expect($older->fresh()->read_at)->not->toBeNull()
+        ->and($sameSecond->fresh()->read_at)->toBeNull()
+        ->and($newer->fresh()->read_at)->toBeNull()
+        ->and($theirs->fresh()->read_at)->toBeNull();
+});
+
+test('mark all without a cutoff still reads rows created after the list loaded', function () {
+    $newer = ($this->pushRow)(['created_at' => now()->addMinute()]);
+
+    readStateRequest($this, 'POST', '/api/v1/alerts/read-all', $this->token, ['through' => null])
+        ->assertOk()
+        ->assertExactJson(['data' => ['unread_count' => 0]]);
+
+    expect($newer->fresh()->read_at)->not->toBeNull();
+});
+
+test('mark all refuses a malformed cutoff or one too far in the future', function (Closure $through) {
+    $row = ($this->pushRow)(['created_at' => now()->subMinute()]);
+
+    readStateRequest($this, 'POST', '/api/v1/alerts/read-all', $this->token, ['through' => $through()])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('through');
+
+    expect($row->fresh()->read_at)->toBeNull();
+})->with([
+    'not a date' => fn () => fn () => 'not-a-date',
+    'an array' => fn () => fn () => ['2026-10-20'],
+    'beyond the five-minute bound' => fn () => fn () => readStateCutoff(now()->addMinutes(6)),
+]);
+
+test('mark all accepts a cutoff slightly ahead of the server clock', function () {
+    $row = ($this->pushRow)(['created_at' => now()->subMinute()]);
+
+    readStateRequest($this, 'POST', '/api/v1/alerts/read-all', $this->token, ['through' => readStateCutoff(now()->addMinutes(4))])
+        ->assertOk();
+
+    expect($row->fresh()->read_at)->not->toBeNull();
 });
 
 test('opening reads one alert and returns the new count', function () {
@@ -130,6 +201,7 @@ test('a beacon token is refused', function () {
 
     readStateRequest($this, 'POST', "/api/v1/alerts/{$alert->id}/read", $beacon)->assertForbidden();
     readStateRequest($this, 'POST', '/api/v1/alerts/read-all', $beacon)->assertForbidden();
+    readStateRequest($this, 'POST', '/api/v1/alerts/read-all', $beacon, ['through' => readStateCutoff(now())])->assertForbidden();
 
     expect($alert->fresh()->read_at)->toBeNull();
 });
