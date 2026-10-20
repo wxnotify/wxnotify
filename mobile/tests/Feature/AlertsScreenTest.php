@@ -1112,3 +1112,21 @@ test('a queued Mark all as read with a cutoff still leaves the newer alert unrea
     $screen->assertSet('unreadCount', 1);
     Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/read-all') && $r->data() === ['through' => $cutoff]);
 });
+
+test('an alert sent in the second of the list\'s as_of keeps its dot after Mark all as read, in the count and the badge', function () {
+    $this->freezeTime();
+    $loadedAt = now()->subMinutes(2)->startOfSecond();
+    Http::fake([
+        'wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 1]]),
+        'wx.test/api/v1/alerts*' => Http::response(feedResponse([
+            apiEntry(4, ['read' => false]),
+            apiEntry(5, ['read' => false, 'dispatched_at' => $loadedAt->toIso8601String()]),
+        ], asOf: $loadedAt->copy()->addMicroseconds(400000)->utc()->format('Y-m-d\\TH:i:s.u\\Z'))),
+    ]);
+
+    $screen = Native::test(AlertsScreen::class)->tap('Mark all as read');
+
+    expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 4' => false, 'Tornado Warning 5' => true])
+        ->and($this->appBadge->last())->toBe(1);
+    $screen->assertSet('unreadCount', 1);
+});

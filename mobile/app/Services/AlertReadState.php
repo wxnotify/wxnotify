@@ -63,7 +63,8 @@ class AlertReadState
      * sent at or before it turn read, and the count becomes the cached alerts still unread (those that arrived
      * after it), so a warning the subscriber never saw is not read for them. Without a known `as_of` (an older
      * backend) everything cached turns read and the count drops to zero, as before. A call that fails is kept
-     * with its cutoff, so the replay reads exactly what this tap read.
+     * with its cutoff, so the replay reads exactly what this tap read. After a cutoff mark all the single reads still
+     * waiting are replayed at once, so the stored count (the server's) never counts an alert already shown read.
      *
      * @return string|null the cutoff used, null when everything was read
      */
@@ -77,6 +78,7 @@ class AlertReadState
         try {
             $this->cache->rememberUnreadCount($this->api->markAllAlertsRead($through));
             $this->settlePendingReadAll($through);
+            $this->replayPendingReads();
         } catch (ApiException) {
             $this->cache->rememberPendingReadAll(through: $through);
         }
@@ -145,6 +147,15 @@ class AlertReadState
             }
         }
 
+        $this->replayPendingReads();
+    }
+
+    /**
+     * Replays each pending id, storing the server's count after each. A 404 drops an id; offline, rate limiting
+     * or a refused token stops at once; any other failure keeps that id.
+     */
+    private function replayPendingReads(): void
+    {
         foreach ($this->cache->pendingReads() as $id) {
             try {
                 $this->cache->rememberUnreadCount($this->api->markAlertRead($id));
@@ -162,15 +173,15 @@ class AlertReadState
     /**
      * After the server took a mark all: without a cutoff it read everything, so the single reads waiting are
      * done too; with one they are kept (an alert opened that arrived after the cutoff is still unread there)
-     * and replayed, which is harmless because a read is idempotent.
+     * and replayed by the caller, which is harmless because a read is idempotent.
      */
     private function settlePendingReadAll(?string $through): void
     {
+        $this->cache->rememberPendingReadAll(false);
+
         if ($through === null) {
             $this->cache->rememberPendingReads([]);
         }
-
-        $this->cache->rememberPendingReadAll(false);
     }
 
     private function lowerUnreadCount(): void

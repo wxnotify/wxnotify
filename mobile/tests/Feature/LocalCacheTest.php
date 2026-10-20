@@ -143,7 +143,7 @@ test('a pending mark all keeps its cutoff, and one without a cutoff (or from an 
         ->and($this->cache->pendingReadAllCutoff())->toBeNull();
 });
 
-test('marking all read with a cutoff reads only cached alerts sent at or before it', function () {
+test('marking all read with a cutoff reads only cached alerts sent before the cutoff\'s second', function () {
     $this->cache->replaceFeed([
         [...feedEntry(1), 'dispatched_at' => '2026-10-20T11:59:00+00:00', 'read' => false],
         [...feedEntry(2), 'dispatched_at' => '2026-10-20T12:00:00+00:00', 'read' => false],
@@ -153,7 +153,7 @@ test('marking all read with a cutoff reads only cached alerts sent at or before 
     $this->cache->markAllAlertsRead('2026-10-20T12:00:00.123456Z');
 
     expect([1 => $this->cache->isCachedRead(1), 2 => $this->cache->isCachedRead(2), 3 => $this->cache->isCachedRead(3)])
-        ->toBe([1 => true, 2 => true, 3 => false]);
+        ->toBe([1 => true, 2 => false, 3 => false]);
 });
 
 test('a detail sent after a pending mark all\'s cutoff takes the server\'s unread flag', function () {

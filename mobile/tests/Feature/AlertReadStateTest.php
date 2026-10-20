@@ -242,22 +242,20 @@ test('a rate-limited retry stops at once and keeps the queue', function () {
 
 test('mark all with a known as_of sends it as through and leaves a newer cached alert unread', function () {
     $this->cache->replaceFeed([readStateEntry(1, false), readStateEntry(2, false), [...readStateEntry(4, false), 'dispatched_at' => '2026-10-04T12:01:00+00:00']]);
-    $this->cache->rememberFeedAsOf('2026-10-04T12:00:00.500000Z');
-    $this->cache->rememberPendingReads([9]);
+    $this->cache->rememberFeedAsOf('2026-10-04T12:00:30.500000Z');
     Http::fake(['wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 1]])]);
 
     $this->state->markAll();
 
     expect(cachedReadFlags())->toBe([1 => true, 2 => true, 4 => false])
         ->and($this->cache->unreadCount())->toBe(1)
-        ->and($this->appBadge->counts)->toBe([1])
-        ->and($this->cache->pendingReads())->toBe([9]);
-    Http::assertSent(fn (Request $r) => $r->data() === ['through' => '2026-10-04T12:00:00.500000Z']);
+        ->and($this->appBadge->counts)->toBe([1]);
+    Http::assertSent(fn (Request $r) => $r->data() === ['through' => '2026-10-04T12:00:30.500000Z']);
 });
 
 test('an offline mark all counts the newer alerts as unread and keeps its cutoff for the replay', function () {
     $this->cache->replaceFeed([readStateEntry(1, false), [...readStateEntry(4, false), 'dispatched_at' => '2026-10-04T12:01:00+00:00']]);
-    $this->cache->rememberFeedAsOf('2026-10-04T12:00:00.500000Z');
+    $this->cache->rememberFeedAsOf('2026-10-04T12:00:30.500000Z');
     $this->network->connected = false;
     Http::fake();
 
@@ -266,18 +264,18 @@ test('an offline mark all counts the newer alerts as unread and keeps its cutoff
     expect(cachedReadFlags())->toBe([1 => true, 4 => false])
         ->and($this->cache->unreadCount())->toBe(1)
         ->and($this->appBadge->counts)->toBe([1])
-        ->and($this->cache->pendingReadAllCutoff())->toBe('2026-10-04T12:00:00.500000Z');
+        ->and($this->cache->pendingReadAllCutoff())->toBe('2026-10-04T12:00:30.500000Z');
     Http::assertNothingSent();
 });
 
 test('a replayed mark all sends its original cutoff, not the latest as_of', function () {
-    $this->cache->rememberPendingReadAll(through: '2026-10-04T12:00:00.500000Z');
+    $this->cache->rememberPendingReadAll(through: '2026-10-04T12:00:30.500000Z');
     $this->cache->rememberFeedAsOf('2026-10-04T13:00:00.000000Z');
     Http::fake(['wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 1]])]);
 
     $this->state->retryPending();
 
-    Http::assertSent(fn (Request $r) => $r->data() === ['through' => '2026-10-04T12:00:00.500000Z']);
+    Http::assertSent(fn (Request $r) => $r->data() === ['through' => '2026-10-04T12:00:30.500000Z']);
     expect($this->cache->pendingReadAll())->toBeFalse()
         ->and($this->cache->unreadCount())->toBe(1);
 });
@@ -305,7 +303,7 @@ test('without an as_of (an older backend) mark all sends no cutoff and reads eve
 });
 
 test('a fresh feed with a pending mark all that has a cutoff keeps a newer alert unread', function () {
-    $this->cache->rememberPendingReadAll(through: '2026-10-04T12:00:00.500000Z');
+    $this->cache->rememberPendingReadAll(through: '2026-10-04T12:00:30.500000Z');
 
     $entries = $this->state->applyFeed([
         [...readStateEntry(4, false), 'dispatched_at' => '2026-10-04T12:01:00+00:00'],
@@ -315,4 +313,33 @@ test('a fresh feed with a pending mark all that has a cutoff keeps a newer alert
     expect(array_column($entries, 'read', 'id'))->toBe([4 => false, 1 => true])
         ->and($this->cache->unreadCount())->toBe(1)
         ->and($this->appBadge->last())->toBe(1);
+});
+
+test('an alert sent in the cutoff\'s own second stays unread, as the server leaves it', function () {
+    $this->cache->replaceFeed([readStateEntry(1, false), [...readStateEntry(5, false), 'dispatched_at' => '2026-10-04T12:00:30+00:00']]);
+    $this->cache->rememberFeedAsOf('2026-10-04T12:00:30.500000Z');
+    Http::fake(['wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 1]])]);
+
+    $this->state->markAll();
+
+    expect(cachedReadFlags())->toBe([1 => true, 5 => false])
+        ->and($this->cache->unreadCount())->toBe(1)
+        ->and($this->appBadge->counts)->toBe([1]);
+});
+
+test('a mark all with a cutoff replays the single reads still waiting at once, ending on the server\'s count', function () {
+    $this->cache->replaceFeed([readStateEntry(1, false), [...readStateEntry(9, true), 'dispatched_at' => '2026-10-04T12:01:00+00:00']]);
+    $this->cache->rememberFeedAsOf('2026-10-04T12:00:30.500000Z');
+    $this->cache->rememberPendingReads([9]);
+    Http::fake([
+        'wx.test/api/v1/alerts/read-all' => Http::response(['data' => ['unread_count' => 1]]),
+        'wx.test/api/v1/alerts/9/read' => Http::response(['data' => ['unread_count' => 0]]),
+    ]);
+
+    $this->state->markAll();
+
+    expect($this->cache->pendingReads())->toBe([])
+        ->and($this->cache->unreadCount())->toBe(0)
+        ->and($this->appBadge->last())->toBe(0);
+    Http::assertSent(fn (Request $r) => $r->url() === 'https://wx.test/api/v1/alerts/9/read');
 });
