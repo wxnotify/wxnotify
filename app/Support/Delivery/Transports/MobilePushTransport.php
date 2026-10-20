@@ -7,7 +7,9 @@ use App\Jobs\PruneMobilePushChannel;
 use App\Models\NotificationChannel;
 use App\Support\Delivery\DeliveryResult;
 use App\Support\Delivery\FcmClient;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Pushes one alert to one signed-in phone. Failure text comes from FcmClient (fixed strings plus a
@@ -70,21 +72,29 @@ class MobilePushTransport implements Transport
     /**
      * The iOS icon number: the subscriber's unread alerts including this one (PushBadgeCount). The jobs put the
      * alert's group (`alert_rule_id`, `ingested_product_id`) in the meta; only `type` 'alert' counts as an alert,
-     * so the test push carries the plain unread count.
+     * so the test push carries the plain unread count. The number is a courtesy the app corrects from the feed's
+     * `unread_count`, so a failing count (a query error, or code deployed before the `read_at` migration) sends
+     * the push without a badge instead of losing the alert; only the exception class is logged.
      *
      * @param  array<string, mixed>  $meta
      */
-    private function badge(NotificationChannel $channel, array $meta): int
+    private function badge(NotificationChannel $channel, array $meta): ?int
     {
         $alertRuleId = $meta['alert_rule_id'] ?? null;
         $ingestedProductId = $meta['ingested_product_id'] ?? null;
 
-        return app(PushBadgeCount::class)(
-            $channel->user,
-            is_int($alertRuleId) ? $alertRuleId : null,
-            is_int($ingestedProductId) ? $ingestedProductId : null,
-            ($meta['type'] ?? 'alert') === 'alert',
-        );
+        try {
+            return app(PushBadgeCount::class)(
+                $channel->user,
+                is_int($alertRuleId) ? $alertRuleId : null,
+                is_int($ingestedProductId) ? $ingestedProductId : null,
+                ($meta['type'] ?? 'alert') === 'alert',
+            );
+        } catch (Throwable $e) {
+            Log::warning('Push badge count failed: '.$e::class);
+
+            return null;
+        }
     }
 
     /**

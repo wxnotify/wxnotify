@@ -91,3 +91,53 @@ test('the migration backfill marks existing push rows read in batches', function
         ->and($failed->fresh()->read_at)->toBeNull()
         ->and($email->fresh()->read_at)->toBeNull();
 });
+
+/**
+ * Runs the callback outside the test's wrapping transaction, because CREATE/DROP INDEX CONCURRENTLY refuses to
+ * run inside one (as on a real deploy, the migration is not transactional). The callback must leave the schema
+ * as migrated and commit no rows; the test transaction is reopened afterwards.
+ */
+function outsideTestTransaction(Closure $callback): void
+{
+    DB::commit();
+
+    try {
+        $callback();
+    } finally {
+        DB::beginTransaction();
+    }
+}
+
+function unreadPushIndexIsValid(): bool
+{
+    return (bool) DB::selectOne("SELECT indisvalid FROM pg_index WHERE indexrelid = 'delivery_logs_unread_push_index'::regclass")?->indisvalid;
+}
+
+test('the read-state migration can be run again after an interruption and leaves a valid index', function () {
+    outsideTestTransaction(function () {
+        $migration = loadDeliveryLogReadAtMigration();
+
+        $migration->down();
+        $migration->up();
+
+        // Interrupted after the column was committed (the migration never got recorded): run it again.
+        $migration->up();
+
+        // Interrupted before the index was built: the column is there, the index is missing.
+        DB::statement('DROP INDEX CONCURRENTLY IF EXISTS delivery_logs_unread_push_index');
+        $migration->up();
+    });
+
+    expect(unreadPushIndexIsValid())->toBeTrue();
+});
+
+test('an index left invalid by an interrupted concurrent build is rebuilt', function () {
+    outsideTestTransaction(function () {
+        // Mark the index invalid, as a failed CREATE INDEX CONCURRENTLY leaves it.
+        DB::statement("UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'delivery_logs_unread_push_index'::regclass");
+
+        loadDeliveryLogReadAtMigration()->up();
+    });
+
+    expect(unreadPushIndexIsValid())->toBeTrue();
+});

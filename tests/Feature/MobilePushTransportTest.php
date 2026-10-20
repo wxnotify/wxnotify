@@ -1,14 +1,17 @@
 <?php
 
+use App\Actions\Alerts\PushBadgeCount;
 use App\Actions\Channels\SendTestNotification;
 use App\Jobs\PruneMobilePushChannel;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
@@ -170,6 +173,26 @@ test('the test push carries the plain unread count', function () {
     app(SendTestNotification::class)($phone);
 
     expect(mobilePushSentBadges())->toBe([2]);
+});
+
+test('a failing badge count still sends the iOS push, without a badge', function () {
+    fcmFakeGoogle();
+    $phone = NotificationChannel::factory()->mobilePush('ios-token-badge-down', 'ios')->create();
+    app()->instance(PushBadgeCount::class, new class extends PushBadgeCount
+    {
+        public function __invoke(User $user, ?int $alertRuleId, ?int $ingestedProductId, bool $countsAsAlert): int
+        {
+            throw new RuntimeException('column read_at does not exist');
+        }
+    });
+    Log::spy();
+
+    $result = app(ChannelDispatcher::class)->send($phone, 'Body', 'Title');
+
+    expect($result->success)->toBeTrue();
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && ! array_key_exists('badge', $request['message']['apns']['payload']['aps']));
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message): bool => $message === 'Push badge count failed: RuntimeException');
 });
 
 test('an Android push has no badge', function () {

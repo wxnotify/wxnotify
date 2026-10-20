@@ -33,11 +33,6 @@ final class AppAlert
         return $this->rows->sortBy('dispatched_at')->last()->dispatched_at;
     }
 
-    public function hasFailure(): bool
-    {
-        return $this->rows->contains('status', 'failure');
-    }
-
     /**
      * The rows that delivered this alert to one of the subscriber's phones (DeliveryLog::scopePushedToPhone()).
      *

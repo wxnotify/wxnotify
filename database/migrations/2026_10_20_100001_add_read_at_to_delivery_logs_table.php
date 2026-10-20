@@ -15,8 +15,13 @@ use Illuminate\Support\Facades\Schema;
  * the code deploy start unread, which is acceptable.
  *
  * The index is partial on the unread successful pushes, so it stays tiny (only what is still unread) and serves
- * the unread count (CountUnreadAppAlerts) and marking everything read; its columns carry the group key so the
- * count is an index-only scan.
+ * the unread count (CountUnreadAppAlerts) and marking everything read; its columns carry the group key. The count
+ * is a bitmap scan of it plus heap reads (a group without a product is keyed by `id`, which is not in the index).
+ *
+ * Safe to run again after an interruption (being non-transactional, a failure leaves the column committed but the
+ * migration unrecorded): the column is added only when missing, the backfill touches only rows still unread, and
+ * the index is dropped and rebuilt, because an interrupted CONCURRENTLY build leaves an INVALID index that
+ * `IF NOT EXISTS` would silently accept.
  */
 return new class extends Migration
 {
@@ -29,14 +34,18 @@ return new class extends Migration
 
     public function up(): void
     {
-        Schema::table('delivery_logs', function (Blueprint $table) {
-            $table->timestamp('read_at')->nullable();
-        });
+        if (! Schema::hasColumn('delivery_logs', 'read_at')) {
+            Schema::table('delivery_logs', function (Blueprint $table) {
+                $table->timestamp('read_at')->nullable();
+            });
+        }
 
         $this->backfill();
 
+        DB::statement('DROP INDEX CONCURRENTLY IF EXISTS delivery_logs_unread_push_index');
+
         DB::statement("
-            CREATE INDEX CONCURRENTLY IF NOT EXISTS delivery_logs_unread_push_index
+            CREATE INDEX CONCURRENTLY delivery_logs_unread_push_index
             ON delivery_logs (user_id, ingested_product_id, alert_rule_id)
             WHERE channel_type = 'mobile_push' AND status = 'success' AND read_at IS NULL
         ");
