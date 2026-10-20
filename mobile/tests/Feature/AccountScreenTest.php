@@ -81,7 +81,9 @@ test('signing out works offline: the phone is cleared even though the server cou
     expect((new TokenStore)->token())->toBeNull();
 });
 
-test('signing out clears the icon badge and calls no badge endpoint', function () use ($profile) {
+test('signing out zeroes the icon badge, clears the tray through the plugin and calls no badge endpoint', function () use ($profile) {
+    PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined')->byDefault();
+    PushNotifications::shouldReceive('clearBadge')->once();
     Http::fake([
         'wx.test/api/v1/me' => Http::response(['data' => $profile]),
         'wx.test/api/v1/auth/token' => Http::response(null, 204),
@@ -93,12 +95,14 @@ test('signing out clears the icon badge and calls no badge endpoint', function (
     Http::assertNotSent(fn (Request $r) => str_contains($r->url(), '/push-token/badge'));
 });
 
-test('a failing icon badge never stops the sign-out', function () use ($profile) {
+test('a failing icon badge still clears the tray and never stops the sign-out', function () use ($profile) {
+    PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined')->byDefault();
+    PushNotifications::shouldReceive('clearBadge')->once();
     app()->instance(AppBadge::class, new class extends AppBadge
     {
         public function set(int $count): void
         {
-            throw new RuntimeException('plugin down');
+            throw new RuntimeException('badge down');
         }
     });
     Http::fake([
@@ -109,6 +113,20 @@ test('a failing icon badge never stops the sign-out', function () use ($profile)
     Native::test(AccountScreen::class)->tap('Sign out')->assertReplacedWith('/sign-in');
 
     expect((new TokenStore)->token())->toBeNull();
+});
+
+test('a failing tray clear still zeroes the icon badge and never stops the sign-out', function () use ($profile) {
+    PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined')->byDefault();
+    PushNotifications::shouldReceive('clearBadge')->once()->andThrow(new RuntimeException('plugin down'));
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/auth/token' => Http::response(null, 204),
+    ]);
+
+    Native::test(AccountScreen::class)->tap('Sign out')->assertReplacedWith('/sign-in');
+
+    expect($this->appBadge->counts)->toBe([0])
+        ->and((new TokenStore)->token())->toBeNull();
 });
 
 test('a refused token returns to sign in', function () {
