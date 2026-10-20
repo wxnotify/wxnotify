@@ -6,6 +6,7 @@ use Native\Mobile\Providers\GeolocationServiceProvider;
 use Native\Mobile\Providers\NetworkServiceProvider;
 use Native\Mobile\Providers\PushNotificationsServiceProvider;
 use Native\Mobile\Providers\SecureStorageServiceProvider;
+use Wxnotify\BadgeCount\BadgeCountServiceProvider;
 
 /*
  * The in-process test harness fakes every native call, so a missing plugin is invisible to the
@@ -21,4 +22,5 @@ test('every native capability the app calls has its plugin registered for the na
     'Network::status() (offline detection)' => NetworkServiceProvider::class,
     'PushNotifications (permission, enrollment and the FCM token)' => PushNotificationsServiceProvider::class,
     'SecureStorage (the API token)' => SecureStorageServiceProvider::class,
+    'BadgeCount::set() (the iOS icon badge number, through AppBadge)' => BadgeCountServiceProvider::class,
 ]);

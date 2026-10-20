@@ -11,6 +11,7 @@ use Native\Mobile\Providers\SecureStorageServiceProvider;
 use Native\Mobile\UI\NativeUIServiceProvider;
 use NativePHP\BackgroundTasks\BackgroundTasksServiceProvider;
 use NativePHP\LocalNotifications\LocalNotificationsServiceProvider;
+use Wxnotify\BadgeCount\BadgeCountServiceProvider;
 
 class NativeServiceProvider extends ServiceProvider
 {
@@ -50,6 +51,7 @@ class NativeServiceProvider extends ServiceProvider
             NetworkServiceProvider::class,
             NativeUIServiceProvider::class,
             BrowserServiceProvider::class,
+            BadgeCountServiceProvider::class,
 
         ];
     }

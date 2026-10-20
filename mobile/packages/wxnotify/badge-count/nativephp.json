@@ -1,0 +1,33 @@
+{
+    "name": "wxnotify/badge-count",
+    "version": "1.0.0",
+    "description": "Sets the iOS app icon badge number (Android: no-op)",
+    "namespace": "BadgeCount",
+    "license": "proprietary",
+    "platforms": ["android", "ios"],
+    "bridge_functions": [
+        {
+            "name": "BadgeCount.Set",
+            "android": "com.wxnotify.plugins.badge_count.BadgeCountFunctions.SetCount",
+            "ios": "BadgeCountFunctions.SetCount",
+            "description": "Set the app icon badge number (iOS); a no-op that succeeds on Android"
+        }
+    ],
+    "android": {
+        "min_version": 21,
+        "permissions": [],
+        "dependencies": {
+            "implementation": []
+        }
+    },
+    "ios": {
+        "min_version": "15.0",
+        "permissions": [],
+        "dependencies": {
+            "swift_packages": [],
+            "pods": []
+        }
+    },
+    "events": [],
+    "service_provider": "Wxnotify\\BadgeCount\\BadgeCountServiceProvider"
+}

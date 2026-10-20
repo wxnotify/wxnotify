@@ -1,0 +1,26 @@
+{
+    "name": "wxnotify/badge-count",
+    "description": "Sets the iOS app icon badge number (Android: no-op)",
+    "type": "nativephp-plugin",
+    "version": "1.0.0",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.2",
+        "nativephp/mobile": "^3.0|^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Wxnotify\\BadgeCount\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Wxnotify\\BadgeCount\\BadgeCountServiceProvider"
+            ]
+        },
+        "nativephp": {
+            "manifest": "nativephp.json"
+        }
+    }
+}

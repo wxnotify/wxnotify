@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7cfd75cef29620249e9d62d705dc82ec",
+    "content-hash": "b94c01fd3c62fe8059ad0d69c9eace94",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -7309,6 +7309,42 @@
                 }
             ],
             "time": "2024-11-24T11:45:37+00:00"
+        },
+        {
+            "name": "wxnotify/badge-count",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "packages/wxnotify/badge-count",
+                "reference": "7a74ec26d1ad445acc7bee7aef2f77f489268aec"
+            },
+            "require": {
+                "nativephp/mobile": "^3.0|^4.0",
+                "php": "^8.2"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Wxnotify\\BadgeCount\\BadgeCountServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Wxnotify\\BadgeCount\\": "src/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Sets the iOS app icon badge number (Android: no-op)",
+            "transport-options": {
+                "relative": true
+            }
         }
     ],
     "packages-dev": [
