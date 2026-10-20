@@ -21,7 +21,7 @@
             @foreach ($alert['channels'] as $channel)
                 <native:row class="w-full justify-between">
                     <native:text class="text-base text-theme-on-background">{{ $channel['label'] ?? $channel['type_label'] }}</native:text>
-                    <native:text class="text-base {{ $channel['status'] === 'failure' ? 'text-theme-destructive' : 'text-theme-on-surface-variant' }}">{{ $this->statusLabel($channel['status']) }}</native:text>
+                    <native:text class="text-base text-theme-on-surface-variant">{{ $this->statusLabel($channel['status']) }}</native:text>
                 </native:row>
             @endforeach
 

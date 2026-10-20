@@ -16,7 +16,7 @@ use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Facades\Browser;
 
 /**
- * One alert: what was sent, by which rule, over which channels, and how each delivery went.
+ * One alert: what was sent, by which rule, and to which of the subscriber's phones.
  * An alert opened before is kept for offline use. Opening it reads it (also offline, or from a deep
  * link); an alert the server no longer has, or a refused token, reads nothing.
  */
@@ -80,7 +80,6 @@ class AlertDetail extends NativeComponent
     {
         return match ($status) {
             'success' => 'Delivered',
-            'failure' => 'Failed',
             'suppressed' => 'Held back',
             'skipped' => 'Skipped',
             default => ucfirst($status),

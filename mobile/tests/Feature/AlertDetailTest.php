@@ -19,10 +19,10 @@ function detailPayload(array $overrides = []): array
         'dispatched_at' => now()->subMinutes(5)->toIso8601String(),
         'read' => true,
         'channels' => [
-            ['type' => 'discord', 'type_label' => 'Discord', 'status' => 'success', 'label' => 'Team Discord'],
-            ['type' => 'pushover', 'type_label' => 'Pushover', 'status' => 'failure', 'label' => null],
+            ['type' => 'mobile_push', 'type_label' => 'Mobile app', 'status' => 'success', 'label' => 'Work iPhone'],
+            ['type' => 'mobile_push', 'type_label' => 'Mobile app', 'status' => 'success', 'label' => null],
         ],
-        'has_failure' => true,
+        'has_failure' => false,
         'rule_name' => 'Storm warnings',
         'product_url' => 'https://wx.test/view-product/abc',
         ...$overrides,
@@ -33,16 +33,15 @@ beforeEach(function () {
     (new TokenStore)->put('9|secret');
 });
 
-test('the detail shows the subject, rule, and each channel with its status', function () {
+test('the detail shows the subject, rule, and each phone it was delivered to', function () {
     Http::fake(['wx.test/api/v1/alerts/4' => Http::response(['data' => detailPayload()])]);
 
     Native::test(AlertDetail::class, ['id' => 4])
         ->assertSee('Tornado Warning')
         ->assertSee('Storm warnings')
-        ->assertSee('Team Discord')
-        ->assertSee('Delivered')
-        ->assertSee('Pushover')
-        ->assertSee('Failed');
+        ->assertSee('Work iPhone')
+        ->assertSee('Mobile app')
+        ->assertSee('Delivered');
 
     expect((new LocalCache)->detail(4)['rule_name'])->toBe('Storm warnings');
 });

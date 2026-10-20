@@ -33,8 +33,8 @@ function renderableAlert(): array
         'category' => 'weather_alerts',
         'category_label' => 'Weather Alerts',
         'dispatched_at' => now()->subMinutes(5)->toIso8601String(),
-        'channels' => [['type' => 'discord', 'type_label' => 'Discord', 'status' => 'failure', 'label' => 'Team Discord']],
-        'has_failure' => true,
+        'channels' => [['type' => 'mobile_push', 'type_label' => 'Mobile app', 'status' => 'success', 'label' => 'Work iPhone']],
+        'has_failure' => false,
         'rule_name' => 'Storm warnings',
         'product_url' => 'https://wx.test/view-product/abc',
     ];
