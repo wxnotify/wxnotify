@@ -29,10 +29,16 @@ test('a plugin failure is swallowed and logged without its message', function ()
     Log::shouldHaveReceived('info')->once()->with('Device timezone read failed: '.RuntimeException::class);
 });
 
-test('the plugin asks the native bridge and reads the id from its answer', function () {
+test('the plugin asks the native bridge and reads the id from its flat answer', function () {
     $bridge = Native::fakeBridge();
-    $bridge->respondTo('BadgeCount.Timezone', ['status' => 'success', 'data' => ['timezone' => 'Asia/Tokyo']]);
+    $bridge->respondTo('BadgeCount.Timezone', ['timezone' => 'Asia/Tokyo']);
 
     expect(app(DeviceTimezone::class)->id())->toBe('Asia/Tokyo');
     $bridge->assertCalled('BadgeCount.Timezone');
+});
+
+test('the plugin also reads an id wrapped in a data envelope', function () {
+    Native::fakeBridge()->respondTo('BadgeCount.Timezone', ['status' => 'success', 'data' => ['timezone' => 'Asia/Tokyo']]);
+
+    expect(app(DeviceTimezone::class)->id())->toBe('Asia/Tokyo');
 });

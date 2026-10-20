@@ -43,7 +43,8 @@ class BadgeCount
             }
 
             $decoded = json_decode($result);
-            $timezone = is_object($decoded) ? ($decoded->data->timezone ?? null) : null;
+            // The bridge returns a function's data flat; the wrapped shape is tolerated too.
+            $timezone = is_object($decoded) ? ($decoded->timezone ?? $decoded->data->timezone ?? null) : null;
 
             return is_string($timezone) && $timezone !== '' ? $timezone : null;
         } catch (\Throwable) {
