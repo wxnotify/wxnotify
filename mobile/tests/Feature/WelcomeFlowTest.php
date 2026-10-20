@@ -16,7 +16,6 @@ beforeEach(function () {
     (new TokenStore)->put('9|secret');
     System::shouldReceive('isIos')->andReturn(false)->byDefault();
     PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined')->byDefault();
-    PushNotifications::shouldReceive('clearBadge')->byDefault();
 });
 
 /**

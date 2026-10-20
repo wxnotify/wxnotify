@@ -2,6 +2,7 @@
 
 use App\Models\CachedAlert;
 use App\NativeComponents\AccountScreen;
+use App\Services\AppBadge;
 use App\Support\LocalCache;
 use App\Support\LocationSharingState;
 use App\Support\PushState;
@@ -74,6 +75,36 @@ test('signing out works offline: the phone is cleared even though the server cou
     (new LocalCache)->rememberProfile($profile);
     $this->network->connected = false;
     Http::fake();
+
+    Native::test(AccountScreen::class)->tap('Sign out')->assertReplacedWith('/sign-in');
+
+    expect((new TokenStore)->token())->toBeNull();
+});
+
+test('signing out clears the icon badge and calls no badge endpoint', function () use ($profile) {
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/auth/token' => Http::response(null, 204),
+    ]);
+
+    Native::test(AccountScreen::class)->tap('Sign out')->assertReplacedWith('/sign-in');
+
+    expect($this->appBadge->counts)->toBe([0]);
+    Http::assertNotSent(fn (Request $r) => str_contains($r->url(), '/push-token/badge'));
+});
+
+test('a failing icon badge never stops the sign-out', function () use ($profile) {
+    app()->instance(AppBadge::class, new class extends AppBadge
+    {
+        public function set(int $count): void
+        {
+            throw new RuntimeException('plugin down');
+        }
+    });
+    Http::fake([
+        'wx.test/api/v1/me' => Http::response(['data' => $profile]),
+        'wx.test/api/v1/auth/token' => Http::response(null, 204),
+    ]);
 
     Native::test(AccountScreen::class)->tap('Sign out')->assertReplacedWith('/sign-in');
 

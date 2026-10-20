@@ -1,7 +1,6 @@
 <?php
 
 use App\Services\AppBadge;
-use App\Services\PushBadge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\Browser;
@@ -10,7 +9,6 @@ use Native\Mobile\Network;
 use Native\Mobile\SecureStorage;
 use Tests\Fakes\FakeNetwork;
 use Tests\Fakes\InMemorySecureStorage;
-use Tests\Fakes\NullPushBadge;
 use Tests\Fakes\RecordingAppBadge;
 use Tests\Fakes\RecordingBrowser;
 use Tests\Fakes\RecordingGeolocation;
@@ -42,7 +40,6 @@ pest()->extend(TestCase::class)
         app()->instance(Browser::class, $this->browser);
         app()->instance(Network::class, $this->network);
         app()->instance(Geolocation::class, $this->geolocation);
-        app()->instance(PushBadge::class, new NullPushBadge);
         app()->instance(AppBadge::class, $this->appBadge);
 
         config(['wxnotify.api_url' => 'https://wx.test']);

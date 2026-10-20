@@ -152,14 +152,13 @@ test('opening the feed while push is off enrolls nothing', function () {
 });
 
 test('the feed loads from the server, shows each alert, and refreshes the cache', function () {
-    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(1), apiEntry(2, ['has_failure' => true])]))]);
+    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(1), apiEntry(2, ['read' => false])]))]);
 
     Native::test(AlertsScreen::class)
         ->assertSee('Tornado Warning 1')
         ->assertSee('Weather Alerts · 5 minutes ago')
         ->assertDontSee('Sent via')
         ->assertSee('Tornado Warning 2')
-        ->assertSee('Delivery problem')
         ->assertElement('list', fn (array $list) => isset($list['props']['on_refresh'], $list['props']['on_end_reached'])
             && $list['props']['end_reached_buffer'] === 5
             && $list['props']['separator'] === true
@@ -175,9 +174,7 @@ test('the feed loads from the server, shows each alert, and refreshes the cache'
             && ! array_key_exists('supporting_color', $item['props'])
             && ! array_key_exists('trailing_badges_json', $item['props']))
         ->assertElement('list_item', fn (array $item) => $item['props']['headline'] === 'Tornado Warning 2'
-            && $item['props']['supporting'] === 'Delivery problem'
-            && ! array_key_exists('supporting_color', $item['props'])
-            && json_decode($item['props']['trailing_badges_json'], true)[0]['color'] === '#EF4444'
+            && ($item['props']['supporting'] ?? '') === ''
             && count(json_decode($item['props']['trailing_badges_json'], true)) === 1)
         ->assertSet('offline', false);
 
@@ -892,13 +889,6 @@ test('an unread alert shows the dot and a read one does not', function () {
     $screen = Native::test(AlertsScreen::class);
 
     expect(unreadDots($screen->tree()))->toBe(['Tornado Warning 1' => true, 'Tornado Warning 2' => false]);
-});
-
-test('an unread alert with a failed send shows both the dot and the warning', function () {
-    Http::fake(['wx.test/api/v1/alerts*' => Http::response(feedResponse([apiEntry(1, ['read' => false, 'has_failure' => true])]))]);
-
-    Native::test(AlertsScreen::class)->assertElement('list_item', fn (array $item) => hasUnreadDot($item)
-        && in_array('#EF4444', array_column(json_decode($item['props']['trailing_badges_json'], true), 'color'), true));
 });
 
 test('the badge is set from the server\'s unread_count on every feed load', function () {

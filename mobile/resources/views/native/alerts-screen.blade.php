@@ -72,7 +72,6 @@
             <list-item
                 headline="{{ $alert['subject'] }}"
                 overline="{{ $this->subtitle($alert) }}"
-                :supporting="$this->supporting($alert)"
                 :trailing-badges="$this->trailingBadges($alert)"
                 @tap="open({{ $alert['id'] }})"
                 @longPress="openDetail({{ $alert['id'] }})"

@@ -16,7 +16,6 @@ use Native\Mobile\Facades\System;
 beforeEach(function () {
     System::shouldReceive('isIos')->andReturn(false)->byDefault();
     PushNotifications::shouldReceive('checkPermission')->andReturn('not_determined')->byDefault();
-    PushNotifications::shouldReceive('clearBadge')->byDefault();
 });
 
 function fakeWelcomeSlot(mixed $response): void

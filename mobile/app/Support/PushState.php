@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\Cache;
 /**
  * What the app remembers about push on this phone: whether the subscriber turned it on, said
  * "not now" in the welcome flow, and when the token was last sent to the server. Signing out forgets
- * all of it, including a pending foreground-push flag. None of it is secret (the FCM token itself
- * is never stored here).
+ * all of it. None of it is secret (the FCM token itself is never stored here).
  */
 class PushState
 {
@@ -18,10 +17,6 @@ class PushState
     private const DECLINED = 'wxnotify.push.declined';
 
     private const REGISTERED_AT = 'wxnotify.push.registered_at';
-
-    private const FOREGROUND_PUSH = 'wxnotify.push.foreground_push';
-
-    private const RESET_PENDING = 'wxnotify.push.badge_reset_pending';
 
     public function wantsPush(): bool
     {
@@ -65,44 +60,8 @@ class PushState
         return $at !== null && now()->subHours($hours)->lessThan(Carbon::parse($at));
     }
 
-    /** The server's unread count still needs resetting because the last attempt failed. */
-    public function resetPending(): bool
-    {
-        return (bool) Cache::get(self::RESET_PENDING, false);
-    }
-
-    public function markResetPending(): void
-    {
-        Cache::forever(self::RESET_PENDING, true);
-    }
-
-    public function clearResetPending(): void
-    {
-        Cache::forget(self::RESET_PENDING);
-    }
-
-    /** A push arrived while the app was open (set from the plugin's ephemeral PHP runtime, through the shared cache). */
-    public function markForegroundPush(): void
-    {
-        Cache::forever(self::FOREGROUND_PUSH, true);
-    }
-
-    /** Whether a foreground push was flagged since the last call: read each tick, cleared (a write) only when set. */
-    public function pullForegroundPush(): bool
-    {
-        if (! Cache::get(self::FOREGROUND_PUSH, false)) {
-            return false;
-        }
-
-        Cache::forget(self::FOREGROUND_PUSH);
-
-        return true;
-    }
-
     public function clear(): void
     {
-        Cache::forget(self::FOREGROUND_PUSH);
-        Cache::forget(self::RESET_PENDING);
         Cache::forget(self::ENABLED);
         Cache::forget(self::DECLINED);
         Cache::forget(self::REGISTERED_AT);

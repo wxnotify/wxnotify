@@ -2,7 +2,6 @@
 
 namespace App\NativeComponents;
 
-use App\Support\Concerns\ClearsPushBadge;
 use App\Support\Concerns\RequiresSignIn;
 use Native\Mobile\Edge\NativeComponent;
 
@@ -12,7 +11,6 @@ use Native\Mobile\Edge\NativeComponent;
  */
 class SettingsScreen extends NativeComponent
 {
-    use ClearsPushBadge;
     use RequiresSignIn;
 
     public function mount(): void
@@ -20,8 +18,6 @@ class SettingsScreen extends NativeComponent
         if ($this->redirectIfSignedOut()) {
             return;
         }
-
-        $this->clearPushBadgeOnOpen();
     }
 
     public function openRules(): void

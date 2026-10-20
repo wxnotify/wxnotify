@@ -7,7 +7,6 @@ use App\Support\LocalCache;
 use App\Support\PushState;
 use App\Support\TokenStore;
 use Illuminate\Support\Facades\Log;
-use Native\Mobile\Facades\PushNotifications;
 use Throwable;
 
 /**
@@ -22,6 +21,7 @@ class SignOut
         private LocalCache $cache,
         private PushState $push,
         private LocationSharing $location,
+        private AppBadge $badge,
     ) {}
 
     public function __invoke(): void
@@ -46,15 +46,15 @@ class SignOut
     }
 
     /**
-     * A signed-out phone gets no reset from the server, so its badge (and, on Android, the tray) is
-     * cleared here. Best effort: a plugin failure must not stop the sign-out.
+     * A signed-out phone has no unread alerts to count, so its icon number goes to zero. Best effort: a
+     * badge failure must not stop the sign-out.
      */
     private function clearIconBadge(): void
     {
         try {
-            PushNotifications::clearBadge();
+            $this->badge->clear();
         } catch (Throwable $e) {
-            Log::info('Push badge clear on sign-out failed: '.$e::class);
+            Log::info('App badge clear on sign-out failed: '.$e::class);
         }
     }
 }

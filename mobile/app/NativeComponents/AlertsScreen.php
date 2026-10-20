@@ -15,7 +15,6 @@ use App\Services\Welcome;
 use App\Services\WxNotifyApi;
 use App\Support\ActiveAlertsPresenter;
 use App\Support\AlertPresenter;
-use App\Support\Concerns\ClearsPushBadge;
 use App\Support\Concerns\HandlesPushToken;
 use App\Support\Concerns\RequiresSignIn;
 use App\Support\LocalCache;
@@ -32,7 +31,6 @@ use Native\Mobile\Facades\Browser;
  */
 class AlertsScreen extends NativeComponent
 {
-    use ClearsPushBadge;
     use HandlesPushToken;
     use RequiresSignIn;
 
@@ -93,8 +91,6 @@ class AlertsScreen extends NativeComponent
         }
 
         app(Welcome::class)->markLegacyInstallSeen();
-
-        $this->clearPushBadgeOnOpen();
 
         $cache = app(LocalCache::class);
 
@@ -500,19 +496,7 @@ class AlertsScreen extends NativeComponent
     }
 
     /**
-     * The row's supporting text: "Delivery problem" when a send failed, otherwise none.
-     *
-     * @param  array<string, mixed>  $alert
-     */
-    public function supporting(array $alert): ?string
-    {
-        return $alert['has_failure'] ? 'Delivery problem' : null;
-    }
-
-    /**
-     * The row's trailing badges: a dot in the theme's primary colour while the alert is unread, and a
-     * warning triangle when a send failed (the words "Delivery problem" are in the supporting text, so
-     * failure is never conveyed by the badge colour alone).
+     * The row's trailing badges: a dot in the theme's primary colour while the alert is unread.
      *
      * @param  array<string, mixed>  $alert
      * @return array<int, array{icon: string, ios: Ios, android: Android, color: string}>
@@ -523,10 +507,6 @@ class AlertsScreen extends NativeComponent
 
         if (($alert['read'] ?? true) === false) {
             $badges[] = ['icon' => 'circle', 'ios' => Ios::CircleFill, 'android' => Android::Circle, 'color' => (string) theme('primary', '#2563EB')];
-        }
-
-        if ($alert['has_failure']) {
-            $badges[] = ['icon' => 'warning', 'ios' => Ios::ExclamationmarkTriangleFill, 'android' => Android::Warning, 'color' => '#EF4444'];
         }
 
         return $badges;
