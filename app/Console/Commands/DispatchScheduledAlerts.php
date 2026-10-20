@@ -17,6 +17,7 @@ use App\Support\Units;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -95,9 +96,10 @@ class DispatchScheduledAlerts extends Command
             }
 
             $report = $this->reportFor($rule, $buildReport, $system);
+            $batchKey = (string) Str::uuid();
 
             foreach ($rule->notificationChannels as $channel) {
-                DeliverScheduledAlert::dispatch($rule->id, $channel->id, $rule->displayName(), $message, $report);
+                DeliverScheduledAlert::dispatch($rule->id, $channel->id, $rule->displayName(), $message, $report, $batchKey);
                 $dispatched++;
             }
         }

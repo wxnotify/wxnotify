@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * A page of the subscriber's alerts for the mobile app, newest first. Deliveries of one rule
- * and product collapse into one alert; ordering is by the group's latest delivery time, then
+ * and product collapse into one alert, and so do the deliveries of one batch (one scheduled or
+ * lightning run of a rule with no product, sent to each of its channels); ordering is by the group's latest delivery time, then
  * its id, and the cursor carries both so pages are stable when times tie.
  *
  * Only alerts that reached one of the subscriber's phones are listed: a group is in the feed when at least one
@@ -20,8 +21,11 @@ use Illuminate\Support\Facades\DB;
  */
 class ListAppAlerts
 {
-    /** Mirrors AppAlert::keyFor(). */
-    public const GROUP_KEY = "CASE WHEN ingested_product_id IS NULL THEN 'row-' || id ELSE COALESCE(alert_rule_id::text, 'none') || '-' || ingested_product_id END";
+    /**
+     * Mirrors AppAlert::keyFor(): rule + product, else the batch, else the row on its own. FindAppAlert,
+     * PushBadgeCount and assemble() below look a group up by the same three cases.
+     */
+    public const GROUP_KEY = "CASE WHEN ingested_product_id IS NOT NULL THEN COALESCE(alert_rule_id::text, 'none') || '-' || ingested_product_id WHEN batch_key IS NOT NULL THEN 'batch-' || batch_key ELSE 'row-' || id END";
 
     /**
      * True for a group with at least one successful push row; mirrors DeliveryLog::scopePushedToPhone(). It is a
@@ -79,10 +83,14 @@ class ListAppAlerts
 
         $anchors = DeliveryLog::query()->where('user_id', $user->id)->whereIn('id', $entryIds)->get()->keyBy('id');
         $productIds = $anchors->pluck('ingested_product_id')->filter()->unique();
+        $batchKeys = $anchors->whereNull('ingested_product_id')->pluck('batch_key')->filter()->unique();
 
         $byKey = DeliveryLog::query()
             ->where('user_id', $user->id)
-            ->where(fn ($query) => $query->whereIn('id', $entryIds)->orWhereIn('ingested_product_id', $productIds))
+            ->where(fn ($query) => $query
+                ->whereIn('id', $entryIds)
+                ->orWhereIn('ingested_product_id', $productIds)
+                ->orWhere(fn ($query) => $query->whereNull('ingested_product_id')->whereIn('batch_key', $batchKeys)))
             ->with(['alertRule.products', 'alertRule.location', 'notificationChannel', 'ingestedProduct:id,view_slug'])
             ->orderBy('id')
             ->get()

@@ -7,6 +7,7 @@ use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     Bus::fake();
@@ -102,4 +103,23 @@ test('multiple flashes in one batch only alert a matched rule once, respecting i
     ]);
 
     Bus::assertDispatchedTimes(DeliverScheduledAlert::class, 1);
+});
+
+test('a lightning alert gives every channel of a rule one batch key, and each rule its own', function () {
+    $user = User::factory()->create();
+    $location = Location::factory()->for($user)->create(['lat' => 39.0, 'lng' => -95.0]);
+    $rules = AlertRule::factory()->lightning()->for($user)->for($location)->count(2)->create(['radius_miles' => 15]);
+    foreach ($rules as $rule) {
+        $rule->notificationChannels()->attach(NotificationChannel::factory()->for($user)->count(2)->create());
+    }
+
+    (new MatchLightningFlashes)([['id' => '1', 'lat' => 39.1, 'lon' => -95.0]]);
+
+    $keysByRule = Bus::dispatched(DeliverScheduledAlert::class)
+        ->groupBy('ruleId')
+        ->map(fn ($jobs) => $jobs->pluck('batchKey')->unique()->values()->all());
+
+    expect($keysByRule)->toHaveCount(2)
+        ->and($keysByRule->every(fn (array $keys): bool => count($keys) === 1 && Str::isUuid($keys[0])))->toBeTrue()
+        ->and($keysByRule->flatten()->unique())->toHaveCount(2);
 });

@@ -31,7 +31,7 @@ class WebhookTransport implements Transport
      *
      * @var list<string>
      */
-    private const INTERNAL_KEYS = ['alert_rule_id', 'ingested_product_id'];
+    private const INTERNAL_KEYS = ['alert_rule_id', 'ingested_product_id', 'batch_key'];
 
     /**
      * The top-level keys an alert payload carries, in order. The channel form's

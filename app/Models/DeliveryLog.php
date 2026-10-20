@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * `read_at` is the mobile app's read state on a successful `mobile_push` row; it is set only by server code
  * (forceFill or a query update), never mass-assigned from input.
  */
-#[Fillable(['alert_rule_id', 'notification_channel_id', 'user_id', 'channel_type', 'status', 'category', 'error_detail', 'subject', 'ingested_product_id', 'dispatched_at'])]
+#[Fillable(['alert_rule_id', 'notification_channel_id', 'user_id', 'channel_type', 'status', 'category', 'error_detail', 'subject', 'ingested_product_id', 'batch_key', 'dispatched_at'])]
 class DeliveryLog extends Model
 {
     /** @use HasFactory<DeliveryLogFactory> */

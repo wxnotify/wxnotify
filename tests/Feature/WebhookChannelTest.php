@@ -109,6 +109,7 @@ test('the alert group ids meant for the phone badge never reach a webhook', func
         'rule' => 'My rule',
         'alert_rule_id' => 12,
         'ingested_product_id' => 34,
+        'batch_key' => '0b9c1f9e-2f6d-4a39-9a51-3d7c2f1e8a10',
     ]);
 
     $payload = json_decode((string) $history[0]['request']->getBody(), true);

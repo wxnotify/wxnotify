@@ -180,7 +180,7 @@ test('a failing badge count still sends the iOS push, without a badge', function
     $phone = NotificationChannel::factory()->mobilePush('ios-token-badge-down', 'ios')->create();
     app()->instance(PushBadgeCount::class, new class extends PushBadgeCount
     {
-        public function __invoke(User $user, ?int $alertRuleId, ?int $ingestedProductId, bool $countsAsAlert): int
+        public function __invoke(User $user, ?int $alertRuleId, ?int $ingestedProductId, bool $countsAsAlert, ?string $batchKey = null): int
         {
             throw new RuntimeException('column read_at does not exist');
         }

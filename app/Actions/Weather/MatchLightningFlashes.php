@@ -5,6 +5,7 @@ namespace App\Actions\Weather;
 use App\Enums\AlertCategory;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
+use Illuminate\Support\Str;
 
 /**
  * Matches a batch of decoded GLM flashes (see pipeline/glm-decoder) against
@@ -79,9 +80,10 @@ class MatchLightningFlashes
         $rule->forceFill(['lightning_last_alerted_at' => now()])->save();
 
         $message = "Lightning detected in your area near {$rule->location->label}.";
+        $batchKey = (string) Str::uuid();
 
         foreach ($rule->notificationChannels as $channel) {
-            DeliverScheduledAlert::dispatch($rule->id, $channel->id, $rule->displayName(), $message);
+            DeliverScheduledAlert::dispatch($rule->id, $channel->id, $rule->displayName(), $message, null, $batchKey);
         }
     }
 }

@@ -8,7 +8,8 @@ use Illuminate\Support\Collection;
 
 /**
  * One alert as the app sees it: every delivery row of one subscriber for one rule and one
- * product (a row with no product is an alert on its own). The id is the lowest row id, so it
+ * product; without a product, every row of one batch (one scheduled or lightning run of a rule,
+ * sent to each of its channels), and a row with neither is an alert on its own. The id is the lowest row id, so it
  * stays the same when a later delivery joins the group.
  */
 final class AppAlert
@@ -56,8 +57,10 @@ final class AppAlert
      */
     public static function keyFor(DeliveryLog $row): string
     {
-        return $row->ingested_product_id === null
-            ? 'row-'.$row->id
-            : ($row->alert_rule_id ?? 'none').'-'.$row->ingested_product_id;
+        if ($row->ingested_product_id !== null) {
+            return ($row->alert_rule_id ?? 'none').'-'.$row->ingested_product_id;
+        }
+
+        return $row->batch_key !== null ? 'batch-'.$row->batch_key : 'row-'.$row->id;
     }
 }

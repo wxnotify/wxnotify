@@ -32,6 +32,7 @@ class DeliverScheduledAlert implements ShouldQueue
 
     /**
      * @param  array<string, mixed>|null  $report  the Full Daily Summary's structured payload; null for Brief, Free, Threshold, and for jobs queued before this property existed
+     * @param  string|null  $batchKey  shared by every job of one run of the rule (one per channel), so the app shows the run as one alert; null (or uninitialized) for jobs queued before this property existed
      */
     public function __construct(
         public readonly int $ruleId,
@@ -39,10 +40,13 @@ class DeliverScheduledAlert implements ShouldQueue
         public readonly string $title,
         public readonly string $body,
         public readonly ?array $report = null,
+        public readonly ?string $batchKey = null,
     ) {}
 
     public function handle(ChannelDispatcher $dispatcher): void
     {
+        $batchKey = $this->batchKey ?? null;
+
         $rule = AlertRule::find($this->ruleId);
 
         if ($rule === null) {
@@ -75,6 +79,7 @@ class DeliverScheduledAlert implements ShouldQueue
                 'category' => $rule->category->value,
                 'error_detail' => 'The rule was deactivated after this delivery was dispatched.',
                 'subject' => $rule->displayName(),
+                'batch_key' => $batchKey,
                 'dispatched_at' => now(),
             ]);
 
@@ -95,6 +100,7 @@ class DeliverScheduledAlert implements ShouldQueue
             'rule' => $rule->name,
             'alert_rule_id' => $rule->id,
             'ingested_product_id' => null,
+            'batch_key' => $batchKey,
         ];
 
         // A job serialized before $report existed (SerializesModels' native
@@ -125,6 +131,7 @@ class DeliverScheduledAlert implements ShouldQueue
             'category' => $rule->category->value,
             'error_detail' => $result->error,
             'subject' => $title,
+            'batch_key' => $batchKey,
             'dispatched_at' => now(),
         ]);
     }

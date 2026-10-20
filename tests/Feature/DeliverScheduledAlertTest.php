@@ -295,5 +295,44 @@ test('a job queued before the report property existed unserializes without it an
     $job->handle(app(ChannelDispatcher::class));
 
     Mail::assertSent(ChannelMessageMail::class);
-    expect(DeliveryLog::sole()->status)->toBe('success');
+    expect(DeliveryLog::sole())->status->toBe('success')->batch_key->toBeNull();
+});
+
+test('one summary pushed to two iPhones counts as one new unread alert on both', function () {
+    $credentials = fcmUseCredentials();
+    fcmFakeGoogle();
+
+    $rule = AlertRule::factory()->dailySummary()->create();
+    $phoneA = NotificationChannel::factory()->for($rule->user)->mobilePush('ios-token-a', 'ios')->create();
+    $phoneB = NotificationChannel::factory()->for($rule->user)->mobilePush('ios-token-b', 'ios')->create();
+    DeliveryLog::factory()->for($rule->user)->for(IngestedProduct::factory())->pushed()->create();
+
+    (new DeliverScheduledAlert($rule->id, $phoneA->id, 'Daily summary', 'Today: Sunny.', null, 'batch-1'))->handle(app(ChannelDispatcher::class));
+    (new DeliverScheduledAlert($rule->id, $phoneB->id, 'Daily summary', 'Today: Sunny.', null, 'batch-1'))->handle(app(ChannelDispatcher::class));
+
+    $badges = collect(Http::recorded())
+        ->filter(fn (array $pair) => str_contains($pair[0]->url(), 'messages:send'))
+        ->map(fn (array $pair) => $pair[0]['message']['apns']['payload']['aps']['badge'])
+        ->values()->all();
+
+    expect($badges)->toBe([2, 2]);
+    @unlink($credentials['path']);
+});
+
+test('the batch key is written on success, failure and skipped rows', function () {
+    Http::fake(['*/notify/*' => Http::sequence()->push(status: 200)->push(status: 500)]);
+
+    $rule = AlertRule::factory()->dailySummary()->create();
+    $channel = NotificationChannel::factory()->for($rule->user)->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'body', null, 'batch-ok'))->handle(app(ChannelDispatcher::class));
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'body', null, 'batch-fail'))->handle(app(ChannelDispatcher::class));
+    $rule->update(['is_active' => false]);
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Daily summary', 'body', null, 'batch-skip'))->handle(app(ChannelDispatcher::class));
+
+    expect(DeliveryLog::orderBy('id')->get(['status', 'batch_key'])->map->only(['status', 'batch_key'])->all())->toBe([
+        ['status' => 'success', 'batch_key' => 'batch-ok'],
+        ['status' => 'failure', 'batch_key' => 'batch-fail'],
+        ['status' => 'skipped', 'batch_key' => 'batch-skip'],
+    ]);
 });

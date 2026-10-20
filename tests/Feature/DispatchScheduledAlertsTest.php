@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 function fakeGridDataForThreshold(float $overnightLow): void
 {
@@ -345,4 +346,39 @@ test('a location with no timezone and no profile timezone is scheduled in UTC, a
     $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
 
     Bus::assertDispatched(DeliverScheduledAlert::class);
+});
+
+test('each rule\'s run sends one batch key to all its channels, and the next run a new one', function () {
+    Bus::fake();
+    Http::fake([
+        'api.weather.gov/points/*' => Http::response([
+            'properties' => ['forecast' => 'https://api.weather.gov/gridpoints/TOP/1,1/forecast'],
+        ]),
+        'api.weather.gov/gridpoints/*' => Http::response([
+            'properties' => ['periods' => [
+                ['name' => 'Today', 'isDaytime' => true, 'temperature' => 80, 'temperatureUnit' => 'F', 'shortForecast' => 'Sunny'],
+            ]],
+        ]),
+    ]);
+    $location = Location::factory()->for($user = User::factory()->create())->create(['timezone' => 'America/Chicago']);
+    $rules = AlertRule::factory()->dailySummary()->for($user)->for($location)->count(2)->create(['delivery_time' => '06:00']);
+    foreach ($rules as $rule) {
+        $rule->notificationChannels()->attach(NotificationChannel::factory()->for($user)->count(2)->create());
+    }
+
+    $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
+    $firstRun = Bus::dispatched(DeliverScheduledAlert::class)
+        ->groupBy('ruleId')
+        ->map(fn ($jobs) => $jobs->pluck('batchKey')->unique()->values()->all());
+
+    Carbon::setTestNow('2026-09-15 12:00:00');
+    $this->artisan('alerts:dispatch-scheduled')->assertSuccessful();
+    $bothRuns = Bus::dispatched(DeliverScheduledAlert::class)
+        ->groupBy('ruleId')
+        ->map(fn ($jobs) => $jobs->pluck('batchKey')->unique()->values()->all());
+
+    expect($firstRun)->toHaveCount(2)
+        ->and($firstRun->every(fn (array $keys): bool => count($keys) === 1 && Str::isUuid($keys[0])))->toBeTrue()
+        ->and($firstRun->flatten()->unique())->toHaveCount(2)
+        ->and($bothRuns->every(fn (array $keys): bool => count($keys) === 2))->toBeTrue();
 });

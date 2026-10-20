@@ -71,7 +71,7 @@ class MobilePushTransport implements Transport
 
     /**
      * The iOS icon number: the subscriber's unread alerts including this one (PushBadgeCount). The jobs put the
-     * alert's group (`alert_rule_id`, `ingested_product_id`) in the meta; only `type` 'alert' counts as an alert,
+     * alert's group (`alert_rule_id`, `ingested_product_id`, `batch_key`) in the meta; only `type` 'alert' counts as an alert,
      * so the test push carries the plain unread count. The number is a courtesy the app corrects from the feed's
      * `unread_count`, so a failing count (a query error, or code deployed before the `read_at` migration) sends
      * the push without a badge instead of losing the alert; only the exception class is logged.
@@ -82,6 +82,7 @@ class MobilePushTransport implements Transport
     {
         $alertRuleId = $meta['alert_rule_id'] ?? null;
         $ingestedProductId = $meta['ingested_product_id'] ?? null;
+        $batchKey = $meta['batch_key'] ?? null;
 
         try {
             return app(PushBadgeCount::class)(
@@ -89,6 +90,7 @@ class MobilePushTransport implements Transport
                 is_int($alertRuleId) ? $alertRuleId : null,
                 is_int($ingestedProductId) ? $ingestedProductId : null,
                 ($meta['type'] ?? 'alert') === 'alert',
+                is_string($batchKey) ? $batchKey : null,
             );
         } catch (Throwable $e) {
             Log::warning('Push badge count failed: '.$e::class);
