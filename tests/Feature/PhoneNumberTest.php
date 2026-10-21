@@ -101,7 +101,7 @@ it('refuses numbers that are not NANP', function (string $input) {
         ->and($validator->fails())->toBeTrue();
 
     if ($input !== '') {
-        expect($validator->errors()->first('to'))->toBe('Enter a US or Canadian number, e.g. (555) 234-5678.');
+        expect($validator->errors()->first('to'))->toBe(PhoneNumber::INVALID_MESSAGE);
     }
 })->with([
     'seven digits' => '234-5678',
@@ -183,3 +183,14 @@ it('asks for both numbers and a required consent box', function () {
         ->and($fields['consent'])->toBeInstanceOf(Checkbox::class)
         ->and($fields['consent']->getLabel())->toBe(PhoneConsent::text('Fake', false));
 });
+
+it('lets the number fields accept every format the rule accepts and refuse the rest with its message', function (string $field) {
+    $rules = collect(chanFakePhoneType()->formSchema())->keyBy(fn ($component) => $component->getName())[$field]->getValidationRules();
+    $validate = fn (string $value) => Validator::make([$field => $value], [$field => $rules]);
+
+    foreach (['+1 (555) 234-5678', '1 (555) 234-5678', '(555) 234-5678', '555.234.5678'] as $accepted) {
+        expect($validate($accepted)->passes())->toBeTrue("{$field} refused {$accepted}");
+    }
+
+    expect($validate('+44 20 7946 0958')->errors()->get($field))->toBe([PhoneNumber::INVALID_MESSAGE]);
+})->with(['from', 'to']);

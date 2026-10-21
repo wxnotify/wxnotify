@@ -38,7 +38,9 @@ trait IsPhoneChannel
 
     /**
      * The From number, the subscriber's own number and the consent box, which end every
-     * phone type's form after its credential fields.
+     * phone type's form after its credential fields. The numbers use `type('tel')`, not
+     * `tel()`: Filament's `tel()` adds a regex that refuses `+1 (555) 234-5678`, so
+     * NanpPhoneNumber must stay their only format check.
      *
      * @return array<Component>
      */
@@ -47,13 +49,13 @@ trait IsPhoneChannel
         return [
             TextInput::make('from')
                 ->label('From number')
-                ->tel()
+                ->type('tel')
                 ->required()
                 ->rules([new NanpPhoneNumber])
                 ->helperText($fromHelp),
             TextInput::make('to')
                 ->label('Your number')
-                ->tel()
+                ->type('tel')
                 ->required()
                 ->rules([new NanpPhoneNumber])
                 ->helperText('The US or Canadian number to send alerts to. We send a code to it to confirm it is yours.'),
