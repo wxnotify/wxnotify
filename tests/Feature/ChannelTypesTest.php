@@ -223,6 +223,7 @@ test('every channel type captions its destination value with a fixed, secret-fre
         'telegram' => 'Telegram chat ID',
         'twilio_sms' => 'Text number',
         'bulkvs_sms' => 'Text number',
+        'httpsms' => 'Text number',
         'webhook' => 'Webhook host',
         'webpush' => 'Push service',
     ]);

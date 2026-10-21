@@ -105,6 +105,25 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    /**
+     * An httpSMS channel texting the given E.164 number, with a consent record.
+     */
+    public function httpSms(string $to = '+15555550123'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'httpsms',
+            'label' => 'httpSMS (your Android phone) •••• '.substr($to, -4),
+            'apprise_url' => null,
+            'config' => [
+                'api_key' => 'uk-Test_key9',
+                'from' => '+15552340001',
+                'to' => $to,
+                'consent_version' => PhoneConsent::VERSION,
+                'consented_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

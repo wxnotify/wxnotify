@@ -25,6 +25,7 @@ class ChannelTypeRegistry
         'mobile_push' => MobilePushChannelType::class,
         'twilio_sms' => TwilioSmsChannelType::class,
         'bulkvs_sms' => BulkVsSmsChannelType::class,
+        'httpsms' => HttpSmsChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType
