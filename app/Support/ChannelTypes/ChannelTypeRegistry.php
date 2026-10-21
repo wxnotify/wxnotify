@@ -23,6 +23,7 @@ class ChannelTypeRegistry
         'webhook' => WebhookChannelType::class,
         'webpush' => WebPushChannelType::class,
         'mobile_push' => MobilePushChannelType::class,
+        'twilio_sms' => TwilioSmsChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType

@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Support\PhoneConsent;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -62,6 +63,26 @@ class NotificationChannelFactory extends Factory
     public function email(string $to = 'subscriber@example.com'): static
     {
         return $this->state(fn () => ['channel_type' => 'email', 'apprise_url' => null, 'config' => ['to' => $to]]);
+    }
+
+    /**
+     * A Twilio SMS channel texting the given E.164 number, with valid-shaped credentials and a consent record.
+     */
+    public function twilioSms(string $to = '+15555550123'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'twilio_sms',
+            'label' => 'Twilio SMS •••• '.substr($to, -4),
+            'apprise_url' => null,
+            'config' => [
+                'account_sid' => 'AC'.str_repeat('0a', 16),
+                'auth_token' => str_repeat('1b', 16),
+                'from' => '+15552340001',
+                'to' => $to,
+                'consent_version' => PhoneConsent::VERSION,
+                'consented_at' => now()->toIso8601String(),
+            ],
+        ]);
     }
 
     public function unverified(): static

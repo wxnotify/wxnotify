@@ -9,4 +9,5 @@ enum ChannelTransport: string
     case WebPush = 'webpush';
     case Mail = 'mail';
     case MobilePush = 'mobile_push';
+    case Sms = 'sms';
 }

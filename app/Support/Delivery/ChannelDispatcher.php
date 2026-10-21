@@ -8,6 +8,7 @@ use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\Delivery\Transports\AppriseTransport;
 use App\Support\Delivery\Transports\MailTransport;
 use App\Support\Delivery\Transports\MobilePushTransport;
+use App\Support\Delivery\Transports\SmsTransport;
 use App\Support\Delivery\Transports\Transport;
 use App\Support\Delivery\Transports\WebhookTransport;
 use App\Support\Delivery\Transports\WebPushTransport;
@@ -41,6 +42,7 @@ class ChannelDispatcher
             ChannelTransport::WebPush => app(WebPushTransport::class),
             ChannelTransport::Mail => app(MailTransport::class),
             ChannelTransport::MobilePush => app(MobilePushTransport::class),
+            ChannelTransport::Sms => app(SmsTransport::class),
         };
     }
 }

@@ -71,3 +71,23 @@ test('the SMS catalog rows ship plus-tier and switched off, and the helper switc
 
     expect($rows()->pluck('enabled')->all())->toBe([true, true, true]);
 });
+
+test('a phone type is closed to Free, open to Plus and Pro, and a downgrade keeps the existing channel', function () {
+    $free = User::factory()->create(['tier_override' => Tier::Free]);
+    $pro = User::factory()->create(['tier_override' => Tier::Pro]);
+    $plus = User::factory()->create(['tier_override' => Tier::Plus]);
+    $channel = NotificationChannel::factory()->for($plus)->twilioSms()->create();
+
+    expect($free->canAddChannel('twilio_sms'))->toBeFalse()
+        ->and($plus->canAddChannel('twilio_sms'))->toBeTrue()
+        ->and($pro->canAddChannel('twilio_sms'))->toBeTrue();
+
+    $plus->forceFill(['tier_override' => Tier::Free])->save();
+
+    expect($channel->fresh())->not->toBeNull()
+        ->and($plus->fresh()->canAddChannel('twilio_sms'))->toBeFalse();
+
+    $plus->forceFill(['tier_override' => Tier::Plus])->save();
+
+    expect($plus->fresh()->canAddChannel('twilio_sms'))->toBeTrue();
+});

@@ -6,7 +6,11 @@ use App\Exceptions\ChannelCodeNotSent;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\ChannelTypes\Contracts\ChannelType;
+use App\Support\ChannelTypes\Contracts\PhoneChannelType;
+use App\Support\PhoneConsent;
+use App\Support\PhoneNumber;
 use Illuminate\Support\Arr;
+use InvalidArgumentException;
 
 /**
  * The one way a channel is created and sent its first confirmation code, for the dashboard wizard
@@ -19,14 +23,20 @@ class BeginChannelConnection
     /**
      * @param  array<string, mixed>  $data  the setup fields (and anything else the form held)
      *
-     * @throws \InvalidArgumentException when the type cannot build a destination from the data
+     * @throws InvalidArgumentException when the type cannot build a destination from the data, or the
+     *                                  subscriber already has a channel of this phone type for the number
      * @throws ChannelCodeNotSent
      */
     public function __invoke(User $user, ChannelType $type, array $data, ?string $label = null): NotificationChannel
     {
         $destination = $type->buildDestination($data);
+        $this->refuseDuplicateNumber($user, $type, $destination);
         $existing = $this->existingWebPushChannel($user, $type, $destination);
         $channel = $this->storePendingChannel($user, $type, $destination, $existing, $label);
+
+        if ($existing === null && $type instanceof PhoneChannelType) {
+            $this->recordPhoneConsent($channel, $type);
+        }
 
         if (! app(DispatchChannelConfirmationCode::class)($channel)) {
             if ($existing === null) {
@@ -37,6 +47,48 @@ class BeginChannelConnection
         }
 
         return $channel;
+    }
+
+    /**
+     * One channel per phone type and number: connecting the same type to the same number again is
+     * refused rather than refreshed, which would silently unverify a working channel. Another phone
+     * type on the same number is allowed. `config` is encrypted, so the numbers are only comparable
+     * after decryption, and both sides are normalised so `+1…` and ten digits are one number.
+     *
+     * @param  array<string, mixed>  $destination
+     *
+     * @throws InvalidArgumentException
+     */
+    private function refuseDuplicateNumber(User $user, ChannelType $type, array $destination): void
+    {
+        if (! $type instanceof PhoneChannelType) {
+            return;
+        }
+
+        $to = PhoneNumber::normalize((string) ($destination['config']['to'] ?? ''));
+
+        $duplicate = $to !== null && NotificationChannel::query()
+            ->where('user_id', $user->id)
+            ->where('channel_type', $type->slug())
+            ->get()
+            ->contains(fn (NotificationChannel $channel): bool => PhoneNumber::normalize((string) ($channel->config['to'] ?? '')) === $to);
+
+        if ($duplicate) {
+            throw new InvalidArgumentException("You already have a {$type->label()} channel for that number.");
+        }
+    }
+
+    /**
+     * The consent given on the form, recorded before the first text or call goes to the number.
+     * Only the type and the consent text's version: never the number.
+     */
+    private function recordPhoneConsent(NotificationChannel $channel, PhoneChannelType $type): void
+    {
+        activity()
+            ->performedOn($channel)
+            ->event('phone_consent')
+            ->withProperties(['channel_type' => $type->slug(), 'version' => PhoneConsent::VERSION])
+            ->log('Agreed to automated weather alerts to this number');
     }
 
     /**
