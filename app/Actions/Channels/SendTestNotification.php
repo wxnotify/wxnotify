@@ -27,7 +27,7 @@ class SendTestNotification
         } catch (ConnectionException $e) {
             logger()->error('Could not reach the channel to send a test notification', [
                 'notification_channel_id' => $channel->id,
-                'exception' => $e->getMessage(),
+                'exception' => $e::class,
             ]);
 
             return false;

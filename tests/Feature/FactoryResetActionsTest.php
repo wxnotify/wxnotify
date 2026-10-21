@@ -117,6 +117,17 @@ test('resetting catalogs restores shipped products in place, keeps ids and rule 
         ->and($counts['custom_products_removed'])->toBe(1);
 });
 
+test('factory reset restores an enabled or re-tiered phone type to disabled plus', function () {
+    chanEnablePhoneTypes();
+    DB::table('channel_types')->where('slug', 'httpsms')->update(['min_tier' => 'free']);
+
+    app(ResetCatalogs::class)();
+
+    $phones = DB::table('channel_types')->whereIn('slug', ['twilio_sms', 'bulkvs_sms', 'httpsms'])->get();
+    expect($phones)->toHaveCount(3)
+        ->and($phones->every(fn (object $row): bool => ! $row->enabled && $row->min_tier === 'plus'))->toBeTrue();
+});
+
 test('the preview counts exactly what each selected toggle would delete and writes nothing', function () {
     frSeedPipelineData();
     (new ProductCatalogSeeder)->run();

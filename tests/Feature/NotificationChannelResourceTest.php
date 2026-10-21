@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Channels\RevealChannelUrl;
+use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\NotificationChannels\Pages\ListNotificationChannels;
 use App\Models\NotificationChannel;
 use App\Models\User;
@@ -9,6 +10,7 @@ use Filament\Actions\Testing\TestAction;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Spatie\Activitylog\Models\Activity;
 use STS\FilamentImpersonate\ImpersonateManager;
 
@@ -203,6 +205,46 @@ test('an unreachable apprise api notifies failure instead of throwing', function
         ->callAction(TestAction::make('sendTest')->table($channel))
         ->assertNotified();
 });
+
+test('an unreachable apprise api logs only the exception class, never the url in its message', function () {
+    Log::spy();
+    Http::fake(['*/notify/*' => Http::failedConnection('cURL error 7: Failed to connect to apprise-api port 8000 for http://apprise-api:8000/notify/')]);
+    $channel = NotificationChannel::factory()->for($this->user)->create();
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('sendTest')->table($channel))
+        ->assertNotified();
+
+    Log::shouldHaveReceived('error')->once()->withArgs(fn (string $message, array $context): bool => $context === [
+        'notification_channel_id' => $channel->id,
+        'exception' => ConnectionException::class,
+    ]);
+});
+
+dataset('chanPhoneChannelStates', [
+    'twilio_sms' => ['twilioSms', 'auth_token'],
+    'bulkvs_sms' => ['bulkVsSms', 'api_password'],
+    'httpsms' => ['httpSms', 'api_key'],
+]);
+
+test('the edit modal of a phone channel holds no credential or number and offers no reveal action', function (string $state, string $secretKey) {
+    chanEnablePhoneTypes();
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $this->actingAs($user);
+    $channel = NotificationChannel::factory()->for($user)->{$state}()->create();
+    $secret = $channel->config[$secretKey];
+
+    $component = livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->assertSchemaComponentHidden('apprise_url_preview');
+
+    $snapshot = json_encode($component->snapshot);
+
+    expect($snapshot)->not->toContain($secret)->not->toContain('5555550123')->not->toContain('2340001')
+        ->and($component->instance()->mountedActions[0]['data'])->not->toHaveKeys(['config', 'apprise_url', 'confirmation_code']);
+    expect(fn () => $component->callAction([TestAction::make('revealAppriseUrl')->schemaComponent('apprise_url_preview')]))
+        ->toThrow(Exception::class);
+})->with('chanPhoneChannelStates');
 
 test('editing a channel changes its label', function () {
     $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'Old label']);

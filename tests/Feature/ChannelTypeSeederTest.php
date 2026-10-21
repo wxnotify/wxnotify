@@ -15,7 +15,26 @@ test('the seeder restores edited shipped channel types and leaves custom ones to
         ->and(DB::table('channel_types')->count())->toBe(count(ChannelTypeSeeder::SHIPPED));
 });
 
-test('the migration and the seeder agree on the shipped set', function () {
-    expect(DB::table('channel_types')->orderBy('sort_order')->pluck('slug')->all())
-        ->toBe(array_column(ChannelTypeSeeder::SHIPPED, 'slug'));
+test('the migrations and the seeder agree on every shipped row', function () {
+    $live = DB::table('channel_types')->orderBy('sort_order')->get(['slug', 'min_tier', 'sort_order', 'enabled'])
+        ->map(fn (object $row): array => [
+            'slug' => $row->slug, 'min_tier' => $row->min_tier, 'sort_order' => (int) $row->sort_order, 'enabled' => (bool) $row->enabled,
+        ])->all();
+
+    expect($live)->toBe(ChannelTypeSeeder::SHIPPED);
+});
+
+test('the phone types ship disabled and plus-only', function () {
+    $phoneSlugs = ['twilio_sms', 'bulkvs_sms', 'httpsms'];
+
+    $fromSeeder = collect(ChannelTypeSeeder::SHIPPED)->whereIn('slug', $phoneSlugs);
+    expect($fromSeeder)->toHaveCount(3)
+        ->and($fromSeeder->every(fn (array $row): bool => $row['enabled'] === false && $row['min_tier'] === 'plus'))->toBeTrue();
+
+    DB::table('channel_types')->whereIn('slug', $phoneSlugs)->delete();
+    (require database_path('migrations/2026_10_22_100001_add_sms_channel_types.php'))->up();
+
+    $fromMigration = DB::table('channel_types')->whereIn('slug', $phoneSlugs)->get();
+    expect($fromMigration)->toHaveCount(3)
+        ->and($fromMigration->every(fn (object $row): bool => ! $row->enabled && $row->min_tier === 'plus'))->toBeTrue();
 });

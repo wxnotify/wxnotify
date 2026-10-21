@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Channels\BeginChannelConnection;
 use App\Enums\ChannelTransport;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Pages\ConnectChannel;
@@ -11,8 +12,10 @@ use App\Support\Delivery\Transports\SmsTransport;
 use App\Support\PhoneConsent;
 use App\Support\PhoneNumber;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
+use Spatie\Activitylog\Models\Activity;
 
 use function Pest\Livewire\livewire;
 
@@ -158,6 +161,24 @@ test('the destination summary masks the number', function () {
         ->and($this->type->destinationLabel())->toBe('Text number')
         ->and($this->type->confirmationHint($channel))->toBe('We just texted a 6-digit code to •••• 0001.')
         ->and($this->type->codeNotSentHint())->toContain('BulkVS');
+});
+
+test('the credentials and numbers stay out of the raw config, the activity log and the failure detail', function () {
+    Http::fake(['*/notify/*' => Http::sequence()->push(status: 200)->push(['error' => 'x'], 424)]);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+
+    $channel = app(BeginChannelConnection::class)($user, $this->type, chanBulkVsSmsFormData());
+    $channel->update(['label' => 'Phone']);
+    $result = app(ChannelDispatcher::class)->send($channel->fresh(), 'Tornado Warning', 'Alert');
+
+    $raw = (string) DB::table('notification_channels')->where('id', $channel->id)->value('config');
+    $log = json_encode(Activity::all()->toArray());
+
+    expect($raw)->not->toContain(CHAN_BULKVS_TEST_USER)->not->toContain(CHAN_BULKVS_TEST_PASSWORD)->not->toContain('5555550123')
+        ->and($log)->not->toContain(CHAN_BULKVS_TEST_USER)->not->toContain(CHAN_BULKVS_TEST_PASSWORD)
+        ->not->toContain('5555550123')->not->toContain('2340001')
+        ->and($result->error)->not->toContain(CHAN_BULKVS_TEST_USER)->not->toContain(CHAN_BULKVS_TEST_PASSWORD)
+        ->not->toContain('5555550123')->not->toContain('2340001');
 });
 
 test('the API refuses to create a bulkvs_sms channel', function () {
