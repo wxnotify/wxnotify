@@ -22,16 +22,25 @@ class BeginChannelConnection
 {
     /**
      * @param  array<string, mixed>  $data  the setup fields (and anything else the form held)
+     * @param  NotificationChannel|null  $pending  the unverified phone channel an earlier submit of the same
+     *                                             wizard run created: refreshed, not refused as a duplicate,
+     *                                             when it is the subscriber's own, of this type and for the
+     *                                             same number
      *
      * @throws InvalidArgumentException when the type cannot build a destination from the data, or the
      *                                  subscriber already has a channel of this phone type for the number
      * @throws ChannelCodeNotSent
      */
-    public function __invoke(User $user, ChannelType $type, array $data, ?string $label = null): NotificationChannel
+    public function __invoke(User $user, ChannelType $type, array $data, ?string $label = null, ?NotificationChannel $pending = null): NotificationChannel
     {
         $destination = $type->buildDestination($data);
-        $this->refuseDuplicateNumber($user, $type, $destination);
-        $existing = $this->existingWebPushChannel($user, $type, $destination);
+        $existing = $this->samePendingPhoneChannel($user, $type, $destination, $pending);
+
+        if ($existing === null) {
+            $this->refuseDuplicateNumber($user, $type, $destination);
+            $existing = $this->existingWebPushChannel($user, $type, $destination);
+        }
+
         $channel = $this->storePendingChannel($user, $type, $destination, $existing, $label);
 
         if ($existing === null && $type instanceof PhoneChannelType) {
@@ -76,6 +85,30 @@ class BeginChannelConnection
         if ($duplicate) {
             throw new InvalidArgumentException("You already have a {$type->label()} channel for that number.");
         }
+    }
+
+    /**
+     * The given pending channel when stepping back and submitting the same number again: still
+     * unverified, the subscriber's own, of this phone type and for this number. Anything else (a
+     * channel id the client made up, another number) is ignored, so the usual duplicate check applies.
+     *
+     * @param  array<string, mixed>  $destination
+     */
+    private function samePendingPhoneChannel(User $user, ChannelType $type, array $destination, ?NotificationChannel $pending): ?NotificationChannel
+    {
+        if (! $type instanceof PhoneChannelType || $pending === null) {
+            return null;
+        }
+
+        $to = PhoneNumber::normalize((string) ($destination['config']['to'] ?? ''));
+
+        $isSame = $pending->user_id === $user->id
+            && $pending->channel_type === $type->slug()
+            && ! $pending->isVerified()
+            && $to !== null
+            && PhoneNumber::normalize((string) ($pending->config['to'] ?? '')) === $to;
+
+        return $isSame ? $pending : null;
     }
 
     /**

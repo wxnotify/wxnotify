@@ -7,6 +7,7 @@ use App\Actions\Channels\VerifyChannelConfirmationCode;
 use App\Exceptions\ChannelCodeNotSent;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\Contracts\ChannelType;
 use App\Support\ChannelTypes\Contracts\PhoneChannelType;
 use BackedEnum;
 use Filament\Forms\Components\Field;
@@ -86,10 +87,15 @@ class ConnectChannel extends Page implements HasForms
                             ? $registry->find($get('channel_type'))?->formSchema() ?? []
                             : [])
                         ->afterValidation(function (Get $get, Set $set) {
-                            $type = app(ChannelTypeRegistry::class)->find($get('channel_type'));
+                            $type = $this->availableTypeOrHalt((string) $get('channel_type'));
 
                             try {
-                                $channel = app(BeginChannelConnection::class)(auth()->user(), $type, $get());
+                                $channel = app(BeginChannelConnection::class)(
+                                    auth()->user(),
+                                    $type,
+                                    $get(),
+                                    pending: $this->wizardPendingChannel($type, $get('channel_id')),
+                                );
                             } catch (\InvalidArgumentException $e) {
                                 Notification::make()->title($e->getMessage())->danger()->send();
 
@@ -125,6 +131,56 @@ class ConnectChannel extends Page implements HasForms
                         </x-filament::button>
                     BLADE))),
             ]);
+    }
+
+    /**
+     * The picked type, re-checked on the server: the step index of Wizard::nextStep() comes from
+     * the client, so step 2 can be submitted without step 1's option validation ever running.
+     * Only a type the picker offers (enabled in the catalog and available) that the subscriber's
+     * plan can add gets past here.
+     *
+     * @throws Halt
+     */
+    private function availableTypeOrHalt(string $slug): ChannelType
+    {
+        $type = app(ChannelTypeRegistry::class)->forPicker()
+            ->first(fn (array $row): bool => $row['type']->slug() === $slug)['type'] ?? null;
+
+        if ($type === null) {
+            Notification::make()->title('That channel type isn\'t available.')->danger()->send();
+
+            throw new Halt;
+        }
+
+        if (! auth()->user()->canAddChannel($slug)) {
+            Notification::make()
+                ->title('Your plan can\'t add that channel')
+                ->body('Remove a channel, or upgrade, to add another.')
+                ->danger()
+                ->send();
+
+            throw new Halt;
+        }
+
+        return $type;
+    }
+
+    /**
+     * The phone channel an earlier submit of this wizard run created, so stepping back and
+     * submitting the same number again refreshes it instead of being refused as a duplicate.
+     * `channel_id` is client state: BeginChannelConnection only reuses a channel that is still
+     * unverified, of the same type and number; this lookup keeps it to the subscriber's own.
+     */
+    private function wizardPendingChannel(ChannelType $type, mixed $channelId): ?NotificationChannel
+    {
+        if (! $type instanceof PhoneChannelType || blank($channelId)) {
+            return null;
+        }
+
+        return NotificationChannel::query()
+            ->whereKey($channelId)
+            ->where('user_id', auth()->id())
+            ->first();
     }
 
     /**
