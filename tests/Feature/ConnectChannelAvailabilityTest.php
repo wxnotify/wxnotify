@@ -70,6 +70,62 @@ test('a free subscriber whose free channel is in use cannot add another by skipp
     $component->assertNotified('Your plan can\'t add that channel');
 });
 
+test('a free subscriber who goes back to fix a typo refreshes their own pending channel', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+
+    $component = chanSubmitSetupStep('ntfy', ['topic' => 'wx-tpoic']);
+    $channelId = $component->get('data.channel_id');
+
+    // A new request loads the subscriber afresh; the test's cached user would still hold no channels.
+    $this->actingAs($user->fresh());
+    $component->fillForm(['topic' => 'wx-topic']);
+    goToConnectChannelStep($component, 1)
+        ->assertNotNotified('Your plan can\'t add that channel');
+
+    $channel = NotificationChannel::sole();
+
+    expect($channel->id)->toBe($channelId)
+        ->and($channel->apprise_url)->toBe('ntfy://wx-topic')
+        ->and($channel->isVerified())->toBeFalse();
+    Http::assertSentCount(2);
+    Http::assertSent(fn (Request $request): bool => $request['urls'] === 'ntfy://wx-topic'
+        && str_contains($request['body'], $channel->confirmation_code));
+});
+
+test('a channel id the wizard did not create cannot free up the slot', function (Closure $makeForged) {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    Http::fake();
+    $forged = $makeForged($user);
+    $before = $forged->fresh()->only(['apprise_url', 'confirmation_code', 'verified_at']);
+    $count = NotificationChannel::count();
+
+    $component = livewire(ConnectChannel::class)
+        ->fillForm(['channel_type' => 'ntfy'])
+        ->fillForm(['topic' => 'wx-topic'])
+        ->set('data.channel_id', $forged->id);
+    goToConnectChannelStep($component, 1)
+        ->assertNotified('Your plan can\'t add that channel');
+
+    expect(NotificationChannel::count())->toBe($count)
+        ->and($forged->fresh()->only(['apprise_url', 'confirmation_code', 'verified_at']))->toEqual($before);
+    Http::assertNothingSent();
+})->with([
+    'another subscriber\'s pending channel' => [function (User $user): NotificationChannel {
+        NotificationChannel::factory()->for($user)->create(['channel_type' => 'ntfy', 'apprise_url' => 'ntfy://mine']);
+
+        return NotificationChannel::factory()->unverified()->create(['channel_type' => 'ntfy', 'apprise_url' => 'ntfy://theirs']);
+    }],
+    'the subscriber\'s own pending channel of another type' => [
+        fn (User $user): NotificationChannel => NotificationChannel::factory()->for($user)->unverified()->create(),
+    ],
+    'the subscriber\'s own verified channel' => [
+        fn (User $user): NotificationChannel => NotificationChannel::factory()->for($user)->create(['channel_type' => 'ntfy', 'apprise_url' => 'ntfy://mine']),
+    ],
+]);
+
 test('going back and submitting the same number again resends to the wizard\'s own pending channel', function () {
     chanEnablePhoneTypes();
     $user = User::factory()->create(['tier_override' => Tier::Plus]);

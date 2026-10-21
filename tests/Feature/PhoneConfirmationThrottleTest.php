@@ -11,6 +11,7 @@ use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Spatie\Activitylog\Models\Activity;
 
 use function Pest\Livewire\livewire;
 
@@ -79,7 +80,7 @@ test('a subscriber gets ten codes an hour across all their numbers', function ()
     Http::assertSentCount(DispatchChannelConfirmationCode::CODES_PER_USER_PER_HOUR);
 });
 
-test('the wizard refuses a throttled number and keeps no channel', function () {
+test('the wizard refuses a throttled number and keeps no channel and no consent record', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
     foreach (range(1, DispatchChannelConfirmationCode::CODES_PER_NUMBER_PER_HOUR) as $ignored) {
         RateLimiter::hit(DispatchChannelConfirmationCode::numberLimitKey($this->user->id, CHAN_THROTTLE_NUMBER), 3600);
@@ -91,7 +92,8 @@ test('the wizard refuses a throttled number and keeps no channel', function () {
     goToConnectChannelStep($component, 1)
         ->assertNotified('Too many confirmation codes');
 
-    expect(NotificationChannel::count())->toBe(0);
+    expect(NotificationChannel::count())->toBe(0)
+        ->and(Activity::where('event', 'phone_consent')->count())->toBe(0);
     Http::assertNothingSent();
 });
 

@@ -23,10 +23,10 @@ class BeginChannelConnection
 {
     /**
      * @param  array<string, mixed>  $data  the setup fields (and anything else the form held)
-     * @param  NotificationChannel|null  $pending  the unverified phone channel an earlier submit of the same
-     *                                             wizard run created: refreshed, not refused as a duplicate,
-     *                                             when it is the subscriber's own, of this type and for the
-     *                                             same number
+     * @param  NotificationChannel|null  $pending  the unverified channel an earlier submit of the same wizard
+     *                                             run created: refreshed instead of adding another when it is
+     *                                             the subscriber's own and of this type (a phone channel only
+     *                                             for the same number, so it is not refused as a duplicate)
      *
      * @throws InvalidArgumentException when the type cannot build a destination from the data, or the
      *                                  subscriber already has a channel of this phone type for the number
@@ -36,11 +36,16 @@ class BeginChannelConnection
     public function __invoke(User $user, ChannelType $type, array $data, ?string $label = null, ?NotificationChannel $pending = null): NotificationChannel
     {
         $destination = $type->buildDestination($data);
-        $existing = $this->samePendingPhoneChannel($user, $type, $destination, $pending);
+        $existing = $this->reusablePendingChannel($user, $type, $destination, $pending);
 
         if ($existing === null) {
             $this->refuseDuplicateNumber($user, $type, $destination);
             $existing = $this->existingWebPushChannel($user, $type, $destination);
+        }
+
+        if ($type instanceof PhoneChannelType) {
+            // Before anything is written, so a throttled number leaves no channel or consent record.
+            DispatchChannelConfirmationCode::refuseWhenThrottled($user->id, (string) ($destination['config']['to'] ?? ''));
         }
 
         $channel = $this->storePendingChannel($user, $type, $destination, $existing, $label);
@@ -96,27 +101,29 @@ class BeginChannelConnection
     }
 
     /**
-     * The given pending channel when stepping back and submitting the same number again: still
-     * unverified, the subscriber's own, of this phone type and for this number. Anything else (a
-     * channel id the client made up, another number) is ignored, so the usual duplicate check applies.
+     * The given pending channel when stepping back and submitting step 2 again: still unverified,
+     * the subscriber's own and of this type, and for a phone type also for the same number (another
+     * number is a new channel with its own consent). Anything else (a channel id the client made up,
+     * another number) is ignored, so the usual checks apply.
      *
      * @param  array<string, mixed>  $destination
      */
-    private function samePendingPhoneChannel(User $user, ChannelType $type, array $destination, ?NotificationChannel $pending): ?NotificationChannel
+    private function reusablePendingChannel(User $user, ChannelType $type, array $destination, ?NotificationChannel $pending): ?NotificationChannel
     {
-        if (! $type instanceof PhoneChannelType || $pending === null) {
+        if ($pending === null
+            || $pending->user_id !== $user->id
+            || $pending->channel_type !== $type->slug()
+            || $pending->isVerified()) {
             return null;
+        }
+
+        if (! $type instanceof PhoneChannelType) {
+            return $pending;
         }
 
         $to = PhoneNumber::normalize((string) ($destination['config']['to'] ?? ''));
 
-        $isSame = $pending->user_id === $user->id
-            && $pending->channel_type === $type->slug()
-            && ! $pending->isVerified()
-            && $to !== null
-            && PhoneNumber::normalize((string) ($pending->config['to'] ?? '')) === $to;
-
-        return $isSame ? $pending : null;
+        return $to !== null && PhoneNumber::normalize((string) ($pending->config['to'] ?? '')) === $to ? $pending : null;
     }
 
     /**

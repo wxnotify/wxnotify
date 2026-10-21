@@ -88,15 +88,11 @@ class ConnectChannel extends Page implements HasForms
                             ? $registry->find($get('channel_type'))?->formSchema() ?? []
                             : [])
                         ->afterValidation(function (Get $get, Set $set) {
-                            $type = $this->availableTypeOrHalt((string) $get('channel_type'));
+                            $pending = $this->wizardPendingChannel((string) $get('channel_type'), $get('channel_id'));
+                            $type = $this->availableTypeOrHalt((string) $get('channel_type'), $pending);
 
                             try {
-                                $channel = app(BeginChannelConnection::class)(
-                                    auth()->user(),
-                                    $type,
-                                    $get(),
-                                    pending: $this->wizardPendingChannel($type, $get('channel_id')),
-                                );
+                                $channel = app(BeginChannelConnection::class)(auth()->user(), $type, $get(), pending: $pending);
                             } catch (\InvalidArgumentException $e) {
                                 Notification::make()->title($e->getMessage())->danger()->send();
 
@@ -142,11 +138,13 @@ class ConnectChannel extends Page implements HasForms
      * The picked type, re-checked on the server: the step index of Wizard::nextStep() comes from
      * the client, so step 2 can be submitted without step 1's option validation ever running.
      * Only a type the picker offers (enabled in the catalog and available) that the subscriber's
-     * plan can add gets past here.
+     * plan can add gets past here. Re-submitting for the wizard's own pending channel refreshes
+     * it rather than adding one, so it is only held to the type's tier: that channel already
+     * fills the free slot it would otherwise be refused for.
      *
      * @throws Halt
      */
-    private function availableTypeOrHalt(string $slug): ChannelType
+    private function availableTypeOrHalt(string $slug, ?NotificationChannel $pending): ChannelType
     {
         $type = app(ChannelTypeRegistry::class)->forPicker()
             ->first(fn (array $row): bool => $row['type']->slug() === $slug)['type'] ?? null;
@@ -157,7 +155,11 @@ class ConnectChannel extends Page implements HasForms
             throw new Halt;
         }
 
-        if (! auth()->user()->canAddChannel($slug)) {
+        $allowed = $pending !== null
+            ? auth()->user()->meetsChannelTier($slug)
+            : auth()->user()->canAddChannel($slug);
+
+        if (! $allowed) {
             Notification::make()
                 ->title('Your plan can\'t add that channel')
                 ->body('Remove a channel, or upgrade, to add another.')
@@ -171,20 +173,22 @@ class ConnectChannel extends Page implements HasForms
     }
 
     /**
-     * The phone channel an earlier submit of this wizard run created, so stepping back and
-     * submitting the same number again refreshes it instead of being refused as a duplicate.
-     * `channel_id` is client state: BeginChannelConnection only reuses a channel that is still
-     * unverified, of the same type and number; this lookup keeps it to the subscriber's own.
+     * The channel an earlier submit of this wizard run created, so stepping back and submitting
+     * step 2 again refreshes it instead of adding a second channel (or being refused one).
+     * `channel_id` is client state, so only the subscriber's own, still unverified channel of the
+     * picked type counts; BeginChannelConnection also keeps a phone channel to the same number.
      */
-    private function wizardPendingChannel(ChannelType $type, mixed $channelId): ?NotificationChannel
+    private function wizardPendingChannel(string $slug, mixed $channelId): ?NotificationChannel
     {
-        if (! $type instanceof PhoneChannelType || blank($channelId)) {
+        if (blank($channelId)) {
             return null;
         }
 
         return NotificationChannel::query()
             ->whereKey($channelId)
             ->where('user_id', auth()->id())
+            ->where('channel_type', $slug)
+            ->whereNull('verified_at')
             ->first();
     }
 

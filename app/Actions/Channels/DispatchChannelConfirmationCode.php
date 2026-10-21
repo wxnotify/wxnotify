@@ -95,20 +95,37 @@ class DispatchChannelConfirmationCode
             return;
         }
 
-        $number = PhoneNumber::normalize((string) ($channel->config['to'] ?? '')) ?? '';
-        $limits = [
-            self::numberLimitKey($channel->user_id, $number) => self::CODES_PER_NUMBER_PER_HOUR,
-            self::userLimitKey($channel->user_id) => self::CODES_PER_USER_PER_HOUR,
-        ];
+        $number = (string) ($channel->config['to'] ?? '');
+        self::refuseWhenThrottled($channel->user_id, $number);
 
-        foreach ($limits as $key => $maxAttempts) {
+        foreach (array_keys(self::limitsFor($channel->user_id, $number)) as $key) {
+            RateLimiter::hit($key, 3600);
+        }
+    }
+
+    /**
+     * Refuse when the number or the subscriber has no codes left this hour, without spending one:
+     * BeginChannelConnection asks before it stores a new phone channel.
+     *
+     * @throws ChannelCodeThrottled
+     */
+    public static function refuseWhenThrottled(int $userId, string $number): void
+    {
+        foreach (self::limitsFor($userId, $number) as $key => $maxAttempts) {
             if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
                 throw new ChannelCodeThrottled(RateLimiter::availableIn($key));
             }
         }
+    }
 
-        foreach (array_keys($limits) as $key) {
-            RateLimiter::hit($key, 3600);
-        }
+    /**
+     * @return array<string, int> each limiter key with its codes per hour
+     */
+    private static function limitsFor(int $userId, string $number): array
+    {
+        return [
+            self::numberLimitKey($userId, PhoneNumber::normalize($number) ?? '') => self::CODES_PER_NUMBER_PER_HOUR,
+            self::userLimitKey($userId) => self::CODES_PER_USER_PER_HOUR,
+        ];
     }
 }
