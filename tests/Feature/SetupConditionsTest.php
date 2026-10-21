@@ -75,18 +75,13 @@ function setupConditionCases(): array
         ],
         'push_configured' => [
             'push_configured',
-            function () {
-                config([
-                    'services.firebase.service_account' => setupConditionTempFile(),
-                    'webpush.vapid.public_key' => 'public',
-                    'webpush.vapid.private_key' => 'private',
-                ]);
-            },
-            fn () => config([
-                'services.firebase.service_account' => setupConditionTempFile(),
-                'webpush.vapid.public_key' => 'public',
-                'webpush.vapid.private_key' => '',
-            ]),
+            fn () => config(['services.firebase.service_account' => setupConditionTempFile()]),
+            fn () => config(['services.firebase.service_account' => '/nonexistent/firebase.json']),
+        ],
+        'web_push_configured' => [
+            'web_push_configured',
+            fn () => config(['webpush.vapid.public_key' => 'public', 'webpush.vapid.private_key' => 'private']),
+            fn () => config(['webpush.vapid.public_key' => 'public', 'webpush.vapid.private_key' => '']),
         ],
         'billing_configured' => [
             'billing_configured',
@@ -197,14 +192,40 @@ it('counts a good heartbeat on one feed even when another feed holds garbage', f
 });
 
 it('does not count a missing, empty or unreadable firebase file as push configured', function (?string $path) {
+    config(['services.firebase.service_account' => $path]);
+
+    expect(setupConditionPasses('push_configured'))->toBeFalse();
+})->with([null, '', '/nonexistent/firebase.json']);
+
+it('counts a readable firebase file as mobile push without any VAPID keys', function () {
     config([
-        'services.firebase.service_account' => $path,
+        'services.firebase.service_account' => setupConditionTempFile(),
+        'webpush.vapid.public_key' => null,
+        'webpush.vapid.private_key' => null,
+    ]);
+
+    expect(setupConditionPasses('push_configured'))->toBeTrue();
+});
+
+it('does not count a missing VAPID key as browser push configured', function (?string $public, ?string $private) {
+    config(['webpush.vapid.public_key' => $public, 'webpush.vapid.private_key' => $private]);
+
+    expect(setupConditionPasses('web_push_configured'))->toBeFalse();
+})->with([
+    'no private key' => ['public', null],
+    'no public key' => [null, 'private'],
+    'neither key' => [null, ''],
+]);
+
+it('counts both VAPID keys as browser push configured without a firebase file', function () {
+    config([
+        'services.firebase.service_account' => null,
         'webpush.vapid.public_key' => 'public',
         'webpush.vapid.private_key' => 'private',
     ]);
 
-    expect(setupConditionPasses('push_configured'))->toBeFalse();
-})->with([null, '', '/nonexistent/firebase.json']);
+    expect(setupConditionPasses('web_push_configured'))->toBeTrue();
+});
 
 it('does not count the array mailer as mail configured', function () {
     config(['mail.default' => 'array']);

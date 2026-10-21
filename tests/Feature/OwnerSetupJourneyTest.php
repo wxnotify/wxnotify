@@ -24,7 +24,7 @@ function ownerSetupVisibleStepKeys(User $user): array
         ->all();
 }
 
-test('the migration creates the flow and its nine steps in order with their condition keys', function () {
+test('the migration creates the flow and its ten steps in order with their condition keys', function () {
     $flow = OnboardingFlow::query()->where('key', 'owner-setup')->sole();
     $steps = OnboardingStep::query()->where('flow_id', $flow->id)->orderBy('sort_order')->get();
 
@@ -50,8 +50,9 @@ test('the migration creates the flow and its nine steps in order with their cond
         ['scheduler-queue', 5, 'condition', 'scheduler_and_queue_running', null, null, true],
         ['mail', 6, 'condition', 'mail_configured', null, null, true],
         ['push', 7, 'condition', 'push_configured', null, null, false],
-        ['billing', 8, 'condition', 'billing_configured', 'is_cloud_mode', null, true],
-        ['support-widget', 9, 'condition', 'support_widget_configured', 'is_cloud_mode', null, true],
+        ['web-push', 8, 'condition', 'web_push_configured', null, null, false],
+        ['billing', 9, 'condition', 'billing_configured', 'is_cloud_mode', null, true],
+        ['support-widget', 10, 'condition', 'support_widget_configured', 'is_cloud_mode', null, true],
     ]);
 
     $registry = app(ConditionRegistry::class);
@@ -76,7 +77,7 @@ test('running the migration again, or after an owner edited a step title, change
     ownerSetupJourneyMigration()->up();
 
     expect(OnboardingFlow::query()->where('key', 'owner-setup')->count())->toBe(1)
-        ->and(OnboardingStep::query()->where('flow_id', $basics->flow_id)->count())->toBe(9)
+        ->and(OnboardingStep::query()->where('flow_id', $basics->flow_id)->count())->toBe(10)
         ->and($basics->fresh()->title)->toBe(['en' => 'My own wording']);
 });
 
@@ -131,7 +132,7 @@ test('cloud-only steps are hidden when the mode is self-hosted and shown in clou
     config(['wxnotify.mode' => 'cloud']);
     $cloud = ownerSetupVisibleStepKeys($owner);
 
-    expect($selfHosted)->toBe(['basics', 'weather-feed', 'reference-data', 'boundaries', 'scheduler-queue', 'mail', 'push'])
+    expect($selfHosted)->toBe(['basics', 'weather-feed', 'reference-data', 'boundaries', 'scheduler-queue', 'mail', 'push', 'web-push'])
         ->and($cloud)->toBe([...$selfHosted, 'billing', 'support-widget']);
 });
 
