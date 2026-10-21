@@ -44,3 +44,6 @@ Activity alerts name the client IP of the request that caused the event (`MatchA
 
 ## A channel type the app can create declares appSetupFields() and needs a parity case
 `ChannelType::appSetupFields(User)` returns neutral `ChannelSetupField` descriptors (key, label, input kind, required, help, default, validation rules) or null when the mobile app cannot create the type. Shared rule definitions (a URL pattern constant, `TeamsChannelType::workflowUrlRule()`) are referenced by both the Filament field and the descriptor. Adding a creatable type, or changing a field's rules, needs a sample in `ChannelSetupFieldsTest` and `ChannelApiParityTest`.
+
+## Phone numbers: PhoneNumber only, NANP, consent required
+Numbers go through `App\Support\PhoneNumber` (NANP only; area code AND exchange start 2-9; stored as E.164; `INVALID_MESSAGE` is the shared error text, never a literal). Phone channel types are not creatable inline in the alert form or in the mobile app, need the versioned consent checkbox (`PhoneConsent`, recorded without the number), and number fields use `->type('tel')` (Filament's `->tel()` adds a regex that refuses `+1 (555) ...`). Test-file top-level constants/helpers must be `CHAN_`/`chan`-prefixed (parallel-run global namespace).
