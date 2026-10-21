@@ -60,7 +60,7 @@ class ExtractProductMetadata
     /**
      * Only the SPC Day 1 Convective Outlook's raw text has a confirmed,
      * stable categorical-risk phrase (see extractConvectiveOutlookRiskLevels()).
-     * SPC Fire Weather Outlook risk levels ("Elevated"/"Critical"/etc.) are
+     * SPC Day 1 Fire Weather Outlook risk levels ("Elevated"/"Critical"/etc.) are
      * stated as free-form narrative prose with no fixed sentence found in
      * real sampled products — extraction for it is a known gap, not
      * attempted here rather than guessed at.

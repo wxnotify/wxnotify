@@ -1628,7 +1628,7 @@ return [
     ],
     116 => [
         'code' => 'SPC.FIRE',
-        'name' => 'SPC Fire Weather Outlook',
+        'name' => 'SPC Day 1 Fire Weather Outlook',
         'family' => 'spc_wpc',
         'has_polygon' => false,
         'risk_level_options' => '["Elevated","Critical","Extremely Critical","Isolated Dry T-Storms","Scattered Dry T-Storms"]',
