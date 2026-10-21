@@ -88,6 +88,14 @@ class TwilioSmsChannelType implements SmsChannelType
     }
 
     /**
+     * @return list<string>
+     */
+    public function requiredConfigKeys(): array
+    {
+        return ['account_sid', 'auth_token', 'from', 'to'];
+    }
+
+    /**
      * @param  array<string, mixed>  $config
      */
     public function appriseUrl(array $config): string

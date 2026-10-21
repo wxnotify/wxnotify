@@ -33,7 +33,7 @@ class SmsTransport implements Transport
 
         $config = $channel->config;
 
-        if (! is_array($config) || ! $this->hasSettings($config)) {
+        if (! is_array($config) || ! $this->hasSettings($type, $config)) {
             return DeliveryResult::failed('This SMS channel is missing its settings.');
         }
 
@@ -43,18 +43,14 @@ class SmsTransport implements Transport
     }
 
     /**
-     * Both numbers are present and no stored setting is blank.
+     * Every key the type requires is present and not blank.
      *
      * @param  array<string, mixed>  $config
      */
-    private function hasSettings(array $config): bool
+    private function hasSettings(SmsChannelType $type, array $config): bool
     {
-        if (blank($config['from'] ?? null) || blank($config['to'] ?? null)) {
-            return false;
-        }
-
-        foreach ($config as $value) {
-            if (blank($value)) {
+        foreach ($type->requiredConfigKeys() as $key) {
+            if (blank($config[$key] ?? null)) {
                 return false;
             }
         }

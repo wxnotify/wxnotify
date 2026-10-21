@@ -23,8 +23,8 @@ use ToneGabes\BetterOptions\Forms\Components\RadioCards;
 
 use function Pest\Livewire\livewire;
 
-const TWILIO_TEST_SID = 'AC0123456789abcdef0123456789ABCDEF';
-const TWILIO_TEST_TOKEN = 'fedcba9876543210fedcba9876543210';
+const CHAN_TWILIO_TEST_SID = 'AC0123456789abcdef0123456789ABCDEF';
+const CHAN_TWILIO_TEST_TOKEN = 'fedcba9876543210fedcba9876543210';
 
 beforeEach(function () {
     chanEnablePhoneTypes();
@@ -39,8 +39,8 @@ beforeEach(function () {
 function chanTwilioSmsFormData(array $overrides = []): array
 {
     return [
-        'account_sid' => TWILIO_TEST_SID,
-        'auth_token' => TWILIO_TEST_TOKEN,
+        'account_sid' => CHAN_TWILIO_TEST_SID,
+        'auth_token' => CHAN_TWILIO_TEST_TOKEN,
         'from' => '(555) 234-0001',
         'to' => '555-555-0123',
         'consent' => true,
@@ -52,7 +52,7 @@ test('it builds the twilio url from config with digits-only numbers', function (
     $config = $this->type->buildDestination(chanTwilioSmsFormData())['config'];
 
     expect($this->type->appriseUrl($config))
-        ->toBe('twilio://'.TWILIO_TEST_SID.':'.TWILIO_TEST_TOKEN.'@15552340001/15555550123')
+        ->toBe('twilio://'.CHAN_TWILIO_TEST_SID.':'.CHAN_TWILIO_TEST_TOKEN.'@15552340001/15555550123')
         ->and($this->type->transport())->toBe(ChannelTransport::Sms)
         ->and($this->type->slug())->toBe('twilio_sms')
         ->and($this->type->label())->toBe('Twilio SMS')
@@ -80,14 +80,14 @@ test('it validates the account sid, auth token and both numbers', function (stri
         expect($validator->errors()->get($field))->toBe([$message]);
     }
 })->with([
-    'a valid account sid' => ['account_sid', TWILIO_TEST_SID, true],
-    'an account sid one character short' => ['account_sid', substr(TWILIO_TEST_SID, 0, -1), false],
-    'an API key sid instead of an account sid' => ['account_sid', 'SK'.substr(TWILIO_TEST_SID, 2), false],
-    'an account sid with a non-hex character' => ['account_sid', substr(TWILIO_TEST_SID, 0, -1).'g', false],
+    'a valid account sid' => ['account_sid', CHAN_TWILIO_TEST_SID, true],
+    'an account sid one character short' => ['account_sid', substr(CHAN_TWILIO_TEST_SID, 0, -1), false],
+    'an API key sid instead of an account sid' => ['account_sid', 'SK'.substr(CHAN_TWILIO_TEST_SID, 2), false],
+    'an account sid with a non-hex character' => ['account_sid', substr(CHAN_TWILIO_TEST_SID, 0, -1).'g', false],
     'a blank account sid' => ['account_sid', '', false],
-    'a valid auth token' => ['auth_token', TWILIO_TEST_TOKEN, true],
-    'an auth token one character short' => ['auth_token', substr(TWILIO_TEST_TOKEN, 0, -1), false],
-    'an auth token with a non-hex character' => ['auth_token', substr(TWILIO_TEST_TOKEN, 0, -1).'z', false],
+    'a valid auth token' => ['auth_token', CHAN_TWILIO_TEST_TOKEN, true],
+    'an auth token one character short' => ['auth_token', substr(CHAN_TWILIO_TEST_TOKEN, 0, -1), false],
+    'an auth token with a non-hex character' => ['auth_token', substr(CHAN_TWILIO_TEST_TOKEN, 0, -1).'z', false],
     'a blank auth token' => ['auth_token', '', false],
     'a formatted from number' => ['from', '+1 (555) 234-0001', true],
     'a from number with a 1 exchange' => ['from', '5551230001', false, PhoneNumber::INVALID_MESSAGE],
@@ -136,8 +136,8 @@ test('completing the wizard as Plus stores config and texts the code to the subs
         ->and($channel->label)->toBe('Twilio SMS •••• 0123')
         ->and($channel->isVerified())->toBeFalse()
         ->and($channel->config)->toMatchArray([
-            'account_sid' => TWILIO_TEST_SID,
-            'auth_token' => TWILIO_TEST_TOKEN,
+            'account_sid' => CHAN_TWILIO_TEST_SID,
+            'auth_token' => CHAN_TWILIO_TEST_TOKEN,
             'from' => '+15552340001',
             'to' => '+15555550123',
             'consent_version' => PhoneConsent::VERSION,
@@ -211,11 +211,11 @@ test('config is encrypted, absent from the activity log, and the consent entry h
     $consent = Activity::query()->where('event', 'phone_consent')->sole();
     $log = json_encode(Activity::all()->toArray());
 
-    expect($raw)->not->toContain(TWILIO_TEST_TOKEN)->not->toContain('5555550123')
+    expect($raw)->not->toContain(CHAN_TWILIO_TEST_TOKEN)->not->toContain('5555550123')
         ->and($consent->subject->is($channel))->toBeTrue()
         ->and($consent->properties->all())->toBe(['channel_type' => 'twilio_sms', 'version' => PhoneConsent::VERSION])
-        ->and($log)->not->toContain(TWILIO_TEST_TOKEN)
-        ->not->toContain(TWILIO_TEST_SID)
+        ->and($log)->not->toContain(CHAN_TWILIO_TEST_TOKEN)
+        ->not->toContain(CHAN_TWILIO_TEST_SID)
         ->not->toContain('5555550123')
         ->not->toContain('2340001');
 });
@@ -242,15 +242,28 @@ test('an Apprise connection error still propagates from the transport', function
 test('the transport refuses a channel missing its settings or of a non-SMS type without calling Apprise', function () {
     Http::fake();
 
-    $missing = NotificationChannel::factory()->twilioSms()->create();
-    $missing->config = [...$missing->config, 'auth_token' => ''];
+    $blank = NotificationChannel::factory()->twilioSms()->create();
+    $blank->config = [...$blank->config, 'auth_token' => ''];
+
+    $absent = NotificationChannel::factory()->twilioSms()->create();
+    $absent->config = collect($absent->config)->except('account_sid')->all();
 
     $notSms = NotificationChannel::factory()->create(['channel_type' => 'discord']);
 
-    expect(app(SmsTransport::class)->send($missing, 'body', null)->error)->toBe('This SMS channel is missing its settings.')
+    expect(app(SmsTransport::class)->send($blank, 'body', null)->error)->toBe('This SMS channel is missing its settings.')
+        ->and(app(SmsTransport::class)->send($absent, 'body', null)->error)->toBe('This SMS channel is missing its settings.')
         ->and(app(SmsTransport::class)->send($notSms, 'body', null)->error)->toBe('This channel cannot send text messages.');
 
     Http::assertNothingSent();
+});
+
+test('the transport checks only the type\'s required keys, so an unrelated blank key does not block a send', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $channel = NotificationChannel::factory()->twilioSms()->create();
+    $channel->config = [...$channel->config, 'note' => ''];
+
+    expect($this->type->requiredConfigKeys())->toBe(['account_sid', 'auth_token', 'from', 'to'])
+        ->and(app(SmsTransport::class)->send($channel, 'body', null)->success)->toBeTrue();
 });
 
 test('the destination summary masks the number and the caption is fixed', function () {

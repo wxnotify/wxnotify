@@ -85,6 +85,26 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    /**
+     * A BulkVS SMS channel texting the given E.164 number, with a consent record.
+     */
+    public function bulkVsSms(string $to = '+15555550123'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'bulkvs_sms',
+            'label' => 'BulkVS SMS •••• '.substr($to, -4),
+            'apprise_url' => null,
+            'config' => [
+                'api_username' => 'ops@example.com',
+                'api_password' => 'Secr3t-pass',
+                'from' => '+15552340001',
+                'to' => $to,
+                'consent_version' => PhoneConsent::VERSION,
+                'consented_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [
