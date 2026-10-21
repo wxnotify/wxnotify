@@ -137,7 +137,7 @@ test('completing the wizard as Plus texts the code through httpsms', function ()
 
 test('a rejected send records the fixed httpSMS failure text', function () {
     Http::fake(['*/notify/*' => Http::response(['error' => 'One or more notifications could not be sent'], 424)]);
-    $channel = NotificationChannel::factory()->httpSms()->create();
+    $channel = NotificationChannel::factory()->httpSms()->for(User::factory()->create(['tier_override' => Tier::Plus]))->create();
 
     $result = app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert');
 

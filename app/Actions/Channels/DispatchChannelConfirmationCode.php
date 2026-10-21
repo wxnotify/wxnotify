@@ -42,7 +42,7 @@ class DispatchChannelConfirmationCode
         } catch (ConnectionException $e) {
             logger()->error('Could not reach the Apprise API to dispatch a channel confirmation code', [
                 'notification_channel_id' => $channel->id,
-                'exception' => $e->getMessage(),
+                'exception' => $e::class,
             ]);
 
             return false;

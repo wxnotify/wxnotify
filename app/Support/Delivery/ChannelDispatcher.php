@@ -5,6 +5,8 @@ namespace App\Support\Delivery;
 use App\Enums\ChannelTransport;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\Contracts\ChannelType;
+use App\Support\ChannelTypes\Contracts\PhoneChannelType;
 use App\Support\Delivery\Transports\AppriseTransport;
 use App\Support\Delivery\Transports\MailTransport;
 use App\Support\Delivery\Transports\MobilePushTransport;
@@ -29,9 +31,36 @@ class ChannelDispatcher
             return DeliveryResult::failed("Unknown channel type [{$channel->channel_type}].");
         }
 
+        $refusal = $this->refusal($channel, $type, $meta);
+
+        if ($refusal !== null) {
+            return DeliveryResult::failed($refusal);
+        }
+
         $title = $title !== null ? MessagePrefix::apply($title) : null;
 
         return $this->transportFor($type->transport())->send($channel, $body, $title, $meta);
+    }
+
+    /**
+     * Why a send must not go out, checked before any transport or HTTP call: an owner below
+     * the type's catalog `min_tier` (a downgraded subscriber's channel is kept and refused,
+     * and works again on re-upgrade), or an unverified phone channel getting anything but its
+     * confirmation code. The code is exempt from the second check only, never the first.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function refusal(NotificationChannel $channel, ChannelType $type, array $meta): ?string
+    {
+        if ($channel->user !== null && ! $channel->user->meetsChannelTier($type->slug())) {
+            return 'This channel needs the Plus plan or higher.';
+        }
+
+        if ($type instanceof PhoneChannelType && ! $channel->isVerified() && ($meta['type'] ?? null) !== 'confirmation') {
+            return 'This number has not been confirmed yet.';
+        }
+
+        return null;
     }
 
     private function transportFor(ChannelTransport $transport): Transport

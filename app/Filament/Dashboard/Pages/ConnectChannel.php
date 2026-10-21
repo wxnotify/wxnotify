@@ -7,6 +7,7 @@ use App\Actions\Channels\VerifyChannelConfirmationCode;
 use App\Exceptions\ChannelCodeNotSent;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\Contracts\PhoneChannelType;
 use BackedEnum;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Hidden;
@@ -96,7 +97,9 @@ class ConnectChannel extends Page implements HasForms
                             } catch (ChannelCodeNotSent) {
                                 Notification::make()
                                     ->title('Couldn\'t send your confirmation code')
-                                    ->body('The notification service is temporarily unavailable. Please try again in a moment.')
+                                    ->body($type instanceof PhoneChannelType
+                                        ? $type->codeNotSentHint()
+                                        : 'The notification service is temporarily unavailable. Please try again in a moment.')
                                     ->danger()
                                     ->send();
 
@@ -113,9 +116,7 @@ class ConnectChannel extends Page implements HasForms
                                 ->required()
                                 // The signing secret is shown on step 2 now, so the
                                 // only thing left to say here is where the code went.
-                                ->helperText(fn (Get $get): string => $get('channel_type') === 'webhook'
-                                    ? 'We just sent a confirmation message to your endpoint; enter the 6-digit code from its "code" field.'
-                                    : 'We just sent a 6-digit code to the channel you configured.'),
+                                ->helperText(fn (Get $get): string => $this->confirmStepHint($get('channel_type'), $get('channel_id'))),
                         ]),
                 ])
                     ->submitAction(new HtmlString(Blade::render(<<<'BLADE'
@@ -124,6 +125,30 @@ class ConnectChannel extends Page implements HasForms
                         </x-filament::button>
                     BLADE))),
             ]);
+    }
+
+    /**
+     * Where the code went: a phone type names the masked number of the subscriber's own pending
+     * channel; a webhook points at the payload's "code" field.
+     */
+    private function confirmStepHint(?string $slug, mixed $channelId): string
+    {
+        $type = app(ChannelTypeRegistry::class)->find((string) $slug);
+
+        if ($type instanceof PhoneChannelType && filled($channelId)) {
+            $channel = NotificationChannel::query()
+                ->whereKey($channelId)
+                ->where('user_id', auth()->id())
+                ->first();
+
+            if ($channel !== null) {
+                return $type->confirmationHint($channel);
+            }
+        }
+
+        return $slug === 'webhook'
+            ? 'We just sent a confirmation message to your endpoint; enter the 6-digit code from its "code" field.'
+            : 'We just sent a 6-digit code to the channel you configured.';
     }
 
     /**

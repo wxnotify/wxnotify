@@ -1,9 +1,14 @@
 <?php
 
 use App\Actions\Channels\BeginChannelConnection;
+use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Enums\ChannelTransport;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Pages\ConnectChannel;
+use App\Jobs\DeliverWeatherAlert;
+use App\Models\AlertRule;
+use App\Models\DeliveryLog;
+use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
@@ -13,10 +18,12 @@ use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\Transports\SmsTransport;
 use App\Support\PhoneConsent;
 use App\Support\PhoneNumber;
+use Filament\Notifications\Notification;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Spatie\Activitylog\Models\Activity;
 use ToneGabes\BetterOptions\Forms\Components\RadioCards;
@@ -222,7 +229,7 @@ test('config is encrypted, absent from the activity log, and the consent entry h
 
 test('a rejected send records the fixed Twilio failure text', function () {
     Http::fake(['*/notify/*' => Http::response(['error' => 'One or more notifications could not be sent'], 424)]);
-    $channel = NotificationChannel::factory()->twilioSms()->create();
+    $channel = NotificationChannel::factory()->twilioSms()->for(User::factory()->create(['tier_override' => Tier::Plus]))->create();
 
     $result = app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert');
 
@@ -233,7 +240,7 @@ test('a rejected send records the fixed Twilio failure text', function () {
 
 test('an Apprise connection error still propagates from the transport', function () {
     Http::fake(['*/notify/*' => Http::failedConnection()]);
-    $channel = NotificationChannel::factory()->twilioSms()->create();
+    $channel = NotificationChannel::factory()->twilioSms()->for(User::factory()->create(['tier_override' => Tier::Plus]))->create();
 
     expect(fn () => app(ChannelDispatcher::class)->send($channel, 'Tornado Warning'))
         ->toThrow(ConnectionException::class);
@@ -286,4 +293,88 @@ test('the API refuses to create a twilio_sms channel', function () {
 
     expect(NotificationChannel::count())->toBe(0);
     Http::assertNothingSent();
+});
+
+test('an alert from DeliverWeatherAlert arrives as the composed SMS and logs success', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->for($user)->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->twilioSms()->for($user)->create();
+    $product = IngestedProduct::factory()->create([
+        'text' => "Tornado Warning for\nBoulder County until 5 PM.\n\nTake shelter now — it’s [urgent].",
+        'view_slug' => 'kbou-torbou-271622',
+    ]);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+
+    $log = DeliveryLog::sole();
+
+    expect($log->status)->toBe('success')
+        ->and($log->error_detail)->toBeNull()
+        ->and($log->channel_type)->toBe('twilio_sms');
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn (Request $request): bool => ! array_key_exists('title', $request->data())
+        && $request['body'] === $log->subject."\nTornado Warning for Boulder County until 5 PM. Take shelter now - it's (urgent).\n".$product->viewUrl()
+        && str_ends_with($request['urls'], '@15552340001/15555550123'));
+});
+
+test('a failed alert logs the fixed Twilio text, never the url or number', function () {
+    Http::fake(['*/notify/*' => Http::response(['error' => 'One or more notifications could not be sent'], 424)]);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->for($user)->create(['category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null]);
+    $channel = NotificationChannel::factory()->twilioSms()->for($user)->create();
+    $product = IngestedProduct::factory()->create(['text' => 'Tornado Warning for Boulder County.']);
+
+    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+
+    $log = DeliveryLog::sole();
+
+    expect($log->status)->toBe('failure')
+        ->and($log->error_detail)->toBe($this->type->failureMessage())
+        ->and(json_encode($log->toArray()))
+        ->not->toContain('twilio://')
+        ->not->toContain('5555550123')
+        ->not->toContain('2340001')
+        ->not->toContain($channel->config['auth_token']);
+});
+
+test('the wizard says where the code went and, on failure, to check the credentials', function () {
+    $this->actingAs(User::factory()->create(['tier_override' => Tier::Plus]));
+    Http::fake(['*/notify/*' => Http::sequence()
+        ->push(status: 200)
+        ->push(['error' => 'One or more notifications could not be sent'], 424)]);
+
+    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'twilio_sms']);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm(chanTwilioSmsFormData());
+    goToConnectChannelStep($component, 1);
+
+    $component->assertWizardCurrentStep(3)
+        ->assertSee('We just texted a 6-digit code to •••• 0123.')
+        ->assertDontSee('We just sent a 6-digit code to the channel you configured.');
+
+    $failing = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'twilio_sms']);
+    goToConnectChannelStep($failing, 0);
+    $failing->fillForm(chanTwilioSmsFormData(['to' => '5552340002']));
+    goToConnectChannelStep($failing, 1);
+
+    $failing->assertNotified(Notification::make()
+        ->title('Couldn\'t send your confirmation code')
+        ->body('We couldn\'t send the code. Check your Twilio credentials and both numbers, then try again.')
+        ->danger());
+    expect(NotificationChannel::where('label', 'like', '%0002')->exists())->toBeFalse();
+});
+
+test('a code that cannot reach Apprise logs only the exception class', function () {
+    Log::spy();
+    Http::fake(['*/notify/*' => Http::failedConnection('cURL error 7: Failed to connect to apprise-api port 8000 for http://apprise-api:8000/notify/')]);
+    $channel = NotificationChannel::factory()->twilioSms()->for(User::factory()->create(['tier_override' => Tier::Plus]))->create(['verified_at' => null]);
+
+    expect(app(DispatchChannelConfirmationCode::class)($channel))->toBeFalse();
+
+    Log::shouldHaveReceived('error')->once()->withArgs(fn (string $message, array $context): bool => $context === [
+        'notification_channel_id' => $channel->id,
+        'exception' => ConnectionException::class,
+    ]);
 });

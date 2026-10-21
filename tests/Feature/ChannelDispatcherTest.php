@@ -1,6 +1,9 @@
 <?php
 
+use App\Enums\Tier;
+use App\Models\AlertRule;
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Settings\GeneralSettings;
 use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\DeliveryResult;
@@ -81,4 +84,86 @@ test('config is stored encrypted and is not written to the activity log', functi
 
     $channel->update(['label' => 'renamed']);
     expect(json_encode(Activity::all()->toArray()))->not->toContain('shh-super-secret');
+});
+
+test('a downgraded subscriber\'s phone channel is refused at send time without calling Apprise', function () {
+    chanEnablePhoneTypes();
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $channel = NotificationChannel::factory()->twilioSms()->for($user)->create();
+    $rule = AlertRule::factory()->for($user)->create();
+    $rule->notificationChannels()->attach($channel);
+
+    $user->forceFill(['tier_override' => null])->save();
+
+    foreach (['alert', 'test', 'confirmation'] as $type) {
+        $result = app(ChannelDispatcher::class)->send($channel->fresh(), 'Tornado Warning', 'Alert', ['type' => $type, 'code' => '123456']);
+
+        expect($result->success)->toBeFalse()
+            ->and($result->error)->toBe('This channel needs the Plus plan or higher.');
+    }
+
+    Http::assertNothingSent();
+    expect($channel->fresh())->not->toBeNull()
+        ->and($rule->notificationChannels()->pluck('notification_channels.id')->all())->toBe([$channel->id]);
+});
+
+test('it works again after re-upgrade', function () {
+    chanEnablePhoneTypes();
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $user = User::factory()->create(['tier_override' => null]);
+    $channel = NotificationChannel::factory()->twilioSms()->for($user)->create();
+
+    expect(app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert')->success)->toBeFalse();
+    Http::assertNothingSent();
+
+    $user->forceFill(['tier_override' => Tier::Pro])->save();
+
+    expect(app(ChannelDispatcher::class)->send($channel->fresh(), 'Tornado Warning', 'Alert')->success)->toBeTrue();
+    Http::assertSentCount(1);
+});
+
+test('an unverified phone channel gets its confirmation code but no alert or test', function () {
+    chanEnablePhoneTypes();
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $channel = NotificationChannel::factory()->twilioSms()->for($user)->create(['verified_at' => null]);
+    $dispatcher = app(ChannelDispatcher::class);
+
+    foreach ([['type' => 'alert'], ['type' => 'test'], []] as $meta) {
+        $result = $dispatcher->send($channel, 'Tornado Warning', 'Alert', $meta);
+
+        expect($result->success)->toBeFalse()
+            ->and($result->error)->toBe('This number has not been confirmed yet.');
+    }
+
+    Http::assertNothingSent();
+
+    expect($dispatcher->send($channel, 'Your code is 654321', 'Confirm', ['type' => 'confirmation', 'code' => '654321'])->success)->toBeTrue();
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request): bool => str_contains($request['body'], 'WxNotify code: 654321.'));
+});
+
+test('a confirmation code still needs the plan', function () {
+    chanEnablePhoneTypes();
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $channel = NotificationChannel::factory()->twilioSms()->for(User::factory()->create(['tier_override' => null]))->create(['verified_at' => null]);
+
+    $result = app(ChannelDispatcher::class)->send($channel, 'Your code is 654321', 'Confirm', ['type' => 'confirmation', 'code' => '654321']);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->error)->toBe('This channel needs the Plus plan or higher.');
+    Http::assertNothingSent();
+});
+
+test('non-phone channels are unaffected by the unverified rule', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $channel = NotificationChannel::factory()->create([
+        'channel_type' => 'discord', 'apprise_url' => 'discord://1/abc/', 'verified_at' => null,
+    ]);
+
+    $result = app(ChannelDispatcher::class)->send($channel, 'body', 'title', ['type' => 'alert']);
+
+    expect($result->success)->toBeTrue();
+    Http::assertSent(fn ($request) => $request['urls'] === 'discord://1/abc/' && $request['body'] === 'body');
 });

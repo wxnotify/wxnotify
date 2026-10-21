@@ -7,11 +7,14 @@ use App\Support\Apprise\AppriseApiClient;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\SmsChannelType;
 use App\Support\Delivery\DeliveryResult;
+use App\Support\Delivery\SmsMessage;
 
 /**
  * Texts through Apprise with a URL built from the channel's encrypted `config` at send time:
  * the URL holds the provider credentials, so it is never stored, logged or put in an error.
- * Failures are the type's fixed text. A ConnectionException propagates, as from AppriseTransport.
+ * The text is SmsMessage's two-segment composition, sent with no title (the title is in the
+ * text). Failures are the type's fixed text. A ConnectionException propagates, as from
+ * AppriseTransport.
  */
 class SmsTransport implements Transport
 {
@@ -37,7 +40,9 @@ class SmsTransport implements Transport
             return DeliveryResult::failed('This SMS channel is missing its settings.');
         }
 
-        return $this->client->notify(url: $type->appriseUrl($config), body: $body, title: $title)
+        $text = SmsMessage::compose($body, $title, $meta, $type->optOutHint());
+
+        return $this->client->notify(url: $type->appriseUrl($config), body: $text, title: null)
             ? DeliveryResult::delivered()
             : DeliveryResult::failed($type->failureMessage());
     }

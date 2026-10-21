@@ -133,7 +133,7 @@ test('completing the wizard as Plus texts the code through bulkvs', function () 
 
 test('a rejected send records the fixed BulkVS failure text', function () {
     Http::fake(['*/notify/*' => Http::response(['error' => 'One or more notifications could not be sent'], 424)]);
-    $channel = NotificationChannel::factory()->bulkVsSms()->create();
+    $channel = NotificationChannel::factory()->bulkVsSms()->for(User::factory()->create(['tier_override' => Tier::Plus]))->create();
 
     $result = app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert');
 
