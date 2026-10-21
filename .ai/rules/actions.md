@@ -28,3 +28,6 @@ A product-based rule (Weather Alerts, SPC & WPC) stores how each product matches
 
 ## A shapefile version without a diff summary never finished importing
 `ImportShapefileVersion` writes `diff_summary` last, while `ScanShapefileLayer` records the new checksum before the import runs, so a failed or killed import leaves a Staged version with a null `diff_summary` (`ShapefileLayerVersion::isImported()` false) over an empty or stale staging table, and the next scan sees "no change". `ScanAllShapefileLayers` therefore re-runs the import of such a pending version when its layer has no new version; the View page hides Activate for it (activating would swap that table live) and `BoundariesActiveCondition` does not count an active version without one.
+
+## Phone confirmation codes: throttle lives in DispatchChannelConfirmationCode
+Phone channel code sends are limited in `DispatchChannelConfirmationCode` (5/hour per user+normalised number, 10/hour per user; keys hash the number). It throws `ChannelCodeThrottled`: every caller must catch it (the API renders it as 429 `too_many_codes` with Retry-After) and a refused send changes neither the stored code nor the wrong-code counter. Callers that cannot reach a phone type today (alert-form inline create, webhook URL change) do not catch it; add a catch if that ever changes.

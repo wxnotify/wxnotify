@@ -95,3 +95,6 @@ Filament v5.7 names from the spike, in case a Repeater is wanted elsewhere: `Fil
 
 ## The owner setup checklist is a plugin flow shipped by migration
 The flow `owner-setup` (Admin panel, visibility `is_owner`) and its steps are created by `database/migrations/2026_10_18_300001_create_owner_setup_journey.php` with `firstOrCreate` only (flow by `key`, steps by `flow_id` + `key`), so owner edits in the panel are never overwritten (a deleted step would come back only if that migration ran again); change shipped wording with a new migration. Steps tick through the classes in `app/Onboarding/Conditions`. Everything is owner-only: the plugin's `skipWhen` hides the launcher, `App\Filament\Admin\Pages\SetupChecklist` replaces the plugin's ungated progress page (do not call `->progressPage()`), and `OwnerOnlyOnboardingPolicy` (config `filament-onboarding.policies`) closes the flow and condition resources.
+
+## ConnectChannel step 2 re-checks availability on the server
+`ConnectChannel` step 2's `afterValidation` re-checks `forPicker()` and `canAddChannel()` before `BeginChannelConnection`, because Filament's `Wizard::nextStep($index)` takes the step index from the client and so step 1's option validation can be skipped. Any new wizard-style flow that creates a channel must do its own server-side availability/tier check; never rely on a previous step's validation.
