@@ -3,6 +3,7 @@
 namespace App\Actions\Channels;
 
 use App\Exceptions\ChannelCodeNotSent;
+use App\Exceptions\ChannelCodeThrottled;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\ChannelTypes\Contracts\ChannelType;
@@ -30,6 +31,7 @@ class BeginChannelConnection
      * @throws InvalidArgumentException when the type cannot build a destination from the data, or the
      *                                  subscriber already has a channel of this phone type for the number
      * @throws ChannelCodeNotSent
+     * @throws ChannelCodeThrottled when the phone number's code limit is used up (nothing was sent)
      */
     public function __invoke(User $user, ChannelType $type, array $data, ?string $label = null, ?NotificationChannel $pending = null): NotificationChannel
     {
@@ -47,12 +49,18 @@ class BeginChannelConnection
             $this->recordPhoneConsent($channel, $type);
         }
 
-        if (! app(DispatchChannelConfirmationCode::class)($channel)) {
+        try {
+            $sent = app(DispatchChannelConfirmationCode::class)($channel);
+        } catch (ChannelCodeThrottled $e) {
+            $sent = $e;
+        }
+
+        if ($sent !== true) {
             if ($existing === null) {
                 $channel->delete();
             }
 
-            throw new ChannelCodeNotSent;
+            throw $sent instanceof ChannelCodeThrottled ? $sent : new ChannelCodeNotSent;
         }
 
         return $channel;

@@ -5,6 +5,7 @@ namespace App\Filament\Dashboard\Pages;
 use App\Actions\Channels\BeginChannelConnection;
 use App\Actions\Channels\VerifyChannelConfirmationCode;
 use App\Exceptions\ChannelCodeNotSent;
+use App\Exceptions\ChannelCodeThrottled;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\ChannelType;
@@ -98,6 +99,10 @@ class ConnectChannel extends Page implements HasForms
                                 );
                             } catch (\InvalidArgumentException $e) {
                                 Notification::make()->title($e->getMessage())->danger()->send();
+
+                                throw new Halt;
+                            } catch (ChannelCodeThrottled $e) {
+                                Notification::make()->title(ChannelCodeThrottled::TITLE)->body($e->hint())->danger()->send();
 
                                 throw new Halt;
                             } catch (ChannelCodeNotSent) {

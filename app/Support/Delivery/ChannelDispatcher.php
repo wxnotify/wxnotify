@@ -18,6 +18,11 @@ use App\Support\MessagePrefix;
 
 class ChannelDispatcher
 {
+    /**
+     * Why a channel whose owner is below the type's catalog `min_tier` sends nothing.
+     */
+    public const TIER_REFUSAL = 'This channel needs the Plus plan or higher.';
+
     public function __construct(private readonly ChannelTypeRegistry $registry) {}
 
     /**
@@ -53,7 +58,7 @@ class ChannelDispatcher
     private function refusal(NotificationChannel $channel, ChannelType $type, array $meta): ?string
     {
         if ($channel->user !== null && ! $channel->user->meetsChannelTier($type->slug())) {
-            return 'This channel needs the Plus plan or higher.';
+            return self::TIER_REFUSAL;
         }
 
         if ($type instanceof PhoneChannelType && ! $channel->isVerified() && ($meta['type'] ?? null) !== 'confirmation') {

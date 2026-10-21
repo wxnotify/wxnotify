@@ -2,13 +2,41 @@
 
 namespace App\Actions\Channels;
 
+use App\Exceptions\ChannelCodeThrottled;
 use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\Contracts\PhoneChannelType;
 use App\Support\Delivery\ChannelDispatcher;
+use App\Support\PhoneNumber;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 
 class DispatchChannelConfirmationCode
 {
+    /**
+     * A phone channel's code is a text (or call) with WxNotify's name on it to a number the
+     * subscriber typed, so codes are limited per subscriber and number, and per subscriber across
+     * numbers, for every entry point (wizard, Resend, the API). Other channel types are not limited
+     * here; the API's own app-channel-send limiter still covers them there.
+     */
+    public const CODES_PER_NUMBER_PER_HOUR = 5;
+
+    public const CODES_PER_USER_PER_HOUR = 10;
+
+    public static function userLimitKey(int $userId): string
+    {
+        return "phone-code-user:{$userId}";
+    }
+
+    /**
+     * Keyed by a hash of the E.164 number, so the number itself never sits in the cache.
+     */
+    public static function numberLimitKey(int $userId, string $number): string
+    {
+        return "phone-code-number:{$userId}:".hash('sha256', $number);
+    }
+
     /**
      * Sends the code through ChannelDispatcher: Apprise for most channel
      * types, Laravel Mail for Email. Returns false both when the message
@@ -21,8 +49,14 @@ class DispatchChannelConfirmationCode
      * transient outage — this synchronous, in-wizard call has no such
      * retry mechanism, so it's the one that needs to catch it.
      */
+    /**
+     * @throws ChannelCodeThrottled when a phone channel's limits are used up: nothing is sent, and
+     *                              the stored code and the wrong-code counter are left as they were
+     */
     public function __invoke(NotificationChannel $channel): bool
     {
+        $this->spendPhoneAllowance($channel);
+
         $code = (string) random_int(100000, 999999);
 
         $channel->forceFill([
@@ -46,6 +80,35 @@ class DispatchChannelConfirmationCode
             ]);
 
             return false;
+        }
+    }
+
+    /**
+     * Count this send against the phone limits, or refuse it when either is used up. A send that
+     * goes out but fails at the provider still counts: it was an attempt to text the number.
+     *
+     * @throws ChannelCodeThrottled
+     */
+    private function spendPhoneAllowance(NotificationChannel $channel): void
+    {
+        if (! app(ChannelTypeRegistry::class)->find($channel->channel_type) instanceof PhoneChannelType) {
+            return;
+        }
+
+        $number = PhoneNumber::normalize((string) ($channel->config['to'] ?? '')) ?? '';
+        $limits = [
+            self::numberLimitKey($channel->user_id, $number) => self::CODES_PER_NUMBER_PER_HOUR,
+            self::userLimitKey($channel->user_id) => self::CODES_PER_USER_PER_HOUR,
+        ];
+
+        foreach ($limits as $key => $maxAttempts) {
+            if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+                throw new ChannelCodeThrottled(RateLimiter::availableIn($key));
+            }
+        }
+
+        foreach (array_keys($limits) as $key) {
+            RateLimiter::hit($key, 3600);
         }
     }
 }

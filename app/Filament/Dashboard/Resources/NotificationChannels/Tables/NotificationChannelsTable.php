@@ -5,11 +5,14 @@ namespace App\Filament\Dashboard\Resources\NotificationChannels\Tables;
 use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Actions\Channels\SendTestNotification;
 use App\Actions\Channels\VerifyChannelConfirmationCode;
+use App\Exceptions\ChannelCodeThrottled;
 use App\Models\NotificationChannel;
 use App\Support\AlertNameSummary;
 use App\Support\ChannelDeletionGuard;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\Contracts\PhoneChannelType;
 use App\Support\ChannelTypes\WebhookChannelType;
+use App\Support\Delivery\ChannelDispatcher;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -89,14 +92,7 @@ class NotificationChannelsTable
                     ->label('Resend code')
                     ->icon('heroicon-o-arrow-path')
                     ->visible(fn (NotificationChannel $record): bool => ! $record->isVerified())
-                    ->action(function (NotificationChannel $record) {
-                        app(DispatchChannelConfirmationCode::class)($record);
-
-                        Notification::make()
-                            ->title('Confirmation code resent')
-                            ->success()
-                            ->send();
-                    }),
+                    ->action(fn (NotificationChannel $record) => self::resendCode($record)),
                 Action::make('sendTest')
                     ->label('Send Test')
                     ->icon('heroicon-o-paper-airplane')
@@ -106,7 +102,11 @@ class NotificationChannelsTable
 
                         Notification::make()
                             ->title($sent ? 'Test notification sent' : 'Couldn\'t send the test notification')
-                            ->body($sent ? null : 'Check the channel is still reachable and try again.')
+                            ->body(match (true) {
+                                $sent => null,
+                                ! $record->user->meetsChannelTier($record->channel_type) => ChannelDispatcher::TIER_REFUSAL,
+                                default => 'Check the channel is still reachable and try again.',
+                            })
                             ->status($sent ? 'success' : 'danger')
                             ->send();
                     }),
@@ -129,6 +129,45 @@ class NotificationChannelsTable
                     self::guardedDeleteBulkAction(),
                 ]),
             ]);
+    }
+
+    /**
+     * Send a fresh code and say what happened: a channel the plan no longer covers is refused
+     * before anything is sent, a phone number past its code limit gets the wait, and a send the
+     * provider or the notification service refused gets the type's own hint.
+     */
+    private static function resendCode(NotificationChannel $record): void
+    {
+        $type = app(ChannelTypeRegistry::class)->find($record->channel_type);
+        $failed = Notification::make()->title('Couldn\'t resend the confirmation code')->danger();
+
+        if (! $record->user->meetsChannelTier($record->channel_type)) {
+            $failed->body(ChannelDispatcher::TIER_REFUSAL)->send();
+
+            return;
+        }
+
+        try {
+            $sent = app(DispatchChannelConfirmationCode::class)($record);
+        } catch (ChannelCodeThrottled $e) {
+            Notification::make()->title(ChannelCodeThrottled::TITLE)->body($e->hint())->danger()->send();
+
+            return;
+        }
+
+        if (! $sent) {
+            $failed->body($type instanceof PhoneChannelType
+                ? $type->codeNotSentHint()
+                : 'The notification service is temporarily unavailable. Please try again in a moment.')
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Confirmation code resent')
+            ->success()
+            ->send();
     }
 
     /**
