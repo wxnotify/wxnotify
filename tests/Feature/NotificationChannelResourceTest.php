@@ -6,6 +6,7 @@ use App\Filament\Dashboard\Resources\NotificationChannels\Pages\ListNotification
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\Delivery\WebhookUrlGuard;
+use Filament\Actions\Exceptions\ActionNotResolvableException;
 use Filament\Actions\Testing\TestAction;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Http\Client\ConnectionException;
@@ -242,9 +243,25 @@ test('the edit modal of a phone channel holds no credential or number and offers
 
     expect($snapshot)->not->toContain($secret)->not->toContain('5555550123')->not->toContain('2340001')
         ->and($component->instance()->mountedActions[0]['data'])->not->toHaveKeys(['config', 'apprise_url', 'confirmation_code']);
+
     expect(fn () => $component->callAction([TestAction::make('revealAppriseUrl')->schemaComponent('apprise_url_preview')]))
-        ->toThrow(Exception::class);
+        ->toThrow(ActionNotResolvableException::class, 'Action [revealAppriseUrl] not found in schema at [mountedActionSchema0.apprise_url_preview]');
 })->with('chanPhoneChannelStates');
+
+test('the same reveal action is visible and works for a channel that has a destination url', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create([
+        'channel_type' => 'pushover', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',
+    ]);
+    $reveal = TestAction::make('revealAppriseUrl')->schemaComponent('apprise_url_preview');
+
+    $component = livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->assertSchemaComponentVisible('apprise_url_preview')
+        ->assertActionVisible($reveal)
+        ->callAction([$reveal]);
+
+    expect(json_encode($component->snapshot))->toContain('uKey1234567890');
+});
 
 test('editing a channel changes its label', function () {
     $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'Old label']);
