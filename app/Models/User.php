@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Tier;
 use App\Enums\UnitSystem;
+use App\Models\ChannelType as ChannelTypeModel;
 use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use Database\Factories\UserFactory;
@@ -113,12 +114,23 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->hasMany(NotificationChannel::class);
     }
 
+    /**
+     * Whether this subscriber's tier reaches the catalog row's `min_tier` for the type.
+     * A type with no catalog row counts as free, so a missing row never cuts anyone off.
+     */
+    public function meetsChannelTier(string $channelTypeSlug): bool
+    {
+        $minimum = ChannelTypeModel::query()->where('slug', $channelTypeSlug)->first()?->min_tier;
+
+        return $this->tier()->meets($minimum ?? Tier::Free);
+    }
+
     public function canAddChannel(string $channelTypeSlug): bool
     {
         $registry = app(ChannelTypeRegistry::class);
         $type = $registry->find($channelTypeSlug);
 
-        if (! $type) {
+        if (! $type || ! $this->meetsChannelTier($channelTypeSlug)) {
             return false;
         }
 

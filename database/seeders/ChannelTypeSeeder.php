@@ -24,6 +24,9 @@ class ChannelTypeSeeder extends Seeder
         ['slug' => 'webhook', 'min_tier' => 'free', 'sort_order' => 8, 'enabled' => true],
         ['slug' => 'webpush', 'min_tier' => 'free', 'sort_order' => 9, 'enabled' => true],
         ['slug' => 'mobile_push', 'min_tier' => 'free', 'sort_order' => 10, 'enabled' => true],
+        ['slug' => 'twilio_sms', 'min_tier' => 'plus', 'sort_order' => 11, 'enabled' => false],
+        ['slug' => 'bulkvs_sms', 'min_tier' => 'plus', 'sort_order' => 12, 'enabled' => false],
+        ['slug' => 'httpsms', 'min_tier' => 'plus', 'sort_order' => 13, 'enabled' => false],
     ];
 
     public function run(): void

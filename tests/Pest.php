@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ChannelType;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Settings\IntegrationSettings;
@@ -221,6 +222,17 @@ function chanWebhookChannel(array $config = []): NotificationChannel
     return NotificationChannel::factory()->webhook()->create([
         'config' => [...['url' => 'https://hooks.example.com/wx', 'secret' => 's3cret'], ...$config],
     ]);
+}
+
+/**
+ * Switch on the phone channel types' catalog rows, which ship disabled until the owner's
+ * legal review. Pair with a Plus subscriber: the rows are `min_tier = plus`.
+ */
+function chanEnablePhoneTypes(): void
+{
+    ChannelType::query()
+        ->whereIn('slug', ['twilio_sms', 'bulkvs_sms', 'httpsms', 'twilio_voice'])
+        ->update(['enabled' => true]);
 }
 
 const CHAN_VAPID_PUBLIC = 'BFbRVvYSUiZyN3mXneDDJEjejmTXvjDA8TMDLCD_aUW3GKOA-ohT-uHQDGm3pQqeK4YrmmZlfjwE7XyqTVSzAAM';
