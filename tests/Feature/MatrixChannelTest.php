@@ -164,6 +164,15 @@ test('the fields cap the homeserver, the token and the room', function () {
         ->and(chanChatFieldValidate($this->type, 'room', '!'.str_repeat('a', 255))['passes'])->toBeFalse();
 });
 
+test('a homeserver over 300 characters is refused at the field and when building the destination', function () {
+    $long = 'https://'.implode('.', array_fill(0, 6, str_repeat('a', 50))).'.example.org';
+    expect(strlen($long))->toBeGreaterThan(300);
+
+    expect(chanChatFieldValidate($this->type, 'homeserver', $long)['passes'])->toBeFalse()
+        ->and(fn () => $this->type->buildDestination(chanMatrixFormData(['homeserver' => $long])))
+        ->toThrow(InvalidArgumentException::class, MatrixChannelType::HOMESERVER_MESSAGE);
+});
+
 test('a homeserver spelled two ways is stored and keyed one way', function () {
     $tidy = $this->type->buildDestination(chanMatrixFormData())['config'];
     $loose = $this->type->buildDestination(chanMatrixFormData(['homeserver' => ' HTTPS://Matrix.Example.ORG.:443/ ', 'access_token' => ' '.CHAN_MX_OTHER_TOKEN.' ']))['config'];
@@ -239,7 +248,7 @@ test('a homeserver that resolves privately is refused at save time', function (s
     'a single-label name' => ['https://synapse', ['synapse' => [CHAN_MX_PUBLIC_IP]], ChatServerGuard::NEEDS_DOMAIN],
 ]);
 
-test('private at save and at send time is refused', function () {
+test('a homeserver that resolves to a private address is refused at send time', function () {
     Http::fake();
     $channel = NotificationChannel::factory()->matrix()->for(User::factory()->create(['tier_override' => Tier::Plus]))->create();
     chanFakeChatDns(['matrix.example.org' => ['10.0.0.5']]);

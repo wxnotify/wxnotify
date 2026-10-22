@@ -307,6 +307,8 @@ it('normalises international whatsapp numbers', function (string $input, string 
     'ten-digit us' => ['(555) 234-5678', '+15552345678'],
     'us through 001' => ['001 555 234 5678', '+15552345678'],
     'italian landline with a leading 0' => ['+39 06 1234 5678', '+390612345678'],
+    'german area code in parentheses' => ['+49 (30) 1234567', '+49301234567'],
+    'uk group in parentheses' => ['+44 (7700) 900123', '+447700900123'],
 ]);
 
 it('refuses numbers that are too short, too long, start +0, or are +1 but not nanp', function (string $input) {
@@ -339,6 +341,9 @@ it('refuses numbers that are too short, too long, start +0, or are +1 but not na
     'a trunk (0) after a parenthesised country code' => '+(44) (0)7700900123',
     'a (0) inside the number' => '+44 7700 900 (0) 123',
     'a trunk (0) between dashes after 0044' => '0044-(0)-7700-900123',
+    'a parenthesised group starting 0 after +44' => '+44 (01) 7700 900123',
+    'a parenthesised 00 group after +44' => '+44 (00) 7700900123',
+    'a parenthesised 055 group after +52' => '+52 (055) 1234 5678',
     'fullwidth digits' => '＋４４７７００９００１２３',
     'the us 011 international prefix' => '011 44 7700 900123',
     'letters' => '+52 55 CALL NOW',

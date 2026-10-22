@@ -35,11 +35,11 @@ class GoogleChatChannelType implements MessagingChannelType
 
     public const INVALID_MESSAGE = 'Paste the whole webhook URL from Google Chat: Apps & integrations → Webhooks.';
 
-    private const PATH_PATTERN = '#^/v1/spaces/([A-Za-z0-9_-]+)/messages$#';
+    private const PATH_PATTERN = '#^/v1/spaces/([A-Za-z0-9_-]+)/messages$#D';
 
-    private const KEY_PATTERN = '/^[A-Za-z0-9_-]+$/';
+    private const KEY_PATTERN = '/^[A-Za-z0-9_-]+$/D';
 
-    private const TOKEN_PATTERN = '/^[A-Za-z0-9._~+=-]+$/';
+    private const TOKEN_PATTERN = '/^[A-Za-z0-9._~+=-]+$/D';
 
     public function slug(): string
     {
@@ -81,7 +81,8 @@ class GoogleChatChannelType implements MessagingChannelType
      */
     public static function parseWebhookUrl(string $url): ?array
     {
-        $parts = parse_url(trim($url));
+        $url = trim($url);
+        $parts = preg_match('/[\x00-\x20\x7F]/', $url) === 1 ? false : parse_url($url);
 
         if (! is_array($parts)
             || strtolower($parts['scheme'] ?? '') !== 'https'

@@ -50,6 +50,8 @@ class MatrixChannelType implements MessagingChannelType
 
     public const ROOM_MESSAGE = 'Enter a room ID (!abc123:example.org) or alias (#weather:example.org).';
 
+    private const HOMESERVER_MAX_LENGTH = 300;
+
     private const TOKEN_MAX_LENGTH = 512;
 
     private const TOKEN_PATTERN = '#^[A-Za-z0-9._~+/=-]+$#D';
@@ -79,7 +81,7 @@ class MatrixChannelType implements MessagingChannelType
                 ->label('Homeserver')
                 ->placeholder('https://matrix.example.org')
                 ->required()
-                ->maxLength(300)
+                ->maxLength(self::HOMESERVER_MAX_LENGTH)
                 ->rules([
                     $this->shapeRule(fn (string $value): bool => ChatServerAddress::parts($value) !== null, self::HOMESERVER_MESSAGE),
                     $this->safeServerRule(),
@@ -99,7 +101,7 @@ class MatrixChannelType implements MessagingChannelType
                 ->required()
                 ->maxLength(255)
                 ->rules([$this->shapeRule(self::isRoom(...), self::ROOM_MESSAGE)])
-                ->helperText('Invite the bot account to the room and join it as the bot. The room must already exist: an alias that doesn\'t would make a new, empty room. Use an unencrypted room: WxNotify does not encrypt messages, and in an encrypted room they show as unencrypted or may be hidden.'),
+                ->helperText('Invite the bot account to the room and join it as the bot. Include the :server part of a room ID (!abc:example.org) unless your client shows none; a server-less legacy ID passes our check but the bot may never join it. The room must already exist: an alias that doesn\'t would make a new, empty room. Use an unencrypted room: WxNotify does not encrypt messages, and in an encrypted room they show as unencrypted or may be hidden.'),
         ];
     }
 
@@ -141,7 +143,8 @@ class MatrixChannelType implements MessagingChannelType
      */
     protected function configFromForm(array $data): array
     {
-        $server = ChatServerAddress::parts(trim((string) ($data['homeserver'] ?? '')));
+        $homeserver = trim((string) ($data['homeserver'] ?? ''));
+        $server = strlen($homeserver) <= self::HOMESERVER_MAX_LENGTH ? ChatServerAddress::parts($homeserver) : null;
         $token = trim((string) ($data['access_token'] ?? ''));
         $room = trim((string) ($data['room'] ?? ''));
 

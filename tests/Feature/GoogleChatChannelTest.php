@@ -108,6 +108,12 @@ test('it refuses another host, http, a missing key or token, and a partial url',
     'no query' => fn () => 'https://chat.googleapis.com/v1/spaces/'.CHAN_GCHAT_SPACE.'/messages',
     'no space' => fn () => 'https://chat.googleapis.com/v1/spaces//messages?key=k&token=t',
     'another path' => fn () => 'https://chat.googleapis.com/v1/spaces/'.CHAN_GCHAT_SPACE.'/members?key=k&token=t',
+    'a newline after the token' => fn () => chanGoogleChatWebhookUrl('key=k1&token=t1%0A'),
+    'a newline after the key' => fn () => chanGoogleChatWebhookUrl('key=k1%0A&token=t1'),
+    'a space in the token' => fn () => chanGoogleChatWebhookUrl('key=k1&token=t%201'),
+    'a raw newline after the url' => fn () => chanGoogleChatWebhookUrl()."\nx",
+    'a control character in the token' => fn () => chanGoogleChatWebhookUrl('key=k1&token=t%001'),
+    'a newline after the space id' => fn () => 'https://chat.googleapis.com/v1/spaces/'.CHAN_GCHAT_SPACE.'%0A/messages?key=k&token=t',
     'a space with a slash' => fn () => 'https://chat.googleapis.com/v1/spaces/AAAA%2F..%2Fx/messages?key=k&token=t',
 ]);
 
@@ -284,7 +290,9 @@ test('an alert is posted as the composed chat text with no title', function () {
     $result = app(ChannelDispatcher::class)->send($channel, "Tornado Warning for\nBoulder County.", 'Tornado Warning', ['url' => 'https://wx.example.com/view-product/kbou-1']);
 
     expect($result->success)->toBeTrue();
+    // A declared `format` makes Apprise escape markdown, which breaks links for Google Chat and Rocket.Chat.
     Http::assertSent(fn (Request $request): bool => ! array_key_exists('title', $request->data())
+        && ! array_key_exists('format', $request->data())
         && $request['body'] === "Tornado Warning\n\nTornado Warning for\nBoulder County.\n\nhttps://wx.example.com/view-product/kbou-1");
 });
 
