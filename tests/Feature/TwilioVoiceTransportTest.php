@@ -1,17 +1,13 @@
 <?php
 
-use App\Enums\ChannelTransport;
 use App\Enums\Tier;
 use App\Models\NotificationChannel;
 use App\Models\User;
-use App\Support\ChannelTypes\ChannelTypeRegistry;
-use App\Support\ChannelTypes\Contracts\ChannelType;
-use App\Support\ChannelTypes\TwilioSmsChannelType;
 use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\DeliveryResult;
 use App\Support\Delivery\Transports\TwilioVoiceTransport;
 use App\Support\Delivery\VoiceScript;
-use App\Support\PhoneConsent;
+use GuzzleHttp\Exception\TransferException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -24,29 +20,25 @@ const CHAN_VOICE_TOKEN = 'fedcba9876543210fedcba9876543210';
 const CHAN_VOICE_CALLS_URL = 'https://api.twilio.com/2010-04-01/Accounts/'.CHAN_VOICE_SID.'/Calls.json';
 
 /**
- * A verified Twilio voice channel owned by a Plus subscriber, built directly because the voice
- * channel type (and its factory state) arrives with the next task.
+ * A verified Twilio voice channel owned by a Plus subscriber.
  *
  * @param  array<string, mixed>  $config
  */
 function chanTwilioVoiceChannel(array $config = []): NotificationChannel
 {
-    return NotificationChannel::factory()
+    $channel = NotificationChannel::factory()
+        ->twilioVoice()
         ->for(User::factory()->create(['tier_override' => Tier::Plus]))
-        ->create([
-            'channel_type' => 'twilio_voice',
-            'label' => 'Twilio voice call •••• 0123',
-            'apprise_url' => null,
-            'verified_at' => now(),
-            'config' => array_merge([
-                'account_sid' => CHAN_VOICE_SID,
-                'auth_token' => CHAN_VOICE_TOKEN,
-                'from' => '+15552340001',
-                'to' => '+15555550123',
-                'consent_version' => PhoneConsent::VERSION,
-                'consented_at' => now()->toIso8601String(),
-            ], $config),
-        ]);
+        ->create();
+
+    $channel->forceFill(['config' => array_merge($channel->config, [
+        'account_sid' => CHAN_VOICE_SID,
+        'auth_token' => CHAN_VOICE_TOKEN,
+        'from' => '+15552340001',
+        'to' => '+15555550123',
+    ], $config)])->save();
+
+    return $channel;
 }
 
 function chanSendVoice(NotificationChannel $channel, array $meta = []): DeliveryResult
@@ -173,29 +165,6 @@ test('no exception escapes the dispatcher and the call is placed once', function
 
         return Http::failedConnection()($request);
     }]);
-    app()->instance(ChannelTypeRegistry::class, new class extends ChannelTypeRegistry
-    {
-        public function find(string $slug): ?ChannelType
-        {
-            if ($slug !== 'twilio_voice') {
-                return parent::find($slug);
-            }
-
-            return new class extends TwilioSmsChannelType
-            {
-                public function slug(): string
-                {
-                    return 'twilio_voice';
-                }
-
-                public function transport(): ChannelTransport
-                {
-                    return ChannelTransport::TwilioVoice;
-                }
-            };
-        }
-    });
-
     $result = app(ChannelDispatcher::class)->send(chanTwilioVoiceChannel(), 'Tornado Warning', 'Alert', ['type' => 'alert']);
 
     expect($result->success)->toBeFalse()
@@ -240,9 +209,46 @@ test('missing or invalid settings fail before any HTTP', function (array $config
     'no auth token' => [['auth_token' => '']],
     'no from' => [['from' => null]],
     'no to' => [['to' => ' ']],
+]);
+
+test('a stored number that is not a valid NANP number fails with its own text before any HTTP', function (array $config) {
+    Http::fake();
+
+    $result = chanSendVoice(chanTwilioVoiceChannel($config));
+
+    expect($result->success)->toBeFalse()->and($result->error)->toBe(TwilioVoiceTransport::INVALID_NUMBERS)
+        ->and(TwilioVoiceTransport::INVALID_NUMBERS)->toBe('This voice channel\'s phone numbers are not valid.');
+    Http::assertNothingSent();
+})->with([
     'a to that is not a NANP number' => [['to' => '+442071234567']],
     'a from that is not a NANP number' => [['from' => '12345']],
+    'a to with a 1 exchange' => [['to' => '+15551230123']],
 ]);
+
+test('a channel of another type is refused with a fixed text before any HTTP', function () {
+    Http::fake();
+    $sms = NotificationChannel::factory()->twilioSms()->for(User::factory()->create(['tier_override' => Tier::Plus]))->create();
+
+    $result = app(TwilioVoiceTransport::class)->send($sms, 'Tornado Warning', 'Alert');
+
+    expect($result->success)->toBeFalse()->and($result->error)->toBe('This channel cannot place voice calls.');
+    Http::assertNothingSent();
+});
+
+test('a guzzle transfer error is the no-answer failure after exactly one attempt', function () {
+    $attempts = 0;
+    Http::fake(['api.twilio.com/*' => function () use (&$attempts) {
+        $attempts++;
+
+        throw new TransferException('x');
+    }]);
+
+    $result = chanSendVoice(chanTwilioVoiceChannel());
+
+    expect($result->success)->toBeFalse()
+        ->and($result->error)->toBe(TwilioVoiceTransport::NO_ANSWER)
+        ->and($attempts)->toBe(1);
+});
 
 test('no error text contains the sid, token, number or response body', function (Closure $response) {
     Http::fake(['api.twilio.com/*' => $response]);

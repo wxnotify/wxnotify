@@ -224,6 +224,7 @@ test('every channel type captions its destination value with a fixed, secret-fre
         'twilio_sms' => 'Text number',
         'bulkvs_sms' => 'Text number',
         'httpsms' => 'Text number',
+        'twilio_voice' => 'Call number',
         'google_chat' => 'Google Chat space',
         'mattermost' => 'Mattermost server',
         'rocketchat' => 'Rocket.Chat server',

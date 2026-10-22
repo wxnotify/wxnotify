@@ -26,6 +26,7 @@ class ChannelTypeRegistry
         'twilio_sms' => TwilioSmsChannelType::class,
         'bulkvs_sms' => BulkVsSmsChannelType::class,
         'httpsms' => HttpSmsChannelType::class,
+        'twilio_voice' => TwilioVoiceChannelType::class,
         'google_chat' => GoogleChatChannelType::class,
         'mattermost' => MattermostChannelType::class,
         'rocketchat' => RocketChatChannelType::class,

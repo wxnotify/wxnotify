@@ -124,8 +124,8 @@ test('factory reset restores an enabled or re-tiered phone type to disabled plus
 
     app(ResetCatalogs::class)();
 
-    $phones = DB::table('channel_types')->whereIn('slug', ['twilio_sms', 'bulkvs_sms', 'httpsms'])->get();
-    expect($phones)->toHaveCount(3)
+    $phones = DB::table('channel_types')->whereIn('slug', ['twilio_sms', 'bulkvs_sms', 'httpsms', 'twilio_voice'])->get();
+    expect($phones)->toHaveCount(4)
         ->and($phones->every(fn (object $row): bool => ! $row->enabled && $row->min_tier === 'plus'))->toBeTrue();
 });
 

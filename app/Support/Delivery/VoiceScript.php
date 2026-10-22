@@ -2,6 +2,7 @@
 
 namespace App\Support\Delivery;
 
+use App\Support\MessagePrefix;
 use Illuminate\Support\Str;
 
 /**
@@ -10,7 +11,9 @@ use Illuminate\Support\Str;
  * `<Response><Say language="en-US">…</Say><Pause length="1"/><Say language="en-US">Again. …</Say></Response>`.
  *
  * An alert is "WxNotify weather alert. {title}. {first sentence of the summary}." with the title
- * cut to 150 characters and the sentence to 200, at a word. A confirmation reads the code digit
+ * cut to 150 characters and the sentence to 200, at a word. The admin message prefix ChannelDispatcher puts
+ * in front of the title is dropped (MessagePrefix::strip()), so it is not read out after "WxNotify
+ * weather alert"; the first sentence does not end at a common abbreviation ("St.", "U.S."). A confirmation reads the code digit
  * by digit ("1. 2. 3."), so each digit gets its own pause; a test call says a fixed sentence.
  *
  * Every dynamic string is folded to printable ASCII first (which also removes every character
@@ -32,6 +35,11 @@ class VoiceScript
     public const MAX_TITLE_LENGTH = 150;
 
     public const MAX_SUMMARY_LENGTH = 200;
+
+    /**
+     * Words that end in a full stop inside a sentence, lower case and without that full stop.
+     */
+    private const ABBREVIATIONS = ['st', 'ste', 'mt', 'ft', 'dr', 'no', 'rd', 'ave', 'hwy', 'jct', 'u.s'];
 
     /**
      * Longest code read out; a confirmation code is six digits.
@@ -96,7 +104,7 @@ class VoiceScript
     {
         $parts = array_filter([
             'WxNotify weather alert',
-            self::cut(self::speakable((string) $title), self::MAX_TITLE_LENGTH),
+            self::cut(self::speakable(MessagePrefix::strip((string) $title)), self::MAX_TITLE_LENGTH),
             self::cut(self::firstSentence(self::speakable($body)), self::MAX_SUMMARY_LENGTH),
         ], fn (string $part): bool => $part !== '');
 
@@ -118,11 +126,33 @@ class VoiceScript
         return self::trimPunctuation($text);
     }
 
+    /**
+     * The text up to the first `.`, `!` or `?` followed by a space or the end, skipping a full stop
+     * that ends one of the ABBREVIATIONS ("near St. Louis" is not a sentence end).
+     */
     private static function firstSentence(string $text): string
     {
-        return preg_match('/^(.*?[.!?])(?=\s|$)/', $text, $matches) === 1
-            ? self::trimPunctuation($matches[1])
-            : $text;
+        preg_match_all('/[.!?](?=\s|$)/', $text, $matches, PREG_OFFSET_CAPTURE);
+
+        foreach ($matches[0] as [$mark, $offset]) {
+            $before = substr($text, 0, $offset);
+
+            if ($mark === '.' && self::endsWithAbbreviation($before)) {
+                continue;
+            }
+
+            return self::trimPunctuation($before);
+        }
+
+        return $text;
+    }
+
+    private static function endsWithAbbreviation(string $text): bool
+    {
+        $lastWord = strrchr(' '.$text, ' ');
+        $lastWord = ltrim(substr((string) $lastWord, 1), '("\'');
+
+        return in_array(strtolower($lastWord), self::ABBREVIATIONS, true);
     }
 
     /**

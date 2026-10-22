@@ -52,6 +52,20 @@ class TwilioSmsChannelType implements SmsChannelType
     public function formSchema(): array
     {
         return [
+            ...self::credentialFields(),
+            ...$this->phoneFields('An SMS-capable number on your Twilio account. US carriers require A2P 10DLC registration for it (or a verified toll-free number), and a trial account can only text numbers you have verified in Twilio.'),
+        ];
+    }
+
+    /**
+     * The Account SID and auth token fields, shared with the Twilio voice type so both validate
+     * the same way.
+     *
+     * @return array<TextInput>
+     */
+    public static function credentialFields(): array
+    {
+        return [
             TextInput::make('account_sid')
                 ->label('Account SID')
                 ->required()
@@ -66,7 +80,20 @@ class TwilioSmsChannelType implements SmsChannelType
                 ->regex(self::AUTH_TOKEN_PATTERN)
                 ->validationMessages(['regex' => 'A Twilio auth token is 32 letters and numbers.'])
                 ->helperText('Next to the Account SID under Account Info in the Twilio Console.'),
-            ...$this->phoneFields('An SMS-capable number on your Twilio account. US carriers require A2P 10DLC registration for it (or a verified toll-free number), and a trial account can only text numbers you have verified in Twilio.'),
+        ];
+    }
+
+    /**
+     * The Account SID and auth token to keep in `config`, from the guided form's data.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{account_sid: string, auth_token: string}
+     */
+    public static function credentialsFrom(array $data): array
+    {
+        return [
+            'account_sid' => trim((string) ($data['account_sid'] ?? '')),
+            'auth_token' => trim((string) ($data['auth_token'] ?? '')),
         ];
     }
 
@@ -81,10 +108,7 @@ class TwilioSmsChannelType implements SmsChannelType
      */
     protected function credentialConfig(array $data): array
     {
-        return [
-            'account_sid' => trim((string) ($data['account_sid'] ?? '')),
-            'auth_token' => trim((string) ($data['auth_token'] ?? '')),
-        ];
+        return self::credentialsFrom($data);
     }
 
     /**

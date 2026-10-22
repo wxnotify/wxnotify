@@ -226,6 +226,7 @@ dataset('chanPhoneChannelStates', [
     'twilio_sms' => ['twilioSms', 'auth_token'],
     'bulkvs_sms' => ['bulkVsSms', 'api_password'],
     'httpsms' => ['httpSms', 'api_key'],
+    'twilio_voice' => ['twilioVoice', 'auth_token'],
 ]);
 
 test('the edit modal of a phone channel holds no credential or number and offers no reveal action', function (string $state, string $secretKey) {

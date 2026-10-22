@@ -86,6 +86,26 @@ class NotificationChannelFactory extends Factory
     }
 
     /**
+     * A Twilio voice channel calling the given E.164 number, with a consent record.
+     */
+    public function twilioVoice(string $to = '+15555550123'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'twilio_voice',
+            'label' => 'Twilio voice call •••• '.substr($to, -4),
+            'apprise_url' => null,
+            'config' => [
+                'account_sid' => 'AC'.str_repeat('0a', 16),
+                'auth_token' => str_repeat('1b', 16),
+                'from' => '+15552340001',
+                'to' => $to,
+                'consent_version' => PhoneConsent::VERSION,
+                'consented_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
      * A BulkVS SMS channel texting the given E.164 number, with a consent record.
      */
     public function bulkVsSms(string $to = '+15555550123'): static

@@ -3,6 +3,8 @@
 namespace App\Support\Delivery\Transports;
 
 use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\TwilioVoiceChannelType;
 use App\Support\Delivery\DeliveryResult;
 use App\Support\Delivery\VoiceScript;
 use App\Support\PhoneNumber;
@@ -13,7 +15,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Places a phone call through the subscriber's own Twilio account, directly against Twilio's
+ * Places a phone call through the subscriber's own Twilio account (a TwilioVoiceChannelType
+ * channel only; any other type is refused before any HTTP), directly against Twilio's
  * REST API (not Apprise): one form-encoded POST of `To`, `From` and `Twiml` (VoiceScript) to
  * the fixed host, HTTP Basic `sid:token`, no redirects, 5 s to connect and 10 s in all.
  *
@@ -55,13 +58,23 @@ class TwilioVoiceTransport implements Transport
 
     public const INVALID_SID = "This voice channel's Twilio Account SID is not valid.";
 
+    public const INVALID_NUMBERS = "This voice channel's phone numbers are not valid.";
+
+    public const NOT_VOICE = 'This channel cannot place voice calls.';
+
     public const NO_ANSWER = 'Twilio did not answer in time; a call may still have been placed.';
+
+    public function __construct(private readonly ChannelTypeRegistry $registry) {}
 
     /**
      * @param  array<string, mixed>  $meta
      */
     public function send(NotificationChannel $channel, string $body, ?string $title, array $meta = []): DeliveryResult
     {
+        if (! $this->registry->find($channel->channel_type) instanceof TwilioVoiceChannelType) {
+            return DeliveryResult::failed(self::NOT_VOICE);
+        }
+
         $config = $channel->config;
 
         if (! is_array($config)) {
@@ -70,11 +83,19 @@ class TwilioVoiceTransport implements Transport
 
         $sid = $config['account_sid'] ?? null;
         $token = $config['auth_token'] ?? null;
-        $to = is_string($config['to'] ?? null) ? PhoneNumber::normalize($config['to']) : null;
-        $from = is_string($config['from'] ?? null) ? PhoneNumber::normalize($config['from']) : null;
+        $storedTo = $config['to'] ?? null;
+        $storedFrom = $config['from'] ?? null;
 
-        if (! is_string($sid) || blank($sid) || ! is_string($token) || blank($token) || $to === null || $from === null) {
+        if (! is_string($sid) || blank($sid) || ! is_string($token) || blank($token)
+            || ! is_string($storedTo) || blank($storedTo) || ! is_string($storedFrom) || blank($storedFrom)) {
             return DeliveryResult::failed(self::MISSING_SETTINGS);
+        }
+
+        $to = PhoneNumber::normalize($storedTo);
+        $from = PhoneNumber::normalize($storedFrom);
+
+        if ($to === null || $from === null) {
+            return DeliveryResult::failed(self::INVALID_NUMBERS);
         }
 
         if (preg_match(self::ACCOUNT_SID_PATTERN, $sid) !== 1) {
