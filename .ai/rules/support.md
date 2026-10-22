@@ -2,6 +2,7 @@
 paths:
   - 'app/Support/**'
   - app/Support/Integrations.php
+  - app/Support/PhoneNumber.php
 ---
 
 # Support
@@ -47,3 +48,6 @@ Activity alerts name the client IP of the request that caused the event (`MatchA
 
 ## Phone numbers: PhoneNumber only, NANP, consent required
 Numbers go through `App\Support\PhoneNumber` (NANP only; area code AND exchange start 2-9; stored as E.164; `INVALID_MESSAGE` is the shared error text, never a literal). Phone channel types are not creatable inline in the alert form or in the mobile app, need the versioned consent checkbox (`PhoneConsent`, recorded without the number), and number fields use `->type('tel')` (Filament's `->tel()` adds a regex that refuses `+1 (555) ...`). Test-file top-level constants/helpers must be `CHAN_`/`chan`-prefixed (parallel-run global namespace).
+
+## International numbers: NANP first, trunk zero refused, WhatsApp 10-14
+`normalizeInternational()` tries NANP first (a bare 10-digit number is therefore read as US/Canada: WhatsApp's help text and `+52 •••• 5678`-style hint say so) and is a strict superset of `normalize()` for NANP input. On the international path any parenthesised group starting with 0 (`(0)`, `(01)`) is refused anywhere (trunk-prefix habit stores a malformed number); `+39 06...` and groups like `(30)` stay valid. WhatsApp's own rule narrows to 10-14 E.164 digits (Apprise drops 8/9/15). Mexican `+521` vs `+52` is not canonicalised (owner item).

@@ -31,3 +31,6 @@ A product-based rule (Weather Alerts, SPC & WPC) stores how each product matches
 
 ## Phone confirmation codes: throttle lives in DispatchChannelConfirmationCode
 Phone channel code sends are limited in `DispatchChannelConfirmationCode` (5/hour per user+normalised number, 10/hour per user; keys hash the number). It throws `ChannelCodeThrottled`: every caller must catch it (the API renders it as 429 `too_many_codes` with Retry-After) and a refused send changes neither the stored code nor the wrong-code counter. Callers that cannot reach a phone type today (alert-form inline create, webhook URL change) do not catch it; add a catch if that ever changes.
+
+## Messaging code buckets and duplicate destinations
+Messaging code sends are limited in `DispatchChannelConfirmationCode` in their own buckets (5/hour per user + hash of `destinationKey()`, 10/hour per user); the phone buckets (E.164 hash) are unchanged and WhatsApp, as a phone type, uses them. One channel per messaging type and destination (`destinationKey()`), also when the wizard refreshes its own pending channel. Number comparisons in the actions go through `PhoneNumber::normalizeInternational()`; SMS stays NANP-only through `normalize()`.
