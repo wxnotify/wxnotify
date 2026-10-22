@@ -15,6 +15,7 @@ use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use App\Support\ChannelTypes\GoogleChatChannelType;
 use App\Support\Delivery\ChannelDispatcher;
+use App\Support\Delivery\ChatServerGuard;
 use App\Support\Delivery\Transports\MessagingTransport;
 use Filament\Actions\Testing\TestAction;
 use Filament\Notifications\Notification;
@@ -245,7 +246,7 @@ test('the transport refuses a channel missing its settings or of a non-messaging
     Http::assertNothingSent();
 });
 
-test('a messaging type that names its own server is refused before any HTTP until the server check exists', function () {
+test('a messaging type that names its own server is refused before any HTTP when the server check refuses it', function () {
     Http::fake();
     $ownServer = new class extends GoogleChatChannelType
     {
@@ -270,7 +271,9 @@ test('a messaging type that names its own server is refused before any HTTP unti
     });
     $channel = NotificationChannel::factory()->googleChat()->create(['channel_type' => 'chan_own_server_chat']);
 
-    expect(app(MessagingTransport::class)->send($channel, 'body', null)->error)->toBe('This channel\'s server could not be checked.');
+    chanFakeChatDns(['chat.example.com' => ['10.0.0.5']]);
+
+    expect(app(MessagingTransport::class)->send($channel, 'body', null)->error)->toBe(ChatServerGuard::PRIVATE_NETWORK);
     Http::assertNothingSent();
 });
 

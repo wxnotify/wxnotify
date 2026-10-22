@@ -4,6 +4,7 @@ use App\Models\ChannelType;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Settings\IntegrationSettings;
+use App\Support\Delivery\ChatServerGuard;
 use App\Support\Delivery\HeartbeatUrlGuard;
 use App\Support\Delivery\Pauser;
 use App\Support\TraccarUrlGuard;
@@ -50,6 +51,9 @@ pest()->extend(TestCase::class)
         Http::preventStrayRequests();
         app()->instance(TraccarUrlGuard::class, new TraccarUrlGuard(fn (string $host): array => ['93.184.216.34']));
         app()->instance(HeartbeatUrlGuard::class, new HeartbeatUrlGuard(fn (string $host): array => ['93.184.216.34']));
+        // No chat server name resolves unless a test says so (chanFakeChatDns), so a guarded
+        // messaging type can never reach real DNS: an unknown host is refused as not found.
+        chanFakeChatDns([]);
     })
     ->in('Feature');
 
@@ -242,6 +246,20 @@ function chanEnablePhoneTypes(): void
 function chanEnableWhatsApp(): void
 {
     ChannelType::query()->where('slug', 'whatsapp')->update(['enabled' => true]);
+}
+
+/**
+ * Bind ChatServerGuard with a fake DNS: each host name maps to the addresses it resolves to,
+ * and any other name resolves to nothing (refused as not found). Names are looked up in
+ * lower case, as the guard asks for them.
+ *
+ * @param  array<string, list<string>>  $hostToAddresses
+ */
+function chanFakeChatDns(array $hostToAddresses): void
+{
+    app()->instance(ChatServerGuard::class, new ChatServerGuard(
+        fn (string $host): array => $hostToAddresses[$host] ?? [],
+    ));
 }
 
 const CHAN_VAPID_PUBLIC = 'BFbRVvYSUiZyN3mXneDDJEjejmTXvjDA8TMDLCD_aUW3GKOA-ohT-uHQDGm3pQqeK4YrmmZlfjwE7XyqTVSzAAM';

@@ -6,6 +6,7 @@ use App\Models\NotificationChannel;
 use App\Support\Apprise\AppriseApiClient;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\MessagingChannelType;
+use App\Support\Delivery\ChatServerGuard;
 use App\Support\Delivery\DeliveryResult;
 
 /**
@@ -51,20 +52,22 @@ class MessagingTransport implements Transport
     }
 
     /**
-     * Why the subscriber-supplied server must not be posted to, checked before any HTTP. A type
-     * with a fixed host (`serverUrl()` null, Google Chat) is never refused here. Until the send-time
-     * server check exists (ChatServerGuard), a type that names its own server fails closed, so no
-     * subscriber host is ever reached unvetted.
+     * Why the subscriber-supplied server must not be posted to, checked before any HTTP and
+     * again on every send, because the name may resolve elsewhere now than when it was saved. A
+     * type with a fixed host (`serverUrl()` null, Google Chat) is never refused here. The refusal
+     * is ChatServerGuard's fixed message, which never repeats the address.
      *
      * @param  array<string, mixed>  $config
      */
     private function serverRefusal(MessagingChannelType $type, array $config): ?string
     {
-        if ($type->serverUrl($config) === null) {
+        $serverUrl = $type->serverUrl($config);
+
+        if ($serverUrl === null) {
             return null;
         }
 
-        return 'This channel\'s server could not be checked.';
+        return app(ChatServerGuard::class)->violation($serverUrl);
     }
 
     /**
