@@ -124,6 +124,23 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    /**
+     * A Google Chat channel posting to a space through its webhook (space, key and decoded token).
+     */
+    public function googleChat(string $space = 'AAAAbCdEf12'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'google_chat',
+            'label' => 'Google Chat',
+            'apprise_url' => null,
+            'config' => [
+                'space' => $space,
+                'key' => 'AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI',
+                'token' => 'Zq3x-_Vb9Kd2LmNoPq7RsTuVwXyZ0aBcDeFgHiJkLmN=',
+            ],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

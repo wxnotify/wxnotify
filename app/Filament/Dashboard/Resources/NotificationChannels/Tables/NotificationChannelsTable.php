@@ -10,7 +10,7 @@ use App\Models\NotificationChannel;
 use App\Support\AlertNameSummary;
 use App\Support\ChannelDeletionGuard;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
-use App\Support\ChannelTypes\Contracts\PhoneChannelType;
+use App\Support\ChannelTypes\Contracts\ByoChannelType;
 use App\Support\ChannelTypes\WebhookChannelType;
 use App\Support\Delivery\ChannelDispatcher;
 use Filament\Actions\Action;
@@ -156,7 +156,7 @@ class NotificationChannelsTable
         }
 
         if (! $sent) {
-            $failed->body($type instanceof PhoneChannelType
+            $failed->body($type instanceof ByoChannelType
                 ? $type->codeNotSentHint()
                 : 'The notification service is temporarily unavailable. Please try again in a moment.')
                 ->send();

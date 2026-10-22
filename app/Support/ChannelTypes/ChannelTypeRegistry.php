@@ -26,6 +26,7 @@ class ChannelTypeRegistry
         'twilio_sms' => TwilioSmsChannelType::class,
         'bulkvs_sms' => BulkVsSmsChannelType::class,
         'httpsms' => HttpSmsChannelType::class,
+        'google_chat' => GoogleChatChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType

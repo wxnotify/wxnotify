@@ -167,3 +167,52 @@ test('non-phone channels are unaffected by the unverified rule', function () {
     expect($result->success)->toBeTrue();
     Http::assertSent(fn ($request) => $request['urls'] === 'discord://1/abc/' && $request['body'] === 'body');
 });
+
+test('an unconfirmed messaging channel gets its code but no alert or test', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $channel = NotificationChannel::factory()->googleChat()->for($user)->create(['verified_at' => null]);
+    $dispatcher = app(ChannelDispatcher::class);
+
+    foreach ([['type' => 'alert'], ['type' => 'test'], []] as $meta) {
+        $result = $dispatcher->send($channel, 'Tornado Warning', 'Alert', $meta);
+
+        expect($result->success)->toBeFalse()
+            ->and($result->error)->toBe('This channel has not been confirmed yet.');
+    }
+
+    Http::assertNothingSent();
+
+    $code = 'Your WxNotify confirmation code is: 654321';
+
+    expect($dispatcher->send($channel, $code, 'Confirm', ['type' => 'confirmation', 'code' => '654321'])->success)->toBeTrue();
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request): bool => $request['body'] === $code && str_starts_with($request['urls'], 'gchat://'));
+});
+
+test('phone channels keep their unconfirmed message', function (string $state) {
+    chanEnablePhoneTypes();
+    Http::fake();
+    $channel = NotificationChannel::factory()->{$state}()->for(User::factory()->create(['tier_override' => Tier::Plus]))->create(['verified_at' => null]);
+
+    expect(app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert')->error)->toBe('This number has not been confirmed yet.');
+    Http::assertNothingSent();
+})->with(['twilioSms', 'bulkVsSms', 'httpSms']);
+
+test('a downgraded subscriber\'s google chat channel is refused without calling Apprise', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $channel = NotificationChannel::factory()->googleChat()->for($user)->create();
+
+    expect(app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert')->success)->toBeTrue();
+
+    $user->forceFill(['tier_override' => null])->save();
+
+    foreach (['alert', 'test', 'confirmation'] as $type) {
+        expect(app(ChannelDispatcher::class)->send($channel->fresh(), 'Tornado Warning', 'Alert', ['type' => $type, 'code' => '123456'])->error)
+            ->toBe(ChannelDispatcher::TIER_REFUSAL);
+    }
+
+    Http::assertSentCount(1);
+    expect($channel->fresh())->not->toBeNull();
+});

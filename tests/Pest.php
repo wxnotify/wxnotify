@@ -235,6 +235,15 @@ function chanEnablePhoneTypes(): void
         ->update(['enabled' => true]);
 }
 
+/**
+ * Switch on the WhatsApp catalog row, which ships disabled until the owner's Meta and legal
+ * items are done. Pair with a Plus subscriber: the row is `min_tier = plus`.
+ */
+function chanEnableWhatsApp(): void
+{
+    ChannelType::query()->where('slug', 'whatsapp')->update(['enabled' => true]);
+}
+
 const CHAN_VAPID_PUBLIC = 'BFbRVvYSUiZyN3mXneDDJEjejmTXvjDA8TMDLCD_aUW3GKOA-ohT-uHQDGm3pQqeK4YrmmZlfjwE7XyqTVSzAAM';
 const CHAN_VAPID_PRIVATE = '0bf_Od9Ew-hOKpMBoxmv3RDDX5vkUu2yCrGiC4OQsMs';
 

@@ -224,6 +224,7 @@ test('every channel type captions its destination value with a fixed, secret-fre
         'twilio_sms' => 'Text number',
         'bulkvs_sms' => 'Text number',
         'httpsms' => 'Text number',
+        'google_chat' => 'Google Chat space',
         'webhook' => 'Webhook host',
         'webpush' => 'Push service',
     ]);

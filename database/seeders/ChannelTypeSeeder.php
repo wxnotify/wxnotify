@@ -27,6 +27,11 @@ class ChannelTypeSeeder extends Seeder
         ['slug' => 'twilio_sms', 'min_tier' => 'plus', 'sort_order' => 11, 'enabled' => false],
         ['slug' => 'bulkvs_sms', 'min_tier' => 'plus', 'sort_order' => 12, 'enabled' => false],
         ['slug' => 'httpsms', 'min_tier' => 'plus', 'sort_order' => 13, 'enabled' => false],
+        ['slug' => 'whatsapp', 'min_tier' => 'plus', 'sort_order' => 15, 'enabled' => false],
+        ['slug' => 'google_chat', 'min_tier' => 'plus', 'sort_order' => 16, 'enabled' => true],
+        ['slug' => 'mattermost', 'min_tier' => 'plus', 'sort_order' => 17, 'enabled' => true],
+        ['slug' => 'rocketchat', 'min_tier' => 'plus', 'sort_order' => 18, 'enabled' => true],
+        ['slug' => 'matrix', 'min_tier' => 'plus', 'sort_order' => 19, 'enabled' => true],
     ];
 
     public function run(): void

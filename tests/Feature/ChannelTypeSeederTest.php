@@ -38,3 +38,28 @@ test('the phone types ship disabled and plus-only', function () {
     expect($fromMigration)->toHaveCount(3)
         ->and($fromMigration->every(fn (object $row): bool => ! $row->enabled && $row->min_tier === 'plus'))->toBeTrue();
 });
+
+test('the messaging types ship plus-only with whatsapp switched off', function () {
+    $expected = [
+        ['slug' => 'whatsapp', 'min_tier' => 'plus', 'sort_order' => 15, 'enabled' => false],
+        ['slug' => 'google_chat', 'min_tier' => 'plus', 'sort_order' => 16, 'enabled' => true],
+        ['slug' => 'mattermost', 'min_tier' => 'plus', 'sort_order' => 17, 'enabled' => true],
+        ['slug' => 'rocketchat', 'min_tier' => 'plus', 'sort_order' => 18, 'enabled' => true],
+        ['slug' => 'matrix', 'min_tier' => 'plus', 'sort_order' => 19, 'enabled' => true],
+    ];
+    $slugs = array_column($expected, 'slug');
+    $migration = require database_path('migrations/2026_10_23_100001_add_messaging_channel_types.php');
+    $rows = fn (): array => DB::table('channel_types')->whereIn('slug', $slugs)->orderBy('sort_order')->get(['slug', 'min_tier', 'sort_order', 'enabled'])
+        ->map(fn (object $row): array => [
+            'slug' => $row->slug, 'min_tier' => $row->min_tier, 'sort_order' => (int) $row->sort_order, 'enabled' => (bool) $row->enabled,
+        ])->all();
+
+    expect(array_values(collect(ChannelTypeSeeder::SHIPPED)->whereIn('slug', $slugs)->all()))->toBe($expected);
+
+    $migration->down();
+    expect($rows())->toBe([]);
+
+    $migration->up();
+    $migration->up();
+    expect($rows())->toBe($expected);
+});

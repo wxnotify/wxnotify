@@ -8,8 +8,8 @@ use App\Exceptions\ChannelCodeNotSent;
 use App\Exceptions\ChannelCodeThrottled;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\ChannelTypes\Contracts\ByoChannelType;
 use App\Support\ChannelTypes\Contracts\ChannelType;
-use App\Support\ChannelTypes\Contracts\PhoneChannelType;
 use BackedEnum;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Hidden;
@@ -104,7 +104,7 @@ class ConnectChannel extends Page implements HasForms
                             } catch (ChannelCodeNotSent) {
                                 Notification::make()
                                     ->title('Couldn\'t send your confirmation code')
-                                    ->body($type instanceof PhoneChannelType
+                                    ->body($type instanceof ByoChannelType
                                         ? $type->codeNotSentHint()
                                         : 'The notification service is temporarily unavailable. Please try again in a moment.')
                                     ->danger()
@@ -193,14 +193,14 @@ class ConnectChannel extends Page implements HasForms
     }
 
     /**
-     * Where the code went: a phone type names the masked number of the subscriber's own pending
-     * channel; a webhook points at the payload's "code" field.
+     * Where the code went: a bring-your-own type (phone or messaging) says it from the subscriber's
+     * own pending channel; a webhook points at the payload's "code" field.
      */
     private function confirmStepHint(?string $slug, mixed $channelId): string
     {
         $type = app(ChannelTypeRegistry::class)->find((string) $slug);
 
-        if ($type instanceof PhoneChannelType && filled($channelId)) {
+        if ($type instanceof ByoChannelType && filled($channelId)) {
             $channel = NotificationChannel::query()
                 ->whereKey($channelId)
                 ->where('user_id', auth()->id())
