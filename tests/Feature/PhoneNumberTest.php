@@ -454,3 +454,19 @@ it('stores an international number with no from number', function () {
 it('refuses to build an international destination from a number it cannot normalise', function () {
     chanFakeInternationalPhoneType()->buildDestination(['token' => 't0k', 'to' => '+52 55 123', 'consent' => true]);
 })->throws(InvalidArgumentException::class, 'A phone channel needs a To number it accepts.');
+
+it('masks a number behind its country code so a wrong country is visible', function (string $e164, string $masked) {
+    expect(PhoneNumber::maskWithCountryCode($e164))->toBe($masked);
+})->with([
+    'US' => ['+15552345678', '+1 •••• 5678'],
+    'a bare Mexican national number taken as NANP' => ['+15512345678', '+1 •••• 5678'],
+    'Mexico' => ['+525512345678', '+52 •••• 5678'],
+    'Mexico with the mobile 1' => ['+5215512345678', '+52 •••• 5678'],
+    'Russia' => ['+74951234567', '+7 •••• 4567'],
+    'UK' => ['+447700900123', '+44 •••• 0123'],
+    'Guatemala' => ['+50223456789', '+502 •••• 6789'],
+    'El Salvador' => ['+50321234567', '+503 •••• 4567'],
+    'Honduras' => ['+50498765432', '+504 •••• 5432'],
+    'Dominican Republic shares +1' => ['+18095551234', '+1 •••• 1234'],
+    'not E.164' => ['5552345678', '•••• 5678'],
+]);

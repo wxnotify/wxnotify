@@ -184,6 +184,28 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    /**
+     * A WhatsApp channel sending the subscriber's approved template to the given E.164 number,
+     * with valid-shaped Meta credentials and a consent record.
+     */
+    public function whatsApp(string $to = '+525512345678'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'whatsapp',
+            'label' => 'WhatsApp •••• '.substr($to, -4),
+            'apprise_url' => null,
+            'config' => [
+                'access_token' => 'EAABsbCS1iHgBO7ZBx9Kd2LmNoPq7RsTuVwXyZ0aBcDeFgHiJk',
+                'phone_number_id' => '123456789012',
+                'template' => 'wx_alert',
+                'template_language' => 'es_MX',
+                'to' => $to,
+                'consent_version' => PhoneConsent::VERSION,
+                'consented_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

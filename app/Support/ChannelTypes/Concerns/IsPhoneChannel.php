@@ -64,6 +64,15 @@ trait IsPhoneChannel
     }
 
     /**
+     * The help under the subscriber's own number: which numbers the field takes and how one
+     * without a country code is read.
+     */
+    protected function toNumberHelp(): string
+    {
+        return 'The US or Canadian number to send alerts to. We send a code to it to confirm it is yours.';
+    }
+
+    /**
      * The consent box's wording; its VERSION is PhoneConsent::VERSION for every type.
      */
     protected function consentText(): string
@@ -95,7 +104,7 @@ trait IsPhoneChannel
                 ->type('tel')
                 ->required()
                 ->rules([$this->toNumberRule()])
-                ->helperText('The US or Canadian number to send alerts to. We send a code to it to confirm it is yours.'),
+                ->helperText($this->toNumberHelp()),
             Checkbox::make('consent')
                 ->label($this->consentText())
                 ->accepted(),

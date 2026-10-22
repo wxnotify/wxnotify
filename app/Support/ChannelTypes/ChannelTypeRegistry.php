@@ -30,6 +30,7 @@ class ChannelTypeRegistry
         'mattermost' => MattermostChannelType::class,
         'rocketchat' => RocketChatChannelType::class,
         'matrix' => MatrixChannelType::class,
+        'whatsapp' => WhatsAppChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType
