@@ -72,8 +72,7 @@ class DispatchChannelConfirmationCode
      * exception surfacing so the queue's own retry-with-backoff handles a
      * transient outage — this synchronous, in-wizard call has no such
      * retry mechanism, so it's the one that needs to catch it.
-     */
-    /**
+     *
      * @throws ChannelCodeThrottled when a phone or chat channel's limits are used up: nothing is sent, and
      *                              the stored code and the wrong-code counter are left as they were
      */

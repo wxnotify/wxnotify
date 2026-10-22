@@ -28,8 +28,8 @@ use InvalidArgumentException;
  * `sub`, `/%23general` to `#general`), so a sub-path install cannot be supported and a path is
  * never emitted. A body over 1000 characters is sent whole. Apprise decodes what it is given and
  * uses it as is, so `rawurlencode()` does not round-trip for `/ ? # %`: that is why the parser
- * allows only `[A-Za-z0-9]` in the id and token, and `rawurlencode()` stays as a second line of
- * defence.
+ * (and appriseUrl()) allow only `[A-Za-z0-9]` in the id and token. That allow-list is the only
+ * defence; `rawurlencode()` is a no-op on the allowed values.
  */
 class RocketChatChannelType implements MessagingChannelType
 {

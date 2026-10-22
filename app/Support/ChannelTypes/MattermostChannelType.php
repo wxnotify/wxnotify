@@ -26,9 +26,9 @@ use InvalidArgumentException;
  * POST to `https://host[:port]/{segments}/hooks/{token}` with redirects off and a (5, 10) s
  * timeout, also on a 500 (no retry). Apprise percent-decodes the path before it splits it and
  * puts the decoded characters into the request URL as they are, so `%2F` becomes a separator
- * and `%3F`/`%23` a query or fragment. That is why the parser refuses every character outside
- * the segment and token sets rather than relying on `rawurlencode()`, which stays as a second
- * line of defence.
+ * and `%3F`/`%23` a query or fragment. That is why the parser (and appriseUrl()) refuse every character outside
+ * the segment and token sets: that allow-list is the only defence, because Apprise decodes the
+ * path first and `rawurlencode()` is a no-op on the allowed values.
  */
 class MattermostChannelType implements MessagingChannelType
 {

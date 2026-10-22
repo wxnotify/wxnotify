@@ -376,19 +376,19 @@
     - a test number reaches only its registered recipients;
     - business-initiated messages need the template.
   - **Lookups:** `requiredConfigKeys()` = the five keys. `serverUrl()` = null. `destinationKey()` = `to`.
-  - **URL:** `appriseUrl()` = `whatsapp://{enc template}:{enc token}@{enc phone_number_id}/{digits of to}?lang={enc language}&:1=body`.
+  - **URL:** `appriseUrl()` = `whatsapp://{enc template}:{enc token}@{enc phone_number_id}/{digits of to}?lang={enc language}&:body=1`.
   - **Message:** `compose()` = `MessagingMessage::whatsapp()`.
   - **Texts:**
     - `confirmationHint()` = "We just sent a 6-digit code to •••• 5678 on WhatsApp."
     - `codeNotSentHint()` = "We couldn't send the WhatsApp message. Check the access token, phone number ID, and that the template name and language match an approved template with one variable."
     - `failureMessage()` = spec decision 11.
 
-- [ ] **Step 1: Spike (no network).** Monkeypatch `requests.post` and send through `whatsapp://wx_alert:EAAB…@123456789012/525512345678?lang=es_MX&:1=body`. Record:
+- [ ] **Step 1: Spike (no network).** Monkeypatch `requests.post` and send through `whatsapp://wx_alert:EAAB…@123456789012/525512345678?lang=es_MX&:body=1`. Record:
   - the JSON payload: `type: template`, `template.name`, `language.code`, `components[0].parameters[0].text` = the body;
   - that `+` handling gives `to` = `+525512345678`;
   - that a non-200 reply makes Apprise return False (→ 424).
   
-  Also record in the PHPDoc why the Twilio route was rejected: in `plugins/twilio.py`, WhatsApp mode posts a free-form `Body` only. Confirm `:1=body` and `%3A1=body` both parse, and use the literal form.
+  Also record in the PHPDoc why the Twilio route was rejected: in `plugins/twilio.py`, WhatsApp mode posts a free-form `Body` only. Confirm `:body=1` and `%3Abody=1` both parse, and use the literal form.
 - [ ] **Step 2: Write the failing tests:**
   - `it builds the template url with encoded parts` (dataset)
   - `it validates token, phone number id, template name, language and number through the fields`

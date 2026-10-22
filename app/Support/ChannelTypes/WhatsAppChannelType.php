@@ -205,8 +205,8 @@ class WhatsAppChannelType implements MessagingChannelType, PhoneChannelType
     }
 
     /**
-     * The template URL, or an empty string (which Apprise refuses) when a stored part is outside
-     * its allow-list, so a tampered value can never reach the URL.
+     * The template URL, or an empty string (which MessagingTransport::send() refuses) when a stored part
+     * is outside its allow-list, so a tampered value can never reach the URL.
      *
      * @param  array<string, mixed>  $config
      */
