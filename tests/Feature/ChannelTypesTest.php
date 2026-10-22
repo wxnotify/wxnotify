@@ -227,6 +227,7 @@ test('every channel type captions its destination value with a fixed, secret-fre
         'google_chat' => 'Google Chat space',
         'mattermost' => 'Mattermost server',
         'rocketchat' => 'Rocket.Chat server',
+        'matrix' => 'Matrix room',
         'webhook' => 'Webhook host',
         'webpush' => 'Push service',
     ]);

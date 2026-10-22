@@ -170,6 +170,20 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    /**
+     * A Matrix channel posting to one room as the subscriber's bot (access token only).
+     * Sends need the host to resolve publicly: chanFakeChatDns(['matrix.example.org' => [...]]).
+     */
+    public function matrix(string $server = 'https://matrix.example.org', string $token = 'syt_d3hub3RpZnk_AbCdEfGhIjKlMnOpQrSt_1a2B3c', string $room = '!AbCdEfGhIjKlMn:example.org'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'matrix',
+            'label' => 'Matrix',
+            'apprise_url' => null,
+            'config' => ['server' => $server, 'token' => $token, 'room' => $room],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

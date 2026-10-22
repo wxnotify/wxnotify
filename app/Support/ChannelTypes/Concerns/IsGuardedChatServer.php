@@ -12,7 +12,8 @@ use InvalidArgumentException;
 
 /**
  * What the messaging types that post to a subscriber-supplied chat server (Mattermost,
- * Rocket.Chat, Matrix) share: the pasted-URL field with its server rule, the guard run again at
+ * Rocket.Chat, Matrix) share: the pasted-URL field with its server rule (Matrix, which takes
+ * the server in a field of its own, uses the rule alone), the guard run again at
  * save, the Apprise scheme and authority taken from the stored server, and the server-only
  * `serverUrl()` and summary. The URL shape, the stored values and the destination key stay in
  * each type. Expects a `config['server']` spelled by ChatServerAddress.
@@ -45,11 +46,19 @@ trait IsGuardedChatServer
                         $fail($refusal);
                     }
                 },
-                fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                    (new SafeChatServerUrl)->validate($attribute, is_string($value) ? trim($value) : $value, $fail);
-                },
+                $this->safeServerRule(),
             ])
             ->helperText($helperText);
+    }
+
+    /**
+     * SafeChatServerUrl on the trimmed value, as a field rule.
+     */
+    protected function safeServerRule(): Closure
+    {
+        return fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+            (new SafeChatServerUrl)->validate($attribute, is_string($value) ? trim($value) : $value, $fail);
+        };
     }
 
     /**

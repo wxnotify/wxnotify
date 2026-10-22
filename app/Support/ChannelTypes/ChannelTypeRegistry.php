@@ -29,6 +29,7 @@ class ChannelTypeRegistry
         'google_chat' => GoogleChatChannelType::class,
         'mattermost' => MattermostChannelType::class,
         'rocketchat' => RocketChatChannelType::class,
+        'matrix' => MatrixChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType

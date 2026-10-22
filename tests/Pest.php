@@ -273,10 +273,21 @@ function chanFakeChatDns(array $hostToAddresses): void
  */
 function chanChatWebhookValidate(MessagingChannelType $type, mixed $value): array
 {
-    $field = collect($type->formSchema())->keyBy(fn ($component) => $component->getName())['webhook_url'];
-    $validator = Validator::make(['webhook_url' => $value], ['webhook_url' => $field->getValidationRules()]);
+    return chanChatFieldValidate($type, 'webhook_url', $value);
+}
 
-    return ['passes' => $validator->passes(), 'errors' => $validator->errors()->get('webhook_url')];
+/**
+ * Whether one of a messaging type's form fields accepts the value by its own rules
+ * (getValidationRules()), and its errors.
+ *
+ * @return array{passes: bool, errors: list<string>}
+ */
+function chanChatFieldValidate(MessagingChannelType $type, string $name, mixed $value): array
+{
+    $field = collect($type->formSchema())->keyBy(fn ($component) => $component->getName())[$name];
+    $validator = Validator::make([$name => $value], [$name => $field->getValidationRules()]);
+
+    return ['passes' => $validator->passes(), 'errors' => $validator->errors()->get($name)];
 }
 
 /**
@@ -284,9 +295,19 @@ function chanChatWebhookValidate(MessagingChannelType $type, mixed $value): arra
  */
 function chanChatWebhookSubmit(string $slug, string $url): Testable
 {
+    return chanChatFormSubmit($slug, ['webhook_url' => $url]);
+}
+
+/**
+ * Pick a messaging type in the connect wizard, fill its step 2 fields and submit step 2.
+ *
+ * @param  array<string, mixed>  $data
+ */
+function chanChatFormSubmit(string $slug, array $data): Testable
+{
     $component = Pest\Livewire\livewire(ConnectChannel::class)->fillForm(['channel_type' => $slug]);
     goToConnectChannelStep($component, 0);
-    $component->fillForm(['webhook_url' => $url]);
+    $component->fillForm($data);
 
     return goToConnectChannelStep($component, 1);
 }
