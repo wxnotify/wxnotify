@@ -14,12 +14,21 @@ class WebhookUrlGuard
      * `::ffff:0:0:0/96` is the deprecated IPv4-translated block: written in hex
      * (`::ffff:0:7f00:1`) it sidesteps the dotted `::ffff:a.b.c.d` form handled
      * below, yet still carries an IPv4 address such as 127.0.0.1 or 10.0.0.5.
-     * `2001:db8::/32` is the documentation range, which PHP's reserved-range
-     * flag lets through.
+     * `2001:db8::/32` and `3fff::/20` (RFC 9637) are the documentation ranges,
+     * which PHP's reserved-range flag lets through.
      *
      * @var list<array{string, int}>
      */
-    private const BLOCKED_IPV6_PREFIXES = [['64:ff9b::', 96], ['2002::', 16], ['fec0::', 10], ['2001::', 32], ['::ffff:0:0:0', 96], ['2001:db8::', 32]];
+    private const BLOCKED_IPV6_PREFIXES = [['64:ff9b::', 96], ['2002::', 16], ['fec0::', 10], ['2001::', 32], ['::ffff:0:0:0', 96], ['2001:db8::', 32], ['3fff::', 20]];
+
+    /**
+     * IPv4 ranges PHP's private/reserved flags let through: carrier-grade NAT
+     * (100.64.0.0/10), benchmarking (198.18.0.0/15, also used internally by
+     * fake-IP proxies) and IETF special-purpose (192.0.0.0/24).
+     *
+     * @var list<array{string, int}>
+     */
+    private const BLOCKED_IPV4_PREFIXES = [['100.64.0.0', 10], ['198.18.0.0', 15], ['192.0.0.0', 24]];
 
     /**
      * A proxy is reached over http as often as https, and low ports below 1024
@@ -323,11 +332,13 @@ class WebhookUrlGuard
             }
         }
 
-        // Carrier-grade NAT 100.64.0.0/10 is not covered by PHP's range flags.
+        // Ranges PHP's range flags do not cover: carrier-grade NAT, benchmarking and IETF special-purpose.
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-            $long = ip2long($ip);
-            if ($long >= ip2long('100.64.0.0') && $long <= ip2long('100.127.255.255')) {
-                return false;
+            $packed = inet_pton($ip);
+            foreach (self::BLOCKED_IPV4_PREFIXES as [$prefix, $bits]) {
+                if ($this->matchesPrefix($packed, inet_pton($prefix), $bits)) {
+                    return false;
+                }
             }
         }
 

@@ -18,6 +18,8 @@ use App\Support\Delivery\DeliveryResult;
  */
 class MessagingTransport implements Transport
 {
+    public const SERVER_MISMATCH = "This channel's server address does not match its settings.";
+
     public function __construct(
         private readonly AppriseApiClient $client,
         private readonly ChannelTypeRegistry $registry,
@@ -67,7 +69,50 @@ class MessagingTransport implements Transport
             return null;
         }
 
-        return app(ChatServerGuard::class)->violation($serverUrl);
+        $violation = app(ChatServerGuard::class)->violation($serverUrl);
+
+        if ($violation !== null) {
+            return $violation;
+        }
+
+        $guardedHost = $this->comparableHost((string) parse_url($serverUrl, PHP_URL_HOST));
+        $appriseHost = $this->appriseHost($type->appriseUrl($config));
+
+        return $appriseHost !== null && $appriseHost === $guardedHost ? null : self::SERVER_MISMATCH;
+    }
+
+    /**
+     * The host an Apprise URL connects to (`mmosts://host/...`, `rockets://id%2Ftoken@host`,
+     * `matrixs://token@[v6]/...`): the authority after the last `@` (userinfo is rawurlencoded,
+     * so it holds no raw `@` of its own), without the port. Null when there is none, or when it
+     * is percent-encoded and so could name a different host once Apprise decodes it.
+     */
+    private function appriseHost(string $appriseUrl): ?string
+    {
+        if (preg_match('#^[A-Za-z][A-Za-z0-9+.-]*://([^/?\#]*)#', $appriseUrl, $matches) !== 1) {
+            return null;
+        }
+
+        $authority = $matches[1];
+        $at = strrpos($authority, '@');
+        $hostPort = $at === false ? $authority : substr($authority, $at + 1);
+        $host = preg_match('/^(\[[^\]]*\]|[^:]*)/', $hostPort, $hostMatch) === 1 ? $hostMatch[1] : '';
+
+        if ($host === '' || str_contains($host, '%')) {
+            return null;
+        }
+
+        return $this->comparableHost($host);
+    }
+
+    /** Lower case, brackets and one trailing dot dropped, an IP literal in one spelling. */
+    private function comparableHost(string $host): string
+    {
+        $host = strtolower(trim($host, '[]'));
+        $host = str_ends_with($host, '.') ? substr($host, 0, -1) : $host;
+        $packed = filter_var($host, FILTER_VALIDATE_IP) !== false ? inet_pton($host) : false;
+
+        return $packed === false ? $host : (string) inet_ntop($packed);
     }
 
     /**

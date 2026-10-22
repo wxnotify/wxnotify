@@ -44,14 +44,15 @@ function chanRecordingChatGuard(): array
 
 /**
  * Register a messaging type that names its own server (the Google Chat type with a server URL
- * and a guarded Apprise URL), so the transport's send-time check can be driven before Tasks 4-6
+ * and the given Apprise URL), so the transport's send-time check can be driven before Tasks 4-6
  * add the real ones. Returns a channel of that type.
  */
-function chanOwnServerChatChannel(string $serverUrl): NotificationChannel
+function chanOwnServerChatChannel(string $serverUrl, ?string $appriseUrl = null): NotificationChannel
 {
-    $ownServer = new class($serverUrl) extends GoogleChatChannelType
+    $appriseUrl ??= 'mmosts://'.parse_url($serverUrl, PHP_URL_HOST).'/abcdefghijklmnopqrstuvwxyz?redirect=no&cto=5&rto=10&image=no';
+    $ownServer = new class($serverUrl, $appriseUrl) extends GoogleChatChannelType
     {
-        public function __construct(private readonly string $server) {}
+        public function __construct(private readonly string $server, private readonly string $apprise) {}
 
         public function slug(): string
         {
@@ -65,7 +66,7 @@ function chanOwnServerChatChannel(string $serverUrl): NotificationChannel
 
         public function appriseUrl(array $config): string
         {
-            return 'mmosts://'.parse_url($this->server, PHP_URL_HOST).'/abcdefghijklmnopqrstuvwxyz?'.$this->guardedQuery(['image' => 'no']);
+            return $this->apprise;
         }
     };
     app()->instance(ChannelTypeRegistry::class, new class($ownServer) extends ChannelTypeRegistry
@@ -124,6 +125,9 @@ test('it refuses private, loopback, link-local, metadata, cgnat and mapped addre
     'nat64 metadata' => '64:ff9b::a9fe:a9fe',
     '6to4 loopback' => '2002:7f00:1::',
     'site-local' => 'fec0::1',
+    'benchmarking 198.18/15' => '198.19.0.1',
+    'ietf special-purpose 192.0.0/24' => '192.0.0.8',
+    'documentation range 3fff::/20' => '3fff::1',
 ]);
 
 test('a name resolving to both a public and a private address is refused', function () {
@@ -308,3 +312,34 @@ test('a send to a public server reaches apprise with redirects off and the timeo
     expect(app(MessagingTransport::class)->send($channel, 'body', null)->success)->toBeTrue();
     Http::assertSent(fn (Request $request): bool => $request['urls'] === 'mmosts://chat.example.com/abcdefghijklmnopqrstuvwxyz?redirect=no&cto=5&rto=10&image=no');
 });
+
+test('a send whose apprise url names another host than the guarded server is refused before any http', function (string $appriseUrl) {
+    Http::fake();
+    $channel = chanOwnServerChatChannel('https://chat.example.com', $appriseUrl);
+    chanFakeChatDns(['chat.example.com' => [CHAN_CHAT_PUBLIC_IP]]);
+
+    expect(app(MessagingTransport::class)->send($channel, 'body', null)->error)->toBe(MessagingTransport::SERVER_MISMATCH);
+    Http::assertNothingSent();
+})->with([
+    'private address' => 'mmosts://10.0.0.5/abcdefghijklmnopqrstuvwxyz?redirect=no',
+    'another name' => 'mmosts://evil.example.com/abcdefghijklmnopqrstuvwxyz',
+    'userinfo hides the guarded host' => 'rockets://chat.example.com@10.0.0.5:8443?redirect=no',
+    'encoded host' => 'mmosts://chat%2Eexample.com/abcdefghijklmnopqrstuvwxyz',
+    'no host' => 'mmosts:///abcdefghijklmnopqrstuvwxyz',
+    'ipv6 private' => 'matrixs://tok@[::1]/%21r%3Aex.org',
+    'not a url' => 'nonsense',
+]);
+
+test('the mattermost, rocket.chat and matrix url shapes on the guarded host are sent', function (string $serverUrl, string $appriseUrl, array $dns) {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $channel = chanOwnServerChatChannel($serverUrl, $appriseUrl);
+    chanFakeChatDns($dns);
+
+    expect(app(MessagingTransport::class)->send($channel, 'body', null)->success)->toBeTrue();
+    Http::assertSent(fn (Request $request): bool => $request['urls'] === $appriseUrl);
+})->with([
+    'mattermost' => ['https://Chat.Example.com:8065/mm', 'mmosts://chat.example.com:8065/mm/abcdefghijklmnopqrstuvwxyz?redirect=no&cto=5&rto=10', ['chat.example.com' => [CHAN_CHAT_PUBLIC_IP]]],
+    'rocket.chat' => ['https://chat.example.com', 'rockets://id%2Ftok%40en@chat.example.com?redirect=no&cto=5&rto=10', ['chat.example.com' => [CHAN_CHAT_PUBLIC_IP]]],
+    'matrix ipv6' => ['https://[2606:4700:0::1]:8448', 'matrixs://tok%40x@[2606:4700::1]:8448/%21r%3Aex.org?redirect=no&cto=5&rto=10&discovery=no', []],
+    'trailing dot' => ['https://chat.example.com.', 'mmosts://chat.example.com/abcdefghijklmnopqrstuvwxyz', ['chat.example.com' => [CHAN_CHAT_PUBLIC_IP]]],
+]);

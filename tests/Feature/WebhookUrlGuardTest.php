@@ -28,7 +28,7 @@ test('non-https, credentials, bad ports and missing hosts are rejected', functio
 
 test('private, loopback, link-local, metadata, cgnat and reserved addresses are rejected', function (string $ip) {
     expect(chanGuard([$ip])->violation('https://hooks.example.com/wx'))->not->toBeNull();
-})->with(['10.0.0.5', '172.16.4.4', '192.168.1.10', '127.0.0.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '240.0.0.1', '::1', 'fe80::1', 'fc00::1', '::ffff:10.0.0.1', '::ffff:127.0.0.1', '64:ff9b::7f00:1', '64:ff9b::a9fe:a9fe', '2002:7f00:1::', 'fec0::1', '2001:0:4136:e378:8000:63bf:3fff:fdd2', '::ffff:0:7f00:1', '::ffff:0:a00:5', '2001:db8::1']);
+})->with(['10.0.0.5', '172.16.4.4', '192.168.1.10', '127.0.0.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '240.0.0.1', '::1', 'fe80::1', 'fc00::1', '::ffff:10.0.0.1', '::ffff:127.0.0.1', '64:ff9b::7f00:1', '64:ff9b::a9fe:a9fe', '2002:7f00:1::', 'fec0::1', '2001:0:4136:e378:8000:63bf:3fff:fdd2', '::ffff:0:7f00:1', '::ffff:0:a00:5', '2001:db8::1', '198.18.0.1', '198.19.255.254', '192.0.0.8', '3fff::1', '3fff:fff:ffff::1']);
 
 test('a public ipv4-mapped address in dotted form is still allowed', function () {
     // The hex IPv4-translated block (::ffff:0:0:0/96) is blocked outright, but
