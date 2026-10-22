@@ -35,6 +35,9 @@ test('exactly six types can be created in the app', function () {
 });
 
 test('each type accepts a valid setup and refuses an invalid one', function (string $slug, array $valid, array $invalid) {
+    // The ntfy custom server is resolved by ChatServerGuard; no name resolves unless faked.
+    chanFakeChatDns(['ntfy.example.com' => ['93.184.216.34']]);
+
     foreach ($valid as $input) {
         expect(setupFieldsAccept($slug, $input))->toBeTrue(json_encode($input));
     }

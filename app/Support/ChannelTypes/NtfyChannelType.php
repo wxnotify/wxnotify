@@ -4,6 +4,7 @@ namespace App\Support\ChannelTypes;
 
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Rules\SafeChatServerUrl;
 use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
@@ -12,6 +13,8 @@ use Filament\Forms\Components\TextInput;
 class NtfyChannelType implements ChannelType
 {
     use MasksDestinationSecrets, UsesAppriseTransport;
+
+    public const SERVER_REFUSED = "This channel's ntfy server is not allowed. Edit the channel to use a different server.";
 
     public function slug(): string
     {
@@ -39,7 +42,8 @@ class NtfyChannelType implements ChannelType
             TextInput::make('server')
                 ->label('Server (optional)')
                 ->url()
-                ->helperText('Leave blank to use the public ntfy.sh server, or enter your own self-hosted server URL.'),
+                ->rules([new SafeChatServerUrl])
+                ->helperText('Leave blank to use the public ntfy.sh server, or enter your own https:// server address. Private and local network addresses are not allowed.'),
         ];
     }
 
@@ -47,7 +51,7 @@ class NtfyChannelType implements ChannelType
     {
         return [
             new ChannelSetupField('topic', 'Topic', help: 'A short, hard-to-guess name — anyone who knows it can subscribe. E.g. "wxnotify-a1b2c3".', rules: ['alpha_dash', 'max:255']),
-            new ChannelSetupField('server', 'Server (optional)', ChannelSetupField::URL, required: false, help: 'Leave blank to use the public ntfy.sh server, or enter your own self-hosted server URL.', rules: ['url', 'max:2048']),
+            new ChannelSetupField('server', 'Server (optional)', ChannelSetupField::URL, required: false, help: 'Leave blank to use the public ntfy.sh server, or enter your own https:// server address. Private and local network addresses are not allowed.', rules: ['url', 'max:2048', new SafeChatServerUrl]),
         ];
     }
 
@@ -64,6 +68,20 @@ class NtfyChannelType implements ChannelType
         }
 
         return "ntfy://{$topic}";
+    }
+
+    /**
+     * The custom server a stored ntfy Apprise URL connects to (`ntfys://host[:port]/topic` is
+     * https, `ntfy://host[:port]/topic` http), for the send-time guard; null for the default
+     * server (`ntfy://topic`) and for any other URL.
+     */
+    public static function serverUrlFrom(string $appriseUrl): ?string
+    {
+        if (preg_match('#^(ntfys?)://([^/]+)/#', $appriseUrl, $matches) !== 1) {
+            return null;
+        }
+
+        return ($matches[1] === 'ntfys' ? 'https' : 'http').'://'.$matches[2];
     }
 
     public function supportsRichContent(): bool

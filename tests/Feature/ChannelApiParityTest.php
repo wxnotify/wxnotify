@@ -44,6 +44,9 @@ beforeEach(function () {
 });
 
 test('the dashboard wizard and the API accept the same setups and store the same destination', function (string $slug, array $valid) {
+    // The ntfy custom server is resolved by ChatServerGuard; no name resolves unless faked.
+    chanFakeChatDns(['ntfy.example.com' => ['93.184.216.34']]);
+
     foreach ($valid as $input) {
         $outcome = channelParityOutcome($this, $slug, $input);
 
