@@ -248,6 +248,35 @@ test('the edit modal of a phone channel holds no credential or number and offers
         ->toThrow(ActionNotResolvableException::class, 'Action [revealAppriseUrl] not found in schema at [mountedActionSchema0.apprise_url_preview]');
 })->with('chanPhoneChannelStates');
 
+dataset('chanMessagingChannelStates', [
+    'google_chat' => ['googleChat', ['AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI', 'Zq3x-_Vb9Kd2LmNoPq7RsTuVwXyZ0aBcDeFgHiJkLmN']],
+    'mattermost' => ['mattermost', ['h7kq3m9xw5e8rbt4y6uzi3o5pa']],
+    'rocketchat' => ['rocketChat', ['Zx9Cv8Bn7Mq6Wr5Ty4Ui3Op2As1Df0Gh', 'aB3dE5fG7hJ9kL2mN']],
+    'matrix' => ['matrix', ['syt_d3hub3RpZnk_AbCdEfGhIjKlMnOpQrSt_1a2B3c']],
+    'whatsapp' => ['whatsApp', ['EAABsbCS1iHgBO7ZBx9Kd2LmNoPq7RsTuVwXyZ0aBcDeFgHiJk', '525512345678', '5512345678']],
+]);
+
+test('the edit modal of a messaging channel holds no credential, server path or number and offers no reveal action', function (string $state, array $secrets) {
+    chanEnableWhatsApp();
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $this->actingAs($user);
+    $channel = NotificationChannel::factory()->for($user)->{$state}()->create();
+
+    $component = livewire(ListNotificationChannels::class)
+        ->mountAction(TestAction::make('edit')->table($channel))
+        ->assertSchemaComponentHidden('apprise_url_preview');
+
+    $snapshot = json_encode($component->snapshot);
+
+    foreach ($secrets as $secret) {
+        expect($snapshot)->not->toContain($secret);
+    }
+    expect($component->instance()->mountedActions[0]['data'])->not->toHaveKeys(['config', 'apprise_url', 'confirmation_code']);
+
+    expect(fn () => $component->callAction([TestAction::make('revealAppriseUrl')->schemaComponent('apprise_url_preview')]))
+        ->toThrow(ActionNotResolvableException::class, 'Action [revealAppriseUrl] not found in schema at [mountedActionSchema0.apprise_url_preview]');
+})->with('chanMessagingChannelStates');
+
 test('the same reveal action is visible and works for a channel that has a destination url', function () {
     $channel = NotificationChannel::factory()->for($this->user)->create([
         'channel_type' => 'pushover', 'apprise_url' => 'pover://uKey1234567890@aTok0987654321',

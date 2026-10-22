@@ -20,6 +20,7 @@ use App\Models\TestProductScenario;
 use App\Models\User;
 use App\Notifications\AlertRuleDisabledNotification;
 use App\Support\Pipeline\UnmanagedPipelineStack;
+use Database\Seeders\ChannelTypeSeeder;
 use Database\Seeders\ProductCatalogSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Notifications\DatabaseNotification;
@@ -126,6 +127,26 @@ test('factory reset restores an enabled or re-tiered phone type to disabled plus
     $phones = DB::table('channel_types')->whereIn('slug', ['twilio_sms', 'bulkvs_sms', 'httpsms'])->get();
     expect($phones)->toHaveCount(3)
         ->and($phones->every(fn (object $row): bool => ! $row->enabled && $row->min_tier === 'plus'))->toBeTrue();
+});
+
+test('factory reset restores the five messaging rows to their shipped state', function () {
+    $slugs = ['whatsapp', 'google_chat', 'mattermost', 'rocketchat', 'matrix'];
+    chanEnableWhatsApp();
+    DB::table('channel_types')->whereIn('slug', $slugs)->update(['min_tier' => 'free', 'sort_order' => 99]);
+    DB::table('channel_types')->where('slug', 'matrix')->update(['enabled' => false]);
+    DB::table('channel_types')->where('slug', 'mattermost')->delete();
+
+    app(ResetCatalogs::class)();
+
+    $rows = DB::table('channel_types')->whereIn('slug', $slugs)->orderBy('sort_order')->get(['slug', 'min_tier', 'sort_order', 'enabled'])
+        ->map(fn (object $row): array => [
+            'slug' => $row->slug, 'min_tier' => $row->min_tier, 'sort_order' => (int) $row->sort_order, 'enabled' => (bool) $row->enabled,
+        ])->all();
+
+    expect($rows)->toBe(array_values(collect(ChannelTypeSeeder::SHIPPED)->whereIn('slug', $slugs)->all()))
+        ->and($rows)->toHaveCount(5)
+        ->and(collect($rows)->firstWhere('slug', 'whatsapp')['enabled'])->toBeFalse()
+        ->and(collect($rows)->where('slug', '!=', 'whatsapp')->every(fn (array $row): bool => $row['enabled'] && $row['min_tier'] === 'plus'))->toBeTrue();
 });
 
 test('the preview counts exactly what each selected toggle would delete and writes nothing', function () {
