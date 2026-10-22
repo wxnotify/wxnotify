@@ -6,6 +6,7 @@ use App\Models\NotificationChannel;
 use App\Rules\SafeChatServerUrl;
 use App\Support\ChannelTypes\Concerns\IsMessagingChannel;
 use App\Support\ChannelTypes\Contracts\MessagingChannelType;
+use App\Support\Delivery\ChatServerAddress;
 use App\Support\Delivery\ChatServerGuard;
 use Closure;
 use Filament\Forms\Components\TextInput;
@@ -19,10 +20,9 @@ use InvalidArgumentException;
  * server part is vetted by ChatServerGuard (the field's SafeChatServerUrl rule, again in
  * buildDestination() and before every send); the path is this type's own rule: sub-path
  * segments of `[A-Za-z0-9._~-]` (not `.` or `..`), then `/hooks/` and Mattermost's 26 lower-case
- * alphanumerics, with one trailing slash trimmed. The stored `server` is normalised
- * (`scheme://host[:port]`: lower case, one trailing dot and the default port dropped, an IPv6
- * literal in one spelling), and the Apprise URL's authority is rebuilt from it, so the host
- * Apprise connects to is always the guarded one.
+ * alphanumerics, with one trailing slash trimmed. The stored `server` is ChatServerAddress's
+ * spelling, and the Apprise URL's authority is rebuilt from it, so the host Apprise connects to
+ * is always the guarded one.
  *
  * Checked against Apprise 2.0.0 (requests monkeypatched, no network):
  * `mmosts://host[:port]/{segments}/{token}?redirect=no&cto=5&rto=10&image=no` makes exactly one
@@ -39,11 +39,10 @@ class MattermostChannelType implements MessagingChannelType
 
     public const INVALID_MESSAGE = 'Paste the whole incoming webhook URL from Mattermost; it ends in /hooks/ and a 26-character ID.';
 
-    private const URL_PATTERN = '#^([A-Za-z]+)://([^/?\#@]*)(/[^?\#]*)$#';
+    /** No whitespace or control character anywhere; `D` so `$` never matches before a newline. */
+    private const URL_PATTERN = '#^([A-Za-z]+)://([^/?\#@\x00-\x20\x7F]*)(/[^?\#\x00-\x20\x7F]*)$#D';
 
-    private const PATH_PATTERN = '#^((?:/[A-Za-z0-9._~-]+)*)/hooks/([a-z0-9]{26})/?$#';
-
-    private const SERVER_PATTERN = '#^(https?)://(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::(\d{1,5}))?/?$#';
+    private const PATH_PATTERN = '#^((?:/[A-Za-z0-9._~-]+)*)/hooks/([a-z0-9]{26})/?$#D';
 
     public function slug(): string
     {
@@ -105,14 +104,14 @@ class MattermostChannelType implements MessagingChannelType
             }
         }
 
-        $server = self::serverParts($parts[1].'://'.$parts[2]);
+        $server = ChatServerAddress::parts($parts[1].'://'.$parts[2]);
 
         if ($server === null) {
             return null;
         }
 
         return [
-            'server' => self::serverString($server),
+            'server' => ChatServerAddress::toUrl($server),
             'path' => $segments === [] ? '' : '/'.implode('/', $segments),
             'token' => $path[2],
         ];
@@ -157,9 +156,9 @@ class MattermostChannelType implements MessagingChannelType
      */
     public function appriseUrl(array $config): string
     {
-        $server = self::serverParts((string) ($config['server'] ?? ''));
+        $server = ChatServerAddress::parts((string) ($config['server'] ?? ''));
         $scheme = ($server['scheme'] ?? 'https') === 'https' ? 'mmosts' : 'mmost';
-        $authority = $server === null ? '' : $server['host'].($server['port'] === null ? '' : ':'.$server['port']);
+        $authority = $server === null ? '' : ChatServerAddress::authority($server);
         $path = implode('', array_map(
             fn (string $segment): string => '/'.rawurlencode($segment),
             self::segments((string) ($config['path'] ?? '')),
@@ -170,11 +169,16 @@ class MattermostChannelType implements MessagingChannelType
     }
 
     /**
+     * The stored server, or null when there is none (the transport's required-key check refuses
+     * such a channel first).
+     *
      * @param  array<string, mixed>  $config
      */
     public function serverUrl(array $config): ?string
     {
-        return (string) ($config['server'] ?? '');
+        $server = $config['server'] ?? null;
+
+        return is_string($server) && $server !== '' ? $server : null;
     }
 
     /**
@@ -187,21 +191,20 @@ class MattermostChannelType implements MessagingChannelType
      */
     public function destinationKey(array $config): string
     {
-        $server = self::serverParts((string) ($config['server'] ?? ''));
+        $server = ChatServerAddress::parts((string) ($config['server'] ?? ''));
 
         if ($server === null) {
             return '';
         }
 
-        $port = $server['port'] ?? ($server['scheme'] === 'https' ? 443 : 80);
         $segments = [...self::segments((string) ($config['path'] ?? '')), (string) ($config['token'] ?? '')];
 
-        return "{$server['host']}:{$port}/".implode('/', $segments);
+        return ChatServerAddress::hostAndPort($server).'/'.implode('/', $segments);
     }
 
     public function destinationNoun(): string
     {
-        return 'channel';
+        return 'webhook';
     }
 
     /**
@@ -209,7 +212,7 @@ class MattermostChannelType implements MessagingChannelType
      */
     public function displaySummary(NotificationChannel $record): string
     {
-        $server = self::serverParts((string) ($record->config['server'] ?? ''));
+        $server = ChatServerAddress::parts((string) ($record->config['server'] ?? ''));
 
         return $server['host'] ?? '—';
     }
@@ -232,50 +235,6 @@ class MattermostChannelType implements MessagingChannelType
     public function codeNotSentHint(): string
     {
         return 'We couldn\'t post to that Mattermost webhook. Check the URL and that the server is reachable from the internet.';
-    }
-
-    /**
-     * The scheme, host and port of `scheme://host[:port]` in one spelling: lower case, one
-     * trailing dot dropped, an IPv6 literal canonicalised (brackets kept) and the scheme's
-     * default port dropped. Null when it is not such an address.
-     *
-     * @return array{scheme: string, host: string, port: ?int}|null
-     */
-    private static function serverParts(string $server): ?array
-    {
-        if (preg_match(self::SERVER_PATTERN, strtolower($server), $parts) !== 1) {
-            return null;
-        }
-
-        $host = $parts[2];
-
-        if (str_starts_with($host, '[')) {
-            $packed = @inet_pton(substr($host, 1, -1));
-
-            if ($packed === false) {
-                return null;
-            }
-
-            $host = '['.inet_ntop($packed).']';
-        } elseif (str_ends_with($host, '.')) {
-            $host = substr($host, 0, -1);
-        }
-
-        $port = isset($parts[3]) ? (int) $parts[3] : null;
-
-        if ($host === '' || $port === ($parts[1] === 'https' ? 443 : 80)) {
-            $port = null;
-        }
-
-        return $host === '' ? null : ['scheme' => $parts[1], 'host' => $host, 'port' => $port];
-    }
-
-    /**
-     * @param  array{scheme: string, host: string, port: ?int}  $server
-     */
-    private static function serverString(array $server): string
-    {
-        return "{$server['scheme']}://{$server['host']}".($server['port'] === null ? '' : ':'.$server['port']);
     }
 
     /**

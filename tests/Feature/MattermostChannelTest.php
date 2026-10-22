@@ -119,7 +119,9 @@ test('two spellings of the same webhook give one destination key, and a raw conf
         ->toBe('chat.example.com:443/mm/'.CHAN_MM_TOKEN)
         ->and($this->type->destinationKey(['server' => 'https://chat.example.com:8065', 'path' => '/mm', 'token' => CHAN_MM_TOKEN]))
         ->not->toBe($this->type->destinationKey($tidy))
-        ->and($this->type->destinationKey(['server' => 'not a url', 'path' => '', 'token' => CHAN_MM_TOKEN]))->toBe('');
+        ->and($this->type->destinationKey(['server' => 'not a url', 'path' => '', 'token' => CHAN_MM_TOKEN]))->toBe('')
+        ->and($this->type->serverUrl(['path' => '', 'token' => CHAN_MM_TOKEN]))->toBeNull()
+        ->and($this->type->serverUrl(['server' => '', 'path' => '', 'token' => CHAN_MM_TOKEN]))->toBeNull();
 });
 
 test('it refuses a url without /hooks/, a bad token, a query, a double slash and userinfo', function (string $url, string $message) {
@@ -153,6 +155,12 @@ test('it refuses a url without /hooks/, a bad token, a query, a double slash and
     'ftp' => ['ftp://chat.example.com/hooks/'.CHAN_MM_TOKEN, ChatServerGuard::HTTPS_ONLY],
     'http in the cloud' => ['http://chat.example.com/hooks/'.CHAN_MM_TOKEN, ChatServerGuard::HTTPS_ONLY],
     'a single-label host' => ['https://apprise/hooks/'.CHAN_MM_TOKEN, ChatServerGuard::NEEDS_DOMAIN],
+    'a newline after the host' => ["https://chat.example.com\n/hooks/".CHAN_MM_TOKEN, CHAN_MM_MESSAGE],
+    'a carriage return after the host' => ["https://chat.example.com\r/hooks/".CHAN_MM_TOKEN, CHAN_MM_MESSAGE],
+    'a tab in the host' => ["https://chat.\texample.com/hooks/".CHAN_MM_TOKEN, CHAN_MM_MESSAGE],
+    'a NUL in the host' => ["https://chat.example.com\0/hooks/".CHAN_MM_TOKEN, CHAN_MM_MESSAGE],
+    'a newline before the token' => ["https://chat.example.com/hooks/\n".CHAN_MM_TOKEN, CHAN_MM_MESSAGE],
+    'a newline inside the path' => ["https://chat.example.com/mm\n/hooks/".CHAN_MM_TOKEN, CHAN_MM_MESSAGE],
 ]);
 
 test('the field caps the url at 2048 characters', function () {
@@ -337,15 +345,15 @@ test('the same webhook twice is refused', function () {
     $first = NotificationChannel::factory()->for($user)->mattermost(path: '/mm')->create();
 
     chanMattermostSubmit('https://CHAT.example.com.:443/mm/hooks/'.CHAN_MM_TOKEN.'/')
-        ->assertNotified('You already have a Mattermost channel for that channel.');
+        ->assertNotified('You already have a Mattermost channel for that webhook.');
 
     expect(NotificationChannel::sole()->id)->toBe($first->id);
     Http::assertNothingSent();
 
     chanMattermostSubmit('https://chat.example.com/mm/hooks/'.CHAN_MM_OTHER_TOKEN)
-        ->assertNotNotified('You already have a Mattermost channel for that channel.');
+        ->assertNotNotified('You already have a Mattermost channel for that webhook.');
     chanMattermostSubmit('https://mm.example.org/mm/hooks/'.CHAN_MM_TOKEN)
-        ->assertNotNotified('You already have a Mattermost channel for that channel.');
+        ->assertNotNotified('You already have a Mattermost channel for that webhook.');
 
     expect(NotificationChannel::count())->toBe(3);
 });
@@ -391,7 +399,7 @@ test('the type is a dashboard-only messaging type that shows the host and fixed 
         ->and($this->type->icon())->toBe('fab-mattermost')
         ->and($this->type->transport())->toBe(ChannelTransport::Messaging)
         ->and($this->type->requiredConfigKeys())->toBe(['server', 'token'])
-        ->and($this->type->destinationNoun())->toBe('channel')
+        ->and($this->type->destinationNoun())->toBe('webhook')
         ->and($this->type->supportsInlineCreate())->toBeFalse()
         ->and($this->type->appSetupFields(User::factory()->make()))->toBeNull()
         ->and($this->type->countsTowardFreeSlot())->toBeFalse()
