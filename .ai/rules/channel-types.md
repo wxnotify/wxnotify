@@ -10,3 +10,6 @@ Types with a subscriber-supplied host (Mattermost, Rocket.Chat, Matrix) use `Cha
 
 ## ntfy custom server: same guard, vetted at send
 ntfy's optional Server field uses `SafeChatServerUrl` (so https only, public hosts only; http and private targets only on self-host with `allow_private_networks`). It has no Messaging transport: `AppriseTransport` re-checks `NtfyChannelType::serverUrlFrom($channel->apprise_url)` with `ChatServerGuard` on every send and fails with the fixed `NtfyChannelType::SERVER_REFUSED`. A saved channel with a now-refused host is kept, never deleted. The default server (`ntfy://topic`) is never checked.
+
+## Twilio voice channel type: ships disabled, shared code bucket
+`twilio_voice` is a phone type (`placesCalls()` true, shared credential fields from `TwilioSmsChannelType`, consent text for calls) shipped DISABLED + plus-only (sort 14) until the owner's legal review. Every confirmation-code resend places a billed call, so the phone code throttle is load-bearing (5/hour per user+number, 10/hour per user); SMS and voice channels on the same number share the per-number bucket on purpose (it protects the person behind the number). An SMS and a voice channel may coexist on one number; a second voice channel on it is refused.
