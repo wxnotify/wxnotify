@@ -141,6 +141,21 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    /**
+     * A Mattermost channel posting through an incoming webhook on the subscriber's server
+     * (normalised server, sub-path and token). Sends need the host to resolve publicly:
+     * chanFakeChatDns(['chat.example.com' => [...]]).
+     */
+    public function mattermost(string $server = 'https://chat.example.com', string $path = '', string $token = 'h7kq3m9xw5e8rbt4y6uzi3o5pa'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'mattermost',
+            'label' => 'Mattermost',
+            'apprise_url' => null,
+            'config' => ['server' => $server, 'path' => $path, 'token' => $token],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

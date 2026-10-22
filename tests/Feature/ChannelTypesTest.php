@@ -225,6 +225,7 @@ test('every channel type captions its destination value with a fixed, secret-fre
         'bulkvs_sms' => 'Text number',
         'httpsms' => 'Text number',
         'google_chat' => 'Google Chat space',
+        'mattermost' => 'Mattermost server',
         'webhook' => 'Webhook host',
         'webpush' => 'Push service',
     ]);

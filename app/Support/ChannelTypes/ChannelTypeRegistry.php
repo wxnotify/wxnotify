@@ -27,6 +27,7 @@ class ChannelTypeRegistry
         'bulkvs_sms' => BulkVsSmsChannelType::class,
         'httpsms' => HttpSmsChannelType::class,
         'google_chat' => GoogleChatChannelType::class,
+        'mattermost' => MattermostChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType
