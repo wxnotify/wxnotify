@@ -33,7 +33,9 @@ class PhoneNumber
     /**
      * Everything normalize() accepts, with the same result, and also `+` or `00` followed by
      * 8-15 digits whose country code does not start 0 or 1, with the same formatting allowed.
-     * A `+1` (or `001`) number must pass the NANP rules. Null for anything else.
+     * A `+1` (or `001`) number must pass the NANP rules. A trunk `(0)` straight after the country
+     * code (`+44 (0)7700 900123`) is refused rather than stripped to a wrong number; a plain
+     * leading 0 after it stays (`+39 06…` is a real Italian number). Null for anything else.
      */
     public static function normalizeInternational(string $input): ?string
     {
@@ -41,6 +43,10 @@ class PhoneNumber
 
         if ($nanp !== null) {
             return $nanp;
+        }
+
+        if (preg_match('/^\s*(\+|00)\s*\d{1,3}\s*\(\s*0\s*\)/', $input)) {
+            return null;
         }
 
         $compact = (string) preg_replace('/[\s.\-()]/', '', $input);

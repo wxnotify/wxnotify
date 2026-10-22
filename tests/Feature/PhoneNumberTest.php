@@ -306,6 +306,7 @@ it('normalises international whatsapp numbers', function (string $input, string 
     'eight digits' => ['+2345 6789', '+23456789'],
     'ten-digit us' => ['(555) 234-5678', '+15552345678'],
     'us through 001' => ['001 555 234 5678', '+15552345678'],
+    'italian landline with a leading 0' => ['+39 06 1234 5678', '+390612345678'],
 ]);
 
 it('refuses numbers that are too short, too long, start +0, or are +1 but not nanp', function (string $input) {
@@ -326,7 +327,14 @@ it('refuses numbers that are too short, too long, start +0, or are +1 but not na
     '+1 with an exchange starting 1' => '+1 555 123 4567',
     '+1 with an area code starting 0' => '+1 055 234 5678',
     '001 with an exchange starting 0' => '001 555 034 5678',
-    'eleven digits without a plus' => '15551234567',
+    'eleven non-nanp digits without a plus' => '44770090012',
+    'a trunk (0) after +44' => '+44 (0)7700 900123',
+    'a trunk (0) after 0044' => '0044 (0) 7700 900123',
+    'a trunk (0) after +52' => '+52 (0) 55 1234 5678',
+    'a trunk (0) without spaces' => '+44(0)7700900123',
+    'a trunk (0) with inner spaces' => '+44 ( 0 ) 7700 900123',
+    'fullwidth digits' => '＋４４７７００９００１２３',
+    'the us 011 international prefix' => '011 44 7700 900123',
     'letters' => '+52 55 CALL NOW',
     'an extension' => '+44 7700 900123 x12',
     'a plus in the middle' => '52+5512345678',
@@ -439,4 +447,4 @@ it('stores an international number with no from number', function () {
 
 it('refuses to build an international destination from a number it cannot normalise', function () {
     chanFakeInternationalPhoneType()->buildDestination(['token' => 't0k', 'to' => '+52 55 123', 'consent' => true]);
-})->throws(InvalidArgumentException::class);
+})->throws(InvalidArgumentException::class, 'A phone channel needs a To number it accepts.');
