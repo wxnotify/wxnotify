@@ -3,13 +3,10 @@
 namespace App\Support\ChannelTypes;
 
 use App\Models\NotificationChannel;
-use App\Rules\SafeChatServerUrl;
+use App\Support\ChannelTypes\Concerns\IsGuardedChatServer;
 use App\Support\ChannelTypes\Concerns\IsMessagingChannel;
 use App\Support\ChannelTypes\Contracts\MessagingChannelType;
 use App\Support\Delivery\ChatServerAddress;
-use App\Support\Delivery\ChatServerGuard;
-use Closure;
-use Filament\Forms\Components\TextInput;
 use InvalidArgumentException;
 
 /**
@@ -35,6 +32,7 @@ use InvalidArgumentException;
  */
 class MattermostChannelType implements MessagingChannelType
 {
+    use IsGuardedChatServer;
     use IsMessagingChannel;
 
     public const INVALID_MESSAGE = 'Paste the whole incoming webhook URL from Mattermost; it ends in /hooks/ and a 26-character ID.';
@@ -62,25 +60,13 @@ class MattermostChannelType implements MessagingChannelType
     public function formSchema(): array
     {
         return [
-            TextInput::make('webhook_url')
-                ->label('Webhook URL')
-                ->password()
-                ->revealable()
-                ->required()
-                ->maxLength(2048)
-                ->rules([
-                    fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                        if (! is_string($value) || self::parseWebhookUrl($value) === null) {
-                            $fail(self::INVALID_MESSAGE);
-                        }
-                    },
-                    // The guard judges the URL as pasted, less surrounding whitespace (its path is the rule above's).
-                    fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                        (new SafeChatServerUrl)->validate($attribute, is_string($value) ? trim($value) : $value, $fail);
-                    },
-                ])
-                ->helperText('In Mattermost: Integrations → Incoming Webhooks → Add. Paste the whole URL. The server must be reachable from the internet.'),
+            $this->webhookUrlField('In Mattermost: Integrations → Incoming Webhooks → Add. Paste the whole URL. The server must be reachable from the internet.'),
         ];
+    }
+
+    protected function webhookUrlRefusal(string $url): ?string
+    {
+        return self::parseWebhookUrl($url) === null ? self::INVALID_MESSAGE : null;
     }
 
     /**
@@ -129,13 +115,7 @@ class MattermostChannelType implements MessagingChannelType
             throw new InvalidArgumentException(self::INVALID_MESSAGE);
         }
 
-        $violation = app(ChatServerGuard::class)->violation($parsed['server']);
-
-        if ($violation !== null) {
-            throw new InvalidArgumentException($violation);
-        }
-
-        return $parsed;
+        return $this->guardServer($parsed);
     }
 
     /**
@@ -150,35 +130,26 @@ class MattermostChannelType implements MessagingChannelType
 
     /**
      * `mmost[s]://{host}[:{port}]{/segment...}/{token}?{guarded query}`, the authority rebuilt
-     * from the stored server (empty when it is unusable, which MessagingTransport refuses).
+     * from the stored server. It is empty (which MessagingTransport refuses) when the server is
+     * unusable or the stored path or token is outside what the parser allows: Apprise decodes
+     * the path, so a tampered `a/../b` or a `?` would change where it posts.
      *
      * @param  array<string, mixed>  $config
      */
     public function appriseUrl(array $config): string
     {
-        $server = ChatServerAddress::parts((string) ($config['server'] ?? ''));
-        $scheme = ($server['scheme'] ?? 'https') === 'https' ? 'mmosts' : 'mmost';
-        $authority = $server === null ? '' : ChatServerAddress::authority($server);
-        $path = implode('', array_map(
-            fn (string $segment): string => '/'.rawurlencode($segment),
-            self::segments((string) ($config['path'] ?? '')),
-        ));
-        $token = rawurlencode((string) ($config['token'] ?? ''));
+        $segments = self::segments((string) ($config['path'] ?? ''));
+        $token = (string) ($config['token'] ?? '');
+        $wellFormed = preg_match('/^[a-z0-9]{26}$/D', $token) === 1;
 
-        return "{$scheme}://{$authority}{$path}/{$token}?".$this->guardedQuery(['image' => 'no']);
-    }
+        foreach ($segments as $segment) {
+            $wellFormed = $wellFormed && preg_match('/^[A-Za-z0-9._~-]+$/D', $segment) === 1 && trim($segment, '.') !== '';
+        }
 
-    /**
-     * The stored server, or null when there is none (the transport's required-key check refuses
-     * such a channel first).
-     *
-     * @param  array<string, mixed>  $config
-     */
-    public function serverUrl(array $config): ?string
-    {
-        $server = $config['server'] ?? null;
+        ['scheme' => $scheme, 'authority' => $authority] = $this->chatAuthority($config, 'mmosts', 'mmost', $wellFormed);
+        $path = implode('', array_map(fn (string $segment): string => '/'.rawurlencode($segment), $segments));
 
-        return is_string($server) && $server !== '' ? $server : null;
+        return "{$scheme}://{$authority}{$path}/".rawurlencode($token).'?'.$this->guardedQuery(['image' => 'no']);
     }
 
     /**
@@ -205,16 +176,6 @@ class MattermostChannelType implements MessagingChannelType
     public function destinationNoun(): string
     {
         return 'webhook';
-    }
-
-    /**
-     * The server's host, which is not a secret (the token is).
-     */
-    public function displaySummary(NotificationChannel $record): string
-    {
-        $server = ChatServerAddress::parts((string) ($record->config['server'] ?? ''));
-
-        return $server['host'] ?? '—';
     }
 
     public function destinationLabel(): string

@@ -20,13 +20,11 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Validator;
-use Livewire\Features\SupportTesting\Testable;
 use Spatie\Activitylog\Models\Activity;
 
 use function Pest\Livewire\livewire;
 
-// goToConnectChannelStep() and chanFakeChatDns() live in tests/Pest.php.
+// goToConnectChannelStep(), chanFakeChatDns(), chanChatWebhookValidate() and chanChatWebhookSubmit() live in tests/Pest.php.
 
 const CHAN_RC_ID = 'aB3dE5fG7hJ9kL2mN';
 
@@ -49,36 +47,11 @@ beforeEach(function () {
     chanFakeChatDns(['chat.example.com' => [CHAN_RC_PUBLIC_IP], 'rc.example.org' => [CHAN_RC_PUBLIC_IP]]);
 });
 
-/**
- * Whether the webhook field's own rules accept the value, and its errors.
- *
- * @return array{passes: bool, errors: list<string>}
- */
-function chanRocketChatValidate(RocketChatChannelType $type, mixed $value): array
-{
-    $field = collect($type->formSchema())->keyBy(fn ($component) => $component->getName())['webhook_url'];
-    $validator = Validator::make(['webhook_url' => $value], ['webhook_url' => $field->getValidationRules()]);
-
-    return ['passes' => $validator->passes(), 'errors' => $validator->errors()->get('webhook_url')];
-}
-
-/**
- * Pick Rocket.Chat in the wizard, paste the URL and submit step 2.
- */
-function chanRocketChatSubmit(string $url): Testable
-{
-    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'rocketchat']);
-    goToConnectChannelStep($component, 0);
-    $component->fillForm(['webhook_url' => $url]);
-
-    return goToConnectChannelStep($component, 1);
-}
-
 test('it parses the incoming webhook url with and without a port', function (string $url, array $config, string $appriseUrl, string $key) {
     $destination = $this->type->buildDestination(['webhook_url' => $url]);
 
     expect($destination)->toBe(['config' => $config, 'label' => 'Rocket.Chat'])
-        ->and(chanRocketChatValidate($this->type, $url))->toBe(['passes' => true, 'errors' => []])
+        ->and(chanChatWebhookValidate($this->type, $url))->toBe(['passes' => true, 'errors' => []])
         ->and($this->type->appriseUrl($config))->toBe($appriseUrl.'?'.CHAN_RC_QUERY)
         ->and($this->type->serverUrl($config))->toBe($config['server'])
         ->and($this->type->destinationKey($config))->toBe($key);
@@ -124,7 +97,7 @@ test('two spellings of the same webhook give one destination key, and a raw conf
 });
 
 test('it refuses a sub-path, an api url, a pasted user token and a bad id', function (string $url, string $message) {
-    $result = chanRocketChatValidate($this->type, $url);
+    $result = chanChatWebhookValidate($this->type, $url);
 
     expect($result['passes'])->toBeFalse()
         ->and($result['errors'])->toContain($message)
@@ -163,7 +136,7 @@ test('it refuses a sub-path, an api url, a pasted user token and a bad id', func
 test('the field caps the url at 2048 characters', function () {
     $url = 'https://chat.example.com/hooks/'.CHAN_RC_ID.'/'.str_repeat('a', 2048);
 
-    expect(chanRocketChatValidate($this->type, $url)['passes'])->toBeFalse()
+    expect(chanChatWebhookValidate($this->type, $url)['passes'])->toBeFalse()
         ->and(collect($this->type->formSchema())->first()->getValidationRules())
         ->toContain('max:2048');
 });
@@ -185,11 +158,29 @@ test('it encodes the webhook in the userinfo with %2F and builds the authority f
         ->toBe('rockets://'.CHAN_RC_ID.'%2F'.CHAN_RC_TOKEN.'@chat.example.com?'.CHAN_RC_QUERY)
         ->and($this->type->appriseUrl(['webhook_id' => CHAN_RC_ID, 'webhook_token' => CHAN_RC_TOKEN]))
         ->toBe('rockets://'.CHAN_RC_ID.'%2F'.CHAN_RC_TOKEN.'@?'.CHAN_RC_QUERY);
-
-    $hostile = $this->type->appriseUrl(['server' => 'https://chat.example.com', 'webhook_id' => 'a@b/c', 'webhook_token' => 'x:y?z#w%v é']);
-
-    expect($hostile)->toBe('rockets://a%40b%2Fc%2Fx%3Ay%3Fz%23w%25v%20%C3%A9@chat.example.com?'.CHAN_RC_QUERY);
 });
+
+test('a stored id or token outside [A-Za-z0-9] gets no authority, so the transport refuses the send', function (string $key, string $value) {
+    Http::fake();
+    $config = ['server' => 'https://chat.example.com', 'webhook_id' => CHAN_RC_ID, 'webhook_token' => CHAN_RC_TOKEN, $key => $value];
+
+    expect($this->type->appriseUrl($config))->toContain('@?')
+        ->and($this->type->appriseUrl($config))->not->toContain('chat.example.com');
+
+    $channel = NotificationChannel::factory()->rocketChat(webhookId: $config['webhook_id'], webhookToken: $config['webhook_token'])->for(User::factory()->create(['tier_override' => Tier::Plus]))->create();
+    $result = app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert');
+
+    expect($result->success)->toBeFalse();
+    Http::assertNothingSent();
+})->with([
+    'a slash in the id' => ['webhook_id', 'a/b'],
+    'a slash in the token' => ['webhook_token', 'x/y'],
+    'a question mark in the token' => ['webhook_token', 'x?y'],
+    'a hash in the id' => ['webhook_id', 'a#b'],
+    'a percent in the token' => ['webhook_token', 'x%2Fy'],
+    'a space in the id' => ['webhook_id', 'a b'],
+    'an empty token' => ['webhook_token', ''],
+]);
 
 test('every url-special character is refused in the id and in the token before it can reach apprise', function (string $character) {
     $encoded = rawurlencode($character);
@@ -203,7 +194,7 @@ test('every url-special character is refused in the id and in the token before i
     $urls[] = 'https://chat.example.com/hooks/'.CHAN_RC_ID."/a{$character}b";
 
     foreach ($urls as $url) {
-        expect(chanRocketChatValidate($this->type, $url)['passes'])->toBeFalse($url)
+        expect(chanChatWebhookValidate($this->type, $url)['passes'])->toBeFalse($url)
             ->and(fn () => $this->type->buildDestination(['webhook_url' => $url]))->toThrow(InvalidArgumentException::class);
     }
 })->with(['/', '@', ':', '?', '#', '%', ' ', 'é', '.', '-', '_', '~', '+']);
@@ -213,7 +204,7 @@ test('completing the wizard as Plus posts the code', function () {
     $this->actingAs($user);
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
-    $component = chanRocketChatSubmit('https://chat.example.com:3000/hooks/'.CHAN_RC_ID.'/'.CHAN_RC_TOKEN.'/');
+    $component = chanChatWebhookSubmit('rocketchat', 'https://chat.example.com:3000/hooks/'.CHAN_RC_ID.'/'.CHAN_RC_TOKEN.'/');
     $component->assertSee('We just posted a 6-digit code to your Rocket.Chat channel.');
 
     $channel = NotificationChannel::where('user_id', $user->id)->sole();
@@ -249,9 +240,9 @@ test('a server that resolves privately is refused at save time', function (strin
     Http::fake();
     chanFakeChatDns($dns);
 
-    chanRocketChatSubmit($url)->assertHasFormErrors(['webhook_url']);
+    chanChatWebhookSubmit('rocketchat', $url)->assertHasFormErrors(['webhook_url']);
 
-    expect(chanRocketChatValidate($this->type, $url)['errors'])->toContain(ChatServerGuard::PRIVATE_NETWORK)
+    expect(chanChatWebhookValidate($this->type, $url)['errors'])->toContain(ChatServerGuard::PRIVATE_NETWORK)
         ->and(fn () => $this->type->buildDestination(['webhook_url' => $url]))
         ->toThrow(InvalidArgumentException::class, ChatServerGuard::PRIVATE_NETWORK)
         ->and(NotificationChannel::count())->toBe(0);
@@ -298,6 +289,7 @@ test('messages are cut to 1000 characters with the link kept', function () {
     expect($result->success)->toBeTrue()
         ->and($this->type->maxLength())->toBe(1000);
     Http::assertSent(fn (Request $request): bool => mb_strlen($request['body']) <= 1000
+        && mb_strlen($request['body']) > 950
         && str_ends_with($request['body'], "\n\n{$link}")
         && str_starts_with($request['body'], "Tornado Warning\n\n")
         && str_contains($request['body'], '...')
@@ -328,7 +320,7 @@ test('an Apprise connection error during the wizard says the code could not be s
     $this->actingAs(User::factory()->create(['tier_override' => Tier::Plus]));
     Http::fake(['*/notify/*' => Http::failedConnection()]);
 
-    chanRocketChatSubmit('https://chat.example.com/hooks/'.CHAN_RC_ID.'/'.CHAN_RC_TOKEN)
+    chanChatWebhookSubmit('rocketchat', 'https://chat.example.com/hooks/'.CHAN_RC_ID.'/'.CHAN_RC_TOKEN)
         ->assertNotified(Notification::make()
             ->title('Couldn\'t send your confirmation code')
             ->body('We couldn\'t post to that Rocket.Chat webhook. Check the URL and that the server is reachable from the internet.')
@@ -343,15 +335,15 @@ test('the same webhook twice is refused', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
     $first = NotificationChannel::factory()->for($user)->rocketChat()->create();
 
-    chanRocketChatSubmit('https://CHAT.example.com.:443/hooks/'.CHAN_RC_ID.'/'.CHAN_RC_TOKEN.'/')
+    chanChatWebhookSubmit('rocketchat', 'https://CHAT.example.com.:443/hooks/'.CHAN_RC_ID.'/'.CHAN_RC_TOKEN.'/')
         ->assertNotified('You already have a Rocket.Chat channel for that webhook.');
 
     expect(NotificationChannel::sole()->id)->toBe($first->id);
     Http::assertNothingSent();
 
-    chanRocketChatSubmit('https://chat.example.com/hooks/'.CHAN_RC_OTHER_ID.'/'.CHAN_RC_TOKEN)
+    chanChatWebhookSubmit('rocketchat', 'https://chat.example.com/hooks/'.CHAN_RC_OTHER_ID.'/'.CHAN_RC_TOKEN)
         ->assertNotNotified('You already have a Rocket.Chat channel for that webhook.');
-    chanRocketChatSubmit('https://rc.example.org/hooks/'.CHAN_RC_ID.'/'.CHAN_RC_TOKEN)
+    chanChatWebhookSubmit('rocketchat', 'https://rc.example.org/hooks/'.CHAN_RC_ID.'/'.CHAN_RC_TOKEN)
         ->assertNotNotified('You already have a Rocket.Chat channel for that webhook.');
 
     expect(NotificationChannel::count())->toBe(3);

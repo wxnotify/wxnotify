@@ -1,9 +1,11 @@
 <?php
 
+use App\Filament\Dashboard\Pages\ConnectChannel;
 use App\Models\ChannelType;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Settings\IntegrationSettings;
+use App\Support\ChannelTypes\Contracts\MessagingChannelType;
 use App\Support\Delivery\ChatServerGuard;
 use App\Support\Delivery\HeartbeatUrlGuard;
 use App\Support\Delivery\Pauser;
@@ -21,6 +23,7 @@ use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Features\SupportTesting\Testable;
 use Minishlink\WebPush\MessageSentReport;
 use Minishlink\WebPush\Subscription;
@@ -260,6 +263,32 @@ function chanFakeChatDns(array $hostToAddresses): void
     app()->instance(ChatServerGuard::class, new ChatServerGuard(
         fn (string $host): array => $hostToAddresses[$host] ?? [],
     ));
+}
+
+/**
+ * Whether a guarded chat type's `webhook_url` field accepts the value by its own rules
+ * (getValidationRules(): the shape rule, the length cap and SafeChatServerUrl), and its errors.
+ *
+ * @return array{passes: bool, errors: list<string>}
+ */
+function chanChatWebhookValidate(MessagingChannelType $type, mixed $value): array
+{
+    $field = collect($type->formSchema())->keyBy(fn ($component) => $component->getName())['webhook_url'];
+    $validator = Validator::make(['webhook_url' => $value], ['webhook_url' => $field->getValidationRules()]);
+
+    return ['passes' => $validator->passes(), 'errors' => $validator->errors()->get('webhook_url')];
+}
+
+/**
+ * Pick a guarded chat type in the connect wizard, paste the webhook URL and submit step 2.
+ */
+function chanChatWebhookSubmit(string $slug, string $url): Testable
+{
+    $component = Pest\Livewire\livewire(ConnectChannel::class)->fillForm(['channel_type' => $slug]);
+    goToConnectChannelStep($component, 0);
+    $component->fillForm(['webhook_url' => $url]);
+
+    return goToConnectChannelStep($component, 1);
 }
 
 const CHAN_VAPID_PUBLIC = 'BFbRVvYSUiZyN3mXneDDJEjejmTXvjDA8TMDLCD_aUW3GKOA-ohT-uHQDGm3pQqeK4YrmmZlfjwE7XyqTVSzAAM';

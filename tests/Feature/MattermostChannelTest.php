@@ -20,14 +20,12 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Validator;
-use Livewire\Features\SupportTesting\Testable;
 use Spatie\Activitylog\Models\Activity;
 use ToneGabes\BetterOptions\Forms\Components\RadioCards;
 
 use function Pest\Livewire\livewire;
 
-// goToConnectChannelStep() and chanFakeChatDns() live in tests/Pest.php.
+// goToConnectChannelStep(), chanFakeChatDns(), chanChatWebhookValidate() and chanChatWebhookSubmit() live in tests/Pest.php.
 
 const CHAN_MM_TOKEN = 'h7kq3m9xw5e8rbt4y6uzi3o5pa';
 
@@ -44,36 +42,11 @@ beforeEach(function () {
     chanFakeChatDns(['chat.example.com' => [CHAN_MM_PUBLIC_IP], 'mm.example.org' => [CHAN_MM_PUBLIC_IP]]);
 });
 
-/**
- * Whether the webhook field's own rules accept the value, and its errors.
- *
- * @return array{passes: bool, errors: list<string>}
- */
-function chanMattermostValidate(MattermostChannelType $type, mixed $value): array
-{
-    $field = collect($type->formSchema())->keyBy(fn ($component) => $component->getName())['webhook_url'];
-    $validator = Validator::make(['webhook_url' => $value], ['webhook_url' => $field->getValidationRules()]);
-
-    return ['passes' => $validator->passes(), 'errors' => $validator->errors()->get('webhook_url')];
-}
-
-/**
- * Pick Mattermost in the wizard, paste the URL and submit step 2.
- */
-function chanMattermostSubmit(string $url): Testable
-{
-    $component = livewire(ConnectChannel::class)->fillForm(['channel_type' => 'mattermost']);
-    goToConnectChannelStep($component, 0);
-    $component->fillForm(['webhook_url' => $url]);
-
-    return goToConnectChannelStep($component, 1);
-}
-
 test('it parses webhook urls with and without a sub-path, port and trailing slash', function (string $url, array $config, string $appriseUrl, string $key) {
     $destination = $this->type->buildDestination(['webhook_url' => $url]);
 
     expect($destination)->toBe(['config' => $config, 'label' => 'Mattermost'])
-        ->and(chanMattermostValidate($this->type, $url))->toBe(['passes' => true, 'errors' => []])
+        ->and(chanChatWebhookValidate($this->type, $url))->toBe(['passes' => true, 'errors' => []])
         ->and($this->type->appriseUrl($config))->toBe($appriseUrl.'?'.CHAN_MM_QUERY)
         ->and($this->type->serverUrl($config))->toBe($config['server'])
         ->and($this->type->destinationKey($config))->toBe($key);
@@ -125,7 +98,7 @@ test('two spellings of the same webhook give one destination key, and a raw conf
 });
 
 test('it refuses a url without /hooks/, a bad token, a query, a double slash and userinfo', function (string $url, string $message) {
-    $result = chanMattermostValidate($this->type, $url);
+    $result = chanChatWebhookValidate($this->type, $url);
 
     expect($result['passes'])->toBeFalse()
         ->and($result['errors'])->toContain($message)
@@ -166,7 +139,7 @@ test('it refuses a url without /hooks/, a bad token, a query, a double slash and
 test('the field caps the url at 2048 characters', function () {
     $url = 'https://chat.example.com/'.str_repeat('a', 2048).'/hooks/'.CHAN_MM_TOKEN;
 
-    expect(chanMattermostValidate($this->type, $url)['passes'])->toBeFalse()
+    expect(chanChatWebhookValidate($this->type, $url)['passes'])->toBeFalse()
         ->and(collect($this->type->formSchema())->first()->getValidationRules())
         ->toContain('max:2048');
 });
@@ -183,15 +156,31 @@ test('http is allowed with mmost:// only where private networks are allowed', fu
         ->toBe('http://mm.lan.example');
 });
 
-test('it percent-encodes sub-path segments in the apprise url', function (string $component) {
-    $config = ['server' => 'https://chat.example.com', 'path' => '/mm/team', 'token' => CHAN_MM_TOKEN];
-    $config[$component] = $component === 'path' ? '/mm/a@b:c?d#e%f g é' : 'a@b:c?d#e%f g é/x';
-    $expected = $component === 'path'
-        ? 'mmosts://chat.example.com/mm/a%40b%3Ac%3Fd%23e%25f%20g%20%C3%A9/'.CHAN_MM_TOKEN
-        : 'mmosts://chat.example.com/mm/team/a%40b%3Ac%3Fd%23e%25f%20g%20%C3%A9%2Fx';
+test('a stored path or token outside the parser\'s set gets no authority, so the transport refuses the send', function (string $component, string $value) {
+    Http::fake();
+    $config = ['server' => 'https://chat.example.com', 'path' => '/mm/team', 'token' => CHAN_MM_TOKEN, $component => $value];
 
-    expect($this->type->appriseUrl($config))->toBe($expected.'?'.CHAN_MM_QUERY);
-})->with(['path', 'token']);
+    expect($this->type->appriseUrl($config))->toStartWith('mmosts:///')
+        ->and($this->type->appriseUrl(['server' => 'https://chat.example.com', 'path' => '/mm/team', 'token' => CHAN_MM_TOKEN]))
+        ->toBe('mmosts://chat.example.com/mm/team/'.CHAN_MM_TOKEN.'?'.CHAN_MM_QUERY);
+
+    $channel = NotificationChannel::factory()->mattermost(path: $config['path'], token: $config['token'])->for(User::factory()->create(['tier_override' => Tier::Plus]))->create();
+    $result = app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert');
+
+    expect($result->success)->toBeFalse();
+    Http::assertNothingSent();
+})->with([
+    'a slash that Apprise would decode into a segment (token)' => ['token', 'h7kq3m9xw5e8rbt4y6uzi3o5/a'],
+    'a short token' => ['token', 'abc'],
+    'an upper-case token' => ['token', strtoupper(CHAN_MM_TOKEN)],
+    'a question mark in the path' => ['path', '/mm/a?b'],
+    'an at sign in the path' => ['path', '/mm/a@b'],
+    'a percent in the path' => ['path', '/mm/a%2Fb'],
+    'a space in the path' => ['path', '/mm/a b'],
+    'a unicode segment' => ['path', '/mm/é'],
+    'a dot-dot segment' => ['path', '/mm/../x'],
+    'a single-dot segment' => ['path', '/mm/./x'],
+]);
 
 test('every url-special character is refused in a segment and in the token before it can reach apprise', function (string $character) {
     $encoded = rawurlencode($character);
@@ -205,7 +194,7 @@ test('every url-special character is refused in a segment and in the token befor
     }
 
     foreach ($urls as $url) {
-        expect(chanMattermostValidate($this->type, $url)['passes'])->toBeFalse()
+        expect(chanChatWebhookValidate($this->type, $url)['passes'])->toBeFalse()
             ->and(fn () => $this->type->buildDestination(['webhook_url' => $url]))->toThrow(InvalidArgumentException::class);
     }
 })->with(['/', '@', ':', '?', '#', '%', ' ', 'é']);
@@ -215,7 +204,7 @@ test('the allowed sub-path characters round-trip to apprise unencoded', function
     $this->actingAs($user);
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
-    chanMattermostSubmit('https://chat.example.com/a.b_c~d-e/hooks/'.CHAN_MM_TOKEN);
+    chanChatWebhookSubmit('mattermost', 'https://chat.example.com/a.b_c~d-e/hooks/'.CHAN_MM_TOKEN);
 
     Http::assertSent(fn (Request $request): bool => $request['urls'] === 'mmosts://chat.example.com/a.b_c~d-e/'.CHAN_MM_TOKEN.'?'.CHAN_MM_QUERY);
 });
@@ -225,7 +214,7 @@ test('completing the wizard as Plus posts the code to the webhook', function () 
     $this->actingAs($user);
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 
-    $component = chanMattermostSubmit('https://chat.example.com:8065/mm/hooks/'.CHAN_MM_TOKEN.'/');
+    $component = chanChatWebhookSubmit('mattermost', 'https://chat.example.com:8065/mm/hooks/'.CHAN_MM_TOKEN.'/');
     $component->assertSee('We just posted a 6-digit code to your Mattermost channel.');
 
     $channel = NotificationChannel::where('user_id', $user->id)->sole();
@@ -266,9 +255,9 @@ test('a server that resolves privately is refused at save time', function (strin
     Http::fake();
     chanFakeChatDns($dns);
 
-    chanMattermostSubmit($url)->assertHasFormErrors(['webhook_url']);
+    chanChatWebhookSubmit('mattermost', $url)->assertHasFormErrors(['webhook_url']);
 
-    expect(chanMattermostValidate($this->type, $url)['errors'])->toContain(ChatServerGuard::PRIVATE_NETWORK)
+    expect(chanChatWebhookValidate($this->type, $url)['errors'])->toContain(ChatServerGuard::PRIVATE_NETWORK)
         ->and(fn () => $this->type->buildDestination(['webhook_url' => $url]))
         ->toThrow(InvalidArgumentException::class, ChatServerGuard::PRIVATE_NETWORK)
         ->and(NotificationChannel::count())->toBe(0);
@@ -329,7 +318,7 @@ test('an Apprise connection error during the wizard says the code could not be s
     $this->actingAs(User::factory()->create(['tier_override' => Tier::Plus]));
     Http::fake(['*/notify/*' => Http::failedConnection()]);
 
-    chanMattermostSubmit('https://chat.example.com/hooks/'.CHAN_MM_TOKEN)
+    chanChatWebhookSubmit('mattermost', 'https://chat.example.com/hooks/'.CHAN_MM_TOKEN)
         ->assertNotified(Notification::make()
             ->title('Couldn\'t send your confirmation code')
             ->body('We couldn\'t post to that Mattermost webhook. Check the URL and that the server is reachable from the internet.')
@@ -344,15 +333,15 @@ test('the same webhook twice is refused', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
     $first = NotificationChannel::factory()->for($user)->mattermost(path: '/mm')->create();
 
-    chanMattermostSubmit('https://CHAT.example.com.:443/mm/hooks/'.CHAN_MM_TOKEN.'/')
+    chanChatWebhookSubmit('mattermost', 'https://CHAT.example.com.:443/mm/hooks/'.CHAN_MM_TOKEN.'/')
         ->assertNotified('You already have a Mattermost channel for that webhook.');
 
     expect(NotificationChannel::sole()->id)->toBe($first->id);
     Http::assertNothingSent();
 
-    chanMattermostSubmit('https://chat.example.com/mm/hooks/'.CHAN_MM_OTHER_TOKEN)
+    chanChatWebhookSubmit('mattermost', 'https://chat.example.com/mm/hooks/'.CHAN_MM_OTHER_TOKEN)
         ->assertNotNotified('You already have a Mattermost channel for that webhook.');
-    chanMattermostSubmit('https://mm.example.org/mm/hooks/'.CHAN_MM_TOKEN)
+    chanChatWebhookSubmit('mattermost', 'https://mm.example.org/mm/hooks/'.CHAN_MM_TOKEN)
         ->assertNotNotified('You already have a Mattermost channel for that webhook.');
 
     expect(NotificationChannel::count())->toBe(3);

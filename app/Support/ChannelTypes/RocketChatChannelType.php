@@ -3,13 +3,10 @@
 namespace App\Support\ChannelTypes;
 
 use App\Models\NotificationChannel;
-use App\Rules\SafeChatServerUrl;
+use App\Support\ChannelTypes\Concerns\IsGuardedChatServer;
 use App\Support\ChannelTypes\Concerns\IsMessagingChannel;
 use App\Support\ChannelTypes\Contracts\MessagingChannelType;
 use App\Support\Delivery\ChatServerAddress;
-use App\Support\Delivery\ChatServerGuard;
-use Closure;
-use Filament\Forms\Components\TextInput;
 use InvalidArgumentException;
 
 /**
@@ -36,6 +33,7 @@ use InvalidArgumentException;
  */
 class RocketChatChannelType implements MessagingChannelType
 {
+    use IsGuardedChatServer;
     use IsMessagingChannel;
 
     public const INVALID_MESSAGE = 'Paste the whole incoming webhook URL from Rocket.Chat; it ends in /hooks/, an ID and a token.';
@@ -77,31 +75,13 @@ class RocketChatChannelType implements MessagingChannelType
     public function formSchema(): array
     {
         return [
-            TextInput::make('webhook_url')
-                ->label('Webhook URL')
-                ->password()
-                ->revealable()
-                ->required()
-                ->maxLength(2048)
-                ->rules([
-                    fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                        if (! is_string($value)) {
-                            $fail(self::INVALID_MESSAGE);
-
-                            return;
-                        }
-
-                        if (self::parseWebhookUrl($value) === null) {
-                            $fail(self::refusalMessage($value));
-                        }
-                    },
-                    // The guard judges the URL as pasted, less surrounding whitespace (its path is the rule above's).
-                    fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                        (new SafeChatServerUrl)->validate($attribute, is_string($value) ? trim($value) : $value, $fail);
-                    },
-                ])
-                ->helperText('In Rocket.Chat: Administration → Integrations → New → Incoming. Paste the whole Webhook URL. The server must be reachable from the internet.'),
+            $this->webhookUrlField('In Rocket.Chat: Administration → Integrations → New → Incoming. Paste the whole Webhook URL. The server must be reachable from the internet.'),
         ];
+    }
+
+    protected function webhookUrlRefusal(string $url): ?string
+    {
+        return self::parseWebhookUrl($url) === null ? self::refusalMessage($url) : null;
     }
 
     /**
@@ -162,13 +142,7 @@ class RocketChatChannelType implements MessagingChannelType
             throw new InvalidArgumentException(self::refusalMessage($url));
         }
 
-        $violation = app(ChatServerGuard::class)->violation($parsed['server']);
-
-        if ($violation !== null) {
-            throw new InvalidArgumentException($violation);
-        }
-
-        return $parsed;
+        return $this->guardServer($parsed);
     }
 
     /**
@@ -181,32 +155,21 @@ class RocketChatChannelType implements MessagingChannelType
 
     /**
      * `rocket[s]://{id}%2F{token}@{host}[:{port}]?{guarded query}`, the authority rebuilt from
-     * the stored server (empty when it is unusable, which MessagingTransport refuses). There is
-     * never a path: Apprise would read it as a target channel.
+     * the stored server. It is empty (which MessagingTransport refuses) when the server is
+     * unusable or the stored id or token is not alphanumeric: Apprise decodes the user part, so
+     * a tampered `a/b` would otherwise add a path segment, which it reads as a target channel.
+     * There is never a path in the URL.
      *
      * @param  array<string, mixed>  $config
      */
     public function appriseUrl(array $config): string
     {
-        $server = ChatServerAddress::parts((string) ($config['server'] ?? ''));
-        $scheme = ($server['scheme'] ?? 'https') === 'https' ? 'rockets' : 'rocket';
-        $authority = $server === null ? '' : ChatServerAddress::authority($server);
-        $webhook = rawurlencode((string) ($config['webhook_id'] ?? '')).'%2F'.rawurlencode((string) ($config['webhook_token'] ?? ''));
+        $id = (string) ($config['webhook_id'] ?? '');
+        $token = (string) ($config['webhook_token'] ?? '');
+        $wellFormed = preg_match('/^[A-Za-z0-9]+$/D', $id) === 1 && preg_match('/^[A-Za-z0-9]+$/D', $token) === 1;
+        ['scheme' => $scheme, 'authority' => $authority] = $this->chatAuthority($config, 'rockets', 'rocket', $wellFormed);
 
-        return "{$scheme}://{$webhook}@{$authority}?".$this->guardedQuery(['avatar' => 'no']);
-    }
-
-    /**
-     * The stored server, or null when there is none (the transport's required-key check refuses
-     * such a channel first).
-     *
-     * @param  array<string, mixed>  $config
-     */
-    public function serverUrl(array $config): ?string
-    {
-        $server = $config['server'] ?? null;
-
-        return is_string($server) && $server !== '' ? $server : null;
+        return "{$scheme}://".rawurlencode($id).'%2F'.rawurlencode($token)."@{$authority}?".$this->guardedQuery(['avatar' => 'no']);
     }
 
     /**
@@ -230,16 +193,6 @@ class RocketChatChannelType implements MessagingChannelType
     public function destinationNoun(): string
     {
         return 'webhook';
-    }
-
-    /**
-     * The server's host, which is not a secret (the token is).
-     */
-    public function displaySummary(NotificationChannel $record): string
-    {
-        $server = ChatServerAddress::parts((string) ($record->config['server'] ?? ''));
-
-        return $server['host'] ?? '—';
     }
 
     public function destinationLabel(): string
