@@ -14,6 +14,7 @@ use App\Support\Delivery\Transports\MessagingTransport;
 use App\Support\Delivery\Transports\MobilePushTransport;
 use App\Support\Delivery\Transports\SmsTransport;
 use App\Support\Delivery\Transports\Transport;
+use App\Support\Delivery\Transports\TwilioVoiceTransport;
 use App\Support\Delivery\Transports\WebhookTransport;
 use App\Support\Delivery\Transports\WebPushTransport;
 use App\Support\MessagePrefix;
@@ -83,6 +84,7 @@ class ChannelDispatcher
             ChannelTransport::MobilePush => app(MobilePushTransport::class),
             ChannelTransport::Sms => app(SmsTransport::class),
             ChannelTransport::Messaging => app(MessagingTransport::class),
+            ChannelTransport::TwilioVoice => app(TwilioVoiceTransport::class),
         };
     }
 }

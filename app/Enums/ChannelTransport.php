@@ -11,4 +11,5 @@ enum ChannelTransport: string
     case MobilePush = 'mobile_push';
     case Sms = 'sms';
     case Messaging = 'messaging';
+    case TwilioVoice = 'twilio_voice';
 }
