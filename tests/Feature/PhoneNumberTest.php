@@ -1,8 +1,12 @@
 <?php
 
+use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Enums\ChannelTransport;
+use App\Enums\Tier;
+use App\Exceptions\ChannelCodeThrottled;
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Rules\InternationalPhoneNumber;
 use App\Rules\NanpPhoneNumber;
 use App\Support\ChannelTypes\Concerns\IsPhoneChannel;
 use App\Support\ChannelTypes\Contracts\PhoneChannelType;
@@ -10,6 +14,9 @@ use App\Support\PhoneConsent;
 use App\Support\PhoneNumber;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -194,3 +201,242 @@ it('lets the number fields accept every format the rule accepts and refuse the r
 
     expect($validate('+44 20 7946 0958')->errors()->get($field))->toBe([PhoneNumber::INVALID_MESSAGE]);
 })->with(['from', 'to']);
+
+/**
+ * A phone type that uses every hook the way WhatsApp will: no From number, international
+ * numbers and its own consent wording.
+ */
+function chanFakeInternationalPhoneType(): PhoneChannelType
+{
+    return new class implements PhoneChannelType
+    {
+        use IsPhoneChannel;
+
+        public function slug(): string
+        {
+            return 'fake_whatsapp';
+        }
+
+        public function label(): string
+        {
+            return 'Fake WhatsApp';
+        }
+
+        public function icon(): string
+        {
+            return 'fab-whatsapp';
+        }
+
+        public function formSchema(): array
+        {
+            return $this->phoneFields('Unused: this type has no From number.');
+        }
+
+        public function transport(): ChannelTransport
+        {
+            return ChannelTransport::Apprise;
+        }
+
+        public function destinationLabel(): string
+        {
+            return 'WhatsApp number';
+        }
+
+        public function providerLabel(): string
+        {
+            return 'Meta';
+        }
+
+        public function failureMessage(): string
+        {
+            return 'Fake WhatsApp did not accept the message.';
+        }
+
+        public function optOutHint(): ?string
+        {
+            return null;
+        }
+
+        public function confirmationHint(NotificationChannel $channel): string
+        {
+            return 'We sent a code to your WhatsApp.';
+        }
+
+        public function codeNotSentHint(): string
+        {
+            return 'Check your Meta credentials.';
+        }
+
+        protected function credentialConfig(array $data): array
+        {
+            return ['token' => $data['token']];
+        }
+
+        protected function usesFromNumber(): bool
+        {
+            return false;
+        }
+
+        protected function normalizeNumber(string $input): ?string
+        {
+            return PhoneNumber::normalizeInternational($input);
+        }
+
+        protected function toNumberRule(): ValidationRule
+        {
+            return new InternationalPhoneNumber;
+        }
+
+        protected function consentText(): string
+        {
+            return PhoneConsent::whatsappText();
+        }
+    };
+}
+
+it('normalises international whatsapp numbers', function (string $input, string $e164) {
+    expect(PhoneNumber::normalizeInternational($input))->toBe($e164)
+        ->and(Validator::make(['to' => $input], ['to' => [new InternationalPhoneNumber]])->passes())->toBeTrue();
+})->with([
+    'mexican mobile with the 1' => ['+52 1 55 1234 5678', '+5215512345678'],
+    'mexican with 00' => ['0052 55 1234 5678', '+525512345678'],
+    'uk mobile' => ['+44 7700 900123', '+447700900123'],
+    'dashes and parentheses' => ['+502 (2345) 6789', '+50223456789'],
+    'fifteen digits' => ['+234 5678 9012 345', '+23456789012345'],
+    'eight digits' => ['+2345 6789', '+23456789'],
+    'ten-digit us' => ['(555) 234-5678', '+15552345678'],
+    'us through 001' => ['001 555 234 5678', '+15552345678'],
+]);
+
+it('refuses numbers that are too short, too long, start +0, or are +1 but not nanp', function (string $input) {
+    $validator = Validator::make(['to' => $input], ['to' => ['required', new InternationalPhoneNumber]]);
+
+    expect(PhoneNumber::normalizeInternational($input))->toBeNull()
+        ->and($validator->fails())->toBeTrue();
+
+    if ($input !== '') {
+        expect($validator->errors()->first('to'))->toBe(PhoneNumber::INTERNATIONAL_INVALID_MESSAGE);
+    }
+})->with([
+    'seven digits' => '234-5678',
+    'seven digits after the plus' => '+52 55 123',
+    'sixteen digits' => '+52 1234 5678 9012 34',
+    'starts +0' => '+0 44 7700 900123',
+    'starts 000' => '000 44 7700 900123',
+    '+1 with an exchange starting 1' => '+1 555 123 4567',
+    '+1 with an area code starting 0' => '+1 055 234 5678',
+    '001 with an exchange starting 0' => '001 555 034 5678',
+    'eleven digits without a plus' => '15551234567',
+    'letters' => '+52 55 CALL NOW',
+    'an extension' => '+44 7700 900123 x12',
+    'a plus in the middle' => '52+5512345678',
+    'a repeated plus' => '++52 55 1234 5678',
+    '00 then a plus' => '00+52 55 1234 5678',
+    'empty' => '',
+]);
+
+it('normalizeInternational agrees with normalize for every nanp input', function (string $input) {
+    expect(PhoneNumber::normalizeInternational($input))->toBe(PhoneNumber::normalize($input));
+})->with([
+    'ten digits' => '5552345678',
+    'one plus ten digits' => '15552345678',
+    'plus one with punctuation' => '+1 (555) 234-5678',
+    'dotted' => '555.234.5678',
+    'spaced with a leading one' => '1 555 234 5678',
+    'area code starting 0' => '055-234-5678',
+    'area code starting 1' => '155-234-5678',
+    'exchange starting 0' => '555-034-5678',
+    'exchange starting 1' => '555-123-4567',
+    'plus one, exchange starting 1' => '+1 555 123 4567',
+]);
+
+it('keeps the nanp message for sms and gives the international rule its own', function () {
+    expect(PhoneNumber::INVALID_MESSAGE)->toBe('Enter a US or Canadian number, e.g. (555) 234-5678.')
+        ->and(PhoneNumber::INTERNATIONAL_INVALID_MESSAGE)->toBe('Enter your WhatsApp number with its country code, e.g. +52 55 1234 5678 or (555) 234-5678.')
+        ->and(Validator::make(['to' => '+44 7700 900123'], ['to' => [new NanpPhoneNumber]])->errors()->first('to'))->toBe(PhoneNumber::INVALID_MESSAGE);
+});
+
+it('the phone throttle key for a nanp number is unchanged', function () {
+    chanEnablePhoneTypes();
+    chanFakePauser();
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $channel = NotificationChannel::factory()->for($user)->httpSms('+15552345678')->unverified()->create();
+    $key = "phone-code-number:{$user->id}:".hash('sha256', '+15552345678');
+    RateLimiter::clear($key);
+    RateLimiter::clear("phone-code-user:{$user->id}");
+
+    app(DispatchChannelConfirmationCode::class)($channel);
+
+    expect(DispatchChannelConfirmationCode::numberLimitKey($user->id, '+15552345678'))->toBe($key)
+        ->and(RateLimiter::attempts($key))->toBe(1)
+        ->and(RateLimiter::attempts("phone-code-user:{$user->id}"))->toBe(1);
+});
+
+it('gives an international number its own throttle bucket, whatever its format', function () {
+    $user = User::factory()->create();
+    $key = DispatchChannelConfirmationCode::numberLimitKey($user->id, '+5215512345678');
+    RateLimiter::clear($key);
+    RateLimiter::clear(DispatchChannelConfirmationCode::numberLimitKey($user->id, '+447700900123'));
+    RateLimiter::clear(DispatchChannelConfirmationCode::userLimitKey($user->id));
+
+    foreach (range(1, DispatchChannelConfirmationCode::CODES_PER_NUMBER_PER_HOUR) as $ignored) {
+        RateLimiter::hit($key, 3600);
+    }
+
+    DispatchChannelConfirmationCode::refuseWhenThrottled($user->id, '+44 7700 900123');
+
+    expect(fn () => DispatchChannelConfirmationCode::refuseWhenThrottled($user->id, '+52 1 55 1234 5678'))
+        ->toThrow(ChannelCodeThrottled::class);
+});
+
+it('words the whatsapp consent with the same version, meta charges and how to stop', function () {
+    expect(PhoneConsent::whatsappText())
+        ->toContain('own this phone number or am allowed to use it')
+        ->toContain('opted in')
+        ->toContain('WhatsApp Business account')
+        ->toContain('Meta')
+        ->toContain('deleting this channel')
+        ->toContain('blocking the business number in WhatsApp')
+        ->not->toContain('STOP');
+});
+
+it('leaves out the from number and uses the hooks for the number rule and consent', function () {
+    $fields = collect(chanFakeInternationalPhoneType()->formSchema())->keyBy(fn ($field) => $field->getName());
+    $rules = $fields['to']->getValidationRules();
+    $validate = fn (string $value) => Validator::make(['to' => $value], ['to' => $rules]);
+
+    expect($fields->keys()->all())->toBe(['to', 'consent'])
+        ->and($fields['consent']->getLabel())->toBe(PhoneConsent::whatsappText());
+
+    foreach (['+52 1 55 1234 5678', '0052 55 1234 5678', '+44 7700 900123', '(555) 234-5678'] as $accepted) {
+        expect($validate($accepted)->passes())->toBeTrue("to refused {$accepted}");
+    }
+
+    expect($validate('+1 555 123 4567')->errors()->get('to'))->toBe([PhoneNumber::INTERNATIONAL_INVALID_MESSAGE]);
+});
+
+it('stores an international number with no from number', function () {
+    $this->freezeTime();
+
+    $destination = chanFakeInternationalPhoneType()->buildDestination([
+        'token' => 't0k',
+        'from' => '5559876543',
+        'to' => '+52 1 55 1234 5678',
+        'consent' => true,
+    ]);
+
+    expect($destination)->toBe([
+        'config' => [
+            'token' => 't0k',
+            'to' => '+5215512345678',
+            'consent_version' => PhoneConsent::VERSION,
+            'consented_at' => now()->toIso8601String(),
+        ],
+        'label' => 'Fake WhatsApp •••• 5678',
+    ]);
+});
+
+it('refuses to build an international destination from a number it cannot normalise', function () {
+    chanFakeInternationalPhoneType()->buildDestination(['token' => 't0k', 'to' => '+52 55 123', 'consent' => true]);
+})->throws(InvalidArgumentException::class);

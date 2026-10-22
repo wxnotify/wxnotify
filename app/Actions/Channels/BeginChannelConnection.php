@@ -95,13 +95,13 @@ class BeginChannelConnection
             return;
         }
 
-        $to = PhoneNumber::normalize((string) ($destination['config']['to'] ?? ''));
+        $to = PhoneNumber::normalizeInternational((string) ($destination['config']['to'] ?? ''));
 
         $duplicate = $to !== null && NotificationChannel::query()
             ->where('user_id', $user->id)
             ->where('channel_type', $type->slug())
             ->get()
-            ->contains(fn (NotificationChannel $channel): bool => PhoneNumber::normalize((string) ($channel->config['to'] ?? '')) === $to);
+            ->contains(fn (NotificationChannel $channel): bool => PhoneNumber::normalizeInternational((string) ($channel->config['to'] ?? '')) === $to);
 
         if ($duplicate) {
             throw new InvalidArgumentException("You already have a {$type->label()} channel for that number.");
@@ -160,9 +160,9 @@ class BeginChannelConnection
             return $pending;
         }
 
-        $to = PhoneNumber::normalize((string) ($destination['config']['to'] ?? ''));
+        $to = PhoneNumber::normalizeInternational((string) ($destination['config']['to'] ?? ''));
 
-        return $to !== null && PhoneNumber::normalize((string) ($pending->config['to'] ?? '')) === $to ? $pending : null;
+        return $to !== null && PhoneNumber::normalizeInternational((string) ($pending->config['to'] ?? '')) === $to ? $pending : null;
     }
 
     /**

@@ -188,7 +188,7 @@ class DispatchChannelConfirmationCode
     private static function limitsFor(int $userId, string $number): array
     {
         return [
-            self::numberLimitKey($userId, PhoneNumber::normalize($number) ?? '') => self::CODES_PER_NUMBER_PER_HOUR,
+            self::numberLimitKey($userId, PhoneNumber::normalizeInternational($number) ?? '') => self::CODES_PER_NUMBER_PER_HOUR,
             self::userLimitKey($userId) => self::CODES_PER_USER_PER_HOUR,
         ];
     }

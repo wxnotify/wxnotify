@@ -21,6 +21,12 @@ class PhoneConsent
 
     public const STOP_CLAUSE = ', or by replying STOP where my provider supports it';
 
+    /**
+     * The WhatsApp wording: same VERSION and draft status as TEXT. WhatsApp has no reply-STOP
+     * handling, so blocking the business number is the way to stop besides deleting the channel.
+     */
+    public const WHATSAPP_TEXT = 'I own this phone number or am allowed to use it, and I have opted in to receive automated weather alert messages at it on WhatsApp, sent from my own WhatsApp Business account. Meta\'s per-message charges for these messages are mine. I can stop them at any time by deleting this channel or by blocking the business number in WhatsApp.';
+
     public static function text(string $provider, bool $voice): string
     {
         return strtr(self::TEXT, [
@@ -28,5 +34,10 @@ class PhoneConsent
             '{messages}' => $voice ? 'calls' : 'texts',
             '{stop}' => $voice ? '' : self::STOP_CLAUSE,
         ]);
+    }
+
+    public static function whatsappText(): string
+    {
+        return self::WHATSAPP_TEXT;
     }
 }

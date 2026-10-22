@@ -3,14 +3,16 @@
 namespace App\Support;
 
 /**
- * US and Canadian (NANP) phone numbers, stored in E.164 (`+1NXXNXXXXXX`).
- *
- * No other country is accepted in this batch, and no phone-number library is used:
- * a NANP number is ten digits whose area code and exchange both start 2-9.
+ * Phone numbers, stored in E.164. The SMS types take only US and Canadian (NANP) numbers
+ * (`+1NXXNXXXXXX`); WhatsApp also takes international numbers. No phone-number library is
+ * used: a NANP number is ten digits whose area code and exchange both start 2-9, and an
+ * international number is checked for shape and length only, not for its numbering plan.
  */
 class PhoneNumber
 {
     public const INVALID_MESSAGE = 'Enter a US or Canadian number, e.g. (555) 234-5678.';
+
+    public const INTERNATIONAL_INVALID_MESSAGE = 'Enter your WhatsApp number with its country code, e.g. +52 55 1234 5678 or (555) 234-5678.';
 
     /**
      * Ten digits, 1 + ten digits, or +1 + ten digits, with any spaces, dots, dashes or
@@ -26,6 +28,32 @@ class PhoneNumber
         }
 
         return '+1'.$matches[2];
+    }
+
+    /**
+     * Everything normalize() accepts, with the same result, and also `+` or `00` followed by
+     * 8-15 digits whose country code does not start 0 or 1, with the same formatting allowed.
+     * A `+1` (or `001`) number must pass the NANP rules. Null for anything else.
+     */
+    public static function normalizeInternational(string $input): ?string
+    {
+        $nanp = self::normalize($input);
+
+        if ($nanp !== null) {
+            return $nanp;
+        }
+
+        $compact = (string) preg_replace('/[\s.\-()]/', '', $input);
+
+        if (str_starts_with($compact, '00')) {
+            $compact = '+'.substr($compact, 2);
+        }
+
+        if (str_starts_with($compact, '+1')) {
+            return self::normalize($compact);
+        }
+
+        return preg_match('/^\+[2-9]\d{7,14}$/', $compact) ? $compact : null;
     }
 
     /**
