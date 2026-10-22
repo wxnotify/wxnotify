@@ -7,8 +7,8 @@ use Illuminate\Http\JsonResponse;
 use RuntimeException;
 
 /**
- * A confirmation code was refused before anything was sent: the phone number, or the subscriber,
- * has had too many codes this hour (DispatchChannelConfirmationCode's limits).
+ * A confirmation code was refused before anything was sent: the phone number or chat destination,
+ * or the subscriber, has had too many codes this hour (DispatchChannelConfirmationCode's limits).
  */
 class ChannelCodeThrottled extends RuntimeException implements ShouldntReport
 {

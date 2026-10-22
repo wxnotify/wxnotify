@@ -168,6 +168,11 @@ class GoogleChatChannelType implements MessagingChannelType
         return (string) ($config['space'] ?? '');
     }
 
+    public function destinationNoun(): string
+    {
+        return 'space';
+    }
+
     public function displaySummary(NotificationChannel $record): string
     {
         $space = $record->config['space'] ?? null;

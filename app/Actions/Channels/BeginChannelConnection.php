@@ -7,6 +7,7 @@ use App\Exceptions\ChannelCodeThrottled;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\ChannelTypes\Contracts\ChannelType;
+use App\Support\ChannelTypes\Contracts\MessagingChannelType;
 use App\Support\ChannelTypes\Contracts\PhoneChannelType;
 use App\Support\PhoneConsent;
 use App\Support\PhoneNumber;
@@ -29,9 +30,11 @@ class BeginChannelConnection
      *                                             for the same number, so it is not refused as a duplicate)
      *
      * @throws InvalidArgumentException when the type cannot build a destination from the data, or the
-     *                                  subscriber already has a channel of this phone type for the number
+     *                                  subscriber already has a channel of this phone type for the number,
+     *                                  or of this messaging type for the destination
      * @throws ChannelCodeNotSent
-     * @throws ChannelCodeThrottled when the phone number's code limit is used up (nothing was sent)
+     * @throws ChannelCodeThrottled when the phone number's or chat destination's code limit is used up
+     *                              (nothing was sent)
      */
     public function __invoke(User $user, ChannelType $type, array $data, ?string $label = null, ?NotificationChannel $pending = null): NotificationChannel
     {
@@ -43,9 +46,14 @@ class BeginChannelConnection
             $existing = $this->existingWebPushChannel($user, $type, $destination);
         }
 
+        // A reused pending messaging channel takes whatever destination was typed, so it is checked too.
+        $this->refuseDuplicateDestination($user, $type, $destination, $existing);
+
+        // Before anything is written, so a throttled destination leaves no channel or consent record.
         if ($type instanceof PhoneChannelType) {
-            // Before anything is written, so a throttled number leaves no channel or consent record.
             DispatchChannelConfirmationCode::refuseWhenThrottled($user->id, (string) ($destination['config']['to'] ?? ''));
+        } elseif ($type instanceof MessagingChannelType) {
+            DispatchChannelConfirmationCode::refuseWhenDestinationThrottled($user->id, $type->destinationKey($destination['config'] ?? []));
         }
 
         $channel = $this->storePendingChannel($user, $type, $destination, $existing, $label);
@@ -97,6 +105,37 @@ class BeginChannelConnection
 
         if ($duplicate) {
             throw new InvalidArgumentException("You already have a {$type->label()} channel for that number.");
+        }
+    }
+
+    /**
+     * One channel per messaging type and destination (a Google Chat space, a Matrix room), the
+     * same rule as phone numbers: connecting it again is refused rather than refreshed. The same
+     * destination on another type is allowed. `config` is encrypted, so the keys are only
+     * comparable after decryption. The wizard's own pending channel, refreshed by this submit, is
+     * not compared with itself. Phone types (WhatsApp included) go through refuseDuplicateNumber().
+     *
+     * @param  array<string, mixed>  $destination
+     *
+     * @throws InvalidArgumentException
+     */
+    private function refuseDuplicateDestination(User $user, ChannelType $type, array $destination, ?NotificationChannel $refreshing): void
+    {
+        if (! $type instanceof MessagingChannelType || $type instanceof PhoneChannelType) {
+            return;
+        }
+
+        $key = $type->destinationKey($destination['config'] ?? []);
+
+        $duplicate = $key !== '' && NotificationChannel::query()
+            ->where('user_id', $user->id)
+            ->where('channel_type', $type->slug())
+            ->when($refreshing !== null, fn ($query) => $query->whereKeyNot($refreshing->id))
+            ->get()
+            ->contains(fn (NotificationChannel $channel): bool => $type->destinationKey($channel->config ?? []) === $key);
+
+        if ($duplicate) {
+            throw new InvalidArgumentException("You already have a {$type->label()} channel for that {$type->destinationNoun()}.");
         }
     }
 

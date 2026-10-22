@@ -40,6 +40,12 @@ interface MessagingChannelType extends ByoChannelType
     public function destinationKey(array $config): string;
 
     /**
+     * What one destination of this type is called, for the duplicate refusal ("space",
+     * "channel", "room").
+     */
+    public function destinationNoun(): string;
+
+    /**
      * The text to send for this body, title and meta (alert, confirmation or test).
      *
      * @param  array<string, mixed>  $meta
