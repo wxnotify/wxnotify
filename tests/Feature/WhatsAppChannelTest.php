@@ -16,7 +16,6 @@ use App\Support\ChannelTypes\WhatsAppChannelType;
 use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\MessagingMessage;
 use App\Support\PhoneConsent;
-use App\Support\PhoneNumber;
 use Filament\Actions\Testing\TestAction;
 use Filament\Notifications\Notification;
 use Illuminate\Http\Client\ConnectionException;
@@ -120,6 +119,8 @@ test('a stored language or number outside the allow-list gives no url', function
     'a number with a slash' => ['to', '+52/5512345678'],
     'a number that is not E.164' => ['to', '5512345678'],
     'a group id' => ['to', '+12036312345678901'],
+    'a stored nine-digit number Apprise would drop' => ['to', '+299123456'],
+    'a stored fifteen-digit number Apprise would drop' => ['to', '+502234567890123'],
 ]);
 
 test('it validates token, phone number id, template name, language and number through the fields', function (string $field, mixed $value, bool $passes, ?string $message = null) {
@@ -153,8 +154,12 @@ test('it validates token, phone number id, template name, language and number th
     'a Mexican number with 00' => ['to', '0052 55 1234 5678', true],
     'a UK mobile' => ['to', '+44 7700 900123', true],
     'a ten digit US number' => ['to', '(555) 234-5678', true],
-    'a +1 number with a 1 exchange' => ['to', '+1 555 123 4567', false, PhoneNumber::INTERNATIONAL_INVALID_MESSAGE],
-    'a seven digit string' => ['to', '1234567', false, PhoneNumber::INTERNATIONAL_INVALID_MESSAGE],
+    'a +1 number with a 1 exchange' => ['to', '+1 555 123 4567', false, WhatsAppChannelType::NUMBER_INVALID_MESSAGE],
+    'a seven digit string' => ['to', '1234567', false, WhatsAppChannelType::NUMBER_INVALID_MESSAGE],
+    'a nine digit number' => ['to', '+299 123 456', false, WhatsAppChannelType::NUMBER_INVALID_MESSAGE],
+    'a fifteen digit number' => ['to', '+502 2345 6789 0123', false, WhatsAppChannelType::NUMBER_INVALID_MESSAGE],
+    'a ten digit number' => ['to', '+502 2345 678', true],
+    'a fourteen digit number' => ['to', '+502 2345 6789 012', true],
     'a blank number' => ['to', '', false],
 ]);
 
@@ -190,10 +195,42 @@ test('the language defaults to English (US) when the type is picked', function (
         ->assertSchemaStateSet(['template_language' => 'en_US']);
 });
 
-test('the type has no From number, and its number field takes the international rule', function () {
+test('the type has no From number', function () {
     $fields = collect($this->type->formSchema())->map(fn ($component) => $component->getName())->all();
 
     expect($fields)->toBe(['access_token', 'phone_number_id', 'template', 'template_language', 'to', 'consent']);
+});
+
+test('a number Apprise would drop is refused in the wizard with the WhatsApp message', function (string $number) {
+    chanEnableWhatsApp();
+    $this->actingAs(User::factory()->create(['tier_override' => Tier::Plus]));
+    Http::fake();
+
+    chanChatFormSubmit('whatsapp', chanWhatsAppFormData(['to' => $number]))
+        ->assertHasFormErrors(['to'])
+        ->assertSee(WhatsAppChannelType::NUMBER_INVALID_MESSAGE);
+
+    expect(NotificationChannel::count())->toBe(0)
+        ->and(fn () => $this->type->buildDestination(chanWhatsAppFormData(['to' => $number])))->toThrow(InvalidArgumentException::class);
+    Http::assertNothingSent();
+})->with(['nine digits' => '+299 123 456', 'fifteen digits' => '+502 2345 6789 0123']);
+
+test('a stored number Apprise would drop is never sent', function () {
+    Http::fake();
+    $channel = NotificationChannel::factory()->whatsApp('+299123456')->for(User::factory()->create(['tier_override' => Tier::Plus]))->create();
+
+    $result = app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert');
+
+    expect($result->success)->toBeFalse()
+        ->and($result->error)->toBe('This channel is missing its settings.')
+        ->and($this->type->destinationKey(['to' => '+299123456']))->toBe('');
+    Http::assertNothingSent();
+});
+
+test('the duplicate key agrees across spellings of one number', function () {
+    expect($this->type->destinationKey(['to' => '0052 (55) 1234-5678']))->toBe('+525512345678')
+        ->and($this->type->destinationKey(['to' => '+52 55 1234 5678']))->toBe('+525512345678')
+        ->and($this->type->destinationKey(['to' => '+525512345678']))->toBe('+525512345678');
 });
 
 test('the consent box is required and recorded without the number', function () {
@@ -283,7 +320,7 @@ test('the setup step says how numbers are read and what the template must be', f
         ->assertSee('include the country code')
         ->assertDontSee('The US or Canadian number to send alerts to.')
         ->assertSee('WxNotify: {{1}} (from your WxNotify account)')
-        ->assertSee('Utility')
+        ->assertSee('create one template in the Utility category, in the language you pick below')
         ->assertSee('exactly one variable, not at the very start or end')
         ->assertSee('Meta must approve the template before anything can be sent')
         ->assertSee('Meta bills your account for each template message')

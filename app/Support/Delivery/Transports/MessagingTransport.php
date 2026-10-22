@@ -48,7 +48,14 @@ class MessagingTransport implements Transport
             return DeliveryResult::failed($refusal);
         }
 
-        return $this->client->notify(url: $type->appriseUrl($config), body: $type->compose($body, $title, $meta), title: null)
+        $url = $type->appriseUrl($config);
+
+        // A type gives an empty URL when a stored part is outside its allow-list (a tampered value).
+        if ($url === '') {
+            return DeliveryResult::failed('This channel is missing its settings.');
+        }
+
+        return $this->client->notify(url: $url, body: $type->compose($body, $title, $meta), title: null)
             ? DeliveryResult::delivered()
             : DeliveryResult::failed($type->failureMessage());
     }

@@ -39,7 +39,7 @@ use InvalidArgumentException;
  *   with a variable.
  * - The target is digits only (`PhoneNumber::digits()`); Apprise adds the `+`. A raw `+` or `%2B`
  *   gives the same `to`. Apprise drops a target under 10 or over 14 digits (a 16+ digit one would
- *   be a group), so such a number fails like any other refusal.
+ *   be a group), so normalizeNumber() refuses those (8, 9 and 15 digits pass normalizeInternational()).
  * - Apprise passes the body through unchanged (newlines and tabs too), so MessagingMessage folds
  *   it to one line; a title would be joined on with `\r\n`, so none is sent.
  * - Without `lang` the language is `en_US`. A non-200 reply from Meta makes the plugin return
@@ -59,6 +59,8 @@ class WhatsAppChannelType implements MessagingChannelType, PhoneChannelType
         IsPhoneChannel::countsTowardFreeSlot insteadof IsMessagingChannel;
         IsPhoneChannel::isAvailable insteadof IsMessagingChannel;
     }
+
+    public const NUMBER_INVALID_MESSAGE = 'Enter the WhatsApp number with its country code, 10 to 14 digits, e.g. +52 55 1234 5678.';
 
     public const ACCESS_TOKEN_PATTERN = '/^[A-Za-z0-9]{1,1024}$/D';
 
@@ -136,14 +138,21 @@ class WhatsAppChannelType implements MessagingChannelType, PhoneChannelType
         return false;
     }
 
+    /**
+     * The number in E.164 when normalizeInternational() takes it and it has 10 to 14 digits with its
+     * country code: Apprise 2.0.0 drops a WhatsApp target under 10 or over 14 digits, so such a
+     * number could never get its code.
+     */
     protected function normalizeNumber(string $input): ?string
     {
-        return PhoneNumber::normalizeInternational($input);
+        $e164 = PhoneNumber::normalizeInternational($input);
+
+        return $e164 !== null && preg_match('/^\+\d{10,14}$/D', $e164) === 1 ? $e164 : null;
     }
 
     protected function toNumberRule(): ValidationRule
     {
-        return new InternationalPhoneNumber;
+        return new InternationalPhoneNumber($this->normalizeNumber(...), self::NUMBER_INVALID_MESSAGE);
     }
 
     protected function toNumberHelp(): string
@@ -205,7 +214,7 @@ class WhatsAppChannelType implements MessagingChannelType, PhoneChannelType
     {
         $to = (string) ($config['to'] ?? '');
 
-        if (! self::credentialsAllowed($config) || PhoneNumber::normalizeInternational($to) !== $to) {
+        if (! self::credentialsAllowed($config) || $this->normalizeNumber($to) !== $to) {
             return '';
         }
 
@@ -232,7 +241,7 @@ class WhatsAppChannelType implements MessagingChannelType, PhoneChannelType
      */
     public function destinationKey(array $config): string
     {
-        return PhoneNumber::normalizeInternational((string) ($config['to'] ?? '')) ?? '';
+        return $this->normalizeNumber((string) ($config['to'] ?? '')) ?? '';
     }
 
     public function destinationNoun(): string
