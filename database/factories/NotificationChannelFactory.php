@@ -156,6 +156,20 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    /**
+     * A Rocket.Chat channel posting through an incoming webhook on the subscriber's server.
+     * Sends need the host to resolve publicly: chanFakeChatDns(['chat.example.com' => [...]]).
+     */
+    public function rocketChat(string $server = 'https://chat.example.com', string $webhookId = 'aB3dE5fG7hJ9kL2mN', string $webhookToken = 'Zx9Cv8Bn7Mq6Wr5Ty4Ui3Op2As1Df0Gh'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'rocketchat',
+            'label' => 'Rocket.Chat',
+            'apprise_url' => null,
+            'config' => ['server' => $server, 'webhook_id' => $webhookId, 'webhook_token' => $webhookToken],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [
