@@ -110,3 +110,72 @@ test('a stored private or http server sends when self-host allows private networ
 
     expect($result->success)->toBeTrue();
 });
+
+test('a server typed with any spelling saves as the normalised URL and sends', function (string $server, string $expected) {
+    chanFakeChatDns(['ntfy.sh' => ['93.184.216.34'], 'ntfy.example.com' => ['93.184.216.34']]);
+    Http::fake(['*' => Http::response('', 200)]);
+
+    expect(ntfyServerValidate($server))->toMatchArray(['form' => true, 'app' => true]);
+
+    $appriseUrl = app(ChannelTypeRegistry::class)->find('ntfy')->buildAppriseUrl(['topic' => 'wx-topic', 'server' => $server]);
+    [, $result] = ntfySend($appriseUrl);
+
+    expect($appriseUrl)->toBe($expected)
+        ->and($result->success)->toBeTrue();
+    Http::assertSent(fn (Request $request): bool => $request['urls'] === $expected);
+})->with([
+    'uppercase scheme' => ['HTTPS://ntfy.example.com', 'ntfys://ntfy.example.com/wx-topic'],
+    'uppercase host' => ['https://NTFY.Example.COM', 'ntfys://ntfy.example.com/wx-topic'],
+    'trailing dot' => ['https://ntfy.example.com.', 'ntfys://ntfy.example.com/wx-topic'],
+    'explicit default port' => ['https://ntfy.example.com:443', 'ntfys://ntfy.example.com/wx-topic'],
+    'non-default port and slash' => ['https://ntfy.example.com:8443/', 'ntfys://ntfy.example.com:8443/wx-topic'],
+    'ntfy.sh' => ['https://ntfy.sh', 'ntfys://ntfy.sh/wx-topic'],
+    'ntfy.sh explicit port' => ['https://ntfy.sh:443', 'ntfys://ntfy.sh/wx-topic'],
+    'uppercase scheme with a path' => ['HTTPS://ntfy.example.com/extra', 'ntfys://ntfy.example.com/extra/wx-topic'],
+]);
+
+test('a blank server still stores the default ntfy URL', function () {
+    expect(app(ChannelTypeRegistry::class)->find('ntfy')->buildAppriseUrl(['topic' => 'wx-topic', 'server' => '']))->toBe('ntfy://wx-topic');
+});
+
+test('the refusal text tells the subscriber to remove and re-add the channel', function () {
+    expect(NtfyChannelType::SERVER_REFUSED)->toContain('Remove this channel and add it again')->not->toContain('Edit');
+});
+
+test('at send time metadata, localhost and unresolvable servers fail before any HTTP', function (string $appriseUrl, string $message) {
+    chanFakeChatDns([]);
+    Http::fake();
+
+    [, $result] = ntfySend($appriseUrl);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->error)->toBe($message);
+    Http::assertNothingSent();
+})->with([
+    'metadata' => ['ntfys://169.254.169.254/wx-topic', NtfyChannelType::SERVER_REFUSED],
+    'localhost' => ['ntfys://localhost/wx-topic', NtfyChannelType::SERVER_REFUSED],
+    'unresolvable name' => ['ntfys://nope.example.com/wx-topic', NtfyChannelType::SERVER_UNRESOLVED],
+]);
+
+test('a name lookup failure for a public host is not reported as a policy refusal', function () {
+    chanFakeChatDns([]);
+    Http::fake();
+
+    [, $result] = ntfySend('ntfys://ntfy.sh/wx-topic');
+
+    expect($result->error)->toBe(NtfyChannelType::SERVER_UNRESOLVED)
+        ->and(NtfyChannelType::SERVER_UNRESOLVED)->not->toContain('not allowed');
+    Http::assertNothingSent();
+});
+
+test('a non-ntfy Apprise channel is sent without any server lookup', function () {
+    app()->instance(ChatServerGuard::class, new ChatServerGuard(function (string $host): array {
+        throw new RuntimeException('no lookup expected');
+    }));
+    Http::fake(['*' => Http::response('', 200)]);
+
+    [, $result] = ntfySend('discord://123456/token');
+
+    expect($result->success)->toBeTrue();
+    Http::assertSent(fn (Request $request): bool => $request['urls'] === 'discord://123456/token');
+});

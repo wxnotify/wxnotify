@@ -21,8 +21,13 @@ class AppriseTransport implements Transport
         // elsewhere now than when it was saved. The refusal is fixed text and never repeats the URL.
         $ntfyServer = NtfyChannelType::serverUrlFrom((string) $channel->apprise_url);
 
-        if ($ntfyServer !== null && app(ChatServerGuard::class)->violation($ntfyServer) !== null) {
-            return DeliveryResult::failed(NtfyChannelType::SERVER_REFUSED);
+        $violation = $ntfyServer === null ? null : app(ChatServerGuard::class)->violation($ntfyServer);
+
+        if ($violation !== null) {
+            // A failed name lookup may be transient, so it is not reported as a policy refusal.
+            return DeliveryResult::failed($violation === ChatServerGuard::NOT_FOUND
+                ? NtfyChannelType::SERVER_UNRESOLVED
+                : NtfyChannelType::SERVER_REFUSED);
         }
 
         return $this->client->notify(url: (string) $channel->apprise_url, body: $body, title: $title)

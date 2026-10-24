@@ -8,13 +8,16 @@ use App\Rules\SafeChatServerUrl;
 use App\Support\ChannelTypes\Concerns\MasksDestinationSecrets;
 use App\Support\ChannelTypes\Concerns\UsesAppriseTransport;
 use App\Support\ChannelTypes\Contracts\ChannelType;
+use App\Support\Delivery\ChatServerAddress;
 use Filament\Forms\Components\TextInput;
 
 class NtfyChannelType implements ChannelType
 {
     use MasksDestinationSecrets, UsesAppriseTransport;
 
-    public const SERVER_REFUSED = "This channel's ntfy server is not allowed. Edit the channel to use a different server.";
+    public const SERVER_REFUSED = "This channel's ntfy server is not allowed. Remove this channel and add it again with a different server.";
+
+    public const SERVER_UNRESOLVED = 'The ntfy server could not be reached by name. Try again later.';
 
     public function slug(): string
     {
@@ -60,9 +63,22 @@ class NtfyChannelType implements ChannelType
         $topic = rawurlencode($data['topic']);
 
         if (filled($data['server'] ?? null)) {
-            $host = preg_replace('#^https?://#', '', rtrim($data['server'], '/'));
+            $server = rtrim(trim($data['server']), '/');
+            $parts = ChatServerAddress::parts($server);
 
-            return str_starts_with($data['server'], 'https://')
+            if ($parts !== null) {
+                $scheme = $parts['scheme'];
+                $host = ChatServerAddress::authority($parts);
+            } else {
+                // A path in the Server field (extra topics on the subscriber's own host): only the
+                // scheme and authority are respelled, the path is kept as typed.
+                preg_match('#^([a-z]+)://([^/]*)(.*)$#is', $server, $matches);
+                $scheme = strtolower($matches[1] ?? 'http');
+                $authority = ChatServerAddress::parts($scheme.'://'.($matches[2] ?? ''));
+                $host = ($authority === null ? strtolower($matches[2] ?? '') : ChatServerAddress::authority($authority)).($matches[3] ?? '');
+            }
+
+            return $scheme === 'https'
                 ? "ntfys://{$host}/{$topic}"
                 : "ntfy://{$host}/{$topic}";
         }
