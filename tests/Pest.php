@@ -6,6 +6,7 @@ use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Settings\IntegrationSettings;
 use App\Support\ChannelTypes\Contracts\MessagingChannelType;
+use App\Support\Delivery\BlueskyAccountGuard;
 use App\Support\Delivery\ChatServerGuard;
 use App\Support\Delivery\HeartbeatUrlGuard;
 use App\Support\Delivery\Pauser;
@@ -263,6 +264,24 @@ function chanFakeChatDns(array $hostToAddresses): void
     app()->instance(ChatServerGuard::class, new ChatServerGuard(
         fn (string $host): array => $hostToAddresses[$host] ?? [],
     ));
+}
+
+/**
+ * Bind a BlueskyAccountGuard that verifies every handle as the given account without any HTTP
+ * (the factory's default DID), for tests about other things than the account check
+ * (BlueskyChannelTest fakes the real lookups).
+ */
+function chanFakeBlueskyAccount(string $did = 'did:plc:abcdefghijklmnopqrstuvwx'): void
+{
+    app()->instance(BlueskyAccountGuard::class, new class($did) extends BlueskyAccountGuard
+    {
+        public function __construct(private readonly string $did) {}
+
+        public function verifiedDid(string $handle): string
+        {
+            return $this->did;
+        }
+    });
 }
 
 /**

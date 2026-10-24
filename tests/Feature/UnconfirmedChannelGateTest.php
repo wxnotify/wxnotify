@@ -31,7 +31,7 @@ use function Pest\Livewire\livewire;
 const CHAN_GATE_SLUGS = [
     'email', 'ntfy', 'discord', 'slack', 'telegram', 'pushover', 'msteams', 'webhook', 'webpush', 'mobile_push',
     'twilio_sms', 'bulkvs_sms', 'httpsms', 'twilio_voice', 'google_chat', 'mattermost', 'rocketchat', 'matrix', 'whatsapp',
-    'pagerduty',
+    'pagerduty', 'bluesky',
 ];
 
 const CHAN_GATE_PHONE_SLUGS = ['twilio_sms', 'bulkvs_sms', 'httpsms', 'twilio_voice', 'whatsapp'];
@@ -55,6 +55,7 @@ function chanGateFakeWires(): Closure
     Mail::fake();
     app()->instance(WebhookUrlGuard::class, new WebhookUrlGuard(fn (): array => [CHAN_GATE_PUBLIC_IP]));
     chanFakeChatDns(['chat.example.com' => [CHAN_GATE_PUBLIC_IP], 'matrix.example.org' => [CHAN_GATE_PUBLIC_IP]]);
+    chanFakeBlueskyAccount();
     chanFakePauser();
     chanConfigureVapid();
     $webhookCalls = chanFakeWebhookEndpoint(array_fill(0, 10, new Response(200)));
@@ -89,6 +90,7 @@ function chanGateChannel(string $slug, User $user, bool $verified): Notification
         'matrix' => $factory->matrix(),
         'whatsapp' => $factory->whatsApp(),
         'pagerduty' => $factory->pagerDuty(),
+        'bluesky' => $factory->bluesky(),
         default => $factory->state(['channel_type' => $slug, 'apprise_url' => match ($slug) {
             'ntfy' => 'ntfy://wx-alerts-topic',
             'discord' => 'discord://123456789/token/',

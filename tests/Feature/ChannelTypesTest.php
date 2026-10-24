@@ -231,6 +231,7 @@ test('every channel type captions its destination value with a fixed, secret-fre
         'matrix' => 'Matrix room',
         'whatsapp' => 'WhatsApp number',
         'pagerduty' => 'PagerDuty service',
+        'bluesky' => 'Bluesky account',
         'webhook' => 'Webhook host',
         'webpush' => 'Push service',
     ]);

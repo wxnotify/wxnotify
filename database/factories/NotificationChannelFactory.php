@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Support\BlueskyConsent;
 use App\Support\PhoneConsent;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -241,6 +242,27 @@ class NotificationChannelFactory extends Factory
                 'severity' => $severity,
                 'source' => 'WxNotify',
                 'component' => 'weather-alert',
+            ],
+        ]);
+    }
+
+    /**
+     * A Bluesky channel for a Bluesky-hosted account (handle, App Password, its verified DID and
+     * the public-posting consent). Sends look the account up again: fake `public.api.bsky.app`
+     * and `plc.directory`, or bind a stub BlueskyAccountGuard (chanFakeBlueskyAccount()).
+     */
+    public function bluesky(string $handle = 'wxdesk.bsky.social', string $did = 'did:plc:abcdefghijklmnopqrstuvwx'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'bluesky',
+            'label' => 'Bluesky',
+            'apprise_url' => null,
+            'config' => [
+                'handle' => strtolower($handle),
+                'app_password' => 'k7m2-q4xz-p9hw-3tab',
+                'did' => $did,
+                'consent_version' => BlueskyConsent::VERSION,
+                'consented_at' => now()->toIso8601String(),
             ],
         ]);
     }

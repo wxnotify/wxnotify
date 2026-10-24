@@ -33,6 +33,16 @@ interface MessagingChannelType extends ByoChannelType
     public function appriseUrlFor(array $config, array $meta): string;
 
     /**
+     * Why this send must not go out, checked by MessagingTransport before every send, after the
+     * URL is known to be untampered and before any Apprise HTTP; null when it may. For a check
+     * that is not a stored server host (Bluesky verifies the account's hosting with its own
+     * lookups). A fixed, secret-free text.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public function sendRefusal(array $config): ?string;
+
+    /**
      * The subscriber-supplied server's base URL, vetted at save and again before every send,
      * or null for a type whose host is fixed.
      *

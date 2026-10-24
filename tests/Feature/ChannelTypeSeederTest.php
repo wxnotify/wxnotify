@@ -83,3 +83,23 @@ test('pagerduty ships enabled and plus-only, from the seeder and from its own mi
     $migration->up();
     expect($rows())->toBe($expected);
 });
+
+test('bluesky ships enabled and plus-only, from the seeder and from its own migration', function () {
+    $expected = [['slug' => 'bluesky', 'min_tier' => 'plus', 'sort_order' => 21, 'enabled' => true]];
+    $migration = require database_path('migrations/2026_10_24_100001_add_bluesky_channel_type.php');
+    $rows = fn (): array => DB::table('channel_types')->where('slug', 'bluesky')->get(['slug', 'min_tier', 'sort_order', 'enabled'])
+        ->map(fn (object $row): array => [
+            'slug' => $row->slug, 'min_tier' => $row->min_tier, 'sort_order' => (int) $row->sort_order, 'enabled' => (bool) $row->enabled,
+        ])->all();
+    $others = DB::table('channel_types')->where('slug', '!=', 'bluesky')->count();
+
+    expect(array_values(collect(ChannelTypeSeeder::SHIPPED)->where('slug', 'bluesky')->all()))->toBe($expected);
+
+    $migration->down();
+    expect($rows())->toBe([])
+        ->and(DB::table('channel_types')->count())->toBe($others);
+
+    $migration->up();
+    $migration->up();
+    expect($rows())->toBe($expected);
+});

@@ -6,6 +6,8 @@ use App\Exceptions\ChannelCodeNotSent;
 use App\Exceptions\ChannelCodeThrottled;
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Support\BlueskyConsent;
+use App\Support\ChannelTypes\BlueskyChannelType;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use App\Support\ChannelTypes\Contracts\MessagingChannelType;
 use App\Support\ChannelTypes\Contracts\PhoneChannelType;
@@ -60,6 +62,11 @@ class BeginChannelConnection
 
         if ($existing === null && $type instanceof PhoneChannelType) {
             $this->recordPhoneConsent($channel, $type);
+        }
+
+        // Every submit stores the account it names (a refreshed pending channel may name another).
+        if ($type instanceof BlueskyChannelType) {
+            $this->recordBlueskyConsent($channel);
         }
 
         try {
@@ -176,6 +183,19 @@ class BeginChannelConnection
             ->event('phone_consent')
             ->withProperties(['channel_type' => $type->slug(), 'version' => PhoneConsent::VERSION])
             ->log('Agreed to automated weather alerts to this number');
+    }
+
+    /**
+     * The public-posting consent given on the form, recorded before the first post. Only the type
+     * and the consent text's version: never the handle or the app password.
+     */
+    private function recordBlueskyConsent(NotificationChannel $channel): void
+    {
+        activity()
+            ->performedOn($channel)
+            ->event('bluesky_consent')
+            ->withProperties(['channel_type' => 'bluesky', 'version' => BlueskyConsent::VERSION])
+            ->log('Agreed that every message to this Bluesky account is posted publicly');
     }
 
     /**

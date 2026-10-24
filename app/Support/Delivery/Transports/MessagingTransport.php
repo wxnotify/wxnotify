@@ -12,7 +12,8 @@ use App\Support\Delivery\DeliveryResult;
 /**
  * Posts to a messaging channel through Apprise with a URL built from the channel's encrypted
  * `config` at send time: the URL holds the webhook secret or token, so it is never stored,
- * logged or put in an error. The text is the type's own composition, sent with no title (the
+ * logged or put in an error. Before Apprise is called the type's own sendRefusal() runs (Bluesky
+ * re-verifies the account's hosting there). The text is the type's own composition, sent with no title (the
  * title is in the text). Failures are the type's fixed text. A ConnectionException propagates,
  * as from SmsTransport.
  */
@@ -53,6 +54,12 @@ class MessagingTransport implements Transport
         // A type gives an empty URL when a stored part is outside its allow-list (a tampered value).
         if ($url === '') {
             return DeliveryResult::failed('This channel is missing its settings.');
+        }
+
+        $refusal = $type->sendRefusal($config);
+
+        if ($refusal !== null) {
+            return DeliveryResult::failed($refusal);
         }
 
         return $this->client->notify(url: $url, body: $type->compose($body, $title, $meta), title: null)

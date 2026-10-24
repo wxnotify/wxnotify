@@ -72,6 +72,16 @@ trait IsMessagingChannel
     }
 
     /**
+     * Nothing beyond the transport's own checks (a stored server is vetted by serverUrl()).
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public function sendRefusal(array $config): ?string
+    {
+        return null;
+    }
+
+    /**
      * The Apprise URL arguments every subscriber-supplied server carries: no redirects (a
      * public server must not bounce Apprise to a private address), a 5 s connect and 10 s read
      * timeout. Extras are appended (Matrix's `discovery=no`, say).

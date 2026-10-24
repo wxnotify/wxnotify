@@ -33,6 +33,7 @@ class ChannelTypeRegistry
         'matrix' => MatrixChannelType::class,
         'whatsapp' => WhatsAppChannelType::class,
         'pagerduty' => PagerDutyChannelType::class,
+        'bluesky' => BlueskyChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType
