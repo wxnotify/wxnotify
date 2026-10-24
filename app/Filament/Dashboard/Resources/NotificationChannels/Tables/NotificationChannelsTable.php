@@ -105,6 +105,9 @@ class NotificationChannelsTable
                             ->body(match (true) {
                                 $sent => null,
                                 ! $record->user->meetsChannelTier($record->channel_type) => ChannelDispatcher::TIER_REFUSAL,
+                                // The dispatcher refuses an unconfirmed channel; a Web Push subscription that expired
+                                // during this very send is unconfirmed now too.
+                                ! $record->isVerified() => 'This channel needs to be confirmed first. Resend the code and enter it, or connect the channel again.',
                                 default => 'Check the channel is still reachable and try again.',
                             })
                             ->status($sent ? 'success' : 'danger')

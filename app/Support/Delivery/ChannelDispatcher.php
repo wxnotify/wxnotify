@@ -5,7 +5,6 @@ namespace App\Support\Delivery;
 use App\Enums\ChannelTransport;
 use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
-use App\Support\ChannelTypes\Contracts\ByoChannelType;
 use App\Support\ChannelTypes\Contracts\ChannelType;
 use App\Support\ChannelTypes\Contracts\PhoneChannelType;
 use App\Support\Delivery\Transports\AppriseTransport;
@@ -25,6 +24,16 @@ class ChannelDispatcher
      * Why a channel whose owner is below the type's catalog `min_tier` sends nothing.
      */
     public const TIER_REFUSAL = 'This channel needs the Plus plan or higher.';
+
+    /**
+     * Why an unconfirmed channel of any type sends nothing but its confirmation code.
+     */
+    public const UNCONFIRMED_REFUSAL = 'This channel has not been confirmed yet.';
+
+    /**
+     * The same refusal for a phone type, whose destination is a number.
+     */
+    public const UNCONFIRMED_NUMBER_REFUSAL = 'This number has not been confirmed yet.';
 
     public function __construct(private readonly ChannelTypeRegistry $registry) {}
 
@@ -53,9 +62,8 @@ class ChannelDispatcher
     /**
      * Why a send must not go out, checked before any transport or HTTP call: an owner below
      * the type's catalog `min_tier` (a downgraded subscriber's channel is kept and refused,
-     * and works again on re-upgrade), or an unverified bring-your-own channel (phone or messaging)
-     * getting anything but its confirmation code. The code is exempt from the second check only,
-     * never the first.
+     * and works again on re-upgrade), or an unverified channel of any type getting anything but its
+     * confirmation code. The code is exempt from the second check only, never the first.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -65,10 +73,8 @@ class ChannelDispatcher
             return self::TIER_REFUSAL;
         }
 
-        if ($type instanceof ByoChannelType && ! $channel->isVerified() && ($meta['type'] ?? null) !== 'confirmation') {
-            return $type instanceof PhoneChannelType
-                ? 'This number has not been confirmed yet.'
-                : 'This channel has not been confirmed yet.';
+        if (! $channel->isVerified() && ($meta['type'] ?? null) !== 'confirmation') {
+            return $type instanceof PhoneChannelType ? self::UNCONFIRMED_NUMBER_REFUSAL : self::UNCONFIRMED_REFUSAL;
         }
 
         return null;

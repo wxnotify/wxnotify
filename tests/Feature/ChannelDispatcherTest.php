@@ -156,7 +156,7 @@ test('a confirmation code still needs the plan', function () {
     Http::assertNothingSent();
 });
 
-test('non-phone channels are unaffected by the unverified rule', function () {
+test('non-phone channels are held by the unverified rule too', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
     $channel = NotificationChannel::factory()->create([
         'channel_type' => 'discord', 'apprise_url' => 'discord://1/abc/', 'verified_at' => null,
@@ -164,8 +164,9 @@ test('non-phone channels are unaffected by the unverified rule', function () {
 
     $result = app(ChannelDispatcher::class)->send($channel, 'body', 'title', ['type' => 'alert']);
 
-    expect($result->success)->toBeTrue();
-    Http::assertSent(fn ($request) => $request['urls'] === 'discord://1/abc/' && $request['body'] === 'body');
+    expect($result->success)->toBeFalse()
+        ->and($result->error)->toBe('This channel has not been confirmed yet.');
+    Http::assertNothingSent();
 });
 
 test('an unconfirmed messaging channel gets its code but no alert or test', function () {

@@ -106,10 +106,16 @@ class ChannelController extends Controller
         $channel = $this->find($request, $id);
 
         if (! $channel->isVerified()) {
-            return response()->json(['error' => 'not_verified', 'message' => 'Verify this channel before sending a test.'], 409);
+            return $this->notVerifiedForTest();
         }
 
         if (! $send($channel)) {
+            // The dispatcher refuses an unconfirmed channel; a Web Push subscription that expired during
+            // this very send is unconfirmed now too, and says so instead of "check it is reachable".
+            if (! $channel->isVerified()) {
+                return $this->notVerifiedForTest();
+            }
+
             return response()->json([
                 'error' => 'test_failed',
                 'message' => 'Couldn\'t send the test notification. Check the channel is still reachable and try again.',
@@ -134,6 +140,11 @@ class ChannelController extends Controller
     /**
      * The user's own channel, or a 404; a phone's push channel is refused (409) before any write.
      */
+    private function notVerifiedForTest(): JsonResponse
+    {
+        return response()->json(['error' => 'not_verified', 'message' => 'Verify this channel before sending a test.'], 409);
+    }
+
     private function find(Request $request, int $id): NotificationChannel
     {
         $channel = $request->user()->notificationChannels()->find($id) ?? abort(404);
