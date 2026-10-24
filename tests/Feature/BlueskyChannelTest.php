@@ -25,6 +25,7 @@ use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Spatie\Activitylog\Models\Activity;
 use ToneGabes\BetterOptions\Forms\Components\RadioCards;
 
@@ -278,6 +279,7 @@ test('a DID document naming a PDS outside Bluesky\'s hosts is refused and nothin
     'a fragment' => 'https://bsky.social#x',
     'upper case' => 'https://BSKY.SOCIAL',
     'a trailing dot' => 'https://bsky.social.',
+    'a trailing slash' => 'https://morel.us-east.host.bsky.network/',
     'an encoded dot' => 'https://evil%2Eexample',
     'whitespace' => 'https://bsky.social ',
     'a fullwidth dot' => 'https://puffball。us-east.host.bsky.network',
@@ -320,7 +322,6 @@ test('Bluesky\'s own PDS hosts are accepted', function (string $endpoint, string
     'bsky.social' => ['https://bsky.social', '#atproto_pds'],
     'a us-east mushroom' => [CHAN_BSKY_PDS, '#atproto_pds'],
     'a us-west mushroom' => ['https://woodtuft.us-west.host.bsky.network', '#atproto_pds'],
-    'a trailing slash' => ['https://morel.us-east.host.bsky.network/', '#atproto_pds'],
     'the full service id' => [CHAN_BSKY_PDS, CHAN_BSKY_DID.'#atproto_pds'],
 ]);
 
@@ -361,6 +362,21 @@ test('a handle Bluesky cannot resolve says so', function () {
         ->and(chanBlueskyNotifyCount())->toBe(0);
 });
 
+test('a DID document plc.directory no longer has (deactivated or tombstoned) is not found, not try-again', function (int $status) {
+    $this->actingAs(chanBlueskyPlusUser());
+    Http::fake([
+        'public.api.bsky.app/*' => Http::response(['did' => CHAN_BSKY_DID]),
+        'plc.directory/*' => Http::response(['message' => 'DID not available'], $status),
+        '*/notify/*' => Http::response(status: 200),
+    ]);
+
+    chanChatFormSubmit('bluesky', chanBlueskyForm())
+        ->assertNotified(BlueskyAccountGuard::HANDLE_NOT_FOUND);
+
+    expect(NotificationChannel::count())->toBe(0)
+        ->and(chanBlueskyNotifyCount())->toBe(0);
+})->with([404, 410]);
+
 test('a lookup that fails gives its own text, distinct from the policy refusal, and sends nothing', function (array $stubs) {
     $this->actingAs(chanBlueskyPlusUser());
     Http::fake([...$stubs, '*/notify/*' => Http::response(status: 200)]);
@@ -380,7 +396,6 @@ test('a lookup that fails gives its own text, distinct from the policy refusal, 
     'resolve without a did' => [fn (): array => ['public.api.bsky.app/*' => Http::response(['handle' => CHAN_BSKY_HANDLE])]],
     'resolve with a non-string did' => [fn (): array => ['public.api.bsky.app/*' => Http::response(['did' => ['did:plc:x']])]],
     'resolve too big' => [fn (): array => ['public.api.bsky.app/*' => Http::response(['did' => CHAN_BSKY_DID, 'pad' => str_repeat('a', 70000)])]],
-    'document 404' => [fn (): array => ['public.api.bsky.app/*' => Http::response(['did' => CHAN_BSKY_DID]), 'plc.directory/*' => Http::response(status: 404)]],
     'document 500' => [fn (): array => ['public.api.bsky.app/*' => Http::response(['did' => CHAN_BSKY_DID]), 'plc.directory/*' => Http::response(status: 500)]],
     'document redirects' => [fn (): array => ['public.api.bsky.app/*' => Http::response(['did' => CHAN_BSKY_DID]), 'plc.directory/*' => Http::response(status: 301, headers: ['Location' => 'https://evil.example/'])]],
     'document unreachable' => [fn (): array => ['public.api.bsky.app/*' => Http::response(['did' => CHAN_BSKY_DID]), 'plc.directory/*' => Http::failedConnection()]],
@@ -744,6 +759,10 @@ test('the app password never appears outside the encrypted config', function () 
         expect(str_contains(strtolower($content), CHAN_BSKY_PASSWORD))->toBeFalse("the app password leaked into the {$place}");
     }
 
+    foreach (['activity log', 'delivery log'] as $place) {
+        expect(str_contains(strtolower($places[$place]), 'wxdesk'))->toBeFalse("the handle leaked into the {$place}");
+    }
+
     Http::assertSent(fn (Request $request): bool => ! str_contains($request->url(), '/notify/')
         && ! str_contains($request->url(), CHAN_BSKY_PASSWORD) && ! str_contains($request->body(), CHAN_BSKY_PASSWORD));
     expect(collect(Http::recorded())->filter(fn (array $pair): bool => ! str_contains($pair[0]->url(), '/notify/')
@@ -781,3 +800,119 @@ test('the API refuses to create a bluesky channel', function () {
     expect(NotificationChannel::count())->toBe(0);
     Http::assertNothingSent();
 });
+
+test('save-time lookups are limited per subscriber, refused with their own text and without looking anything up', function () {
+    $user = chanBlueskyPlusUser();
+    $other = chanBlueskyPlusUser();
+    RateLimiter::clear('bluesky-lookup:'.$user->id);
+    RateLimiter::clear('bluesky-lookup:'.$other->id);
+    Http::fake([
+        'public.api.bsky.app/*' => Http::response(['error' => 'InvalidRequest'], 400),
+        '*' => Http::response(status: 200),
+    ]);
+    $this->actingAs($user);
+
+    foreach (range(1, 10) as $attempt) {
+        expect(fn () => $this->type->buildDestination(chanBlueskyForm(['handle' => "try{$attempt}.example.com"])))
+            ->toThrow(InvalidArgumentException::class, BlueskyAccountGuard::HANDLE_NOT_FOUND);
+    }
+    expect(chanBlueskyRequestsTo('public.api.bsky.app'))->toBe(10);
+
+    try {
+        $this->type->buildDestination(chanBlueskyForm(['handle' => 'try11.example.com']));
+        $this->fail('Expected the throttle refusal.');
+    } catch (InvalidArgumentException $refusal) {
+        expect($refusal->getMessage())->toMatch('/^Too many attempts\. Try again in \d+ minutes?\.$/')
+            ->not->toBe(BlueskyAccountGuard::UNVERIFIED)
+            ->not->toBe(BlueskyAccountGuard::NOT_HOSTED_BY_BLUESKY);
+    }
+    expect(chanBlueskyRequestsTo('public.api.bsky.app'))->toBe(10);
+
+    chanChatFormSubmit('bluesky', chanBlueskyForm(['handle' => 'try12.example.com']))
+        ->assertNotified('Too many attempts. Try again in 10 minutes.');
+    expect(chanBlueskyRequestsTo('public.api.bsky.app'))->toBe(10);
+
+    $this->actingAs($other);
+    expect(fn () => $this->type->buildDestination(chanBlueskyForm(['handle' => 'other.example.com'])))
+        ->toThrow(InvalidArgumentException::class, BlueskyAccountGuard::HANDLE_NOT_FOUND)
+        ->and(chanBlueskyRequestsTo('public.api.bsky.app'))->toBe(11);
+
+    $this->actingAs($user);
+    $this->travel(11)->minutes();
+    expect(fn () => $this->type->buildDestination(chanBlueskyForm(['handle' => 'try13.example.com'])))
+        ->toThrow(InvalidArgumentException::class, BlueskyAccountGuard::HANDLE_NOT_FOUND);
+});
+
+test('the save limit never applies to sends, and a cached .bsky.social check costs no attempt', function () {
+    $user = chanBlueskyPlusUser();
+    RateLimiter::clear('bluesky-lookup:'.$user->id);
+    $this->actingAs($user);
+    foreach (range(1, 10) as $ignored) {
+        RateLimiter::hit('bluesky-lookup:'.$user->id, 600);
+    }
+    $channel = NotificationChannel::factory()->bluesky('alerts.example.com')->for($user)->create();
+    Http::fake([
+        'public.api.bsky.app/*' => Http::response(['did' => CHAN_BSKY_DID]),
+        'plc.directory/*' => Http::response(chanBlueskyDocument(handle: 'alerts.example.com')),
+        '*/notify/*' => Http::response(status: 200),
+    ]);
+
+    expect(app(ChannelDispatcher::class)->send($channel, 'Tornado Warning', 'Alert')->success)->toBeTrue();
+
+    Cache::put(BlueskyAccountGuard::cacheKey(CHAN_BSKY_HANDLE), CHAN_BSKY_DID, 600);
+    expect($this->type->buildDestination(chanBlueskyForm())['config']['did'])->toBe(CHAN_BSKY_DID);
+});
+
+test('a custom-domain handle is verified again on every send, never from the cache', function () {
+    $did = CHAN_BSKY_DID;
+    Http::fake(function (Request $request) use (&$did) {
+        return match (parse_url($request->url(), PHP_URL_HOST)) {
+            'public.api.bsky.app' => Http::response(['did' => $did]),
+            'plc.directory' => Http::response(chanBlueskyDocument(handle: 'alerts.example.com', did: $did)),
+            default => Http::response(status: 200),
+        };
+    });
+    $channel = NotificationChannel::factory()->bluesky('alerts.example.com')->for(chanBlueskyPlusUser())->create();
+    $send = fn () => app(ChannelDispatcher::class)->send($channel->fresh(), 'Tornado Warning', 'Alert');
+
+    expect($send()->success)->toBeTrue()
+        ->and($send()->success)->toBeTrue()
+        ->and(chanBlueskyRequestsTo('public.api.bsky.app'))->toBe(2)
+        ->and(chanBlueskyRequestsTo('plc.directory'))->toBe(2)
+        ->and(Cache::has(BlueskyAccountGuard::cacheKey('alerts.example.com')))->toBeFalse();
+
+    $did = 'did:plc:zzzzzzzzzzzzzzzzzzzzzzzz';
+
+    expect($send())->success->toBeFalse()->error->toBe(BlueskyChannelType::ACCOUNT_CHANGED_MESSAGE)
+        ->and(chanBlueskyNotifyCount())->toBe(2);
+
+    $did = 'did:web:evil.example';
+
+    expect($send())->success->toBeFalse()->error->toBe(BlueskyAccountGuard::NOT_HOSTED_BY_BLUESKY)
+        ->and(chanBlueskyNotifyCount())->toBe(2);
+});
+
+test('only handles under .bsky.social are cached', function () {
+    expect(BlueskyAccountGuard::isCacheable('wxdesk.bsky.social'))->toBeTrue()
+        ->and(BlueskyAccountGuard::isCacheable('a.b.bsky.social'))->toBeTrue()
+        ->and(BlueskyAccountGuard::isCacheable('bsky.social'))->toBeFalse()
+        ->and(BlueskyAccountGuard::isCacheable('wxdesk.bsky.social.evil.example'))->toBeFalse()
+        ->and(BlueskyAccountGuard::isCacheable('evilbsky.social'))->toBeFalse()
+        ->and(BlueskyAccountGuard::isCacheable('alerts.example.com'))->toBeFalse();
+});
+
+test('the 280-character cap never cuts the View Product link: it is kept whole or dropped', function (int $linkLength, bool $kept) {
+    $link = 'https://wx.example.com/view-product/'.str_repeat('a', $linkLength - 36);
+
+    foreach (['alert', 'confirmation'] as $type) {
+        $text = $this->type->compose(str_repeat('Severe storms moving east. ', 30), 'Severe Thunderstorm Warning', ['type' => $type, 'url' => $link]);
+
+        expect(mb_strlen($text))->toBeLessThanOrEqual(280)
+            ->and(str_contains($text, $link))->toBe($kept)
+            ->and(str_contains($text, 'https://wx.example.com/view-product/') === str_contains($text, $link))->toBeTrue("{$type}: a cut link");
+    }
+})->with([
+    'a short link' => [60, true],
+    'a 250-character link' => [250, true],
+    'a 300-character link' => [300, false],
+]);

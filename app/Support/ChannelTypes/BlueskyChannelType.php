@@ -168,7 +168,7 @@ class BlueskyChannelType implements MessagingChannelType
         return [
             'handle' => $handle,
             'app_password' => $password,
-            'did' => app(BlueskyAccountGuard::class)->verifiedDid($handle),
+            'did' => app(BlueskyAccountGuard::class)->verifiedDidForSave($handle, auth()->id()),
             'consent_version' => BlueskyConsent::VERSION,
             'consented_at' => now()->toIso8601String(),
         ];
@@ -237,8 +237,8 @@ class BlueskyChannelType implements MessagingChannelType
     }
 
     /**
-     * The chat composition at 280 characters. The confirmation code always fits; a test whose
-     * channel name would not fit sends TEST_FALLBACK instead.
+     * The chat composition at 280 characters, the View Product link always whole or left out. The
+     * confirmation code always fits; a test whose channel name would not fit sends TEST_FALLBACK.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -250,7 +250,13 @@ class BlueskyChannelType implements MessagingChannelType
             return $text;
         }
 
-        return ($meta['type'] ?? 'alert') === 'test' ? self::TEST_FALLBACK : mb_substr($text, 0, $this->maxLength());
+        if (($meta['type'] ?? 'alert') === 'test') {
+            return self::TEST_FALLBACK;
+        }
+
+        // An over-long confirmation (never in practice): composed as an alert, which shortens the
+        // text at a word and keeps the link whole or drops it, never cuts it.
+        return MessagingMessage::chat($body, $title, [...$meta, 'type' => 'alert'], $this->maxLength());
     }
 
     /**

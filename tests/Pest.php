@@ -281,6 +281,11 @@ function chanFakeBlueskyAccount(string $did = 'did:plc:abcdefghijklmnopqrstuvwx'
         {
             return $this->did;
         }
+
+        public function verifiedDidForSave(string $handle, ?int $userId): string
+        {
+            return $this->did;
+        }
     });
 }
 
