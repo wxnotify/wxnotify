@@ -382,7 +382,7 @@ services:
     # monitoring/support tool -- server-c should be able to actually deliver
     # alerts on its own.
     apprise:
-        image: 'caronc/apprise:latest'
+        image: 'caronc/apprise:2.0.0'
         ports:
             - '${FORWARD_APPRISE_PORT:-8026}:8000'
         networks:
