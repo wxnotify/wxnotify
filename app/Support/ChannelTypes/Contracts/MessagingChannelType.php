@@ -24,6 +24,15 @@ interface MessagingChannelType extends ByoChannelType
     public function appriseUrl(array $config): string;
 
     /**
+     * The Apprise URL one send goes out on: appriseUrl() unless the message itself changes it
+     * (PagerDuty pages a confirmation code and a test at `info`). Empty when appriseUrl() is.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $meta
+     */
+    public function appriseUrlFor(array $config, array $meta): string;
+
+    /**
      * The subscriber-supplied server's base URL, vetted at save and again before every send,
      * or null for a type whose host is fixed.
      *

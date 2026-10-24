@@ -63,3 +63,23 @@ test('the messaging types ship plus-only with whatsapp switched off', function (
     $migration->up();
     expect($rows())->toBe($expected);
 });
+
+test('pagerduty ships enabled and plus-only, from the seeder and from its own migration', function () {
+    $expected = [['slug' => 'pagerduty', 'min_tier' => 'plus', 'sort_order' => 20, 'enabled' => true]];
+    $migration = require database_path('migrations/2026_10_23_200001_add_pagerduty_channel_type.php');
+    $rows = fn (): array => DB::table('channel_types')->where('slug', 'pagerduty')->get(['slug', 'min_tier', 'sort_order', 'enabled'])
+        ->map(fn (object $row): array => [
+            'slug' => $row->slug, 'min_tier' => $row->min_tier, 'sort_order' => (int) $row->sort_order, 'enabled' => (bool) $row->enabled,
+        ])->all();
+    $others = DB::table('channel_types')->where('slug', '!=', 'pagerduty')->count();
+
+    expect(array_values(collect(ChannelTypeSeeder::SHIPPED)->where('slug', 'pagerduty')->all()))->toBe($expected);
+
+    $migration->down();
+    expect($rows())->toBe([])
+        ->and(DB::table('channel_types')->count())->toBe($others);
+
+    $migration->up();
+    $migration->up();
+    expect($rows())->toBe($expected);
+});

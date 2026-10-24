@@ -61,6 +61,17 @@ trait IsMessagingChannel
     }
 
     /**
+     * Every message goes out on the channel's one URL.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $meta
+     */
+    public function appriseUrlFor(array $config, array $meta): string
+    {
+        return $this->appriseUrl($config);
+    }
+
+    /**
      * The Apprise URL arguments every subscriber-supplied server carries: no redirects (a
      * public server must not bounce Apprise to a private address), a 5 s connect and 10 s read
      * timeout. Extras are appended (Matrix's `discovery=no`, say).

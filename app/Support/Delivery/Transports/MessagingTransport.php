@@ -48,7 +48,7 @@ class MessagingTransport implements Transport
             return DeliveryResult::failed($refusal);
         }
 
-        $url = $type->appriseUrl($config);
+        $url = $type->appriseUrlFor($config, $meta);
 
         // A type gives an empty URL when a stored part is outside its allow-list (a tampered value).
         if ($url === '') {

@@ -226,6 +226,25 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    /**
+     * A PagerDuty channel opening incidents through an Events API v2 integration key, with the
+     * default source and component.
+     */
+    public function pagerDuty(string $integrationKey = 'e93facc04764012d7bfb002500d5d1a6', string $severity = 'error'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'pagerduty',
+            'label' => 'PagerDuty',
+            'apprise_url' => null,
+            'config' => [
+                'integration_key' => $integrationKey,
+                'severity' => $severity,
+                'source' => 'WxNotify',
+                'component' => 'weather-alert',
+            ],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

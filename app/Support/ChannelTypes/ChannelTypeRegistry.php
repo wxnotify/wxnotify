@@ -32,6 +32,7 @@ class ChannelTypeRegistry
         'rocketchat' => RocketChatChannelType::class,
         'matrix' => MatrixChannelType::class,
         'whatsapp' => WhatsAppChannelType::class,
+        'pagerduty' => PagerDutyChannelType::class,
     ];
 
     public function find(string $slug): ?ChannelType

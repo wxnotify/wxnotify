@@ -230,6 +230,7 @@ test('every channel type captions its destination value with a fixed, secret-fre
         'rocketchat' => 'Rocket.Chat server',
         'matrix' => 'Matrix room',
         'whatsapp' => 'WhatsApp number',
+        'pagerduty' => 'PagerDuty service',
         'webhook' => 'Webhook host',
         'webpush' => 'Push service',
     ]);
