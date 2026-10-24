@@ -1,14 +1,17 @@
 <?php
 
 use App\Actions\Alerts\GetAlertsNeedingAttention;
+use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     Carbon::setTestNow('2026-10-03 12:00:00');
@@ -97,7 +100,7 @@ test('an unverified channel used by an active alert is reported with up to three
 
     expect($rows)->toHaveCount(1)
         ->and($rows[0])->toMatchArray(['kind' => 'channel_unverified', 'severity' => 'warning', 'subject' => 'Work email'])
-        ->and($rows[0]['detail'])->toBe("isn't verified yet — confirm it so alerts using it are sure to reach you (Alpha, Bravo, Charlie and 1 more)");
+        ->and($rows[0]['detail'])->toBe("isn't confirmed yet — alerts using it won't be sent until you confirm it (Alpha, Bravo, Charlie and 1 more)");
 });
 
 test('an alert on a verified and an unverified channel lists only the unverified one', function () {
@@ -124,12 +127,24 @@ test('an unverified channel that no active alert uses is not reported', function
     expect(array_column(attentionRows($this->user), 'kind'))->toBe(['alert_inactive']);
 });
 
-test('a channel that is both failing and unverified appears once, as failing', function () {
+test('a channel that is both failing and unverified appears once, as unverified', function () {
     $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'Both', 'verified_at' => null]);
     attentionAlert($this->user, [$channel]);
     channelAttempt($this->user, $channel, 'failure', now()->subHour());
 
-    expect(attentionSummary($this->user))->toBe(['channel_failing: Both']);
+    expect(attentionSummary($this->user))->toBe(['channel_unverified: Both']);
+});
+
+test('an unverified channel whose alerts the dispatcher refused is reported as unverified, not failing', function () {
+    Http::fake();
+    $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'Pending Discord', 'verified_at' => null]);
+    $alert = attentionAlert($this->user, [$channel], ['name' => 'Morning summary']);
+
+    (new DeliverScheduledAlert($alert->id, $channel->id, 'Daily summary', 'Today: Sunny.'))->handle(app(ChannelDispatcher::class));
+
+    expect(DeliveryLog::sole()->only(['status', 'error_detail']))->toBe(['status' => 'failure', 'error_detail' => 'This channel has not been confirmed yet.'])
+        ->and(attentionSummary($this->user))->toBe(['channel_unverified: Pending Discord']);
+    Http::assertNothingSent();
 });
 
 test('an active scheduled alert on a mobile location with no position is reported', function () {

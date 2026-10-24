@@ -151,9 +151,9 @@ test('an unconfirmed channel gets no alert, no summary and no test, and the jobs
         ->and($logs->pluck('notification_channel_id')->unique()->all())->toBe([$channel->id]);
 
     $secrets = array_filter([$channel->apprise_url, ...array_values(array_filter($channel->config ?? [], 'is_string')), $channel->confirmation_code]);
-    foreach ($secrets as $secret) {
-        expect($refusal)->not->toContain($secret);
-    }
+    $leaks = collect($logs->pluck('error_detail'))->crossJoin($secrets)
+        ->filter(fn (array $pair): bool => str_contains((string) $pair[0], (string) $pair[1]));
+    expect($leaks->all())->toBe([]);
 })->with(CHAN_GATE_SLUGS);
 
 test('confirming the channel lets the same alert, summary and test go out', function (string $slug) {
@@ -240,7 +240,30 @@ test('a dashboard test that finds the channel unconfirmed says to confirm it, no
         ->callAction(TestAction::make('sendTest')->table($channel))
         ->assertNotified(Notification::make()
             ->title('Couldn\'t send the test notification')
-            ->body('This channel needs to be confirmed first. Resend the code and enter it, or connect the channel again.')
+            ->body('This browser\'s Web Push subscription is no longer valid. Re-enable Web Push from Notification Channels by connecting the channel again.')
+            ->danger());
+});
+
+test('a dashboard test that finds another type unconfirmed says to resend and enter the code', function () {
+    chanGateFakeWires();
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    $channel = chanGateChannel('discord', $user, verified: true);
+    app()->instance(SendTestNotification::class, new class extends SendTestNotification
+    {
+        public function __invoke(NotificationChannel $channel): bool
+        {
+            $channel->forceFill(['verified_at' => null])->save();
+
+            return false;
+        }
+    });
+
+    livewire(ListNotificationChannels::class)
+        ->callAction(TestAction::make('sendTest')->table($channel))
+        ->assertNotified(Notification::make()
+            ->title('Couldn\'t send the test notification')
+            ->body('This channel needs to be confirmed first. Resend the code and enter it.')
             ->danger());
 });
 

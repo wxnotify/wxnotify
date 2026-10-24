@@ -19,8 +19,10 @@ use Illuminate\Support\Collection;
  *
  * Order: failing channels, unverified channels, active alerts with no channel,
  * mobile locations whose device is gone, mobile locations with no position,
- * inactive alerts -- each group by name. A channel appears once
- * (failing wins over unverified); an inactive alert appears only as inactive,
+ * inactive alerts -- each group by name. A channel appears once: an unverified
+ * channel only as unverified, never as failing (the dispatcher refuses every send to it
+ * and logs that refusal as a failure, so "failing" would name the wrong cause and hide
+ * the fix); an inactive alert appears only as inactive,
  * and the channel/position/verification checks look at active alerts only.
  */
 class GetAlertsNeedingAttention
@@ -34,11 +36,9 @@ class GetAlertsNeedingAttention
      */
     public function __invoke(User $user): array
     {
-        $failing = $this->failingChannels($user);
-
         return [
-            ...$failing->values()->all(),
-            ...$this->unverifiedChannels($user, $failing->keys()->all()),
+            ...$this->failingChannels($user)->values()->all(),
+            ...$this->unverifiedChannels($user),
             ...$this->activeAlertsWithoutChannel($user),
             ...$this->mobileLocationsWithMissingDevice($user),
             ...$this->mobileLocationsWithoutPosition($user),
@@ -81,6 +81,7 @@ class GetAlertsNeedingAttention
         return NotificationChannel::query()
             ->where('user_id', $user->id)
             ->whereIn('id', $latest->keys())
+            ->whereNotNull('verified_at')
             ->get()
             ->sortBy(fn (NotificationChannel $channel): string => mb_strtolower((string) $channel->label))
             ->mapWithKeys(function (NotificationChannel $channel) use ($latest, $failureCounts): array {
@@ -98,15 +99,13 @@ class GetAlertsNeedingAttention
     }
 
     /**
-     * @param  array<int, int>  $excludeChannelIds
      * @return list<array<string, mixed>>
      */
-    private function unverifiedChannels(User $user, array $excludeChannelIds): array
+    private function unverifiedChannels(User $user): array
     {
         $unverified = fn ($query) => $query
             ->where('notification_channels.user_id', $user->id)
-            ->whereNull('notification_channels.verified_at')
-            ->whereNotIn('notification_channels.id', $excludeChannelIds);
+            ->whereNull('notification_channels.verified_at');
 
         $activeAlerts = AlertRule::query()
             ->where('user_id', $user->id)
@@ -137,7 +136,7 @@ class GetAlertsNeedingAttention
                     'kind' => 'channel_unverified',
                     'severity' => 'warning',
                     'subject' => (string) $channel->label,
-                    'detail' => "isn't verified yet — confirm it so alerts using it are sure to reach you (".$listed.($rest > 0 ? " and {$rest} more" : '').')',
+                    'detail' => "isn't confirmed yet — alerts using it won't be sent until you confirm it (".$listed.($rest > 0 ? " and {$rest} more" : '').')',
                     'target' => ['type' => 'channels', 'id' => null],
                 ];
             })

@@ -120,7 +120,7 @@ test('Needs attention lists each problem with a link to the fix', function () {
 
     livewire(NeedsAttentionWidget::class)
         ->assertSee('Work email')
-        ->assertSee("isn't verified yet — confirm it so alerts using it are sure to reach you")
+        ->assertSee("isn't confirmed yet — alerts using it won't be sent until you confirm it")
         ->assertSee('Storm warnings')
         ->assertSee('is turned off')
         ->assertSeeHtml(route('filament.dashboard.resources.alert-rules.edit', ['record' => $paused->id]))
