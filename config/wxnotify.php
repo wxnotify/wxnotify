@@ -46,6 +46,21 @@ return [
         'allow_private_networks' => env('WXNOTIFY_WEBHOOKS_ALLOW_PRIVATE', false),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | SPC Day 1 outlook pairing
+    |--------------------------------------------------------------------------
+    |
+    | SPC sends the Day 1 outlook as two bulletins about a second apart: the
+    | text (SWODY1) and its areal outline (PTSDY1). An outline that arrives
+    | before its text waits this many seconds for it, then is merged into it
+    | (one alert), or, if the text never came, sent on its own. 0 sends an
+    | unpaired outline on its own at once, as before (and the outlook may then
+    | go out twice). See App\Actions\Pipeline\BackfillOutlookRiskAreas.
+    |
+    */
+    'outlook_pairing_delay_seconds' => (int) env('WXNOTIFY_OUTLOOK_PAIRING_DELAY_SECONDS', 120),
+
     'pipeline' => [
         'delivery_retention_hours' => (int) env('PIPELINE_DELIVERY_RETENTION_HOURS', 48),
         'stale_minutes' => [
