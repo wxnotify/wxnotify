@@ -57,9 +57,11 @@ return [
     | rule); this delay only bounds the fallback for an orphan outline: one
     | whose text has not arrived after this many seconds is sent on its own.
     | 0 sends an unpaired outline on its own at once, as before (the outlook
-    | may then go out twice). The wait needs a real queue driver: on `sync`
-    | it behaves as 0, so a self-hosted instance on sync keeps the old
-    | duplicate. See App\Actions\Pipeline\BackfillOutlookRiskAreas.
+    | may then go out twice). The wait needs a real queue driver: when the
+    | default queue connection uses `sync`, this setting is ignored and the
+    | delay is 0 (no wait, no merge into a later text), so a self-hosted
+    | instance on sync keeps only the old duplicate for Nationwide rules.
+    | See App\Actions\Pipeline\BackfillOutlookRiskAreas.
     |
     */
     'outlook_pairing_delay_seconds' => (int) env('WXNOTIFY_OUTLOOK_PAIRING_DELAY_SECONDS', 60),

@@ -139,9 +139,10 @@ class BackfillOutlookRiskAreas
 
     /**
      * Called by ProcessIngestedProduct for a SWODY1 just before it is matched: gives it the risk areas of
-     * the newest real same-issuance outline stored up to the pairing delay before it, so the one match
-     * already carries them. The window is the delay because an older outline may already have fallen
-     * back to its own standalone match, and merging it would send location rules a second copy. The
+     * the newest real same-issuance outline stored less than the pairing delay before it, so the one match
+     * already carries them. The window is the delay, its far end excluded, because an older outline (or
+     * one exactly the delay older: created_at has one-second resolution) may already have fallen back to
+     * its own standalone match, and merging it would send location rules a second copy. The
      * write only lands on a row still without risk areas, so two runs merge once. Never matches.
      */
     public function mergeWaitingOutline(IngestedProduct $swody1): void
@@ -160,7 +161,8 @@ class BackfillOutlookRiskAreas
             ->where('is_test', false)
             ->whereNull('replay_of_id')
             ->whereNotNull('risk_level_polygons')
-            ->whereBetween('created_at', [$swody1->created_at->copy()->subSeconds($delaySeconds), $swody1->created_at])
+            ->where('created_at', '>', $swody1->created_at->copy()->subSeconds($delaySeconds))
+            ->where('created_at', '<=', $swody1->created_at)
             ->get()
             ->filter(fn (IngestedProduct $row): bool => self::headerIssuance($row) === $issuance)
             ->sortByDesc(fn (IngestedProduct $row): array => [$row->created_at->getTimestamp(), $row->id])
@@ -182,8 +184,20 @@ class BackfillOutlookRiskAreas
         $swody1->refresh();
     }
 
+    /**
+     * The configured delay, or 0 on the sync queue: there a delayed job runs inline at once, so an outline
+     * stored first would fall back to its standalone match before its text arrived and the text would then
+     * still take its risk areas, firing location and polygon rules twice. With 0, sync behaves exactly as a
+     * configured delay of 0 (no delayed check, no reverse merge).
+     */
     public static function pairingDelaySeconds(): int
     {
+        $connection = config('queue.default');
+
+        if (config("queue.connections.{$connection}.driver") === 'sync') {
+            return 0;
+        }
+
         return max(0, (int) config('wxnotify.outlook_pairing_delay_seconds', 60));
     }
 

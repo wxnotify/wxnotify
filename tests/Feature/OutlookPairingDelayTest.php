@@ -41,6 +41,14 @@ function chanPairingUseDatabaseQueue(): void
 }
 
 /**
+ * The suite defaults to the sync queue, on which there is no pairing delay at all; every test here except
+ * the sync one runs on the database queue, where the configured delay applies.
+ */
+beforeEach(function (): void {
+    chanPairingUseDatabaseQueue();
+});
+
+/**
  * Runs every job that is due, oldest first, the way the production worker does (one try each). See
  * DeliverWeatherAlertUniqueTest for why the memory cap and timeout are lifted.
  */
@@ -200,6 +208,36 @@ test('an areal outline whose outlook text never arrives waits out the delay, the
 test('the pairing delay defaults to sixty seconds', function () {
     expect(BackfillOutlookRiskAreas::pairingDelaySeconds())->toBe(60);
 });
+
+test('on the sync queue there is no pairing delay: an outline stored first is matched on its own at once and its text never takes its risk areas', function () {
+    Mail::fake();
+    $this->freezeTime();
+    config(['queue.default' => 'sync']);
+    [$rule] = chanPairingOutlookRule();
+    $riskAreaRule = chanPairingRiskAreaRule();
+    $ptsdy1 = chanPairingBulletin('ptsdy1');
+    $this->travel(1)->seconds();
+    $swody1 = chanPairingBulletin('swody1');
+
+    expect(DeliveryLog::where('alert_rule_id', $riskAreaRule->id)->sole()->ingested_product_id)->toBe($ptsdy1->id)
+        ->and($swody1->fresh()->risk_level_polygons)->toBeNull()
+        ->and(DeliveryLog::where('alert_rule_id', $rule->id)->pluck('ingested_product_id')->sort()->values()->all())->toBe([$ptsdy1->id, $swody1->id])
+        ->and(BackfillOutlookRiskAreas::pairingDelaySeconds())->toBe(0);
+});
+
+test('an outlook text takes a waiting outline\'s risk areas only while the outline is younger than the delay', function (int $secondsAfterOutline, bool $merged) {
+    $this->freezeTime();
+    chanPairingQuietly(fn (): IngestedProduct => chanPairingBulletin('ptsdy1'));
+    $this->travel($secondsAfterOutline)->seconds();
+    $swody1 = chanPairingQuietly(fn (): IngestedProduct => chanPairingBulletin('swody1'));
+
+    app(BackfillOutlookRiskAreas::class)->mergeWaitingOutline($swody1);
+
+    expect($swody1->fresh()->risk_level_polygons)->toBe($merged ? CHAN_PAIRING_RISK_POLYGONS : null);
+})->with([
+    'one second inside the delay' => [59, true],
+    'exactly at the delay' => [60, false],
+]);
 
 test('an outlook text that arrives first is paired with its areal outline at once, without waiting', function (int $secondsBetween) {
     Mail::fake();
