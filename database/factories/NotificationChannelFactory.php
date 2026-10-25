@@ -267,6 +267,22 @@ class NotificationChannelFactory extends Factory
         ]);
     }
 
+    /**
+     * An IFTTT channel firing a Webhooks event (the Webhooks key and the event name).
+     */
+    public function ifttt(string $webhooksKey = 'a3nHB7gA9TfBQSqJAHk-od', string $event = 'wxnotify_alert'): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'ifttt',
+            'label' => 'IFTTT',
+            'apprise_url' => null,
+            'config' => [
+                'webhooks_key' => $webhooksKey,
+                'event' => $event,
+            ],
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn () => [

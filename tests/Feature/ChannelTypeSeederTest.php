@@ -103,3 +103,23 @@ test('bluesky ships enabled and plus-only, from the seeder and from its own migr
     $migration->up();
     expect($rows())->toBe($expected);
 });
+
+test('ifttt ships enabled and plus-only, from the seeder and from its own migration', function () {
+    $expected = [['slug' => 'ifttt', 'min_tier' => 'plus', 'sort_order' => 22, 'enabled' => true]];
+    $migration = require database_path('migrations/2026_10_24_200001_add_ifttt_channel_type.php');
+    $rows = fn (): array => DB::table('channel_types')->where('slug', 'ifttt')->get(['slug', 'min_tier', 'sort_order', 'enabled'])
+        ->map(fn (object $row): array => [
+            'slug' => $row->slug, 'min_tier' => $row->min_tier, 'sort_order' => (int) $row->sort_order, 'enabled' => (bool) $row->enabled,
+        ])->all();
+    $others = DB::table('channel_types')->where('slug', '!=', 'ifttt')->count();
+
+    expect(array_values(collect(ChannelTypeSeeder::SHIPPED)->where('slug', 'ifttt')->all()))->toBe($expected);
+
+    $migration->down();
+    expect($rows())->toBe([])
+        ->and(DB::table('channel_types')->count())->toBe($others);
+
+    $migration->up();
+    $migration->up();
+    expect($rows())->toBe($expected);
+});

@@ -31,7 +31,7 @@ use function Pest\Livewire\livewire;
 const CHAN_GATE_SLUGS = [
     'email', 'ntfy', 'discord', 'slack', 'telegram', 'pushover', 'msteams', 'webhook', 'webpush', 'mobile_push',
     'twilio_sms', 'bulkvs_sms', 'httpsms', 'twilio_voice', 'google_chat', 'mattermost', 'rocketchat', 'matrix', 'whatsapp',
-    'pagerduty', 'bluesky',
+    'pagerduty', 'bluesky', 'ifttt',
 ];
 
 const CHAN_GATE_PHONE_SLUGS = ['twilio_sms', 'bulkvs_sms', 'httpsms', 'twilio_voice', 'whatsapp'];
@@ -91,6 +91,7 @@ function chanGateChannel(string $slug, User $user, bool $verified): Notification
         'whatsapp' => $factory->whatsApp(),
         'pagerduty' => $factory->pagerDuty(),
         'bluesky' => $factory->bluesky(),
+        'ifttt' => $factory->ifttt(),
         default => $factory->state(['channel_type' => $slug, 'apprise_url' => match ($slug) {
             'ntfy' => 'ntfy://wx-alerts-topic',
             'discord' => 'discord://123456789/token/',

@@ -177,6 +177,20 @@ test('factory reset restores the bluesky row to its shipped state', function () 
     expect(DB::table('channel_types')->where('slug', 'bluesky')->where('enabled', true)->where('min_tier', 'plus')->exists())->toBeTrue();
 });
 
+test('factory reset restores the ifttt row to its shipped state', function () {
+    DB::table('channel_types')->where('slug', 'ifttt')->update(['min_tier' => 'free', 'sort_order' => 99, 'enabled' => false]);
+
+    app(ResetCatalogs::class)();
+
+    expect((array) DB::table('channel_types')->where('slug', 'ifttt')->first(['slug', 'min_tier', 'sort_order', 'enabled']))
+        ->toEqual(['slug' => 'ifttt', 'min_tier' => 'plus', 'sort_order' => 22, 'enabled' => true]);
+
+    DB::table('channel_types')->where('slug', 'ifttt')->delete();
+    app(ResetCatalogs::class)();
+
+    expect(DB::table('channel_types')->where('slug', 'ifttt')->where('enabled', true)->where('min_tier', 'plus')->exists())->toBeTrue();
+});
+
 test('the preview counts exactly what each selected toggle would delete and writes nothing', function () {
     frSeedPipelineData();
     (new ProductCatalogSeeder)->run();

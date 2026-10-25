@@ -70,4 +70,14 @@ interface MessagingChannelType extends ByoChannelType
      * @param  array<string, mixed>  $meta
      */
     public function compose(string $body, ?string $title, array $meta): string;
+
+    /**
+     * The separate title Apprise sends alongside compose()'s text, or null to send none (the
+     * default: the title is then part of the text). Only a type whose destination has its own
+     * title field returns one (IFTTT's value1), and its compose() then leaves the title out.
+     * `$title` already carries the admin message prefix.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    public function appriseTitle(?string $title, array $meta): ?string;
 }

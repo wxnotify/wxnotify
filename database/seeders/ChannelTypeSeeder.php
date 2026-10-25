@@ -35,6 +35,7 @@ class ChannelTypeSeeder extends Seeder
         ['slug' => 'matrix', 'min_tier' => 'plus', 'sort_order' => 19, 'enabled' => true],
         ['slug' => 'pagerduty', 'min_tier' => 'plus', 'sort_order' => 20, 'enabled' => true],
         ['slug' => 'bluesky', 'min_tier' => 'plus', 'sort_order' => 21, 'enabled' => true],
+        ['slug' => 'ifttt', 'min_tier' => 'plus', 'sort_order' => 22, 'enabled' => true],
     ];
 
     public function run(): void

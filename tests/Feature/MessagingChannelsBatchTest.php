@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Channels\SendTestNotification;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Pages\ConnectChannel;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
@@ -18,7 +19,7 @@ use function Pest\Livewire\livewire;
 
 // goToConnectChannelStep(), chanEnableWhatsApp(), chanFakeChatDns() and chanChatFormSubmit() live in tests/Pest.php.
 
-const CHAN_BATCH_SLUGS = ['google_chat', 'mattermost', 'rocketchat', 'matrix', 'whatsapp', 'pagerduty', 'bluesky'];
+const CHAN_BATCH_SLUGS = ['google_chat', 'mattermost', 'rocketchat', 'matrix', 'whatsapp', 'pagerduty', 'bluesky', 'ifttt'];
 
 const CHAN_BATCH_PUBLIC_IP = '93.184.216.34';
 
@@ -68,6 +69,10 @@ function chanBatchWizardCases(): array
             'app_password' => 'k7m2-q4xz-p9hw-3tab',
             'consent' => true,
         ], 'bsky://'],
+        'ifttt' => ['ifttt', [
+            'webhooks_key' => 'a3nHB7gA9TfBQSqJAHk-od',
+            'event' => 'wxnotify_alert',
+        ], 'ifttt://'],
     ];
 }
 
@@ -86,10 +91,11 @@ function chanBatchChannelsFor(User $user): array
         NotificationChannel::factory()->for($user)->whatsApp()->create(),
         NotificationChannel::factory()->for($user)->pagerDuty()->create(),
         NotificationChannel::factory()->for($user)->bluesky()->create(),
+        NotificationChannel::factory()->for($user)->ifttt()->create(),
     ];
 }
 
-test('a Plus subscriber connects each of the seven types through the wizard', function (string $slug, array $data, string $scheme) {
+test('a Plus subscriber connects each of the eight types through the wizard', function (string $slug, array $data, string $scheme) {
     $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $this->actingAs($user);
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
@@ -112,7 +118,7 @@ test('a Plus subscriber connects each of the seven types through the wizard', fu
     expect($channel->fresh()->isVerified())->toBeTrue();
 })->with(fn (): array => chanBatchWizardCases());
 
-test('a Free subscriber sees all seven disabled in the picker and is refused on a forced step', function () {
+test('a Free subscriber sees all eight disabled in the picker and is refused on a forced step', function () {
     $this->actingAs(User::factory()->create(['tier_override' => Tier::Free]));
     Http::fake();
 
@@ -134,7 +140,7 @@ test('a Free subscriber sees all seven disabled in the picker and is refused on 
     Http::assertNothingSent();
 });
 
-test('none of the seven is creatable in the app, the API or the alert form\'s inline create', function () {
+test('none of the eight is creatable in the app, the API or the alert form\'s inline create', function () {
     $this->seed(ProductCatalogSeeder::class);
     $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $this->actingAs($user);
@@ -169,7 +175,7 @@ test('none of the seven is creatable in the app, the API or the alert form\'s in
     }
 });
 
-test('a downgraded subscriber\'s seven channels are kept, refused with the tier text and resume on re-upgrade', function () {
+test('a downgraded subscriber\'s eight channels are kept, refused with the tier text and resume on re-upgrade', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
     $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $channels = chanBatchChannelsFor($user);
@@ -181,7 +187,7 @@ test('a downgraded subscriber\'s seven channels are kept, refused with the tier 
     foreach ($channels as $channel) {
         expect($send($channel, 'alert')->success)->toBeTrue("{$channel->channel_type} should send on Plus");
     }
-    Http::assertSentCount(7);
+    Http::assertSentCount(8);
 
     $user->forceFill(['tier_override' => null])->save();
 
@@ -192,15 +198,62 @@ test('a downgraded subscriber\'s seven channels are kept, refused with the tier 
         expect($channel->fresh())->not->toBeNull()
             ->and($user->fresh()->canAddChannel($channel->channel_type))->toBeFalse();
     }
-    Http::assertSentCount(7);
-    expect($rule->notificationChannels()->count())->toBe(7);
+    Http::assertSentCount(8);
+    expect($rule->notificationChannels()->count())->toBe(8);
 
     $user->forceFill(['tier_override' => Tier::Pro])->save();
 
     foreach ($channels as $channel) {
         expect($send($channel, 'alert')->success)->toBeTrue("{$channel->channel_type} should resume");
     }
-    Http::assertSentCount(14);
+    Http::assertSentCount(16);
+});
+
+test('the seven types that send no title of their own still send exactly the same request', function () {
+    Http::fake(['*/notify/*' => Http::response(status: 200)]);
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $link = 'https://wx.example.com/view-product/kbou-a_b_c';
+    $code = 'Your WxNotify confirmation code is: 123456';
+    $chat = [
+        'alert' => "Tornado Warning\n\nTornado Warning for\nBoulder County.\n\n{$link}",
+        'confirmation' => $code,
+    ];
+    $expected = [
+        'google_chat' => [...$chat, 'test' => 'This is a test notification from WxNotify. If you received this, "Google Chat" is working correctly.'],
+        'mattermost' => [...$chat, 'test' => 'This is a test notification from WxNotify. If you received this, "Mattermost" is working correctly.'],
+        'rocketchat' => [...$chat, 'test' => 'This is a test notification from WxNotify. If you received this, "Rocket.Chat" is working correctly.'],
+        'matrix' => [...$chat, 'test' => 'This is a test notification from WxNotify. If you received this, "Matrix" is working correctly.'],
+        'whatsapp' => [
+            'alert' => "Tornado Warning: Tornado Warning for Boulder County. {$link}",
+            'confirmation' => 'Your WxNotify code is 123456. Enter it in your dashboard to confirm this number for weather alerts.',
+            'test' => 'WxNotify test: "WhatsApp •••• 5678" is working.',
+        ],
+        'pagerduty' => [...$chat, 'test' => 'This is a test notification from WxNotify. If you received this, "PagerDuty" is working correctly.'],
+        'bluesky' => [...$chat, 'test' => 'This is a test notification from WxNotify. If you received this, "Bluesky" is working correctly.'],
+    ];
+    $channels = collect(chanBatchChannelsFor($user))->filter(fn (NotificationChannel $channel): bool => array_key_exists($channel->channel_type, $expected));
+
+    expect($channels->map->channel_type->values()->all())->toBe(array_keys($expected));
+
+    foreach ($channels as $channel) {
+        $dispatcher = app(ChannelDispatcher::class);
+        $dispatcher->send($channel, "Tornado Warning for\nBoulder County.", 'Tornado Warning', ['url' => $link]);
+        $dispatcher->send($channel, $code, 'Confirm your WxNotify channel', ['type' => 'confirmation', 'code' => '123456']);
+        app(SendTestNotification::class)($channel);
+    }
+
+    $sent = collect(Http::recorded())->map(fn (array $pair): array => $pair[0]->data())->values();
+
+    expect($sent)->toHaveCount(21);
+
+    foreach ($channels->values() as $index => $channel) {
+        foreach (['alert', 'confirmation', 'test'] as $offset => $kind) {
+            $request = $sent[$index * 3 + $offset];
+
+            expect(array_keys($request))->toBe(['urls', 'body'], "{$channel->channel_type} {$kind} sent a title or format")
+                ->and($request['body'])->toBe($expected[$channel->channel_type][$kind], "{$channel->channel_type} {$kind}");
+        }
+    }
 });
 
 test('the app\'s channel list shows them generically and never carries a secret', function () {
@@ -212,8 +265,8 @@ test('the app\'s channel list shows them generically and never carries a secret'
     $rows = collect($response->json('data'))->keyBy('channel_type');
 
     expect($rows->keys()->all())->toEqualCanonicalizing(CHAN_BATCH_SLUGS)
-        ->and($rows->only(['google_chat', 'mattermost', 'rocketchat', 'matrix', 'whatsapp', 'pagerduty', 'bluesky'])->map->type_label->all())->toBe([
-            'google_chat' => 'Google Chat', 'mattermost' => 'Mattermost', 'rocketchat' => 'Rocket.Chat', 'matrix' => 'Matrix', 'whatsapp' => 'WhatsApp', 'pagerduty' => 'PagerDuty', 'bluesky' => 'Bluesky',
+        ->and($rows->only(['google_chat', 'mattermost', 'rocketchat', 'matrix', 'whatsapp', 'pagerduty', 'bluesky', 'ifttt'])->map->type_label->all())->toBe([
+            'google_chat' => 'Google Chat', 'mattermost' => 'Mattermost', 'rocketchat' => 'Rocket.Chat', 'matrix' => 'Matrix', 'whatsapp' => 'WhatsApp', 'pagerduty' => 'PagerDuty', 'bluesky' => 'Bluesky', 'ifttt' => 'IFTTT',
         ])
         ->and($rows['matrix']['destination'])->toBe('!AbCdEfGhIjKlMn:example.org')
         ->and($rows['matrix']['destination_label'])->toBe('Matrix room')
@@ -226,7 +279,7 @@ test('the app\'s channel list shows them generically and never carries a secret'
     $body = $response->getContent();
     foreach ([
         'AIzaSyDdI0hCZtE6vySjMm', 'Zq3x-_Vb9Kd2LmNo', 'h7kq3m9xw5e8rbt4y6uzi3o5pa', 'Zx9Cv8Bn7Mq6Wr5Ty4Ui3Op2As1Df0Gh',
-        'syt_d3hub3RpZnk', 'EAABsbCS1iHgBO7ZBx9K', 'e93facc04764012d7bfb002500d5d1a6', 'k7m2-q4xz-p9hw-3tab', '525512345678', '5512345678', 'apprise_url', '"config"', '"token"',
+        'syt_d3hub3RpZnk', 'EAABsbCS1iHgBO7ZBx9K', 'e93facc04764012d7bfb002500d5d1a6', 'k7m2-q4xz-p9hw-3tab', 'a3nHB7gA9TfBQSqJAHk-od', '525512345678', '5512345678', 'apprise_url', '"config"', '"token"',
     ] as $secret) {
         expect($body)->not->toContain($secret);
     }

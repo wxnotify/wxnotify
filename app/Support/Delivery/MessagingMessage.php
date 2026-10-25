@@ -87,6 +87,17 @@ class MessagingMessage
     }
 
     /**
+     * A title sent in its own field (IFTTT's value1): folded to one line, cut at a word to at
+     * most $maxLength characters, or $fallback when nothing is left.
+     */
+    public static function heading(?string $title, int $maxLength, string $fallback): string
+    {
+        $heading = self::cut(self::oneLine((string) $title), $maxLength);
+
+        return $heading === '' ? $fallback : $heading;
+    }
+
+    /**
      * Folds text to one line: every run of whitespace, separators or control characters (newline,
      * tab, no-break and ideographic spaces, line separators) becomes a single space.
      */

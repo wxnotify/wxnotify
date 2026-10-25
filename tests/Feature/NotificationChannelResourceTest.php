@@ -257,6 +257,7 @@ dataset('chanMessagingChannelStates', [
     'whatsapp' => ['whatsApp', ['EAABsbCS1iHgBO7ZBx9Kd2LmNoPq7RsTuVwXyZ0aBcDeFgHiJk', '525512345678', '5512345678']],
     'pagerduty' => ['pagerDuty', ['e93facc04764012d7bfb002500d5d1a6']],
     'bluesky' => ['bluesky', ['k7m2-q4xz-p9hw-3tab']],
+    'ifttt' => ['ifttt', ['a3nHB7gA9TfBQSqJAHk-od']],
 ]);
 
 test('the edit modal of a messaging channel holds no credential, server path or number and offers no reveal action', function (string $state, array $secrets) {

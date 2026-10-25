@@ -61,6 +61,16 @@ trait IsMessagingChannel
     }
 
     /**
+     * No separate title: compose() puts it in the text.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    public function appriseTitle(?string $title, array $meta): ?string
+    {
+        return null;
+    }
+
+    /**
      * Every message goes out on the channel's one URL.
      *
      * @param  array<string, mixed>  $config

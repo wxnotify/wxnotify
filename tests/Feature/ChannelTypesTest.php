@@ -232,6 +232,7 @@ test('every channel type captions its destination value with a fixed, secret-fre
         'whatsapp' => 'WhatsApp number',
         'pagerduty' => 'PagerDuty service',
         'bluesky' => 'Bluesky account',
+        'ifttt' => 'IFTTT Webhooks event',
         'webhook' => 'Webhook host',
         'webpush' => 'Push service',
     ]);
