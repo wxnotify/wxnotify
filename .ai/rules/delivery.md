@@ -64,3 +64,6 @@ Voice calls go through `TwilioVoiceTransport` (direct, api.twilio.com only): ONE
 
 ## MessagingChannelType::sendRefusal(): per-send preflight hook
 `MessagingChannelType::sendRefusal()` (default no-op in `IsMessagingChannel`) lets a messaging type veto a send before any Apprise call; `MessagingTransport` runs it after the blank-key / empty-URL / guarded-host checks and before `notify()`. Use it for checks that cannot be expressed as a stored server host (Bluesky's account verification). It must return a fixed secret-free text and must be cheap or cached when it needs outbound lookups. A custom Apprise deployment must keep `APPRISE_STATELESS_STORAGE` off so Apprise re-resolves every send.
+
+## MessagingChannelType::appriseTitle(): a separate Apprise title for one type
+`MessagingChannelType::appriseTitle()` (default null in `IsMessagingChannel`) lets a messaging type send a separate title to Apprise; `MessagingTransport` passes `title: $type->appriseTitle(...)`. Only IFTTT overrides it: a type that returns a title must leave it OUT of its `compose()` (no title duplicated in the body). Every other messaging type must keep sending exactly `urls` and `body` (no title/format key): `MessagingChannelsBatchTest` pins the exact request for an alert, a code and a test on each type. `AppriseApiClient::notify` drops a null/falsy title (`array_filter`).
