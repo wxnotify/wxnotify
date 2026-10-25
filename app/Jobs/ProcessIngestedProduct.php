@@ -34,7 +34,8 @@ use Throwable;
  * and never to SyncActiveWwa (replays never write active_wwas). The ptsdy1 check
  * comes next, before the general vtec_office branch, since PTSDY1 is neither a
  * replay nor VTEC-tagged but still needs to skip both of those paths — see
- * App\Actions\Pipeline\BackfillOutlookRiskAreas.
+ * App\Actions\Pipeline\BackfillOutlookRiskAreas. A SWODY1 (the outline's outlook text) first takes
+ * the risk areas of an outline stored before it, then is matched like any other product.
  *
  * Before any of that branching, a VTEC bulletin's segments (one per section x VTEC line) are
  * built, for replays too: matching reads them instead of the bulletin's first zone block and first
@@ -85,7 +86,29 @@ class ProcessIngestedProduct implements ShouldQueue
             return;
         }
 
+        if ($product->awipsid === 'swody1') {
+            $this->mergeWaitingOutline($product);
+        }
+
         app(MatchWeatherAlertRules::class)($product);
+    }
+
+    /**
+     * An SPC Day 1 outlook text takes the risk areas of its areal outline if that was stored first, so
+     * its one match below fires every rule (see BackfillOutlookRiskAreas::mergeWaitingOutline()). A
+     * failure is logged, never thrown: the outlook is still matched, without the areas, and the
+     * outline's own delayed check merges them later.
+     */
+    private function mergeWaitingOutline(IngestedProduct $product): void
+    {
+        try {
+            app(BackfillOutlookRiskAreas::class)->mergeWaitingOutline($product);
+        } catch (Throwable $e) {
+            logger()->error('ProcessIngestedProduct: failed to merge a waiting areal outline into an outlook', [
+                'ingested_product_id' => $product->id,
+                'exception' => $e::class,
+            ]);
+        }
     }
 
     /**

@@ -51,15 +51,18 @@ return [
     | SPC Day 1 outlook pairing
     |--------------------------------------------------------------------------
     |
-    | SPC sends the Day 1 outlook as two bulletins about a second apart: the
-    | text (SWODY1) and its areal outline (PTSDY1). An outline that arrives
-    | before its text waits this many seconds for it, then is merged into it
-    | (one alert), or, if the text never came, sent on its own. 0 sends an
-    | unpaired outline on its own at once, as before (and the outlook may then
-    | go out twice). See App\Actions\Pipeline\BackfillOutlookRiskAreas.
+    | SPC sends the Day 1 outlook as two bulletins 0-32 seconds apart: the
+    | text (SWODY1) and its areal outline (PTSDY1). A text that arrives after
+    | its outline takes the outline's risk areas at once (one alert, every
+    | rule); this delay only bounds the fallback for an orphan outline: one
+    | whose text has not arrived after this many seconds is sent on its own.
+    | 0 sends an unpaired outline on its own at once, as before (the outlook
+    | may then go out twice). The wait needs a real queue driver: on `sync`
+    | it behaves as 0, so a self-hosted instance on sync keeps the old
+    | duplicate. See App\Actions\Pipeline\BackfillOutlookRiskAreas.
     |
     */
-    'outlook_pairing_delay_seconds' => (int) env('WXNOTIFY_OUTLOOK_PAIRING_DELAY_SECONDS', 120),
+    'outlook_pairing_delay_seconds' => (int) env('WXNOTIFY_OUTLOOK_PAIRING_DELAY_SECONDS', 60),
 
     'pipeline' => [
         'delivery_retention_hours' => (int) env('PIPELINE_DELIVERY_RETENTION_HOURS', 48),

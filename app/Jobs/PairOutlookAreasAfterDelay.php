@@ -17,8 +17,10 @@ use Throwable;
  * The one delayed re-check for an SPC Day 1 areal outline (PTSDY1) that found no outlook text (SWODY1)
  * when it arrived: App\Actions\Pipeline\BackfillOutlookRiskAreas dispatches it
  * `wxnotify.outlook_pairing_delay_seconds` later, and its pairAfterWaiting() merges the risk areas into
- * the SWODY1 of the same issuance if that has arrived since. If none has, the outline is matched on its own,
- * the documented "never lose the alert" fallback.
+ * the SWODY1 of the same issuance if that has arrived since without taking them. Usually the SWODY1 took
+ * them when it was processed (BackfillOutlookRiskAreas::mergeWaitingOutline()) and this job does nothing.
+ * If no SWODY1 of that issuance arrived, the outline is matched on its own, the documented "never lose the
+ * alert" fallback: the delay only bounds how long that orphan outline waits.
  *
  * Unique per outline id, so a retried or duplicated ProcessIngestedProduct schedules it once; the lock is
  * taken at dispatch and released when the job finishes, bounded by uniqueFor() (the delay plus an hour) so

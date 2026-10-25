@@ -28,8 +28,8 @@ test('backfills risk_level_polygons onto the most recent un-enriched same-produc
     $rule->products()->attach($outlook);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
 
-    $swody1 = createOutlookRow(['product_id' => $outlook->id, 'risk_level_polygons' => null, 'created_at' => now()->subMinutes(10)]);
-    $ptsdy1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'ptsdy1', 'risk_levels' => ['Moderate'], 'risk_level_polygons' => [
+    $swody1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'swody1', 'wmo_header_key' => 'acus01 kwns 070447 swody1', 'risk_level_polygons' => null, 'created_at' => now()->subMinutes(10)]);
+    $ptsdy1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'ptsdy1', 'wmo_header_key' => 'wuus01 kwns 070447 ptsdy1', 'risk_levels' => ['Moderate'], 'risk_level_polygons' => [
         'Moderate' => [['lat' => 33, 'lon' => -97], ['lat' => 33, 'lon' => -94], ['lat' => 36, 'lon' => -94], ['lat' => 36, 'lon' => -97]],
     ]]);
 
@@ -54,7 +54,7 @@ test('re-matching the backfilled row never double-delivers a rule that already m
     $channel = NotificationChannel::factory()->for($rule->user)->create();
     $rule->notificationChannels()->attach($channel);
 
-    $swody1 = createOutlookRow(['product_id' => $outlook->id, 'risk_level_polygons' => null, 'created_at' => now()->subMinutes(10)]);
+    $swody1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'swody1', 'wmo_header_key' => 'acus01 kwns 070447 swody1', 'risk_level_polygons' => null, 'created_at' => now()->subMinutes(10)]);
     DeliveryLog::factory()->create([
         'alert_rule_id' => $rule->id,
         'notification_channel_id' => $channel->id,
@@ -62,7 +62,7 @@ test('re-matching the backfilled row never double-delivers a rule that already m
         'user_id' => $rule->user_id,
         'channel_type' => $channel->channel_type,
     ]);
-    $ptsdy1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'ptsdy1', 'risk_level_polygons' => [
+    $ptsdy1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'ptsdy1', 'wmo_header_key' => 'wuus01 kwns 070447 ptsdy1', 'risk_level_polygons' => [
         'Moderate' => [['lat' => 33, 'lon' => -97], ['lat' => 33, 'lon' => -94], ['lat' => 36, 'lon' => -94], ['lat' => 36, 'lon' => -97]],
     ]]);
 
@@ -78,7 +78,7 @@ test('stands alone as its own matchable row when no recent un-enriched SWODY1 ro
     $rule->products()->attach($outlook);
     $rule->notificationChannels()->attach(NotificationChannel::factory()->for($rule->user)->create());
 
-    $ptsdy1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'ptsdy1', 'risk_level_polygons' => [
+    $ptsdy1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'ptsdy1', 'wmo_header_key' => 'wuus01 kwns 070447 ptsdy1', 'risk_level_polygons' => [
         'Moderate' => [['lat' => 33, 'lon' => -97], ['lat' => 33, 'lon' => -94], ['lat' => 36, 'lon' => -94], ['lat' => 36, 'lon' => -97]],
     ]]);
 
@@ -90,8 +90,8 @@ test('stands alone as its own matchable row when no recent un-enriched SWODY1 ro
 test('a same-product row older than the 2-hour window is not backfilled', function () {
     Queue::fake([DeliverWeatherAlert::class]);
     $outlook = Product::where('code', 'SPC.OUTLOOK')->sole();
-    $stale = createOutlookRow(['product_id' => $outlook->id, 'risk_level_polygons' => null, 'created_at' => now()->subHours(3)]);
-    $ptsdy1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'ptsdy1', 'risk_level_polygons' => [
+    $stale = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'swody1', 'wmo_header_key' => 'acus01 kwns 070447 swody1', 'risk_level_polygons' => null, 'created_at' => now()->subHours(3)]);
+    $ptsdy1 = createOutlookRow(['product_id' => $outlook->id, 'awipsid' => 'ptsdy1', 'wmo_header_key' => 'wuus01 kwns 070447 ptsdy1', 'risk_level_polygons' => [
         'Moderate' => [['lat' => 33, 'lon' => -97], ['lat' => 33, 'lon' => -94], ['lat' => 36, 'lon' => -94], ['lat' => 36, 'lon' => -97]],
     ]]);
 

@@ -63,11 +63,14 @@ function chanQueuedJobCount(): int
 test('an SPC Day 1 outlook re-matched by its areal outline before the first delivery ran is delivered once', function () {
     Mail::fake();
     $this->freezeTime();
+    // No pairing delay, so the outlook text does not take the outline's risk areas before its own match
+    // and the outline's backfill still re-matches it while the first delivery is queued.
+    config(['wxnotify.outlook_pairing_delay_seconds' => 0]);
     chanUseDatabaseQueue();
     [$rule, $channel] = chanOutlookRuleWithEmailChannel();
     $outlookId = Product::where('code', 'SPC.OUTLOOK')->sole()->id;
-    $swody1 = IngestedProduct::factory()->create(['product_id' => $outlookId, 'awipsid' => 'swody1', 'risk_level_polygons' => null]);
-    IngestedProduct::factory()->create(['product_id' => $outlookId, 'awipsid' => 'ptsdy1', 'risk_levels' => ['Moderate'], 'risk_level_polygons' => CHAN_UNIQUE_RISK_POLYGONS]);
+    $swody1 = IngestedProduct::factory()->create(['product_id' => $outlookId, 'awipsid' => 'swody1', 'wmo_header_key' => 'acus01 kwns 250102 swody1', 'risk_level_polygons' => null]);
+    IngestedProduct::factory()->create(['product_id' => $outlookId, 'awipsid' => 'ptsdy1', 'wmo_header_key' => 'wuus01 kwns 250102 ptsdy1', 'risk_levels' => ['Moderate'], 'risk_level_polygons' => CHAN_UNIQUE_RISK_POLYGONS]);
     expect(DB::table('jobs')->pluck('payload')->map(fn (string $payload): string => json_decode($payload, true)['displayName'])->all())
         ->toBe([ProcessIngestedProduct::class, ProcessIngestedProduct::class]);
 
