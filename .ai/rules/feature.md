@@ -15,3 +15,6 @@ Found while writing TestProductScenarioResourceAccessTest.php (Task 12 of the Te
 
 ## Testing unique jobs: Queue::fake() takes the lock and never releases it
 In Laravel 13 `Queue::fake()` still takes `ShouldBeUnique` locks and never releases them (only `Bus::fake()` bypasses them), so a unique-job dedup test must use the real `database` queue driver plus `queue:work --tries=1` and count `jobs`/DeliveryLog rows; `phpunit.xml` uses the array cache, whose locks live per application instance, so there is no cross-test or cross-process leakage.
+
+## Delayed-job tests: use the database queue driver and travel the clock
+The suite runs on the `sync` queue by default, which the outlook pairing treats as delay 0. A test of a delayed job must switch to the `database` queue driver (`beforeEach`), run `queue:work --tries=1` and move the frozen clock past `available_at` (not run at 59 s, run at 61 s) instead of calling `handle()` directly (only the deleted-product and throwing cases may).
