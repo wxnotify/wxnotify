@@ -15,6 +15,7 @@ use App\Models\NotificationChannel;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -56,10 +57,24 @@ use Illuminate\Support\Str;
  * product in an inbox.
  *
  * The matched segment ids (see IngestedProductSegment) name the events this delivery is about: the subject lists each once, the templated body describes the first, and delivery_log_segment records them on the log row, including a skipped one. An id whose segment is gone by the time the job runs is ignored. An empty list (a non-VTEC product, a job queued before segments existed) keeps the bulletin's own product.
+ *
+ * One delivery per rule, channel and product: a product can be matched twice (an SPC Day 1 outlook is
+ * re-matched by App\Actions\Pipeline\BackfillOutlookRiskAreas once its areal outline arrives), and
+ * MatchWeatherAlertRules' DeliveryLog guard cannot see a delivery that is still queued, because the row
+ * is only written when this job runs. So the job is unique on those three ids (never the location or
+ * segment ids: two matches of one product can differ in those, and the first dispatch wins), its lock
+ * taken at dispatch and released when the job finishes or fails, bounded by $uniqueFor so a lost worker
+ * cannot hold it. handle() repeats the DeliveryLog guard first, for a dispatch that arrives after an
+ * earlier job already finished and released the lock.
  */
-class DeliverWeatherAlert implements ShouldQueue
+class DeliverWeatherAlert implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * Seconds the unique lock lives at most, should the job never finish or fail.
+     */
+    public int $uniqueFor = 3600;
 
     /**
      * @param  list<int>  $segmentIds  the matched IngestedProductSegment ids, in bulletin order
@@ -72,8 +87,26 @@ class DeliverWeatherAlert implements ShouldQueue
         public readonly array $segmentIds = [],
     ) {}
 
+    /**
+     * Ids only: the lock key is stored in the cache store, so it must never carry personal data.
+     */
+    public function uniqueId(): string
+    {
+        return "{$this->ruleId}:{$this->channelId}:{$this->ingestedProductId}";
+    }
+
     public function handle(ChannelDispatcher $dispatcher): void
     {
+        if ($this->alreadyLogged()) {
+            logger()->debug('DeliverWeatherAlert: already delivered for this rule, channel and product', [
+                'rule_id' => $this->ruleId,
+                'channel_id' => $this->channelId,
+                'ingested_product_id' => $this->ingestedProductId,
+            ]);
+
+            return;
+        }
+
         $rule = AlertRule::find($this->ruleId);
 
         if ($rule === null) {
@@ -160,6 +193,18 @@ class DeliverWeatherAlert implements ShouldQueue
         ]);
 
         $this->linkSegments($log, $segments);
+    }
+
+    /**
+     * The same check as MatchWeatherAlertRules::dispatchOrSuppress(): any row for this rule, channel and
+     * product, whatever its status, means this delivery was already handled.
+     */
+    private function alreadyLogged(): bool
+    {
+        return DeliveryLog::where('alert_rule_id', $this->ruleId)
+            ->where('notification_channel_id', $this->channelId)
+            ->where('ingested_product_id', $this->ingestedProductId)
+            ->exists();
     }
 
     /**

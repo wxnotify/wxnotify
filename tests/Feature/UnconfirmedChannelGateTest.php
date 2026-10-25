@@ -173,8 +173,11 @@ test('confirming the channel lets the same alert, summary and test go out', func
     expect($sent())->toBe(0);
 
     $channel->forceFill(['verified_at' => now()])->save();
+    // The refused delivery's failure row closes that rule, channel and product for good
+    // (DeliverWeatherAlert sends once per product), so the confirmed send is the next product.
+    $nextProduct = IngestedProduct::factory()->create(['text' => 'Tornado Warning issued for...']);
 
-    expect(chanGateSendAll($channel, $rule, $summaryRule, $product))->toBeTrue()
+    expect(chanGateSendAll($channel, $rule, $summaryRule, $nextProduct))->toBeTrue()
         ->and($sent())->toBeGreaterThanOrEqual(3)
         ->and(DeliveryLog::query()->where('status', 'success')->count())->toBe(2);
 })->with(CHAN_GATE_SLUGS);
@@ -228,7 +231,7 @@ test('a web push channel whose subscription expired gets no further alerts', fun
     expect($pushes)->toHaveCount(1)
         ->and($channel->fresh()->isVerified())->toBeFalse();
 
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, IngestedProduct::factory()->create()->id))->handle(app(ChannelDispatcher::class));
 
     expect($pushes)->toHaveCount(1)
         ->and(DeliveryLog::query()->orderByDesc('id')->first()->error_detail)->toBe('This channel has not been confirmed yet.');

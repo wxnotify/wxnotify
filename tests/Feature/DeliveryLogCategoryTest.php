@@ -74,7 +74,7 @@ test('a weather alert delivery records the rule\'s category, success and skipped
     (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
 
     $rule->update(['is_active' => false]);
-    (new DeliverWeatherAlert($rule->id, $channel->id, $product->id))->handle(app(ChannelDispatcher::class));
+    (new DeliverWeatherAlert($rule->id, $channel->id, IngestedProduct::factory()->create()->id))->handle(app(ChannelDispatcher::class));
 
     expect(DeliveryLog::orderBy('id')->pluck('category', 'status')->all())->toBe(['success' => 'weather_alerts', 'skipped' => 'weather_alerts']);
 });
