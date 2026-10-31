@@ -151,8 +151,11 @@ call.
 - **Brief ignores the chosen locations** (it shows only the US maximum per period).
 - **Scheduling.** A separate branch/command beside `alerts:dispatch-scheduled`'s existing query, which is not
   changed; it shares only the `last_scheduled_run_on` once-a-day stamp. Per-channel failures stay per job.
-- **Location tests.** In-project PHP point-in-polygon on the fetched GeoJSON: handles MultiPolygon and holes, a
-  point on an edge counts as inside. The PWO text is shown from the stored product text; the builder finds its
+- **Location tests.** Point-in-polygon runs in PostGIS (`ST_Intersects` on the fetched GeoJSON geometry), which the
+  app already uses; it handles MultiPolygon and holes, and a point on an edge counts as inside. (Changed from
+  "in-project PHP" when the plan was written.)
+- **Category.** The report is a new rule category (`outlook_report`) listed right after SPC & WPC Alerts in the
+  picker, not a sub-type of the product-triggered SPC rule. The mobile API leaves it to the dashboard for now. The PWO text is shown from the stored product text; the builder finds its
   product code in the catalog (`PWO`).
 
 ## Open questions for the owner
