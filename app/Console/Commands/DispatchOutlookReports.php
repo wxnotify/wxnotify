@@ -104,7 +104,7 @@ class DispatchOutlookReports extends Command
             return 0;
         }
 
-        $payload = $buildReport($outlooks, $rule->locations, $pwo);
+        $payload = $buildReport($outlooks, $rule->locations, $pwo, $today);
 
         $sendNothing = $rule->report_mode === OutlookReportMode::OnlyWhenForecast
             && ! $payload['something_forecast']

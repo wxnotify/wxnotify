@@ -97,7 +97,7 @@ test('a due rule sends the subject and brief once to its channel and stamps toda
 
     Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->ruleId === $rule->id
         && $job->channelId === $channel->id
-        && $job->title === 'Severe Wx Report - 🟡 D1 | ⚪ D2 | ⚪ D3 | ⚪ D4 | ⚪ D5 | ⚪ D6 | ⚪ D7 | ⚪ D8'
+        && $job->title === 'Severe Wx Outlook - 🟡 D1 | ⚪ D2 | ⚪ D3 | ⚪ D4 | ⚪ D5 | ⚪ D6 | ⚪ D7 | ⚪ D8'
         && $job->body === 'D1 🟡  D2 ⚪  D3 ⚪  D4-8 ⚪'
         && $job->report === null
         && $job->batchKey !== null);
@@ -232,7 +232,7 @@ test('an unavailable Day 1 after the grace hour sends with day1_missing', functi
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
     Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->report['day1_missing'] === true
-        && str_starts_with($job->title, 'Severe Wx Report - ❔ D1 |'));
+        && str_starts_with($job->title, 'Severe Wx Outlook - ❔ D1 |'));
 });
 
 test('a failed Day 1 hail file holds the rule within the grace hour and sends it marked missing after', function () {
@@ -262,7 +262,7 @@ test('an SPC outage after the grace hour still sends the unavailable report', fu
 
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
-    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->title === 'Severe Wx Report - ❔ D1 | ❔ D2 | ❔ D3 | ❔ D4 | ❔ D5 | ❔ D6 | ❔ D7 | ❔ D8'
+    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->title === 'Severe Wx Outlook - ❔ D1 | ❔ D2 | ❔ D3 | ❔ D4 | ❔ D5 | ❔ D6 | ❔ D7 | ❔ D8'
         && $job->body === 'D1 ❔  D2 ❔  D3 ❔  D4-8 ❔');
     expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe('2026-10-31');
 });
@@ -533,4 +533,16 @@ test('an owner with no profile timezone sends at the time read as UTC', function
     Carbon::setTestNow('2026-10-31 14:30:00');
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
     Queue::assertPushed(DeliverScheduledAlert::class, 1);
+});
+
+test('the report is dated with the owner\'s local date', function () {
+    // 20:00 in Denver on October 31 is 02:00 UTC on November 1.
+    Carbon::setTestNow('2026-11-01 02:00:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles(day1Issued: '2026-11-01T01:00:00Z'));
+    dorRule(['delivery_time' => '20:00'], NotificationChannel::factory()->for(dorPaid('America/Denver'))->email()->create());
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->report['report_date'] === '2026-10-31');
 });

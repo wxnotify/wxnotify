@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\OutlookCategory;
+use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Support\Carbon;
 
@@ -10,10 +11,25 @@ use Illuminate\Support\Carbon;
  * Turns a BuildOutlookReport payload into display strings for the Full outlook report email, so the
  * mail views stay logic-free. A day that could not be fetched reads as unavailable, never as "no
  * storms", and so does a single level whose file failed ("not available"); a chosen location outside
- * every area reads as None.
+ * every area reads as None. The per-day dates count from the payload's `report_date` (the send date in
+ * the subscriber's timezone); a payload without one (queued before it existed) shows no dates.
  */
 class OutlookReportPresenter
 {
+    public const SPC_URL = 'https://www.spc.noaa.gov/';
+
+    public const NOTE = 'Only the maximum risk and probabilities are shown for each day and category.';
+
+    /** The SPC outlook page each graphic links to, keyed like the graphics. */
+    private const PAGES = [
+        'day1' => 'https://www.spc.noaa.gov/products/outlook/day1otlk.html',
+        'day2' => 'https://www.spc.noaa.gov/products/outlook/day2otlk.html',
+        'day3' => 'https://www.spc.noaa.gov/products/outlook/day3otlk.html',
+        'day48' => 'https://www.spc.noaa.gov/products/exper/day4-8/',
+    ];
+
+    private const DATE_FORMAT = 'F j, Y';
+
     private const UNAVAILABLE = '❔';
 
     private const NONE = 'none';
@@ -24,13 +40,19 @@ class OutlookReportPresenter
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{days: list<array<string, mixed>>, extended: list<array<string, mixed>>, extended_available: bool, pwo: array{title: string, text: string, issued: ?string}|null}
+     * @return array{days: list<array<string, mixed>>, extended: list<array<string, mixed>>, extended_available: bool, extended_dates: ?string, extended_link: string, pwo: array{title: string, text: string, issued: ?string}|null}
      */
     public static function present(array $payload): array
     {
+        $reportDate = self::reportDate($payload['report_date'] ?? null);
+
         $days = [];
         foreach ([1, 2, 3] as $number) {
-            $days[] = self::convectiveDay($number, $payload['days'][$number] ?? null, (bool) ($payload['day1_missing'] ?? false));
+            $days[] = [
+                ...self::convectiveDay($number, $payload['days'][$number] ?? null, (bool) ($payload['day1_missing'] ?? false)),
+                'date' => $reportDate?->addDays($number - 1)->format(self::DATE_FORMAT),
+                'link' => self::PAGES["day{$number}"],
+            ];
         }
 
         $extended = [];
@@ -44,6 +66,8 @@ class OutlookReportPresenter
             'days' => $days,
             'extended' => $extended,
             'extended_available' => in_array(true, array_column($extended, 'available'), true),
+            'extended_dates' => $reportDate === null ? null : $reportDate->addDays(3)->format(self::DATE_FORMAT).' - '.$reportDate->addDays(7)->format(self::DATE_FORMAT),
+            'extended_link' => self::PAGES['day48'],
             'pwo' => is_array($pwo) ? [
                 'title' => (string) $pwo['title'],
                 // AWIPS bulletins end lines in \r\r\n; normalised in the same order as ChannelMessageMail.
@@ -58,11 +82,18 @@ class OutlookReportPresenter
      */
     public static function text(array $view): string
     {
-        $lines = [];
+        $lines = [
+            'From the NOAA Storm Prediction Center ('.self::SPC_URL.') convective outlooks.',
+            self::NOTE,
+        ];
 
         foreach ($view['days'] as $day) {
             $lines[] = '';
-            $lines[] = strtoupper($day['heading']).': '.$day['circle'].($day['available'] ? ' '.$day['label'] : '');
+            $lines[] = strtoupper($day['heading']).' - '.$day['circle'].($day['available'] ? ' '.$day['label'] : '');
+
+            if ($day['date'] !== null) {
+                $lines[] = $day['date'];
+            }
 
             if (! $day['available']) {
                 $lines[] = $day['unavailable'];
@@ -84,6 +115,10 @@ class OutlookReportPresenter
 
         $lines[] = '';
         $lines[] = 'DAYS 4-8';
+
+        if ($view['extended_dates'] !== null) {
+            $lines[] = $view['extended_dates'];
+        }
 
         foreach ($view['extended'] as $day) {
             $inside = $day['inside'] !== null ? ' — '.$day['inside'] : '';
@@ -221,6 +256,19 @@ class OutlookReportPresenter
         }
 
         return is_string($value) && $value !== '' ? $value : self::NONE;
+    }
+
+    private static function reportDate(mixed $date): ?CarbonImmutable
+    {
+        if (! is_string($date) || preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::createFromFormat('!Y-m-d', $date, 'UTC') ?: null;
+        } catch (InvalidFormatException) {
+            return null;
+        }
     }
 
     private static function issued(mixed $iso): ?string

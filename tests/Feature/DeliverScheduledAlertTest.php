@@ -347,14 +347,14 @@ test('an outlook report uses the passed-in subject and hands its report to a ric
     $dispatcher->shouldReceive('send')->once()
         ->withArgs(fn (NotificationChannel $sent, string $body, ?string $title, array $meta): bool => $sent->is($channel)
             && $body === 'D1 ⚪'
-            && $title === 'Severe Wx Report - ⚪ D1'
+            && $title === 'Severe Wx Outlook - ⚪ D1'
             && $meta['outlook_report'] === $report
             && ! array_key_exists('daily_summary', $meta))
         ->andReturn(DeliveryResult::delivered());
 
-    (new DeliverScheduledAlert($rule->id, $channel->id, 'Severe Wx Report - ⚪ D1', 'D1 ⚪', $report, 'batch-1'))->handle($dispatcher);
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Severe Wx Outlook - ⚪ D1', 'D1 ⚪', $report, 'batch-1'))->handle($dispatcher);
 
-    expect(DeliveryLog::sole()->subject)->toBe('Severe Wx Report - ⚪ D1');
+    expect(DeliveryLog::sole()->subject)->toBe('Severe Wx Outlook - ⚪ D1');
 });
 
 test('an outlook report to a non-rich channel carries no report', function () {
@@ -365,5 +365,5 @@ test('an outlook report to a non-rich channel carries no report', function () {
         ->withArgs(fn (NotificationChannel $sent, string $body, ?string $title, array $meta): bool => ! array_key_exists('outlook_report', $meta))
         ->andReturn(DeliveryResult::delivered());
 
-    (new DeliverScheduledAlert($rule->id, $channel->id, 'Severe Wx Report - ⚪ D1', 'D1 ⚪', ['days' => []]))->handle($dispatcher);
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Severe Wx Outlook - ⚪ D1', 'D1 ⚪', ['days' => []]))->handle($dispatcher);
 });

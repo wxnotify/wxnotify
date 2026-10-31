@@ -11,8 +11,10 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * One of SPC's small outlook graphics (Days 1, 2, 3 and the Days 4-8 overview), fetched at send time
- * so the Full outlook report email can embed it inline.
+ * One of SPC's outlook graphics (Days 1, 2, 3 and the Days 4-8 overview), fetched at send time so the
+ * Full outlook report email can embed it inline. These are SPC's full-size images (1630 px wide, about
+ * 370 KB, for Days 1-3; 815 px, about 175 KB, for Days 4-8), shown at 380 px, because the small ones
+ * (190 px) would blur at that size.
  *
  * Only a fixed key picks a fixed URL (no other input reaches a URL); the host is fixed; redirects
  * are not followed; and the body is accepted only when status, content type, magic bytes and size
@@ -27,10 +29,10 @@ class GetSpcOutlookGraphic
     private const TIMEOUT_SECONDS = 5;
 
     private const URLS = [
-        'day1' => 'https://www.spc.noaa.gov/products/outlook/day1otlk_sm.png',
-        'day2' => 'https://www.spc.noaa.gov/products/outlook/day2otlk_sm.png',
-        'day3' => 'https://www.spc.noaa.gov/products/outlook/day3otlk_sm.png',
-        'day48' => 'https://www.spc.noaa.gov/products/exper/day4-8/day48prob_small.gif',
+        'day1' => 'https://www.spc.noaa.gov/products/outlook/day1otlk.png',
+        'day2' => 'https://www.spc.noaa.gov/products/outlook/day2otlk.png',
+        'day3' => 'https://www.spc.noaa.gov/products/outlook/day3otlk.png',
+        'day48' => 'https://www.spc.noaa.gov/products/exper/day4-8/day48prob.gif',
     ];
 
     private const MAGIC = [
@@ -40,6 +42,17 @@ class GetSpcOutlookGraphic
 
     /** Cached in place of a failed graphic so that every email of a run does not ask again. */
     private const FAILED = 'failed';
+
+    /**
+     * The fixed SPC address of each graphic, keyed day1, day2, day3 and day48 (the dashboard preview
+     * shows them straight from SPC).
+     *
+     * @return array<string, string>
+     */
+    public static function urls(): array
+    {
+        return self::URLS;
+    }
 
     /**
      * @return array{bytes: string, mime: string}|null

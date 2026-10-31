@@ -11,7 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 
-const OMB_SUBJECT = 'Severe Wx Report - 🟠 D1 | 🟡 D2 | 🟢 D3 | ⚪ D4 | 🟡 D5 | ⚪ D6 | ⚪ D7 | ⚪ D8';
+const OMB_SUBJECT = 'Severe Wx Outlook - 🟠 D1 | 🟡 D2 | 🟢 D3 | ⚪ D4 | 🟡 D5 | ⚪ D6 | ⚪ D7 | ⚪ D8';
 const OMB_BRIEF = 'D1 🟠  D2 🟡  D3 🟢  D4-8 🟡';
 
 beforeEach(function () {

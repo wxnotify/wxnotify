@@ -26,7 +26,7 @@ class OutlookReportText
             $parts[] = self::emoji($payload['extended'][$day]['category'] ?? null)." D{$day}";
         }
 
-        return 'Severe Wx Report - '.implode(' | ', $parts);
+        return 'Severe Wx Outlook - '.implode(' | ', $parts);
     }
 
     /**

@@ -141,7 +141,7 @@ test('an unavailable Day 1 sets day1_missing and renders a question mark', funct
         ->and($payload['days'][1]['available'])->toBeFalse()
         ->and($payload['days'][1]['category'])->toBeNull()
         ->and($payload['days'][1]['locations'])->toBe([])
-        ->and(OutlookReportText::subject($payload))->toStartWith('Severe Wx Report - ❔ D1 | 🟢 D2')
+        ->and(OutlookReportText::subject($payload))->toStartWith('Severe Wx Outlook - ❔ D1 | 🟢 D2')
         ->and(OutlookReportText::brief($payload))->toStartWith('D1 ❔  D2 🟢');
 })->with([
     'null' => [['value' => null]],
@@ -162,7 +162,7 @@ test('other unavailable days render a question mark and are ignored for somethin
         ->and($payload['extended'][4])->toBe(['available' => false, 'probability' => null, 'category' => null, 'highlight' => false, 'locations' => []])
         ->and($payload['extended'][5]['available'])->toBeFalse()
         ->and($payload['something_forecast'])->toBeFalse()
-        ->and(OutlookReportText::subject($payload))->toBe('Severe Wx Report - ⚪ D1 | ❔ D2 | ❔ D3 | ❔ D4 | ❔ D5 | ⚪ D6 | ⚪ D7 | ⚪ D8')
+        ->and(OutlookReportText::subject($payload))->toBe('Severe Wx Outlook - ⚪ D1 | ❔ D2 | ❔ D3 | ❔ D4 | ❔ D5 | ⚪ D6 | ⚪ D7 | ⚪ D8')
         ->and(OutlookReportText::brief($payload))->toBe('D1 ⚪  D2 ❔  D3 ❔  D4-8 ⚪');
 });
 
@@ -216,7 +216,7 @@ test('the subject and brief match the documented strings', function () {
 
     $payload = app(BuildOutlookReport::class)($outlooks, collect());
 
-    expect(OutlookReportText::subject($payload))->toBe('Severe Wx Report - 🟠 D1 | 🟢 D2 | 🟤 D3 | ⚪ D4 | 🟡 D5 | ⚪ D6 | ⚪ D7 | ⚪ D8')
+    expect(OutlookReportText::subject($payload))->toBe('Severe Wx Outlook - 🟠 D1 | 🟢 D2 | 🟤 D3 | ⚪ D4 | 🟡 D5 | ⚪ D6 | ⚪ D7 | ⚪ D8')
         ->and(OutlookReportText::brief($payload))->toBe('D1 🟠  D2 🟢  D3 🟤  D4-8 🟡');
 });
 
@@ -291,4 +291,9 @@ test('an absent hazard layer is listed as missing while an empty one is none', f
         ->and($payload['days'][2]['missing'])->toBe([])
         ->and($payload['days'][3]['missing'])->toBe(['any_severe'])
         ->and($payload['days'][3]['available'])->toBeTrue();
+});
+
+test('the payload carries the report date as an ISO date string, or null when none is given', function () {
+    expect(app(BuildOutlookReport::class)(olkQuiet(), collect(), null, '2026-10-31')['report_date'])->toBe('2026-10-31')
+        ->and(app(BuildOutlookReport::class)(olkQuiet(), collect())['report_date'])->toBeNull();
 });

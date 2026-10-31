@@ -20,7 +20,7 @@
 - Circle emoji scale: none ⚪, general thunderstorms 🟤, Marginal 🟢, Slight 🟡, Enhanced 🟠, Moderate 🔴, High 🟣.
 - Days 4-8: no categories; a 15% area shows 🟡 (Slight), 30% or more shows 🟠 (Enhanced), none ⚪.
 - Default send time 14:30 UTC, chosen in UTC at 15-minute steps. A missing Day 1 never stops the report: retry on each tick until send time + 60 minutes, then send with "Day 1 outlook not yet available".
-- SPC files (all under `https://www.spc.noaa.gov/products/`): `outlook/day{1,2}otlk_{cat,torn,hail,wind}.nolyr.geojson`; `outlook/day3otlk_cat.nolyr.geojson`, `outlook/day3otlk_prob.nolyr.geojson`; `exper/day4-8/day{4..8}prob.nolyr.geojson`. Graphics: `outlook/day{1,2,3}otlk_sm.png`, `exper/day4-8/day48prob_small.gif`. Feature properties used: `LABEL` (`TSTM`, `MRGL`, `SLGT`, `ENH`, `MDT`, `HIGH`, or a decimal string such as `0.05`, `0.15`; `Less Than 2% All Areas` means none), `ISSUE_ISO`, `VALID_ISO`, `EXPIRE_ISO`.
+- SPC files (all under `https://www.spc.noaa.gov/products/`): `outlook/day{1,2}otlk_{cat,torn,hail,wind}.nolyr.geojson`; `outlook/day3otlk_cat.nolyr.geojson`, `outlook/day3otlk_prob.nolyr.geojson`; `exper/day4-8/day{4..8}prob.nolyr.geojson`. Graphics: `outlook/day{1,2,3}otlk.png`, `exper/day4-8/day48prob.gif` (full size since 2026-10-31; first built with `_sm.png` / `_small.gif`). Feature properties used: `LABEL` (`TSTM`, `MRGL`, `SLGT`, `ENH`, `MDT`, `HIGH`, or a decimal string such as `0.05`, `0.15`; `Less Than 2% All Areas` means none), `ISSUE_ISO`, `VALID_ISO`, `EXPIRE_ISO`.
 - Only the rule's own user's locations; a location without a fix (`Location::hasFix()` false) is skipped.
 
 ## Review Focus

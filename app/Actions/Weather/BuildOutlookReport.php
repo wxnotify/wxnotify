@@ -14,7 +14,8 @@ use Illuminate\Support\Collection;
  * unavailable; an empty layer is a valid quiet day. A Day 1 without `cat` is unavailable like in
  * Day1OutlookFreshness, which also sets `day1_missing`. On an available day a level whose own file
  * failed (hail, wind, tornado on Days 1-2; any_severe on Day 3) is listed in `missing`, never read as
- * none. Locations without a fix are skipped.
+ * none. Locations without a fix are skipped. `report_date` is the date the report is sent in the
+ * subscriber's timezone (ISO Y-m-d, the base of the per-day dates in the email), or null.
  *
  * @phpstan-type Row array{label: string, category: string, hail: ?string, wind: ?string, tornado: ?string}
  */
@@ -27,9 +28,10 @@ class BuildOutlookReport
     /**
      * @param  array<string, mixed>  $outlooks
      * @param  Collection<int, Location>  $locations
+     * @param  string|null  $reportDate  the send date in the subscriber's timezone, Y-m-d
      * @return array<string, mixed>
      */
-    public function __invoke(array $outlooks, Collection $locations, ?IngestedProduct $pwo = null): array
+    public function __invoke(array $outlooks, Collection $locations, ?IngestedProduct $pwo = null, ?string $reportDate = null): array
     {
         $locations = $locations->filter(fn (Location $location): bool => $location->hasFix())->values();
 
@@ -57,6 +59,7 @@ class BuildOutlookReport
                 : null,
             'something_forecast' => $this->somethingForecast($days, $extended),
             'day1_missing' => ! $days[1]['available'],
+            'report_date' => $reportDate,
         ];
     }
 

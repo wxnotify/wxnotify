@@ -15,7 +15,8 @@ use Symfony\Component\Mime\Email;
  * the shared Markdown mail layout like DailySummaryMail, with the section HTML collapsed to one line
  * so CommonMark leaves it alone.
  *
- * The graphics are Symfony inline embeds referenced as cid:spc-day1 .. cid:spc-day48. Like
+ * The graphics are Symfony inline embeds referenced as cid:spc-day1 .. cid:spc-day48, each linking to
+ * its SPC outlook page. Like
  * DailySummaryMail this must be sent, never queued: the constructor registers a closure.
  */
 class OutlookReportMail extends Mailable
@@ -47,13 +48,13 @@ class OutlookReportMail extends Mailable
     public function content(): Content
     {
         $view = OutlookReportPresenter::present($this->report);
-        $hasImage = array_map(fn (string $key): bool => isset($this->embeddable()[$key]), array_combine(self::IMAGE_KEYS, self::IMAGE_KEYS));
+        $imageSrc = array_map(fn (string $key): ?string => isset($this->embeddable()[$key]) ? "cid:spc-{$key}" : null, array_combine(self::IMAGE_KEYS, self::IMAGE_KEYS));
 
         return new Content(
             markdown: 'mail.outlook-report',
             text: 'mail.outlook-report-text',
             with: [
-                'reportHtml' => new HtmlString($this->collapse(view('mail.partials.outlook-report', ['r' => $view, 'hasImage' => $hasImage])->render())),
+                'reportHtml' => new HtmlString($this->collapse(view('mail.partials.outlook-report', ['r' => $view, 'imageSrc' => $imageSrc])->render())),
                 'reportText' => OutlookReportPresenter::text($view),
             ],
         );

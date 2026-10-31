@@ -55,7 +55,17 @@ no-product alert behaviour: a `batch_key` groups the sends, and the notification
 ### Full
 
 For every other channel (email, and any long-form channel). Subject, e.g.
-`Severe Wx Report - 🟠 D1 | 🟡 D2 | 🟤 D3 | ⚪ D4 | 🟡 D5 | 🟠 D6 | ⚪ D7 | ⚪ D8`. Body:
+`Severe Wx Outlook - 🟠 D1 | 🟡 D2 | 🟤 D3 | ⚪ D4 | 🟡 D5 | 🟠 D6 | ⚪ D7 | ⚪ D8`. Body:
+
+- At the top, "From the NOAA Storm Prediction Center convective outlooks." with "NOAA Storm Prediction Center"
+  linking to https://www.spc.noaa.gov/ (the text part prints the URL after it), and a note that only the maximum
+  risk and probabilities are shown for each day and category.
+- Day headings read "Day 1 - 🟤 General thunderstorms" (the text part "DAY 1 - 🟤 ..."). Under each, in gray, its
+  date ("October 31, 2026"): Day 1 is the date the report is sent in the subscriber's timezone (the payload's
+  `report_date`), Day 2 +1, Day 3 +2; under "Days 4-8" the range "November 3, 2026 - November 7, 2026" (+3 to +7).
+  A payload queued before `report_date` existed shows no dates.
+- Each graphic is shown at 380 px wide (twice the first version's 190 px) above that day's levels, links to its SPC
+  outlook page in a new tab (`outlook/day{1,2,3}otlk.html`, `exper/day4-8/`) and has alt text.
 
 - For each of Days 1, 2, 3: the SPC outlook graphic, the max category, and the max hail, wind and tornado
   probability levels (Day 3 has only an "any severe" probability, so it shows that); and, for each chosen
@@ -81,9 +91,10 @@ Public files under `https://www.spc.noaa.gov/products/`, all verified reachable 
 - Features carry `LABEL` (`TSTM`, `MRGL`, `SLGT`, `ENH`, `MDT`, `HIGH` for categories; a decimal like `0.05`,
   `0.15`, `0.30` for probabilities), `VALID_ISO`, `EXPIRE_ISO`, `ISSUE_ISO` and `FORECASTER`. The hail file
   showed `0.05`; tornado showed `Less Than 2% All Areas`, which means none.
-- Graphics: `outlook/day1otlk.png` (full size, ~380 KB) and `outlook/day{1,2,3}otlk_sm.png` (~28 KB);
-  `exper/day4-8/day48prob_small.gif` (overview) and `exper/day4-8/day{4..8}prob.gif`. The builder confirms which
-  size is used in email, and whether to embed or link.
+- Graphics: `outlook/day{1,2,3}otlk.png` (full size, 1630 x 1110 px, ~370-380 KB) and `outlook/day{1,2,3}otlk_sm.png`
+  (190 px, ~28 KB); `exper/day4-8/day48prob.gif` (815 x 555 px, ~175 KB) and `day48prob_small.gif` (190 px, ~45 KB).
+  The email embeds the full-size files (checked 2026-10-31): the small ones would blur at the 380 px display width.
+  With all four the email weighs about 1.8 MB (HTML about 20 KB), against about 0.2 MB with the small files.
 
 An empty or "no areas" file is a valid answer ("no storms"). The files change when SPC issues an update; the CDN
 caches for about 2 minutes.
