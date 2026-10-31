@@ -133,6 +133,7 @@ class AlertRuleForm
                     AlertCategory::Threshold => self::thresholdFields(),
                     AlertCategory::DailySummary => self::dailySummaryFields(),
                     AlertCategory::Lightning => self::lightningFields(),
+                    AlertCategory::OutlookReport => [],
                     null => [],
                 };
 

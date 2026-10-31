@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
 use App\Enums\MessageBodyStyle;
+use App\Enums\OutlookReportMode;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
@@ -39,6 +40,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'threshold_value',
     'timeframe',
     'delivery_time',
+    'report_mode',
     'last_scheduled_run_on',
     'radius_miles',
     'lightning_last_alerted_at',
@@ -73,7 +75,7 @@ class AlertRule extends Model
                 return;
             }
 
-            $timezone = Timezones::forRule($rule);
+            $timezone = $rule->category === AlertCategory::OutlookReport ? 'UTC' : Timezones::forRule($rule);
             $now = Carbon::now($timezone);
 
             if ($now->lt($now->copy()->setTimeFromTimeString($rule->delivery_time))) {
@@ -117,6 +119,7 @@ class AlertRule extends Model
         return [
             'category' => AlertCategory::class,
             'matching_mode' => MatchingMode::class,
+            'report_mode' => OutlookReportMode::class,
             'risk_levels' => 'array',
             'variable' => ThresholdVariable::class,
             'direction' => ThresholdDirection::class,
@@ -246,6 +249,14 @@ class AlertRule extends Model
         return $this->user->tier() !== Tier::Free ? $this->message_body_style : null;
     }
 
+    /**
+     * The UTC clock time (H:i) the outlook report goes out; 14:30 until the subscriber picks one.
+     */
+    public function outlookSendTime(): string
+    {
+        return filled($this->delivery_time) ? Carbon::parse($this->delivery_time)->format('H:i') : '14:30';
+    }
+
     public function displayName(?UnitSystem $units = null): string
     {
         if (filled($this->name)) {
@@ -254,6 +265,7 @@ class AlertRule extends Model
 
         return match ($this->category) {
             AlertCategory::WeatherAlerts, AlertCategory::SpcWpc => $this->products->pluck('name')->join(', ') ?: $this->category->label(),
+            AlertCategory::OutlookReport => $this->category->label(),
             AlertCategory::DailySummary => "Daily summary for {$this->location?->label}",
             AlertCategory::Threshold => "{$this->variable?->label()} {$this->direction?->label()} {$this->variable?->format((float) $this->threshold_value, $units ?? Units::forRule($this)->system)}",
             AlertCategory::Lightning => 'Lightning within '.(new Units($units ?? Units::forRule($this)->system))->distance((float) $this->radius_miles, 0)." of {$this->location?->label}",

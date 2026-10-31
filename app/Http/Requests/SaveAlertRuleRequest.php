@@ -72,6 +72,7 @@ class SaveAlertRuleRequest extends FormRequest
             AlertCategory::WeatherAlerts, AlertCategory::SpcWpc => $this->productRules($category),
             AlertCategory::Threshold => $this->thresholdRules(),
             AlertCategory::DailySummary => $this->scheduledRules(),
+            AlertCategory::OutlookReport => [],
             AlertCategory::Lightning => $this->lightningRules(),
             null => [],
         }];

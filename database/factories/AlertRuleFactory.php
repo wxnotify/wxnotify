@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\AlertCategory;
+use App\Enums\OutlookReportMode;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
@@ -57,6 +58,20 @@ class AlertRuleFactory extends Factory
             'threshold_value' => null,
             'timeframe' => null,
             'delivery_time' => '07:00',
+        ]);
+    }
+
+    public function outlookReport(): static
+    {
+        return $this->state(fn () => [
+            'category' => AlertCategory::OutlookReport,
+            'location_id' => null,
+            'variable' => null,
+            'direction' => null,
+            'threshold_value' => null,
+            'timeframe' => null,
+            'delivery_time' => '14:30',
+            'report_mode' => OutlookReportMode::EveryDay,
         ]);
     }
 

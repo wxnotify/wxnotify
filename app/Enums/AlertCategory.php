@@ -8,6 +8,7 @@ enum AlertCategory: string
     case DailySummary = 'daily_summary';
     case Threshold = 'threshold';
     case SpcWpc = 'spc_wpc';
+    case OutlookReport = 'outlook_report';
     case Lightning = 'lightning';
 
     public function label(): string
@@ -17,6 +18,7 @@ enum AlertCategory: string
             self::DailySummary => 'Daily Weather Summary',
             self::Threshold => 'Threshold Alerts',
             self::SpcWpc => 'SPC & WPC Alerts',
+            self::OutlookReport => 'Severe Weather Outlook Report',
             self::Lightning => 'Lightning Alerts',
         };
     }
@@ -28,6 +30,7 @@ enum AlertCategory: string
             self::DailySummary => 'A daily push of the 7-day forecast for a saved location.',
             self::Threshold => 'Get notified when a forecast variable crosses a value you set.',
             self::SpcWpc => 'Convective outlooks, mesoscale discussions, and rainfall outlooks.',
+            self::OutlookReport => 'A daily overview of severe weather chances over the next week from the SPC outlooks.',
             self::Lightning => 'Lightning detected near a saved location.',
         };
     }
@@ -39,6 +42,7 @@ enum AlertCategory: string
             self::DailySummary => 'heroicon-o-sun',
             self::Threshold => 'heroicon-o-adjustments-horizontal',
             self::SpcWpc => 'heroicon-o-map',
+            self::OutlookReport => 'heroicon-o-cloud',
             self::Lightning => 'heroicon-o-bolt',
         };
     }

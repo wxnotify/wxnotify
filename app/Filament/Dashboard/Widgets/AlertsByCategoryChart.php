@@ -21,6 +21,7 @@ class AlertsByCategoryChart extends ChartWidget
     public const COLORS = [
         'weather_alerts' => '#dc2626',
         'spc_wpc' => '#f97316',
+        'outlook_report' => '#14b8a6',
         'daily_summary' => '#3b82f6',
         'threshold' => '#8b5cf6',
         'lightning' => '#eab308',

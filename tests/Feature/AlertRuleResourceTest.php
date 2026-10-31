@@ -583,7 +583,7 @@ test('the Area Forecast Discussion is offered under Weather Alerts, in the Other
 test('Forecast Discussions is no longer a category in the wizard', function () {
     livewire(CreateAlertRule::class)
         ->assertFormFieldExists('category', fn (Radio $field): bool => ! array_key_exists('forecast_discussion', $field->getOptions())
-            && count($field->getOptions()) === 5);
+            && count($field->getOptions()) === 6);
 });
 
 test('a Free subscriber\'s wizard never shows the message customization fields', function () {
