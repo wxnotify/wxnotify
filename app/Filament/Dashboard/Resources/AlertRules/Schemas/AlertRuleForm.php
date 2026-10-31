@@ -5,6 +5,7 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Schemas;
 use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Enums\AlertCategory;
 use App\Enums\MessageBodyStyle;
+use App\Enums\OutlookReportMode;
 use App\Enums\ProductCategory;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
@@ -74,6 +75,7 @@ class AlertRuleForm
                     ->afterStateUpdated(function (Set $set, Get $get, ?AlertRule $record): void {
                         self::seedProductSettings($set, $get, $record);
                         self::clearAlertTemplateIfCategoryUnsupported($set, $get);
+                        self::seedOutlookReportDefaults($set, $get);
                     }),
             ]);
     }
@@ -123,6 +125,25 @@ class AlertRuleForm
         }
     }
 
+    /**
+     * The outlook report's step is built dynamically, so its field ->default()s never apply (see
+     * .ai/rules/filament.md): they are seeded here when the category is chosen, guarded on null so a
+     * value already picked (or loaded on Edit) is never replaced. `location_ids` is seeded to []
+     * so the checkboxes bind as an array.
+     */
+    protected static function seedOutlookReportDefaults(Set $set, Get $get): void
+    {
+        if ($get('category') !== AlertCategory::OutlookReport->value) {
+            return;
+        }
+
+        foreach (['delivery_time' => '14:30', 'report_mode' => OutlookReportMode::EveryDay->value, 'location_ids' => []] as $key => $default) {
+            if ($get($key) === null) {
+                $set($key, $default);
+            }
+        }
+    }
+
     protected static function detailsStep(): Step
     {
         return Step::make('Set it up')
@@ -133,7 +154,7 @@ class AlertRuleForm
                     AlertCategory::Threshold => self::thresholdFields(),
                     AlertCategory::DailySummary => self::dailySummaryFields(),
                     AlertCategory::Lightning => self::lightningFields(),
-                    AlertCategory::OutlookReport => [],
+                    AlertCategory::OutlookReport => self::outlookReportFields(),
                     null => [],
                 };
 
@@ -232,7 +253,8 @@ class AlertRuleForm
                     ->label('Message length')
                     ->options(collect(MessageBodyStyle::cases())->mapWithKeys(fn (MessageBodyStyle $s) => [$s->value => $s->label()]))
                     ->default(MessageBodyStyle::Full)
-                    ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free),
+                    ->visible(fn (Get $get): bool => auth()->user()->tier() !== Tier::Free
+                        && $get('category') !== AlertCategory::OutlookReport->value),
                 TextInput::make('custom_subject_template')
                     ->label('Custom subject line (optional)')
                     ->maxLength(255)
@@ -377,6 +399,42 @@ class AlertRuleForm
             TimePicker::make('delivery_time')
                 ->required()
                 ->seconds(false),
+        ];
+    }
+
+    /**
+     * The severe weather outlook report: a send time (UTC), whether to send every day, and the
+     * saved locations to cover (none means a US-wide report). The locations are a native
+     * CheckboxList, not a searchable Select, for the entangle reason documented on locationSelect();
+     * only the subscriber's own locations that have a fix are offered (SaveAlertRule scopes the
+     * ids to the owner again).
+     *
+     * @return array<Component>
+     */
+    public static function outlookReportFields(): array
+    {
+        return [
+            TimePicker::make('delivery_time')
+                ->label('Send time (UTC)')
+                ->default('14:30')
+                ->seconds(false)
+                ->minutesStep(15)
+                ->required()
+                ->helperText('SPC\'s 1300 UTC update posts at about 13:00, and the report waits up to 60 minutes after your send time for it before sending what it has.'),
+            Radio::make('report_mode')
+                ->label('When to send')
+                ->options(collect(OutlookReportMode::cases())->mapWithKeys(fn (OutlookReportMode $mode): array => [$mode->value => $mode->label()]))
+                ->default(OutlookReportMode::EveryDay->value)
+                ->required(),
+            CheckboxList::make('location_ids')
+                ->label('Locations')
+                ->options(fn (): array => auth()->user()->locations()
+                    ->whereNotNull('lat')
+                    ->whereNotNull('lng')
+                    ->orderBy('label')
+                    ->pluck('label', 'id')
+                    ->all())
+                ->helperText('Leave empty for a US-wide report.'),
         ];
     }
 

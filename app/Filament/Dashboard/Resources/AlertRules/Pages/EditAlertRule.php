@@ -68,6 +68,12 @@ class EditAlertRule extends EditRecord
             $data['risk_levels'] = SpcWpcRiskLevels::forForm($this->record);
         }
 
+        if (($data['category'] ?? null) === AlertCategory::OutlookReport->value) {
+            $data['delivery_time'] = $this->record->outlookSendTime();
+            $data['report_mode'] = $this->record->report_mode?->value ?? 'every_day';
+            $data['location_ids'] = $this->record->locations->pluck('id')->all();
+        }
+
         return AlertRuleFormUnits::toDisplay($data, Units::for(auth()->user()));
     }
 
