@@ -14,7 +14,7 @@ function spcPolygon(): array
     return ['type' => 'MultiPolygon', 'coordinates' => [[[[-97.5, 35.5], [-96.5, 35.5], [-96.5, 36.5], [-97.5, 35.5]]]]];
 }
 
-function spcCollection(array $labels, string $issue = '202610311300'): string
+function spcCollection(array $labels): string
 {
     return json_encode([
         'type' => 'FeatureCollection',
@@ -72,7 +72,7 @@ test('a full fetch parses every day into layers of label and geometry', function
     expect($result['day_6']['layers']['prob'][0]['label'])->toBe('0.15');
 });
 
-test('requests go to the fixed SPC host with a user agent, without following redirects', function () {
+test('requests go to the fixed SPC host with a user agent', function () {
     Http::fake(spcFiles());
 
     (new FetchSpcOutlooks)();
@@ -188,16 +188,18 @@ test('emoji, label and rank follow the scale', function () {
 test('day 1 freshness is judged against the latest expected cycle', function (string $sendTime, ?array $day1, bool $expected) {
     expect(Day1OutlookFreshness::isCurrent($day1, CarbonImmutable::parse($sendTime, 'UTC')))->toBe($expected);
 })->with([
-    '14:30 needs 13:00, issued 13:00' => ['2026-10-31 14:30', ['issued_at' => '2026-10-31T13:00:00Z', 'last_modified' => null, 'layers' => []], true],
-    '14:30 with the 06:00 issue is stale' => ['2026-10-31 14:30', ['issued_at' => '2026-10-31T06:00:00Z', 'last_modified' => null, 'layers' => []], false],
-    '14:30 accepts 12:45, within 15 minutes of the cycle' => ['2026-10-31 14:30', ['issued_at' => '2026-10-31T12:45:00Z', 'last_modified' => null, 'layers' => []], true],
-    '08:00 needs 06:00' => ['2026-10-31 08:00', ['issued_at' => '2026-10-31T06:00:00Z', 'last_modified' => null, 'layers' => []], true],
-    '08:00 with the 01:00 issue is stale' => ['2026-10-31 08:00', ['issued_at' => '2026-10-31T01:00:00Z', 'last_modified' => null, 'layers' => []], false],
-    '00:30 needs the previous 20:00' => ['2026-10-31 00:30', ['issued_at' => '2026-10-30T20:00:00Z', 'last_modified' => null, 'layers' => []], true],
-    '00:30 with the previous 16:30 is stale' => ['2026-10-31 00:30', ['issued_at' => '2026-10-30T16:30:00Z', 'last_modified' => null, 'layers' => []], false],
-    '14:30 quiet day, last modified current' => ['2026-10-31 14:30', ['issued_at' => null, 'last_modified' => 'Sat, 31 Oct 2026 13:04:00 GMT', 'layers' => []], true],
-    '14:30 quiet day, last modified old' => ['2026-10-31 14:30', ['issued_at' => null, 'last_modified' => 'Sat, 31 Oct 2026 06:04:00 GMT', 'layers' => []], false],
-    'nothing readable is treated as current' => ['2026-10-31 14:30', ['issued_at' => null, 'last_modified' => null, 'layers' => []], true],
-    'an unparseable stamp is treated as current' => ['2026-10-31 14:30', ['issued_at' => 'garbage', 'last_modified' => null, 'layers' => []], true],
+    '14:30 needs 13:00, issued 13:00' => ['2026-10-31 14:30', ['issued_at' => '2026-10-31T13:00:00Z', 'last_modified' => null, 'layers' => ['cat' => []]], true],
+    '14:30 with the 06:00 issue is stale' => ['2026-10-31 14:30', ['issued_at' => '2026-10-31T06:00:00Z', 'last_modified' => null, 'layers' => ['cat' => []]], false],
+    '14:30 accepts 12:45, within 15 minutes of the cycle' => ['2026-10-31 14:30', ['issued_at' => '2026-10-31T12:45:00Z', 'last_modified' => null, 'layers' => ['cat' => []]], true],
+    '08:00 needs 06:00' => ['2026-10-31 08:00', ['issued_at' => '2026-10-31T06:00:00Z', 'last_modified' => null, 'layers' => ['cat' => []]], true],
+    '08:00 with the 01:00 issue is stale' => ['2026-10-31 08:00', ['issued_at' => '2026-10-31T01:00:00Z', 'last_modified' => null, 'layers' => ['cat' => []]], false],
+    '00:30 needs the previous 20:00' => ['2026-10-31 00:30', ['issued_at' => '2026-10-30T20:00:00Z', 'last_modified' => null, 'layers' => ['cat' => []]], true],
+    '00:30 with the previous 16:30 is stale' => ['2026-10-31 00:30', ['issued_at' => '2026-10-30T16:30:00Z', 'last_modified' => null, 'layers' => ['cat' => []]], false],
+    '14:30 quiet day, last modified current' => ['2026-10-31 14:30', ['issued_at' => null, 'last_modified' => 'Sat, 31 Oct 2026 13:04:00 GMT', 'layers' => ['cat' => []]], true],
+    '14:30 quiet day, last modified old' => ['2026-10-31 14:30', ['issued_at' => null, 'last_modified' => 'Sat, 31 Oct 2026 06:04:00 GMT', 'layers' => ['cat' => []]], false],
+    'nothing readable is treated as current' => ['2026-10-31 14:30', ['issued_at' => null, 'last_modified' => null, 'layers' => ['cat' => []]], true],
+    'an unparseable stamp is treated as current' => ['2026-10-31 14:30', ['issued_at' => 'garbage', 'last_modified' => null, 'layers' => ['cat' => []]], true],
+    'cat absent with other layers is not current' => ['2026-10-31 14:30', ['issued_at' => null, 'last_modified' => null, 'layers' => ['torn' => [], 'hail' => [], 'wind' => []]], false],
+    'cat absent is not current even with a fresh last modified' => ['2026-10-31 14:30', ['issued_at' => null, 'last_modified' => 'Sat, 31 Oct 2026 13:04:00 GMT', 'layers' => ['torn' => []]], false],
     'a null day 1 is not current' => ['2026-10-31 14:30', null, false],
 ]);
