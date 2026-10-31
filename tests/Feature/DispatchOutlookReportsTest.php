@@ -181,6 +181,24 @@ test('a stale Day 1 after the grace hour is sent as fetched, not marked missing'
     expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe('2026-10-31');
 });
 
+test('a stale Day 1 is held until exactly 60 minutes after the send time', function () {
+    Carbon::setTestNow('2026-10-31 15:29:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles(day1Issued: '2026-10-31T06:00:00Z'));
+    $rule = dorRule();
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertNothingPushed();
+    expect($rule->fresh()->last_scheduled_run_on)->toBeNull();
+
+    Carbon::setTestNow('2026-10-31 15:30:00');
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, 1);
+    expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe('2026-10-31');
+});
+
 test('an unavailable Day 1 waits out the grace hour', function () {
     Carbon::setTestNow('2026-10-31 14:35:00');
     Queue::fake([DeliverScheduledAlert::class]);

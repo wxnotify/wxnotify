@@ -419,8 +419,9 @@ class AlertRuleForm
                 ->default('14:30')
                 ->seconds(false)
                 ->minutesStep(15)
+                ->maxDate('22:45')
                 ->required()
-                ->helperText('SPC\'s 1300 UTC update posts at about 13:00, and the report waits up to 60 minutes after your send time for it before sending what it has.'),
+                ->helperText('SPC\'s 1300 UTC update posts at about 13:00, and the report waits up to 60 minutes after your send time for it before sending what it has. The latest send time is 22:45 UTC, so that 60 minute wait for SPC\'s Day 1 update finishes before midnight UTC.'),
             Radio::make('report_mode')
                 ->label('When to send')
                 ->options(collect(OutlookReportMode::cases())->mapWithKeys(fn (OutlookReportMode $mode): array => [$mode->value => $mode->label()]))

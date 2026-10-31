@@ -114,3 +114,22 @@ test('the message length field is not offered for an outlook report', function (
         ->set('data.category', 'outlook_report')
         ->assertFormFieldIsHidden('message_body_style');
 });
+
+test('a send time after 22:45 UTC is refused and 22:45 is accepted', function (string $time, bool $accepted) {
+    $component = livewire(CreateAlertRule::class)
+        ->set('data.category', 'outlook_report')
+        ->fillForm(['delivery_time' => $time, 'channel_ids' => [$this->channel->id]])
+        ->call('create');
+
+    if ($accepted) {
+        $component->assertHasNoFormErrors();
+        expect(AlertRule::where('user_id', $this->user->id)->sole()->outlookSendTime())->toBe($time);
+    } else {
+        $component->assertHasFormErrors(['delivery_time' => 'before_or_equal']);
+        expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+    }
+})->with([
+    '22:45' => ['22:45', true],
+    '23:00' => ['23:00', false],
+    '23:45' => ['23:45', false],
+]);

@@ -31,6 +31,10 @@ use Throwable;
  * up to 60 minutes past its send time; after that the report goes out as fetched (an unavailable
  * Day 1 then shows as missing). A rule that fails is logged by exception class, left unstamped and
  * does not stop the others.
+ *
+ * Known limitation: the grace never rolls over midnight UTC, so a rule whose send time is later than
+ * 22:45 UTC (the form's cap; only possible through a forged request) gets no report on a day its
+ * Day 1 stays stale past midnight UTC.
  */
 class DispatchOutlookReports extends Command
 {
