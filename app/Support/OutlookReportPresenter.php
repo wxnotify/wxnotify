@@ -21,7 +21,7 @@ class OutlookReportPresenter
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{days: list<array<string, mixed>>, extended: list<array<string, mixed>>, pwo: array{title: string, text: string, issued: ?string}|null}
+     * @return array{days: list<array<string, mixed>>, extended: list<array<string, mixed>>, extended_available: bool, pwo: array{title: string, text: string, issued: ?string}|null}
      */
     public static function present(array $payload): array
     {
@@ -40,9 +40,11 @@ class OutlookReportPresenter
         return [
             'days' => $days,
             'extended' => $extended,
+            'extended_available' => in_array(true, array_column($extended, 'available'), true),
             'pwo' => is_array($pwo) ? [
                 'title' => (string) $pwo['title'],
-                'text' => (string) $pwo['text'],
+                // AWIPS bulletins end lines in \r\r\n; normalised in the same order as ChannelMessageMail.
+                'text' => str_replace(["\r\r\n", "\r\n", "\r"], "\n", (string) $pwo['text']),
                 'issued' => self::issued($pwo['issued_at'] ?? null),
             ] : null,
         ];

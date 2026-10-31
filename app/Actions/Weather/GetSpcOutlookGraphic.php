@@ -6,6 +6,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * One of SPC's small outlook graphics (Days 1, 2, 3 and the Days 4-8 overview), fetched at send time
@@ -65,6 +66,11 @@ class GetSpcOutlookGraphic
                 ->get($url);
         } catch (ConnectionException) {
             Log::warning('SPC outlook graphic fetch failed to connect');
+
+            return null;
+        } catch (Throwable $e) {
+            // A graphic is optional: nothing may escape into the delivery job. Class only, never the message.
+            Log::warning('SPC outlook graphic fetch failed with an error', ['exception' => $e::class]);
 
             return null;
         }

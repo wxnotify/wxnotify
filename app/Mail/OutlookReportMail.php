@@ -78,7 +78,8 @@ class OutlookReportMail extends Mailable
     }
 
     /**
-     * As DailySummaryMail::collapse, except that the line breaks of a <pre> (the PWO bulletin text)
+     * As DailySummaryMail::collapse, except that the line breaks of a <pre> (the PWO bulletin text,
+     * already normalised to \n by the presenter)
      * become &#10; entities: the browser still breaks the line, but the source stays one line, so a
      * blank line in the bulletin cannot end CommonMark's HTML block.
      */
@@ -88,7 +89,7 @@ class OutlookReportMail extends Mailable
 
         foreach ($parts as $index => $part) {
             if ($index % 2 === 1) {
-                $parts[$index] = str_replace(["\r\n", "\r", "\n"], '&#10;', $part);
+                $parts[$index] = str_replace("\n", '&#10;', $part);
 
                 continue;
             }

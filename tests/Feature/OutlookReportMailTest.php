@@ -364,3 +364,33 @@ test('end to end, a push-like channel receives only the brief text and no graphi
     Http::assertNotSent(fn ($request) => str_contains($request->url(), 'spc.noaa.gov'));
     expect(DeliveryLog::sole()->status)->toBe('success');
 });
+
+test('a PWO bulletin with AWIPS line endings keeps single line breaks in the html and the text part', function () {
+    $mail = new OutlookReportMail(ORM_SUBJECT, ormPayload(['pwo' => [
+        'title' => 'Public Severe Weather Outlook',
+        'text' => "LINE ONE\r\r\nLINE TWO\r\r\n\r\r\nLINE FOUR\r\nLINE FIVE\rLINE SIX",
+        'issued_at' => '2026-10-31T12:51:00+00:00',
+    ]]), ORM_BRIEF, []);
+
+    expect($mail->render())->toMatch('/<pre[^>]*>LINE ONE\nLINE TWO\n\nLINE FOUR\nLINE FIVE\nLINE SIX<\/pre>/');
+    $mail->assertSeeInText("LINE ONE\nLINE TWO\n\nLINE FOUR\nLINE FIVE\nLINE SIX")
+        ->assertDontSeeInText("\r");
+});
+
+test('any other error while fetching a graphic returns null and logs only its class', function () {
+    Log::spy();
+    Http::fake(['www.spc.noaa.gov/*' => fn () => throw new RuntimeException('secret detail')]);
+
+    expect((new GetSpcOutlookGraphic)('day1'))->toBeNull();
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $message === 'SPC outlook graphic fetch failed with an error'
+        && $context === ['exception' => RuntimeException::class])->once();
+});
+
+test('the Days 4-8 overview graphic is left out when every day 4 to 8 is unavailable', function () {
+    $unavailable = ['available' => false, 'probability' => null, 'category' => null, 'highlight' => false, 'locations' => []];
+    $html = (new OutlookReportMail(ORM_SUBJECT, ormPayload(['extended' => array_fill(4, 5, $unavailable)]), ORM_BRIEF, ormImages()))->render();
+
+    expect($html)->not->toContain('cid:spc-day48')
+        ->and(ormVisible($html))->toContain('Day 4 ❔ Not available')
+        ->and($html)->toContain('cid:spc-day1');
+});

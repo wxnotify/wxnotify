@@ -26,7 +26,7 @@
 @endforeach
 
 <h3 style="margin: 20px 0 6px; font-size: 16px;">Days 4-8</h3>
-@if ($hasImage['day48'])
+@if ($hasImage['day48'] && $r['extended_available'])
 <img src="cid:spc-day48" alt="SPC Days 4-8 severe weather outlook" width="190" style="display: block; width: 190px; max-width: 100%; height: auto; margin-bottom: 6px;">
 @endif
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; border-collapse: collapse;">
