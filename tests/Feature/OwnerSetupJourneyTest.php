@@ -65,7 +65,7 @@ test('the step texts tell the owner the mode default, the scan cost and where bi
     $descriptions = OnboardingStep::query()->pluck('description', 'key')->map(fn (array $description): string => $description['en']);
 
     expect($descriptions['basics'])->toContain('WXNOTIFY_MODE=selfhost')
-        ->and($descriptions['boundaries'])->toContain('alerts wait while it runs')
+        ->and($descriptions['boundaries'])->toContain('queue-long')
         ->and($descriptions['billing'])->toContain('App Settings > Secrets');
 });
 
