@@ -123,6 +123,12 @@ call.
   wait. A rule edited to a time still ahead today (local) runs again today, as `AlertRule`'s `delivery_time` change
   handling does for every scheduled category. The once-a-day stamp is the local date; the due check, the grace
   and Day 1's expected cycle compare instants (the send time converted to UTC).
+- The "Set it up" step opens with a collapsible "Today's Report" section, collapsed by default: a live preview of the
+  Full report (the email's own presenter and partial, with SPC's image URLs instead of inline embeds) built from
+  SPC's current outlooks for the locations ticked in the form, with the PWO section when it applies. It asks SPC
+  nothing until it is first opened (the `OutlookReportPreview` widget loads on expand; `FetchSpcOutlooks` caches
+  complete results for 2 minutes), reloads when the ticked locations change only while it is open, shows a
+  loading line first, and shows "SPC is unavailable right now" instead of an error when SPC cannot be read.
 - Per rule: `message_body_style` (Brief/Full), send time, "send" mode (`every_day` or `only_when_forecast`), and the chosen
   locations.
 - "Only when something is forecast": any Marginal or higher category on Days 1-3, or a 15% or higher area on

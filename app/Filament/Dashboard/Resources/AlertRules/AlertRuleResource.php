@@ -10,6 +10,7 @@ use App\Filament\Dashboard\Resources\AlertRules\Tables\AlertRulesTable;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\ActiveNowWidget;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\AlertStatsWidget;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\NeedsAttentionWidget;
+use App\Filament\Dashboard\Resources\AlertRules\Widgets\OutlookReportPreview;
 use App\Models\AlertRule;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -55,12 +56,17 @@ class AlertRuleResource extends Resource
         ];
     }
 
+    /**
+     * Registers the widgets' Livewire components: the three My Alerts header widgets and the outlook
+     * report form's "Today's Report" preview (embedded in the form, not a header widget).
+     */
     public static function getWidgets(): array
     {
         return [
             AlertStatsWidget::class,
             NeedsAttentionWidget::class,
             ActiveNowWidget::class,
+            OutlookReportPreview::class,
         ];
     }
 

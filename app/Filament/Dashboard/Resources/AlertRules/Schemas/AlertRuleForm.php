@@ -12,6 +12,7 @@ use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
 use App\Enums\Tier;
+use App\Filament\Dashboard\Resources\AlertRules\Widgets\OutlookReportPreview;
 use App\Filament\Dashboard\Resources\AlertTemplates\Schemas\AlertTemplateForm;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
 use App\Models\AlertRule;
@@ -29,6 +30,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Livewire;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\View;
@@ -450,13 +453,22 @@ class AlertRuleForm
      * timezone, else UTC), whether to send every day, and the saved locations to cover (none means a
      * US-wide report). The locations are a native CheckboxList, not a searchable Select, for the
      * entangle reason documented on locationSelect(); only the subscriber's own locations that have a
-     * fix are offered (SaveAlertRule scopes the ids to the owner again).
+     * fix are offered (SaveAlertRule scopes the ids to the owner again). Above them, the collapsed
+     * "Today's Report" section previews the Full report.
      *
      * @return array<Component>
      */
     public static function outlookReportFields(): array
     {
         return [
+            // Collapsed, and the preview asks SPC nothing until it is opened (see OutlookReportPreview).
+            Section::make('Today\'s Report')
+                ->key('outlookReportPreview')
+                ->description('What the Full report would look like right now, for the locations ticked below.')
+                ->collapsed()
+                ->schema([
+                    Livewire::make(OutlookReportPreview::class)->key('outlookReportPreviewWidget'),
+                ]),
             TimePicker::make('delivery_time')
                 ->label('Send time')
                 ->default('14:30')
