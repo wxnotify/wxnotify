@@ -86,7 +86,8 @@ test('the header action queues the job for the current user and says a queue wor
 
     expect($sent)->not->toBeNull()
         ->and($sent->getBody())->toContain('queue worker')
-        ->and($sent->getBody())->toContain('alerts wait while it runs');
+        ->and($sent->getBody())->toContain('its own queue worker (queue-long)')
+        ->and($sent->getBody())->toContain('Alerts keep being delivered while it runs');
 });
 
 test('a scan job that fails tells the user the scan did not finish, and has room to run a full scan once', function () {

@@ -7,6 +7,7 @@ use App\Jobs\PairOutlookAreasAfterDelay;
 use App\Jobs\ProcessIngestedProduct;
 use App\Jobs\PruneMobilePushChannel;
 use App\Jobs\RecordQueueHeartbeat;
+use App\Jobs\ScanShapefileLayersJob;
 use App\Jobs\SendActivityAlert;
 use App\Mail\ChannelMessageMail;
 use App\Models\AlertRule;
@@ -31,6 +32,26 @@ beforeEach(function (): void {
  * The queues the stack's worker reads, highest priority first (compose.yaml's `queue` service).
  */
 const CHAN_WORKER_QUEUES = 'deliveries,default';
+
+/**
+ * The seconds in a compose duration such as `70s`.
+ */
+function chanComposeSeconds(string $duration): int
+{
+    expect($duration)->toMatch('/^\d+s$/');
+
+    return (int) $duration;
+}
+
+/**
+ * The value of a worker command's `--timeout=` option, 0 when it has none.
+ */
+function chanCommandTimeout(string $command): int
+{
+    preg_match('/--timeout=(\d+)/', $command, $timeout);
+
+    return (int) ($timeout[1] ?? 0);
+}
 
 /**
  * @return array<string, mixed>
@@ -79,14 +100,63 @@ test('the worker runs a queued delivery before an older job waiting on the defau
 });
 
 test('the stack worker is a persistent worker that reads deliveries first, runs a job once and stops it before the queue would hand it out again', function () {
-    $command = chanComposeService('compose.yaml', 'queue')['command'];
+    $service = chanComposeService('compose.yaml', 'queue');
+    $timeout = chanCommandTimeout($service['command']);
 
-    preg_match('/--timeout=(\d+)/', $command, $timeout);
-
-    expect($command)->toStartWith('php artisan queue:work ')
+    expect($service['command'])->toStartWith('php artisan queue:work ')
         ->toContain('--queue='.CHAN_WORKER_QUEUES.' ')
         ->toContain('--tries=1 ')
-        ->and((int) ($timeout[1] ?? 0))->toBeGreaterThan(0)->toBeLessThan(config('queue.connections.database.retry_after'));
+        ->not->toContain('long')
+        ->and($timeout)->toBeGreaterThan(0)->toBeLessThan(config('queue.connections.database.retry_after'))
+        ->and(chanComposeSeconds($service['stop_grace_period']))->toBeGreaterThan($timeout);
+});
+
+test('the shapefile scan is queued on the long queue of its own connection', function () {
+    $job = new ScanShapefileLayersJob(1);
+
+    dispatch($job);
+
+    expect($job->connection)->toBe('database_long')
+        ->and(DB::table('jobs')->sole()->queue)->toBe('long');
+});
+
+test('without the database queue the shapefile scan keeps the default connection and queue', function () {
+    config(['queue.default' => 'sync']);
+
+    $job = new ScanShapefileLayersJob(1);
+
+    expect($job->connection)->toBeNull()
+        ->and($job->queue)->toBeNull();
+});
+
+test('the long connection shares the jobs table and hands a scan out again only after its timeout', function () {
+    $long = config('queue.connections.database_long');
+
+    expect($long['driver'])->toBe('database')
+        ->and($long['table'])->toBe(config('queue.connections.database.table'))
+        ->and($long['connection'])->toBe(config('queue.connections.database.connection'))
+        ->and($long['queue'])->toBe('long')
+        ->and($long['retry_after'])->toBeGreaterThan((new ScanShapefileLayersJob(1))->timeout);
+});
+
+test('the stack worker leaves a queued shapefile scan for its own worker', function () {
+    dispatch(new ScanShapefileLayersJob(1));
+
+    Artisan::call('queue:work', ['connection' => 'database', '--queue' => CHAN_WORKER_QUEUES, '--once' => true, '--tries' => 1, '--sleep' => 0, '--timeout' => 0, '--memory' => 1_000_000]);
+
+    expect(DB::table('jobs')->sole()->queue)->toBe('long');
+});
+
+test('the long worker reads only the long queue, runs a scan once, and lets it finish before the queue or a stop would cut it short', function () {
+    $service = chanComposeService('compose.yaml', 'queue-long');
+    $timeout = chanCommandTimeout($service['command']);
+
+    expect($service['command'])->toStartWith('php artisan queue:work database_long ')
+        ->toContain('--queue=long ')
+        ->toContain('--tries=1 ')
+        ->and($timeout)->toBeGreaterThanOrEqual((new ScanShapefileLayersJob(1))->timeout)
+        ->toBeLessThan(config('queue.connections.database_long.retry_after'))
+        ->and(chanComposeSeconds($service['stop_grace_period']))->toBeGreaterThan($timeout);
 });
 
 test('the no-restart development override reads the same queues in the same order and runs a job once', function () {

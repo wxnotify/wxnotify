@@ -136,6 +136,45 @@ services:
         restart: unless-stopped
         profiles:
             - server-c
+    # The shapefile scan's own worker (ScanShapefileLayersJob, up to 15
+    # minutes): on the `queue` worker it would hold the only worker that
+    # delivers alerts for that long. It reads only the `long` queue of the
+    # `database_long` connection, the same jobs table as `database` but with
+    # retry_after 960 s (DB_QUEUE_LONG_RETRY_AFTER), above --timeout=900, so a
+    # running scan is never handed out a second time; retry_after is per
+    # connection, hence the separate connection. --tries=1: a retry would
+    # re-scan. --sleep=3: nothing here is urgent. Like `queue`, it keeps the
+    # code it booted with, so deploys restart it (`php artisan queue:restart`).
+    queue-long:
+        build:
+            context: './docker/8.4'
+            dockerfile: Dockerfile
+            target: worker-development
+            args:
+                USER_ID: '${USER_ID:-1000}'
+                GROUP_ID: '${GROUP_ID:-1000}'
+        image: 'wxnotify-php/worker:local'
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - pgsql
+            - redis
+        command: 'php artisan queue:work database_long --queue=long --tries=1 --sleep=3 --timeout=900 --memory=192 --max-time=3600'
+        stop_signal: SIGTERM
+        # Room for a running scan (at most --timeout) to finish after SIGTERM.
+        stop_grace_period: 930s
+        healthcheck:
+            test:
+                - CMD
+                - healthcheck-queue
+            start_period: 10s
+        restart: unless-stopped
+        profiles:
+            - server-c
     # Nothing else runs `artisan schedule:run`, so every schedule() entry in
     # bootstrap/app.php (alerts:dispatch-scheduled -- Daily Summary and
     # Threshold deliveries -- plus shapefile:scan, traccar:poll-positions,

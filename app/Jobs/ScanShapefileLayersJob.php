@@ -19,13 +19,24 @@ class ScanShapefileLayersJob implements ShouldQueue
 
     /**
      * A full scan fetches every layer's page and downloads and imports each staged zip, which
-     * can run well past the worker's 60 second default. It runs once: a retry would re-scan.
+     * can run well past the worker's 60 second default (the queue-long worker allows 900, its
+     * connection's retry_after 960). It runs once: a retry would re-scan.
      */
     public int $timeout = 900;
 
     public int $tries = 1;
 
-    public function __construct(public readonly int $userId) {}
+    /**
+     * On the database queue the scan goes to its own connection and queue, read only by the
+     * queue-long worker (compose.yaml), so it never holds the worker that delivers alerts. Any other
+     * queue connection (sync in tests, a non-database install) keeps the default, as before.
+     */
+    public function __construct(public readonly int $userId)
+    {
+        if (config('queue.default') === 'database') {
+            $this->onConnection('database_long')->onQueue('long');
+        }
+    }
 
     public function handle(ScanAllShapefileLayers $scan): void
     {

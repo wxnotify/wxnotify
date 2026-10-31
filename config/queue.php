@@ -44,6 +44,18 @@ return [
             'after_commit' => false,
         ],
 
+        // The shapefile scan's own connection: same jobs table, but a retry_after above the scan's
+        // 900 s timeout (retry_after is per connection), read only by the queue-long worker, so a
+        // scan never holds the worker that delivers alerts.
+        'database_long' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'long',
+            'retry_after' => (int) env('DB_QUEUE_LONG_RETRY_AFTER', 960),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),
