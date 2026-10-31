@@ -7,7 +7,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/** | .ai/rules/actions.md |
 | app/Actions/Alerts/** | .ai/rules/alerts.md |
 | routes/api.php, app/Http/Controllers/Api/**, app/Http/Resources/** | .ai/rules/api.md |
-| app/Jobs/DeliverWeatherAlert.php, app/Jobs/** | .ai/rules/app-jobs.md |
+| app/Jobs/DeliverWeatherAlert.php, app/Jobs/**, app/Jobs/DeliverScheduledAlert.php | .ai/rules/app-jobs.md |
 | app/Support/ChannelTypes/** | .ai/rules/channel-types.md |
 | app/Console/Commands/** | .ai/rules/commands.md |
 | app/Support/Delivery/** | .ai/rules/delivery.md |

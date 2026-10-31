@@ -2,6 +2,7 @@
 paths:
   - app/Jobs/DeliverWeatherAlert.php
   - 'app/Jobs/**'
+  - app/Jobs/DeliverScheduledAlert.php
 ---
 
 # App Jobs
@@ -14,3 +15,6 @@ Every job that sends to a subscriber channel sets `$this->onQueue('deliveries')`
 
 ## Long jobs run on the `long` queue / `database_long` connection
 ScanShapefileLayersJob (timeout 900) goes to connection `database_long`, queue `long` (only when `queue.default` is `database`; sync in tests keeps the default), read only by the `queue-long` worker (`queue:work database_long --queue=long --timeout=900`, grace 930 s). `retry_after` is per connection, so `database_long` has 960 (DB_QUEUE_LONG_RETRY_AFTER) above the job timeout. Any new job that can run longer than ~50 s goes there, never on `default`/`deliveries`, or it blocks alert delivery. `queue-long` must be started separately (`docker compose --profile server-c up -d queue-long`); nothing monitors it, and it is also stopped by `queue:restart` after the running scan finishes.
+
+## An outlook report job honours the rule's Brief setting
+For an `outlook_report` rule `DeliverScheduledAlert` uses `$this->title` (the prebuilt circles subject, not RenderAlertSubject) and puts the report in `$meta['outlook_report']` only for rich-content channels. A rule whose Message length is Brief ignores a report already on the queued job and fetches no graphics (Brief means the short text everywhere). Graphics are fetched in `handle()` (one pool, failures cached), only for days the payload marks available, and their bytes never go on the queue. The job does not re-check the owner's tier: a job queued just before a downgrade still sends once.
