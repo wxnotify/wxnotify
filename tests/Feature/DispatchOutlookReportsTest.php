@@ -61,15 +61,16 @@ function dorFiles(array $day1Cat = ['TSTM', 'SLGT'], string $day1Issued = '2026-
 }
 
 /**
- * A Plus-tier subscriber: the outlook report is a paid-tier feature.
+ * A Plus-tier subscriber (the outlook report is a paid-tier feature) whose profile timezone is UTC unless given.
  */
-function dorPaid(): UserFactory
+function dorPaid(string $timezone = 'UTC'): UserFactory
 {
-    return User::factory()->state(['tier_override' => Tier::Plus]);
+    return User::factory()->state(['tier_override' => Tier::Plus, 'timezone' => $timezone]);
 }
 
 /**
- * An active outlook report rule sending at 14:30 UTC to one channel, with one location inside the fixture area.
+ * An active outlook report rule sending at 14:30 in its owner's timezone (UTC unless the channel's owner says
+ * otherwise) to one channel, with one location inside the fixture area.
  */
 function dorRule(array $attributes = [], ?NotificationChannel $channel = null): AlertRule
 {
@@ -116,7 +117,7 @@ test('a rule before its send time sends nothing and fetches nothing', function (
     expect($rule->fresh()->last_scheduled_run_on)->toBeNull();
 });
 
-test('a second run on the same UTC day sends nothing more', function () {
+test('a second run on the same local day sends nothing more', function () {
     Carbon::setTestNow('2026-10-31 14:30:00');
     Queue::fake([DeliverScheduledAlert::class]);
     Http::fake(dorFiles());
@@ -458,3 +459,78 @@ test('a Full or unset rule still gives an email channel the report', function (?
     'full' => [MessageBodyStyle::Full],
     'unset' => [null],
 ]);
+
+test('a non-UTC owner\'s send time is their local time, due at the matching UTC instant', function (string $date, string $before, string $due) {
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles(day1Issued: "{$date}T13:00:00Z"));
+    $rule = dorRule(['delivery_time' => '08:30'], NotificationChannel::factory()->for(dorPaid('America/Denver'))->create());
+
+    Carbon::setTestNow("{$date} {$before}");
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+    Queue::assertNothingPushed();
+
+    Carbon::setTestNow("{$date} {$due}");
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+    Queue::assertPushed(DeliverScheduledAlert::class, 1);
+    expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe($date);
+})->with([
+    'before the November DST change (MDT, UTC-6)' => ['2026-10-31', '14:29:00', '14:30:00'],
+    'after the November DST change (MST, UTC-7)' => ['2026-11-02', '15:29:00', '15:30:00'],
+]);
+
+test('a non-UTC owner is stamped with their local date and not sent twice across midnight UTC', function () {
+    // 20:00 in Denver on October 31 is 02:00 UTC on November 1.
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles(day1Issued: '2026-11-01T01:00:00Z'));
+    $rule = dorRule(['delivery_time' => '20:00', 'last_scheduled_run_on' => '2026-10-30'], NotificationChannel::factory()->for(dorPaid('America/Denver'))->create());
+
+    Carbon::setTestNow('2026-11-01 02:00:00');
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+    Carbon::setTestNow('2026-11-01 05:45:00');
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, 1);
+    expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe('2026-10-31');
+});
+
+test('an owner whose local day starts before the UTC day gets that day\'s report', function () {
+    // 08:00 on November 1 in Tokyo is still October 31 in UTC; yesterday's stamp is Tokyo's October 31.
+    Carbon::setTestNow('2026-11-01 08:00:00 Asia/Tokyo');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles(day1Issued: '2026-10-31T20:00:00Z'));
+    $rule = dorRule(['delivery_time' => '07:00', 'last_scheduled_run_on' => '2026-10-31'], NotificationChannel::factory()->for(dorPaid('Asia/Tokyo'))->create());
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, 1);
+    expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe('2026-11-01');
+});
+
+test('a non-UTC owner\'s Day 1 must be the cycle due before their send time as a UTC instant', function (string $day1Issued, int $pushed) {
+    // 08:30 in Denver is 14:30 UTC, so the 1300 UTC cycle is expected (read as UTC, 08:30 would accept 0600).
+    Carbon::setTestNow('2026-10-31 14:30:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles(day1Issued: $day1Issued));
+    dorRule(['delivery_time' => '08:30'], NotificationChannel::factory()->for(dorPaid('America/Denver'))->create());
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, $pushed);
+})->with([
+    'the 0600 UTC cycle is held' => ['2026-10-31T06:00:00Z', 0],
+    'the 1300 UTC cycle is sent' => ['2026-10-31T13:00:00Z', 1],
+]);
+
+test('an owner with no profile timezone sends at the time read as UTC', function () {
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles());
+    dorRule([], NotificationChannel::factory()->for(User::factory()->state(['tier_override' => Tier::Plus, 'timezone' => null]))->create());
+
+    Carbon::setTestNow('2026-10-31 14:29:00');
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+    Queue::assertNothingPushed();
+
+    Carbon::setTestNow('2026-10-31 14:30:00');
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+    Queue::assertPushed(DeliverScheduledAlert::class, 1);
+});

@@ -14,6 +14,8 @@ use App\Models\User;
 use Database\Seeders\ProductCatalogSeeder;
 use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\TimePicker;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 use function Pest\Livewire\livewire;
@@ -25,6 +27,10 @@ beforeEach(function () {
     $this->actingAs($this->user);
     $this->location = Location::factory()->for($this->user)->create(['label' => 'Home']);
     $this->channel = NotificationChannel::factory()->for($this->user)->create();
+});
+
+afterEach(function () {
+    Carbon::setTestNow();
 });
 
 test('choosing the outlook report shows its three fields and no product table', function () {
@@ -154,7 +160,7 @@ test('a Pro subscriber can create an outlook report', function () {
     expect(AlertRule::where('user_id', $this->user->id)->sole()->category->value)->toBe('outlook_report');
 });
 
-test('a send time after 22:45 UTC is refused and 22:45 is accepted', function (string $time, bool $accepted) {
+test('a send time after 22:45 is refused and 22:45 is accepted', function (string $time, bool $accepted) {
     $component = livewire(CreateAlertRule::class)
         ->set('data.category', 'outlook_report')
         ->fillForm(['delivery_time' => $time, 'channel_ids' => [$this->channel->id]])
@@ -173,23 +179,39 @@ test('a send time after 22:45 UTC is refused and 22:45 is accepted', function (s
     '23:45' => ['23:45', false],
 ]);
 
-test('the send time hint shows the UTC time in the subscriber\'s own timezone', function () {
-    $this->user->update(['timezone' => 'America/Phoenix']);
+test('the send time is labelled in local time and its hint gives the UTC time for today', function (string $today, string $time, string $hint) {
+    Carbon::setTestNow("{$today} 12:00:00 UTC");
+    $this->user->update(['timezone' => 'America/Denver']);
 
     livewire(CreateAlertRule::class)
         ->set('data.category', 'outlook_report')
-        ->set('data.delivery_time', '14:30')
-        ->assertSee('That is 7:30 AM your time.')
-        ->set('data.delivery_time', '22:45')
-        ->assertSee('That is 3:45 PM your time.');
+        ->assertFormFieldExists('delivery_time', fn (TimePicker $field): bool => $field->getLabel() === 'Send time')
+        ->set('data.delivery_time', $time)
+        ->assertSee($hint);
+})->with([
+    'daylight time' => ['2026-10-31', '08:30', 'That is 14:30 UTC today.'],
+    'standard time' => ['2026-11-02', '08:30', 'That is 15:30 UTC today.'],
+    'past midnight UTC' => ['2026-11-02', '20:00', 'That is 03:00 UTC the next day.'],
+]);
+
+test('the send time help names SPC\'s Day 1 issue times in UTC and the subscriber\'s time, the 60 minute wait and the 22:45 cap', function () {
+    Carbon::setTestNow('2026-10-31 12:00:00 UTC');
+    $this->user->update(['timezone' => 'America/Denver']);
+
+    livewire(CreateAlertRule::class)
+        ->set('data.category', 'outlook_report')
+        ->assertSee('SPC issues Day 1 outlooks at 0100, 0600, 1300, 1630 and 2000 UTC (7:00 PM, 12:00 AM, 7:00 AM, 10:30 AM and 2:00 PM your time).')
+        ->assertSee('The report waits up to 60 minutes after your send time for the latest Day 1 outlook, then sends what it has.')
+        ->assertSee('The latest send time is 22:45, so that wait ends before midnight your time.');
 });
 
-test('without a profile timezone the send time hint is left out', function () {
+test('without a profile timezone the send time help says times are in UTC', function () {
     livewire(CreateAlertRule::class)
         ->set('data.category', 'outlook_report')
         ->set('data.delivery_time', '14:30')
-        ->assertDontSee('your time.')
-        ->assertSee('The latest send time is 22:45 UTC');
+        ->assertSee('Times are in UTC until you set a timezone in your profile.')
+        ->assertDontSee('your time).')
+        ->assertSee('The latest send time is 22:45, so that wait ends before midnight UTC.');
 });
 
 test('a downgraded owner saving a kept outlook report on Edit is told it is a paid feature', function () {

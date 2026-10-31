@@ -61,8 +61,15 @@ final class Timezones
     {
         $locationTimezone = $rule->location?->timezone;
 
-        return filled($locationTimezone)
-            ? $locationTimezone
-            : (self::forUser($rule->user) ?? config('app.timezone'));
+        return filled($locationTimezone) ? $locationTimezone : self::forUserOrDefault($rule->user);
+    }
+
+    /**
+     * The timezone a rule with no Location (the outlook report) runs in for this owner: the profile
+     * timezone, else the app timezone (UTC), exactly as forRule() resolves such a rule.
+     */
+    public static function forUserOrDefault(?User $user): string
+    {
+        return self::forUser($user) ?? config('app.timezone');
     }
 }

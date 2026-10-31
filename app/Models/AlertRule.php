@@ -75,8 +75,7 @@ class AlertRule extends Model
                 return;
             }
 
-            $timezone = $rule->category === AlertCategory::OutlookReport ? 'UTC' : Timezones::forRule($rule);
-            $now = Carbon::now($timezone);
+            $now = Carbon::now(Timezones::forRule($rule));
 
             if ($now->lt($now->copy()->setTimeFromTimeString($rule->delivery_time))) {
                 $rule->last_scheduled_run_on = null;
@@ -250,7 +249,8 @@ class AlertRule extends Model
     }
 
     /**
-     * The UTC clock time (H:i) the outlook report goes out; 14:30 until the subscriber picks one.
+     * The local clock time (H:i, in Timezones::forRule()) the outlook report goes out; 14:30 until the
+     * subscriber picks one.
      */
     public function outlookSendTime(): string
     {

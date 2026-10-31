@@ -45,19 +45,19 @@ test('the send time is the delivery time, defaulting to 14:30', function () {
     expect($rule->outlookSendTime())->toBe('14:30');
 });
 
-test('moving the send time reads the clock in UTC, not the subscriber timezone', function () {
-    // 15:00 UTC is 05:00 in Honolulu: a local-time reading would treat both new times as still ahead.
+test('moving the send time reads the clock in the owner\'s local time, not UTC', function () {
+    // 15:00 UTC is 05:00 in Honolulu: 09:00 is still ahead there (it has passed in UTC), 04:45 is not.
     Carbon::setTestNow('2026-11-02 15:00:00 UTC');
     $user = User::factory()->create(['timezone' => 'Pacific/Honolulu']);
     $rule = AlertRule::factory()->outlookReport()->for($user)->create([
-        'delivery_time' => '14:30',
+        'delivery_time' => '04:30',
         'last_scheduled_run_on' => '2026-11-02',
     ]);
 
-    $rule->update(['delivery_time' => '09:00']);
+    $rule->update(['delivery_time' => '04:45']);
     expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe('2026-11-02');
 
-    $rule->update(['delivery_time' => '16:00']);
+    $rule->update(['delivery_time' => '09:00']);
     expect($rule->fresh()->last_scheduled_run_on)->toBeNull();
 });
 

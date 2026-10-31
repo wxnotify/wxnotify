@@ -5,7 +5,7 @@ Date: 2026-10-30. Status: draft for the owner's review.
 ## Intent
 
 Subscribers want a glance at the week's severe weather chances without opening SPC's site. Once a day at a time
-the subscriber chooses, default 14:30 UTC (late enough to include the 1300 UTC Day 1 update) WxNotify sends a report built from the SPC
+the subscriber chooses in their own local time, default 14:30, WxNotify sends a report built from the SPC
 Convective Outlooks: Days 1, 2, 3 and 4-8, across the US and for the subscriber's chosen saved locations. It is
 worth opening when severe weather is forecast; a subscriber who does not want quiet days can choose to receive it
 only when something is forecast.
@@ -14,10 +14,10 @@ It is a new option under SPC & WPC Alerts: "Severe Weather Outlook Report".
 
 ## Goals
 
-- One daily report per rule per channel, at a time the subscriber chooses (default 14:30 UTC).
+- One daily report per rule per channel, at a local time the subscriber chooses (default 14:30).
 - Two lengths, as other rules have, chosen by the rule's Message length: Brief (the short summary on every
   channel) and Full (the rich email on email channels, the Brief elsewhere).
-- Each rule chooses: channels, send time (UTC), which saved locations to include (zero or more), and "every day" or "only when
+- Each rule chooses: channels, send time (local), which saved locations to include (zero or more), and "every day" or "only when
   something is forecast".
 - Built from SPC's published outlook files, fetched at send time.
 
@@ -101,12 +101,17 @@ call.
 
 - A new SPC & WPC option, not a product-triggered rule: it fires on the clock, like Daily Summary and Threshold
   rules, not on an incoming bulletin. It reuses `alerts:dispatch-scheduled`'s once-a-day stamp
-  (`last_scheduled_run_on`), but the send time and the day boundary are UTC, not the rule's own timezone, and it
-  needs no `location_id` (it has a set of chosen locations, possibly empty).
-- Send time: chosen in UTC (a time field labelled UTC, default 14:30), 15-minute granularity because the scheduler
-  ticks every 15 minutes. My call: UTC, not local time, so the time does not drift with daylight saving; the form
-  shows the local equivalent as a hint. A rule edited to a time still ahead today runs again today, as
-  `AlertRule`'s existing `delivery_time` change handling does.
+  (`last_scheduled_run_on`, the owner's local date); the send time and the day boundary are in the rule owner's
+  timezone (`Timezones::forRule()`: the profile timezone, else UTC, as the rule has no `location_id`; it has a set
+  of chosen locations, possibly empty).
+- Send time (owner decision, final; reverses the earlier UTC design): chosen in the subscriber's local time (a field
+  labelled "Send time", default 14:30), the same local hour year-round, 15-minute granularity because the scheduler
+  ticks every 15 minutes, latest 22:45 local so the 60 minute wait cannot pass the subscriber's midnight. The form
+  shows the UTC equivalent for today ("That is 14:30 UTC today."; without a profile timezone it says times are in
+  UTC), SPC's Day 1 issue times (0100, 0600, 1300, 1630, 2000 UTC, with the local equivalents) and the 60 minute
+  wait. A rule edited to a time still ahead today (local) runs again today, as `AlertRule`'s `delivery_time` change
+  handling does for every scheduled category. The once-a-day stamp is the local date; the due check, the grace
+  and Day 1's expected cycle compare instants (the send time converted to UTC).
 - Per rule: `message_body_style` (Brief/Full), send time, "send" mode (`every_day` or `only_when_forecast`), and the chosen
   locations.
 - "Only when something is forecast": any Marginal or higher category on Days 1-3, or a 15% or higher area on
@@ -148,9 +153,9 @@ call.
   unset: only a channel that supports rich content (email) gets the Full report with graphics; every other
   channel gets the Brief text, as do SMS, voice and mobile. So "Full" in practice means the rich email. A
   plain-text Full for chat channels is a later option.
-- **Freshness.** Only Day 1 is waited for (the 1300 UTC update is what the 14:30 default exists for). Days 2, 3 and
+- **Freshness.** Only Day 1 is waited for (the 14:30 default was chosen for the 1300 UTC update when send times were UTC; in local time the expected cycle depends on the subscriber's offset). Days 2, 3 and
   4-8 are accepted as fetched. Day 1 is "current" when its features' `ISSUE_ISO` is from the latest SPC Day 1 cycle that was due at
-  least 15 minutes before the send time (the 1300 UTC cycle for the 14:30 default; an earlier cycle for an earlier
+  least 15 minutes before the send time as a UTC instant (e.g. the 1300 UTC cycle for 08:30 in Denver in summer; an earlier cycle for an earlier
   send time) or later; when Day 1 has no features (a valid quiet day), the HTTP `Last-Modified` header of the file is the
   freshness signal, falling back to the companion hail/wind/tornado files' `ISSUE_ISO`. If no signal can be read,
   treat the file as current, so a quiet day never retries for an hour.

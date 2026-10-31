@@ -446,11 +446,11 @@ class AlertRuleForm
     }
 
     /**
-     * The severe weather outlook report: a send time (UTC), whether to send every day, and the
-     * saved locations to cover (none means a US-wide report). The locations are a native
-     * CheckboxList, not a searchable Select, for the entangle reason documented on locationSelect();
-     * only the subscriber's own locations that have a fix are offered (SaveAlertRule scopes the
-     * ids to the owner again).
+     * The severe weather outlook report: a send time (the subscriber's local time, in their profile
+     * timezone, else UTC), whether to send every day, and the saved locations to cover (none means a
+     * US-wide report). The locations are a native CheckboxList, not a searchable Select, for the
+     * entangle reason documented on locationSelect(); only the subscriber's own locations that have a
+     * fix are offered (SaveAlertRule scopes the ids to the owner again).
      *
      * @return array<Component>
      */
@@ -458,14 +458,14 @@ class AlertRuleForm
     {
         return [
             TimePicker::make('delivery_time')
-                ->label('Send time (UTC)')
+                ->label('Send time')
                 ->default('14:30')
                 ->seconds(false)
                 ->minutesStep(15)
                 ->maxDate('22:45')
                 ->required()
                 ->live()
-                ->helperText(fn (?string $state): string => trim(self::localSendTimeHint($state).' SPC\'s 1300 UTC update posts at about 13:00, and the report waits up to 60 minutes after your send time for it before sending what it has. The latest send time is 22:45 UTC, so that 60 minute wait for SPC\'s Day 1 update finishes before midnight UTC.')),
+                ->helperText(fn (?string $state): string => self::outlookSendTimeHelp($state)),
             Radio::make('report_mode')
                 ->label('When to send')
                 ->options(collect(OutlookReportMode::cases())->mapWithKeys(fn (OutlookReportMode $mode): array => [$mode->value => $mode->label()]))
@@ -484,24 +484,55 @@ class AlertRuleForm
     }
 
     /**
-     * The UTC send time in the subscriber's profile timezone, e.g. "That is 9:30 AM your time.", for
-     * today's date (so daylight saving is applied); empty without a profile timezone or a time.
+     * The send time's help: its UTC equivalent today (or that times are UTC without a profile
+     * timezone), SPC's Day 1 issue times in UTC and the subscriber's time, the 60 minute wait and
+     * the 22:45 cap.
      */
-    public static function localSendTimeHint(?string $time): string
+    public static function outlookSendTimeHelp(?string $time): string
     {
         $timezone = Timezones::forUser(auth()->user());
+        $cycles = ['01:00', '06:00', '13:00', '16:30', '20:00'];
+        $sentences = [];
 
-        if ($timezone === null || blank($time)) {
+        if ($timezone === null) {
+            $sentences[] = 'Times are in UTC until you set a timezone in your profile.';
+            $sentences[] = 'SPC issues Day 1 outlooks at 0100, 0600, 1300, 1630 and 2000 UTC.';
+        } else {
+            $sentences[] = self::utcSendTimeHint($time, $timezone);
+            $local = array_map(fn (string $cycle): string => Carbon::now('UTC')->setTimeFromTimeString($cycle)->setTimezone($timezone)->format('g:i A'), $cycles);
+            $sentences[] = 'SPC issues Day 1 outlooks at 0100, 0600, 1300, 1630 and 2000 UTC ('.Arr::join($local, ', ', ' and ').' your time).';
+        }
+
+        $sentences[] = 'The report waits up to 60 minutes after your send time for the latest Day 1 outlook, then sends what it has.';
+        $sentences[] = 'The latest send time is 22:45, so that wait ends before midnight '.($timezone === null ? 'UTC.' : 'your time.');
+
+        return implode(' ', array_filter($sentences));
+    }
+
+    /**
+     * The local send time as UTC for today's date (so daylight saving is applied), e.g. "That is
+     * 14:30 UTC today."; empty without a time.
+     */
+    public static function utcSendTimeHint(?string $time, string $timezone): string
+    {
+        if (blank($time)) {
             return '';
         }
 
         try {
-            $local = Carbon::now('UTC')->setTimeFromTimeString($time)->setTimezone($timezone);
+            $local = Carbon::now($timezone)->setTimeFromTimeString($time);
         } catch (Throwable) {
             return '';
         }
 
-        return 'That is '.$local->format('g:i A').' your time.';
+        $utc = $local->copy()->utc();
+        $day = match ($utc->toDateString() <=> $local->toDateString()) {
+            1 => 'the next day',
+            -1 => 'the day before',
+            default => 'today',
+        };
+
+        return "That is {$utc->format('H:i')} UTC {$day}.";
     }
 
     /**

@@ -24,6 +24,7 @@ class Day1OutlookFreshness
 
     /**
      * @param  array{issued_at?: ?string, last_modified?: ?string, layers?: array<string, mixed>}|null  $day1
+     * @param  CarbonInterface  $sendTime  an instant in any timezone (the owner's local send time); the cycles are UTC, so it is converted to UTC first
      */
     public static function isCurrent(?array $day1, CarbonInterface $sendTime): bool
     {
