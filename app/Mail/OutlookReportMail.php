@@ -94,7 +94,8 @@ class OutlookReportMail extends Mailable
                 continue;
             }
 
-            $part = preg_replace('/\s*\n\s*/', ' ', $part) ?? $part;
+            // A bare \r (e.g. in a location label) would otherwise survive and could break the layout.
+            $part = preg_replace('/\s*[\r\n]\s*/', ' ', $part) ?? $part;
             $parts[$index] = preg_replace('/>\s+</', '><', $part) ?? $part;
         }
 

@@ -32,6 +32,8 @@ class AlertRulesTable
 
     private const MIXED = 'Mixed';
 
+    private const US_WIDE = 'US-wide';
+
     public static function configure(Table $table): Table
     {
         return $table
@@ -89,7 +91,8 @@ class AlertRulesTable
     }
 
     /**
-     * Where an alert applies: its saved locations, or -- for matching modes
+     * Where an alert applies: its saved locations (an outlook report's chosen ones, or US-wide when it
+     * has none), or -- for matching modes
      * that are not tied to a saved location -- the mode's short name. A
      * Weather Alerts / SPC rule is read product by product: one shared mode
      * reads as before, differing modes read "Mixed" followed by the union of
@@ -104,6 +107,12 @@ class AlertRulesTable
      */
     private static function locationLabels(AlertRule $record): array
     {
+        if ($record->category === AlertCategory::OutlookReport) {
+            $labels = $record->locations->pluck('label')->values()->all();
+
+            return $labels === [] ? [self::US_WIDE] : $labels;
+        }
+
         if (! in_array($record->category, [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc], true)) {
             $labels = array_filter([$record->location?->label]);
 

@@ -99,6 +99,17 @@ test('scheduled alerts show their single location', function () {
         ->assertTableColumnStateSet('location_labels', ['Home'], $threshold);
 });
 
+test('an outlook report lists its chosen locations, or US-wide when it has none', function () {
+    $home = Location::factory()->for($this->user)->create(['label' => 'Home']);
+    $cabin = Location::factory()->for($this->user)->create(['label' => 'Cabin']);
+    $chosen = AlertRule::factory()->outlookReport()->for($this->user)->locations($home, $cabin)->create();
+    $nationwide = AlertRule::factory()->outlookReport()->for($this->user)->create();
+
+    livewire(ListAlertRules::class)
+        ->assertTableColumnStateSet('location_labels', ['Home', 'Cabin'], $chosen)
+        ->assertTableColumnStateSet('location_labels', ['US-wide'], $nationwide);
+});
+
 test('alerts not tied to a saved location show their matching mode', function (string $mode, string $label) {
     $rule = alertColumnsWeatherRule($this->user, mode: $mode);
 

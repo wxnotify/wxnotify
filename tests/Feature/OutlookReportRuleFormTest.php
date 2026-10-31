@@ -133,3 +133,22 @@ test('a send time after 22:45 UTC is refused and 22:45 is accepted', function (s
     '23:00' => ['23:00', false],
     '23:45' => ['23:45', false],
 ]);
+
+test('the send time hint shows the UTC time in the subscriber\'s own timezone', function () {
+    $this->user->update(['timezone' => 'America/Phoenix']);
+
+    livewire(CreateAlertRule::class)
+        ->set('data.category', 'outlook_report')
+        ->set('data.delivery_time', '14:30')
+        ->assertSee('That is 7:30 AM your time.')
+        ->set('data.delivery_time', '22:45')
+        ->assertSee('That is 3:45 PM your time.');
+});
+
+test('without a profile timezone the send time hint is left out', function () {
+    livewire(CreateAlertRule::class)
+        ->set('data.category', 'outlook_report')
+        ->set('data.delivery_time', '14:30')
+        ->assertDontSee('your time.')
+        ->assertSee('The latest send time is 22:45 UTC');
+});

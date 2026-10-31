@@ -469,3 +469,14 @@ test('the graphics of a report are fetched together in one pool', function () {
         ->and($graphics['unknown'])->toBeNull();
     Http::assertSentCount(4);
 });
+
+test('bare carriage returns in a location label are collapsed outside the PWO text, so they cannot end the html block', function () {
+    $payload = ormPayload();
+    $payload['days'][1]['locations'][0]['label'] = "Home\r\r    Side";
+
+    $html = (new OutlookReportMail(ORM_SUBJECT, $payload, ORM_BRIEF, []))->render();
+
+    expect($html)->not->toContain("\r")
+        ->and($html)->not->toContain('<code>')
+        ->and(ormVisible($html))->toContain('Home Side 🟡 Slight');
+});

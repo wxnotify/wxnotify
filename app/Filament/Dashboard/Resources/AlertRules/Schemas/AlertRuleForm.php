@@ -19,6 +19,7 @@ use App\Models\Product;
 use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\ChannelType;
+use App\Support\Timezones;
 use App\Support\Units;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
@@ -34,9 +35,11 @@ use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Exists;
+use Throwable;
 
 class AlertRuleForm
 {
@@ -421,7 +424,8 @@ class AlertRuleForm
                 ->minutesStep(15)
                 ->maxDate('22:45')
                 ->required()
-                ->helperText('SPC\'s 1300 UTC update posts at about 13:00, and the report waits up to 60 minutes after your send time for it before sending what it has. The latest send time is 22:45 UTC, so that 60 minute wait for SPC\'s Day 1 update finishes before midnight UTC.'),
+                ->live()
+                ->helperText(fn (?string $state): string => trim(self::localSendTimeHint($state).' SPC\'s 1300 UTC update posts at about 13:00, and the report waits up to 60 minutes after your send time for it before sending what it has. The latest send time is 22:45 UTC, so that 60 minute wait for SPC\'s Day 1 update finishes before midnight UTC.')),
             Radio::make('report_mode')
                 ->label('When to send')
                 ->options(collect(OutlookReportMode::cases())->mapWithKeys(fn (OutlookReportMode $mode): array => [$mode->value => $mode->label()]))
@@ -437,6 +441,27 @@ class AlertRuleForm
                     ->all())
                 ->helperText('Leave empty for a US-wide report.'),
         ];
+    }
+
+    /**
+     * The UTC send time in the subscriber's profile timezone, e.g. "That is 9:30 AM your time.", for
+     * today's date (so daylight saving is applied); empty without a profile timezone or a time.
+     */
+    public static function localSendTimeHint(?string $time): string
+    {
+        $timezone = Timezones::forUser(auth()->user());
+
+        if ($timezone === null || blank($time)) {
+            return '';
+        }
+
+        try {
+            $local = Carbon::now('UTC')->setTimeFromTimeString($time)->setTimezone($timezone);
+        } catch (Throwable) {
+            return '';
+        }
+
+        return 'That is '.$local->format('g:i A').' your time.';
     }
 
     /**
