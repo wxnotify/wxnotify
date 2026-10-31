@@ -4,8 +4,8 @@ Date: 2026-10-30. Status: draft for the owner's review.
 
 ## Intent
 
-Subscribers want a glance at the week's severe weather chances without opening SPC's site. Once a day at
-13:30 UTC (late enough to include the 1300 UTC Day 1 update) WxNotify sends a report built from the SPC
+Subscribers want a glance at the week's severe weather chances without opening SPC's site. Once a day at a time
+the subscriber chooses, default 14:30 UTC (late enough to include the 1300 UTC Day 1 update) WxNotify sends a report built from the SPC
 Convective Outlooks: Days 1, 2, 3 and 4-8, across the US and for the subscriber's chosen saved locations. It is
 worth opening when severe weather is forecast; a subscriber who does not want quiet days can choose to receive it
 only when something is forecast.
@@ -14,9 +14,9 @@ It is a new option under SPC & WPC Alerts: "Severe Weather Outlook Report".
 
 ## Goals
 
-- One daily report at a fixed 13:30 UTC, per rule, per channel.
+- One daily report per rule per channel, at a time the subscriber chooses (default 14:30 UTC).
 - Two lengths, as other rules have: Brief (the mobile channel) and Full (every other channel).
-- Each rule chooses: channels, which saved locations to include (zero or more), and "every day" or "only when
+- Each rule chooses: channels, send time (UTC), which saved locations to include (zero or more), and "every day" or "only when
   something is forecast".
 - Built from SPC's published outlook files, fetched at send time.
 
@@ -89,18 +89,24 @@ caches for about 2 minutes.
 
 ### Late or unavailable files
 
-The report is retried on each 15-minute scheduler tick from 13:30 until 14:30 UTC if the Day 1 file's `ISSUE_ISO`
-is not from today's 1300 UTC cycle, or a fetch fails. After 14:30 it sends with what it has and marks the missing
-part ("Day 1 outlook not yet available"). A day that cannot be fetched at all is still shown as missing, never as
-"no storms". This is my call.
+The report is always sent. From the chosen send time, each 15-minute scheduler tick retries while Day 1 is not
+current (see Freshness below) or a fetch fails; after 60 minutes it sends with what it has and marks the missing
+part ("Day 1 outlook not yet available"). A day that cannot be fetched at all is shown as missing, never as "no
+storms". Owner decision: a missing Day 1 never stops the report, including for "only when something is
+forecast": that setting then sends, because a missing Day 1 is not known to be quiet. The 60 minute grace is my
+call.
 
 ## Rule behaviour
 
 - A new SPC & WPC option, not a product-triggered rule: it fires on the clock, like Daily Summary and Threshold
   rules, not on an incoming bulletin. It reuses `alerts:dispatch-scheduled`'s once-a-day stamp
-  (`last_scheduled_run_on`), but the day boundary and time are UTC and fixed, not the rule's own timezone, and it
+  (`last_scheduled_run_on`), but the send time and the day boundary are UTC, not the rule's own timezone, and it
   needs no `location_id` (it has a set of chosen locations, possibly empty).
-- Per rule: `message_body_style` (Brief/Full), "send" mode (`every_day` or `only_when_forecast`), and the chosen
+- Send time: chosen in UTC (a time field labelled UTC, default 14:30), 15-minute granularity because the scheduler
+  ticks every 15 minutes. My call: UTC, not local time, so the time does not drift with daylight saving; the form
+  shows the local equivalent as a hint. A rule edited to a time still ahead today runs again today, as
+  `AlertRule`'s existing `delivery_time` change handling does.
+- Per rule: `message_body_style` (Brief/Full), send time, "send" mode (`every_day` or `only_when_forecast`), and the chosen
   locations.
 - "Only when something is forecast": any Marginal or higher category on Days 1-3, or a 15% or higher area on
   Days 4-8, anywhere in the US. Checked after the files are fetched; a quiet day is a final answer for the day.
@@ -129,16 +135,17 @@ part ("Day 1 outlook not yet available"). A day that cannot be fetched at all is
 - The report payload shape and presenter, the email view, and the Brief/Full text.
 - Timeouts, retries and caching of the fetched files; the choice of graphic sizes.
 - Exact "active PWO" query.
-- Test strategy for the 13:30-14:30 window.
+- Test strategy for the send-time window and the 60 minute grace.
 
 ## Calls made after the builder check (mine, to be reviewed)
 
 - **Which channels get Full.** Same rule the Daily Summary uses: only a channel that supports rich content (email)
   gets the Full report with graphics; every other channel gets the Brief text, as do SMS, voice and mobile.
   So "Full" in practice means the rich email. A plain-text Full for chat channels is a later option.
-- **Freshness.** Only Day 1 is waited for (the 1300 UTC update is what the 13:30 time exists for). Days 2, 3 and
-  4-8 are accepted as fetched. Day 1 is "current" when its features' `ISSUE_ISO` is from today's 1300 UTC cycle or
-  later; when Day 1 has no features (a valid quiet day), the HTTP `Last-Modified` header of the file is the
+- **Freshness.** Only Day 1 is waited for (the 1300 UTC update is what the 14:30 default exists for). Days 2, 3 and
+  4-8 are accepted as fetched. Day 1 is "current" when its features' `ISSUE_ISO` is from the latest SPC Day 1 cycle that was due at
+  least 15 minutes before the send time (the 1300 UTC cycle for the 14:30 default; an earlier cycle for an earlier
+  send time) or later; when Day 1 has no features (a valid quiet day), the HTTP `Last-Modified` header of the file is the
   freshness signal, falling back to the companion hail/wind/tornado files' `ISSUE_ISO`. If no signal can be read,
   treat the file as current, so a quiet day never retries for an hour.
 - **Brief ignores the chosen locations** (it shows only the US maximum per period).
@@ -148,7 +155,6 @@ part ("Day 1 outlook not yet available"). A day that cannot be fetched at all is
   point on an edge counts as inside. The PWO text is shown from the stored product text; the builder finds its
   product code in the catalog (`PWO`).
 
-## Open question for the owner
+## Open questions for the owner
 
-- At 14:30 UTC, when Day 1 is still unavailable and Days 2-8 are quiet, and the rule is set to "only when
-  something is forecast": send an "outlook unavailable" report, or skip?
+None outstanding.
