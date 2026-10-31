@@ -414,3 +414,58 @@ test('a hazard level whose file failed reads not available in the html and the t
         ->assertSeeInText('Home: 🟡 Slight — Hail 15% · Wind 30% · Tornado not available')
         ->assertSeeInText("DAY 3: 🟤 General thunderstorms\nAny severe not available");
 });
+
+test('a failed graphic is cached as a failure, so a second call asks SPC no more', function () {
+    Http::fake(['www.spc.noaa.gov/products/outlook/day1otlk_sm.png' => Http::response('', 503)]);
+
+    expect((new GetSpcOutlookGraphic)('day1'))->toBeNull()
+        ->and((new GetSpcOutlookGraphic)('day1'))->toBeNull();
+    Http::assertSentCount(1);
+});
+
+test('a second email of the same run reuses every graphic, failed ones included', function () {
+    Mail::fake();
+    Http::fake([
+        'www.spc.noaa.gov/products/outlook/day1otlk_sm.png' => Http::response('', 500),
+        'www.spc.noaa.gov/products/outlook/*' => Http::response(ORM_PNG, 200, ['Content-Type' => 'image/png']),
+        'www.spc.noaa.gov/products/exper/*' => Http::response(ORM_GIF, 200, ['Content-Type' => 'image/gif']),
+    ]);
+    $rule = AlertRule::factory()->outlookReport()->create();
+    $first = NotificationChannel::factory()->for($rule->user)->email('one@example.com')->create();
+    $second = NotificationChannel::factory()->for($rule->user)->email('two@example.com')->create();
+
+    (new DeliverScheduledAlert($rule->id, $first->id, ORM_SUBJECT, ORM_BRIEF, ormPayload()))->handle(app(ChannelDispatcher::class));
+    (new DeliverScheduledAlert($rule->id, $second->id, ORM_SUBJECT, ORM_BRIEF, ormPayload()))->handle(app(ChannelDispatcher::class));
+
+    Http::assertSentCount(4);
+    Mail::assertSent(OutlookReportMail::class, 2);
+});
+
+test('graphics of unavailable days are never requested', function () {
+    Mail::fake();
+    ormFakeGraphics();
+    $unavailableDay = ['available' => false, 'issued_at' => null, 'category' => null, 'hail' => null, 'wind' => null, 'tornado' => null, 'any_severe' => null, 'missing' => [], 'locations' => []];
+    $unavailableExtended = ['available' => false, 'probability' => null, 'category' => null, 'highlight' => false, 'locations' => []];
+    $payload = ormPayload(['extended' => array_fill(4, 5, $unavailableExtended)]);
+    $payload['days'][2] = $unavailableDay;
+    $rule = AlertRule::factory()->outlookReport()->create();
+    $channel = NotificationChannel::factory()->for($rule->user)->email()->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, ORM_SUBJECT, ORM_BRIEF, $payload))->handle(app(ChannelDispatcher::class));
+
+    Http::assertSentCount(2);
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'day2otlk') || str_contains($request->url(), 'day4-8'));
+    Mail::assertSent(OutlookReportMail::class, fn (OutlookReportMail $mail) => array_keys($mail->images) === ['day1', 'day2', 'day3', 'day48']
+        && $mail->images['day2'] === null && $mail->images['day48'] === null && $mail->images['day1'] !== null);
+});
+
+test('the graphics of a report are fetched together in one pool', function () {
+    ormFakeGraphics();
+
+    $graphics = (new GetSpcOutlookGraphic)->many(['day1', 'day2', 'day3', 'day48', 'unknown']);
+
+    expect(array_keys($graphics))->toBe(['day1', 'day2', 'day3', 'day48', 'unknown'])
+        ->and($graphics['day48'])->toBe(['bytes' => ORM_GIF, 'mime' => 'image/gif'])
+        ->and($graphics['unknown'])->toBeNull();
+    Http::assertSentCount(4);
+});

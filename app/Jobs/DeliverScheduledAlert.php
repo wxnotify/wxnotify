@@ -122,9 +122,7 @@ class DeliverScheduledAlert implements ShouldQueue
         if ($report !== null && $channelType?->supportsRichContent() === true && $isOutlookReport) {
             $meta['outlook_report'] = $report;
             // Fetched here, never queued: image bytes would bloat the queue payload (.ai/rules/jobs.md).
-            $meta['outlook_report_images'] = collect(['day1', 'day2', 'day3', 'day48'])
-                ->mapWithKeys(fn (string $key): array => [$key => app(GetSpcOutlookGraphic::class)($key)])
-                ->all();
+            $meta['outlook_report_images'] = $this->outlookGraphics($report);
         } elseif ($report !== null && $channelType?->supportsRichContent() === true) {
             $radarSite = $report['radar_site'] ?? null;
 
@@ -149,5 +147,27 @@ class DeliverScheduledAlert implements ShouldQueue
             'batch_key' => $batchKey,
             'dispatched_at' => now(),
         ]);
+    }
+
+    /**
+     * The SPC graphics of the outlook report, keyed day1, day2, day3 and day48: only those of available
+     * days are fetched (day48 when any of days 4-8 is available), all at once; the rest are null.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, array{bytes: string, mime: string}|null>
+     */
+    private function outlookGraphics(array $report): array
+    {
+        $isAvailable = fn (mixed $day): bool => is_array($day) && ($day['available'] ?? false) === true;
+        $wanted = [
+            'day1' => $isAvailable($report['days'][1] ?? null),
+            'day2' => $isAvailable($report['days'][2] ?? null),
+            'day3' => $isAvailable($report['days'][3] ?? null),
+            'day48' => collect($report['extended'] ?? [])->contains($isAvailable),
+        ];
+
+        $fetched = app(GetSpcOutlookGraphic::class)->many(array_keys(array_filter($wanted)));
+
+        return array_map(fn (string $key): ?array => $fetched[$key] ?? null, array_combine(array_keys($wanted), array_keys($wanted)));
     }
 }
