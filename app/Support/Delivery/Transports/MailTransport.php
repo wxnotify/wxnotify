@@ -5,6 +5,7 @@ namespace App\Support\Delivery\Transports;
 use App\Enums\Integration;
 use App\Mail\ChannelMessageMail;
 use App\Mail\DailySummaryMail;
+use App\Mail\OutlookReportMail;
 use App\Models\NotificationChannel;
 use App\Support\Delivery\DeliveryResult;
 use App\Support\Integrations;
@@ -45,7 +46,7 @@ class MailTransport implements Transport
     }
 
     /**
-     * The rich daily summary is rendered here, in its own guard, so a report
+     * The rich daily summary and outlook report are rendered here, in their own guard, so a report
      * that cannot be rendered degrades to the Brief text instead of failing the
      * delivery. The log is fixed text: an exception message can carry report data.
      *
@@ -53,6 +54,20 @@ class MailTransport implements Transport
      */
     private function mailable(NotificationChannel $channel, string $body, ?string $title, array $meta): Mailable
     {
+        $outlookReport = $meta['outlook_report'] ?? null;
+
+        if (is_array($outlookReport)) {
+            try {
+                $images = $meta['outlook_report_images'] ?? [];
+                $mail = new OutlookReportMail($title, $outlookReport, $body, is_array($images) ? $images : []);
+                $mail->render();
+
+                return $mail;
+            } catch (Throwable $e) {
+                logger()->warning('Outlook report email could not be rendered, sending the brief instead', ['notification_channel_id' => $channel->id, 'exception' => $e::class]);
+            }
+        }
+
         $summary = $meta['daily_summary'] ?? null;
 
         if (is_array($summary)) {

@@ -339,6 +339,7 @@ test('the batch key is written on success, failure and skipped rows', function (
 });
 
 test('an outlook report uses the passed-in subject and hands its report to a rich channel as outlook_report', function () {
+    Http::fake(['www.spc.noaa.gov/*' => Http::response('', 404)]);
     $rule = AlertRule::factory()->outlookReport()->create();
     $channel = NotificationChannel::factory()->for($rule->user)->email()->create();
     $report = ['days' => [], 'extended' => [], 'pwo' => null, 'something_forecast' => false, 'day1_missing' => false];

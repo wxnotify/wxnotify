@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Weather\GetRadarSnapshot;
+use App\Actions\Weather\GetSpcOutlookGraphic;
 use App\Actions\Weather\RenderAlertSubject;
 use App\Enums\AlertCategory;
 use App\Enums\ChannelTransport;
@@ -120,6 +121,10 @@ class DeliverScheduledAlert implements ShouldQueue
 
         if ($report !== null && $channelType?->supportsRichContent() === true && $isOutlookReport) {
             $meta['outlook_report'] = $report;
+            // Fetched here, never queued: image bytes would bloat the queue payload (.ai/rules/jobs.md).
+            $meta['outlook_report_images'] = collect(['day1', 'day2', 'day3', 'day48'])
+                ->mapWithKeys(fn (string $key): array => [$key => app(GetSpcOutlookGraphic::class)($key)])
+                ->all();
         } elseif ($report !== null && $channelType?->supportsRichContent() === true) {
             $radarSite = $report['radar_site'] ?? null;
 
