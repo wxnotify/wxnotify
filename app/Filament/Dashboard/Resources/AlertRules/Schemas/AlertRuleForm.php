@@ -2,6 +2,7 @@
 
 namespace App\Filament\Dashboard\Resources\AlertRules\Schemas;
 
+use App\Actions\Alerts\SaveAlertRule;
 use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Enums\AlertCategory;
 use App\Enums\MessageBodyStyle;
@@ -65,6 +66,14 @@ class AlertRuleForm
         ];
     }
 
+    /**
+     * The outlook report is a paid-tier feature: a Free subscriber sees it disabled.
+     */
+    private static function isPaidOnlyForUser(?AlertCategory $category): bool
+    {
+        return $category === AlertCategory::OutlookReport && auth()->user()->tier() === Tier::Free;
+    }
+
     protected static function categoryStep(): Step
     {
         return Step::make('Category')
@@ -72,7 +81,11 @@ class AlertRuleForm
                 Radio::make('category')
                     ->hiddenLabel()
                     ->options(collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [$c->value => $c->label()]))
-                    ->descriptions(collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [$c->value => $c->description()]))
+                    ->descriptions(fn (): array => collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [
+                        $c->value => self::isPaidOnlyForUser($c) ? $c->description().' '.SaveAlertRule::PAID_ONLY_MESSAGE : $c->description(),
+                    ])->all())
+                    // A disabled option is also refused on the server (Radio's `in` rule lists only enabled options).
+                    ->disableOptionWhen(fn (string $value): bool => self::isPaidOnlyForUser(AlertCategory::tryFrom($value)))
                     ->required()
                     ->live()
                     ->afterStateUpdated(function (Set $set, Get $get, ?AlertRule $record): void {
@@ -256,8 +269,10 @@ class AlertRuleForm
                     ->label('Message length')
                     ->options(collect(MessageBodyStyle::cases())->mapWithKeys(fn (MessageBodyStyle $s) => [$s->value => $s->label()]))
                     ->default(MessageBodyStyle::Full)
-                    ->visible(fn (Get $get): bool => auth()->user()->tier() !== Tier::Free
-                        && $get('category') !== AlertCategory::OutlookReport->value),
+                    ->helperText(fn (Get $get): ?string => $get('category') === AlertCategory::OutlookReport->value
+                        ? 'Brief sends the short circle summary to every channel; Full also sends the detailed email to email channels.'
+                        : null)
+                    ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free),
                 TextInput::make('custom_subject_template')
                     ->label('Custom subject line (optional)')
                     ->maxLength(255)

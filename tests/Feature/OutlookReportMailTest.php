@@ -1,12 +1,14 @@
 <?php
 
 use App\Actions\Weather\GetSpcOutlookGraphic;
+use App\Enums\Tier;
 use App\Jobs\DeliverScheduledAlert;
 use App\Mail\ChannelMessageMail;
 use App\Mail\OutlookReportMail;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
+use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\Transports\MailTransport;
 use Illuminate\Http\Client\ConnectionException;
@@ -480,3 +482,20 @@ test('bare carriage returns in a location label are collapsed outside the PWO te
         ->and($html)->not->toContain('<code>')
         ->and(ormVisible($html))->toContain('Home Side 🟡 Slight');
 });
+
+test('a Brief outlook report sends the plain brief to email and fetches no graphic, even with a report on the job', function (?array $report) {
+    Mail::fake();
+    Http::fake();
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $rule = AlertRule::factory()->outlookReport()->for($user)->create(['message_body_style' => 'brief']);
+    $channel = NotificationChannel::factory()->for($user)->email('subscriber@example.com')->create();
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, ORM_SUBJECT, ORM_BRIEF, $report))->handle(app(ChannelDispatcher::class));
+
+    Mail::assertSent(ChannelMessageMail::class, fn (ChannelMessageMail $mail) => $mail->messageBody === ORM_BRIEF);
+    Mail::assertNotSent(OutlookReportMail::class);
+    Http::assertNothingSent();
+})->with([
+    'no report' => [null],
+    'a report queued anyway' => [fn () => ormPayload()],
+]);

@@ -2,7 +2,9 @@
 
 use App\Actions\Weather\BuildOutlookReport;
 use App\Actions\Weather\FindActivePwo;
+use App\Enums\MessageBodyStyle;
 use App\Enums\OutlookReportMode;
+use App\Enums\Tier;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Models\IngestedProduct;
@@ -10,6 +12,7 @@ use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
+use Database\Factories\UserFactory;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -58,11 +61,19 @@ function dorFiles(array $day1Cat = ['TSTM', 'SLGT'], string $day1Issued = '2026-
 }
 
 /**
+ * A Plus-tier subscriber: the outlook report is a paid-tier feature.
+ */
+function dorPaid(): UserFactory
+{
+    return User::factory()->state(['tier_override' => Tier::Plus]);
+}
+
+/**
  * An active outlook report rule sending at 14:30 UTC to one channel, with one location inside the fixture area.
  */
 function dorRule(array $attributes = [], ?NotificationChannel $channel = null): AlertRule
 {
-    $user = $channel?->user ?? User::factory()->create();
+    $user = $channel?->user ?? dorPaid()->create();
     $location = Location::factory()->for($user)->create(['label' => 'Home', 'lat' => 35.9, 'lng' => -97.0]);
     $rule = AlertRule::factory()->outlookReport()->for($user)->locations($location)->create($attributes);
     $rule->notificationChannels()->attach($channel ?? NotificationChannel::factory()->for($user)->create());
@@ -172,7 +183,7 @@ test('a stale Day 1 after the grace hour is sent as fetched, not marked missing'
     Carbon::setTestNow('2026-10-31 15:31:00');
     Queue::fake([DeliverScheduledAlert::class]);
     Http::fake(dorFiles(day1Issued: '2026-10-31T06:00:00Z'));
-    $rule = dorRule([], NotificationChannel::factory()->for(User::factory())->email()->create());
+    $rule = dorRule([], NotificationChannel::factory()->for(dorPaid())->email()->create());
 
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
@@ -215,7 +226,7 @@ test('an unavailable Day 1 after the grace hour sends with day1_missing', functi
     Carbon::setTestNow('2026-10-31 15:31:00');
     Queue::fake([DeliverScheduledAlert::class]);
     Http::fake([DOR_BASE.'outlook/day1otlk_cat.nolyr.geojson' => Http::response('', 500)] + dorFiles());
-    dorRule([], NotificationChannel::factory()->for(User::factory())->email()->create());
+    dorRule([], NotificationChannel::factory()->for(dorPaid())->email()->create());
 
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
@@ -227,7 +238,7 @@ test('a failed Day 1 hail file holds the rule within the grace hour and sends it
     Carbon::setTestNow('2026-10-31 14:35:00');
     Queue::fake([DeliverScheduledAlert::class]);
     Http::fake([DOR_BASE.'outlook/day1otlk_hail.nolyr.geojson' => Http::response('', 503)] + dorFiles());
-    $rule = dorRule([], NotificationChannel::factory()->for(User::factory())->email()->create());
+    $rule = dorRule([], NotificationChannel::factory()->for(dorPaid())->email()->create());
 
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
@@ -293,7 +304,7 @@ test('a rule with a phone and an email channel passes the report to both jobs wi
     Carbon::setTestNow('2026-10-31 14:30:00');
     Queue::fake([DeliverScheduledAlert::class]);
     Http::fake(dorFiles());
-    $user = User::factory()->create();
+    $user = dorPaid()->create();
     $email = NotificationChannel::factory()->for($user)->email()->create();
     $phone = NotificationChannel::factory()->for($user)->mobilePush()->create();
     $rule = dorRule([], $email);
@@ -314,7 +325,7 @@ test('a rule with only non-rich channels gets no report', function () {
     Carbon::setTestNow('2026-10-31 14:30:00');
     Queue::fake([DeliverScheduledAlert::class]);
     Http::fake(dorFiles());
-    dorRule([], NotificationChannel::factory()->for(User::factory())->mobilePush()->create());
+    dorRule([], NotificationChannel::factory()->for(dorPaid())->mobilePush()->create());
 
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
@@ -353,7 +364,7 @@ test('a Moderate Day 1 carries the active PWO in the report', function () {
     Http::fake(dorFiles(day1Cat: ['MDT']));
     $pwo = Product::factory()->create(['code' => 'PWO', 'name' => 'SPC Public Severe Weather Outlook (Statewide)']);
     IngestedProduct::factory()->for($pwo)->create(['text' => 'Tornadoes are likely.', 'received_at' => '2026-10-31 10:00:00']);
-    dorRule([], NotificationChannel::factory()->for(User::factory())->email()->create());
+    dorRule([], NotificationChannel::factory()->for(dorPaid())->email()->create());
 
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
@@ -388,3 +399,62 @@ test('no PWO catalog product means no active PWO', function () {
 
     expect(app(FindActivePwo::class)('2026-10-31T13:00:00Z'))->toBeNull();
 });
+
+test('a rule whose owner is on the Free tier is skipped without fetching or stamping', function () {
+    Carbon::setTestNow('2026-10-31 14:30:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles());
+    $free = User::factory()->create(['tier_override' => null]);
+    $rule = dorRule([], NotificationChannel::factory()->for($free)->create());
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertNothingPushed();
+    Http::assertNothingSent();
+    expect($rule->fresh()->last_scheduled_run_on)->toBeNull();
+});
+
+test('a Free-owned rule does not stop a paid rule in the same run', function () {
+    Carbon::setTestNow('2026-10-31 14:30:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles());
+    $freeRule = dorRule([], NotificationChannel::factory()->for(User::factory())->create());
+    $paidRule = dorRule();
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, 1);
+    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->ruleId === $paidRule->id);
+    expect($freeRule->fresh()->last_scheduled_run_on)->toBeNull();
+});
+
+test('a Brief rule sends the brief to every channel with no report, even to email', function () {
+    Carbon::setTestNow('2026-10-31 14:30:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles());
+    $user = dorPaid()->create();
+    $email = NotificationChannel::factory()->for($user)->email()->create();
+    $phone = NotificationChannel::factory()->for($user)->mobilePush()->create();
+    $rule = dorRule(['message_body_style' => MessageBodyStyle::Brief], $email);
+    $rule->notificationChannels()->attach($phone);
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    $jobs = Queue::pushed(DeliverScheduledAlert::class);
+    expect($jobs)->toHaveCount(2)
+        ->and($jobs->every(fn (DeliverScheduledAlert $job): bool => $job->report === null && $job->body === 'D1 🟡  D2 ⚪  D3 ⚪  D4-8 ⚪'))->toBeTrue();
+});
+
+test('a Full or unset rule still gives an email channel the report', function (?MessageBodyStyle $style) {
+    Carbon::setTestNow('2026-10-31 14:30:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles());
+    dorRule(['message_body_style' => $style], NotificationChannel::factory()->for(dorPaid())->email()->create());
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->report !== null);
+})->with([
+    'full' => [MessageBodyStyle::Full],
+    'unset' => [null],
+]);

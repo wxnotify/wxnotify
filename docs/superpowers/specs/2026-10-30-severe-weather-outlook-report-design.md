@@ -15,7 +15,8 @@ It is a new option under SPC & WPC Alerts: "Severe Weather Outlook Report".
 ## Goals
 
 - One daily report per rule per channel, at a time the subscriber chooses (default 14:30 UTC).
-- Two lengths, as other rules have: Brief (the mobile channel) and Full (every other channel).
+- Two lengths, as other rules have, chosen by the rule's Message length: Brief (the short summary on every
+  channel) and Full (the rich email on email channels, the Brief elsewhere).
 - Each rule chooses: channels, send time (UTC), which saved locations to include (zero or more), and "every day" or "only when
   something is forecast".
 - Built from SPC's published outlook files, fetched at send time.
@@ -122,8 +123,11 @@ call.
 - Pest feature tests, fakes for HTTP (`Http::fake`), no real network in tests.
 - No new composer dependencies without approval (point-in-polygon, if not already available, is written
   in-project; the app already does point-in-polygon for rule matching, so reuse it).
-- Tier/plan: no new gate. My call: the same limits as other rules and channels (channel `min_tier`, the
-  rule-count limits already enforced).
+- Tier/plan (owner decision): paid tiers only (Plus and Pro). The dashboard shows the category disabled for a
+  Free subscriber ("Available on paid plans."), `SaveAlertRule` refuses creating or saving one for a Free
+  subscriber, and a rule kept after its owner moves to Free sends nothing (the dispatch command skips it with no
+  fetch and no stamp). The API still refuses the category. Channel `min_tier` and rule-count limits apply as
+  before.
 - The mobile app (separate repo `wxnotify-mobile`) needs no change if the existing no-product alert rendering is
   enough for a Brief message; the builder confirms.
 
@@ -139,9 +143,11 @@ call.
 
 ## Calls made after the builder check (mine, to be reviewed)
 
-- **Which channels get Full.** Same rule the Daily Summary uses: only a channel that supports rich content (email)
-  gets the Full report with graphics; every other channel gets the Brief text, as do SMS, voice and mobile.
-  So "Full" in practice means the rich email. A plain-text Full for chat channels is a later option.
+- **Which channels get Full** (owner decision). The rule's Message length controls it. Brief: every channel,
+  email included, gets the Brief text (no report is built for the jobs and no graphics are fetched). Full or
+  unset: only a channel that supports rich content (email) gets the Full report with graphics; every other
+  channel gets the Brief text, as do SMS, voice and mobile. So "Full" in practice means the rich email. A
+  plain-text Full for chat channels is a later option.
 - **Freshness.** Only Day 1 is waited for (the 1300 UTC update is what the 14:30 default exists for). Days 2, 3 and
   4-8 are accepted as fetched. Day 1 is "current" when its features' `ISSUE_ISO` is from the latest SPC Day 1 cycle that was due at
   least 15 minutes before the send time (the 1300 UTC cycle for the 14:30 default; an earlier cycle for an earlier

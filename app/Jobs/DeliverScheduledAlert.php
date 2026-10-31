@@ -119,10 +119,13 @@ class DeliverScheduledAlert implements ShouldQueue
         // exactly once here and never dereferenced again.
         $report = $this->report ?? null;
 
-        if ($report !== null && $channelType?->supportsRichContent() === true && $isOutlookReport) {
-            $meta['outlook_report'] = $report;
-            // Fetched here, never queued: image bytes would bloat the queue payload (.ai/rules/jobs.md).
-            $meta['outlook_report_images'] = $this->outlookGraphics($report);
+        if ($isOutlookReport) {
+            // A Brief outlook report is the Brief everywhere, even for a job that still carries a report.
+            if ($report !== null && $channelType?->supportsRichContent() === true && $rule->effectiveMessageBodyStyle() !== MessageBodyStyle::Brief) {
+                $meta['outlook_report'] = $report;
+                // Fetched here, never queued: image bytes would bloat the queue payload (.ai/rules/jobs.md).
+                $meta['outlook_report_images'] = $this->outlookGraphics($report);
+            }
         } elseif ($report !== null && $channelType?->supportsRichContent() === true) {
             $radarSite = $report['radar_site'] ?? null;
 

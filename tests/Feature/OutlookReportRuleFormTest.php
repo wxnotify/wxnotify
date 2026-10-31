@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\MessageBodyStyle;
 use App\Enums\OutlookReportMode;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
@@ -16,7 +17,7 @@ use function Pest\Livewire\livewire;
 beforeEach(function () {
     $this->seed(ProductCatalogSeeder::class);
 
-    $this->user = User::factory()->create();
+    $this->user = User::factory()->create(['tier_override' => Tier::Plus]);
     $this->actingAs($this->user);
     $this->location = Location::factory()->for($this->user)->create(['label' => 'Home']);
     $this->channel = NotificationChannel::factory()->for($this->user)->create();
@@ -107,12 +108,46 @@ test('editing an outlook report loads and saves a changed time, mode and locatio
         ->and($rule->locations->pluck('id')->all())->toBe([$second->id]);
 });
 
-test('the message length field is not offered for an outlook report', function () {
-    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+test('a paid subscriber gets the message length field for an outlook report, with the report\'s own help', function () {
+    livewire(CreateAlertRule::class)
+        ->set('data.category', 'outlook_report')
+        ->assertFormFieldIsVisible('message_body_style')
+        ->assertSee('Brief sends the short circle summary to every channel; Full also sends the detailed email to email channels.');
+});
+
+test('an outlook report saved as Brief stores Brief', function () {
+    livewire(CreateAlertRule::class)
+        ->set('data.category', 'outlook_report')
+        ->fillForm(['message_body_style' => 'brief', 'channel_ids' => [$this->channel->id]])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(AlertRule::where('user_id', $this->user->id)->sole()->effectiveMessageBodyStyle())->toBe(MessageBodyStyle::Brief);
+});
+
+test('a Free subscriber sees the outlook report as a paid feature and cannot create one', function () {
+    $this->user->forceFill(['tier_override' => null])->save();
+
+    livewire(CreateAlertRule::class)
+        ->assertSee('Available on paid plans.')
+        ->set('data.category', 'outlook_report')
+        ->fillForm(['channel_ids' => [$this->channel->id]])
+        ->call('create')
+        ->assertHasFormErrors(['category' => 'in']);
+
+    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+});
+
+test('a Pro subscriber can create an outlook report', function () {
+    $this->user->forceFill(['tier_override' => Tier::Pro])->save();
 
     livewire(CreateAlertRule::class)
         ->set('data.category', 'outlook_report')
-        ->assertFormFieldIsHidden('message_body_style');
+        ->fillForm(['channel_ids' => [$this->channel->id]])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(AlertRule::where('user_id', $this->user->id)->sole()->category->value)->toBe('outlook_report');
 });
 
 test('a send time after 22:45 UTC is refused and 22:45 is accepted', function (string $time, bool $accepted) {

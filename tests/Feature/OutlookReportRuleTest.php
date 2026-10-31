@@ -4,6 +4,7 @@ use App\Actions\Alerts\SaveAlertRule;
 use App\Actions\Weather\RenderAlertSubject;
 use App\Enums\AlertCategory;
 use App\Enums\OutlookReportMode;
+use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Models\AlertRule;
 use App\Models\Location;
@@ -14,6 +15,7 @@ use Database\Seeders\ProductCatalogSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 use function Pest\Livewire\livewire;
 
@@ -85,7 +87,7 @@ test('every category renders in the alerts table and the subject renderer', func
 })->with(fn () => AlertCategory::cases());
 
 test('saving an outlook report stores the time and mode and only the owner\'s locations', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $mine = Location::factory()->for($user)->create();
     $theirs = Location::factory()->create();
     $channel = NotificationChannel::factory()->for($user)->create();
@@ -108,7 +110,7 @@ test('saving an outlook report stores the time and mode and only the owner\'s lo
 });
 
 test('switching an outlook report to another category clears its mode and locations', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $location = Location::factory()->for($user)->create();
     $channel = NotificationChannel::factory()->for($user)->create();
     $rule = (new SaveAlertRule)($user, [
@@ -181,7 +183,7 @@ test('the API refuses a PUT that makes a rule an outlook report, and can move on
 
 test('switching a product rule to an outlook report drops its products and keeps only the owner\'s locations', function () {
     $this->seed(ProductCatalogSeeder::class);
-    $user = User::factory()->create();
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $mine = Location::factory()->for($user)->create();
     $theirs = Location::factory()->create();
     $channel = NotificationChannel::factory()->for($user)->create();
@@ -207,3 +209,25 @@ test('switching a product rule to an outlook report drops its products and keeps
         ->and($rule->outlookSendTime())->toBe('09:15')
         ->and($rule->locations->pluck('id')->all())->toBe([$mine->id]);
 });
+
+test('SaveAlertRule refuses an outlook report for a Free subscriber, creating or saving', function () {
+    $user = User::factory()->create(['tier_override' => null]);
+    $channel = NotificationChannel::factory()->for($user)->create();
+    $input = ['category' => 'outlook_report', 'delivery_time' => '14:30', 'report_mode' => 'every_day', 'channel_ids' => [$channel->id]];
+
+    expect(fn () => (new SaveAlertRule)($user, $input))->toThrow(ValidationException::class, 'Available on paid plans.');
+    expect(AlertRule::count())->toBe(0);
+
+    $stored = AlertRule::factory()->outlookReport()->for($user)->create();
+    expect(fn () => (new SaveAlertRule)($user, ['name' => 'Renamed'], $stored))->toThrow(ValidationException::class);
+    expect($stored->fresh()->name)->not->toBe('Renamed');
+});
+
+test('SaveAlertRule saves an outlook report for Plus and Pro subscribers', function (Tier $tier) {
+    $user = User::factory()->create(['tier_override' => $tier]);
+    $channel = NotificationChannel::factory()->for($user)->create();
+
+    $rule = (new SaveAlertRule)($user, ['category' => 'outlook_report', 'delivery_time' => '14:30', 'report_mode' => 'every_day', 'channel_ids' => [$channel->id]]);
+
+    expect($rule->category)->toBe(AlertCategory::OutlookReport);
+})->with([Tier::Plus, Tier::Pro]);

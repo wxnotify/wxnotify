@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Tier;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\Location;
@@ -78,7 +79,7 @@ function ombFakeSpc(): void
 function ombSend(array $channelConfig = []): array
 {
     ombFakeSpc();
-    $user = User::factory()->create();
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $channel = NotificationChannel::factory()->for($user)->mobilePush('device-token-1')->create();
 
     if ($channelConfig !== []) {

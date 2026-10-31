@@ -309,7 +309,7 @@ test('the API stores product_settings exactly as it stores the flat input that e
 ]);
 
 test('saving an outlook report persists its own columns and clears every other category column', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
     $location = Location::factory()->for($user)->create();
     $channel = NotificationChannel::factory()->for($user)->create();
 

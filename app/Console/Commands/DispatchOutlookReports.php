@@ -6,7 +6,9 @@ use App\Actions\Weather\BuildOutlookReport;
 use App\Actions\Weather\FetchSpcOutlooks;
 use App\Actions\Weather\FindActivePwo;
 use App\Enums\AlertCategory;
+use App\Enums\MessageBodyStyle;
 use App\Enums\OutlookReportMode;
+use App\Enums\Tier;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Models\IngestedProduct;
@@ -23,7 +25,9 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Sends the daily Severe Weather Outlook Report. Runs every 15 minutes (see bootstrap/app.php); each
+ * Sends the daily Severe Weather Outlook Report, a paid-tier feature: rules of Free owners are skipped
+ * (no fetch, no stamp). A Brief rule sends the Brief to every channel; otherwise rich channels also
+ * get the Full report. Runs every 15 minutes (see bootstrap/app.php); each
  * rule sends at most once per UTC day at or after its UTC send time, tracked by last_scheduled_run_on.
  *
  * SPC is asked once per run, only when a rule is due, and the result is shared by every due rule.
@@ -53,10 +57,11 @@ class DispatchOutlookReports extends Command
             ->where('category', AlertCategory::OutlookReport)
             ->whereNotNull('delivery_time')
             ->where(fn (Builder $query) => $query->whereNull('last_scheduled_run_on')->orWhere('last_scheduled_run_on', '<', $now->toDateString()))
-            ->with(['locations', 'notificationChannels'])
+            ->with(['user', 'locations', 'notificationChannels'])
             ->orderBy('id')
             ->get()
-            ->filter(fn (AlertRule $rule): bool => $now->gte($this->sendTime($rule, $now)));
+            // Paid-only: a rule kept after its owner moved to Free stays, unstamped, and sends nothing.
+            ->filter(fn (AlertRule $rule): bool => $rule->user->tier() !== Tier::Free && $now->gte($this->sendTime($rule, $now)));
 
         if ($rules->isEmpty()) {
             $this->info('No outlook reports due.');
@@ -102,7 +107,7 @@ class DispatchOutlookReports extends Command
 
         $title = OutlookReportText::subject($payload);
         $body = OutlookReportText::brief($payload);
-        $report = $this->hasRichChannel($rule) ? $payload : null;
+        $report = $this->wantsFullReport($rule) ? $payload : null;
         $batchKey = (string) Str::uuid();
 
         return DB::transaction(function () use ($rule, $now, $sendNothing, $title, $body, $report, $batchKey): int {
@@ -125,8 +130,16 @@ class DispatchOutlookReports extends Command
         return $now->copy()->setTimeFromTimeString($rule->outlookSendTime());
     }
 
-    private function hasRichChannel(AlertRule $rule): bool
+    /**
+     * The Full report goes only to a rule that is not Brief (Full or unset) and has a channel that can
+     * render it; a Brief rule sends the Brief text to every channel, email included.
+     */
+    private function wantsFullReport(AlertRule $rule): bool
     {
+        if ($rule->effectiveMessageBodyStyle() === MessageBodyStyle::Brief) {
+            return false;
+        }
+
         $registry = app(ChannelTypeRegistry::class);
 
         return $rule->notificationChannels->contains(fn (NotificationChannel $channel): bool => $registry->find($channel->channel_type)?->supportsRichContent() === true);

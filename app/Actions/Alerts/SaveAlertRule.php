@@ -14,6 +14,7 @@ use App\Support\SpcWpcRiskLevels;
 use App\Support\Units;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Spatie\Activitylog\Support\CauserResolver;
 
 /**
@@ -33,11 +34,15 @@ use Spatie\Activitylog\Support\CauserResolver;
  * limited to the levels that product offers; the rule's own `risk_levels` holds their union for
  * older readers. An outlook report keeps its `delivery_time`, `report_mode` and an owner-scoped
  * `alert_rule_location` pivot from `location_ids`; every other category clears `report_mode` and
- * that pivot. A stored product-based rule saved with neither key keeps its products, their
- * settings and its product-based columns as stored.
+ * that pivot. An outlook report is paid-only: creating or saving one for a Free subscriber throws a
+ * ValidationException on `category`. A stored product-based rule saved with neither key keeps its
+ * products, their settings and its product-based columns as stored.
  */
 class SaveAlertRule
 {
+    /** Why a Free subscriber cannot choose a paid-only category (the outlook report); the form shows it too. */
+    public const PAID_ONLY_MESSAGE = 'Available on paid plans.';
+
     /** The category-specific columns each category owns; every other one is cleared on save. */
     private const CATEGORY_COLUMNS = [
         'weather_alerts' => [],
@@ -85,6 +90,11 @@ class SaveAlertRule
     public function attributes(User $user, array $data, ?AlertRule $stored = null): array
     {
         $category = AlertCategory::from((string) ($data['category'] ?? $stored?->category?->value));
+
+        if ($category === AlertCategory::OutlookReport && $user->tier() === Tier::Free) {
+            throw ValidationException::withMessages(['category' => self::PAID_ONLY_MESSAGE]);
+        }
+
         $owned = self::CATEGORY_COLUMNS[$category->value];
         $keepsProducts = $stored !== null && self::usesProducts($stored->category) && $this->keepsProducts($category, $data);
 
