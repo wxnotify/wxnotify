@@ -1,8 +1,9 @@
 ---
 paths:
   - 'app/Actions/Pipeline/**'
-  - 'app/Actions/Weather/MatchWeatherAlertRules.php'
-  - 'app/Observers/IngestedProductObserver.php'
+  - app/Actions/Weather/MatchWeatherAlertRules.php
+  - app/Observers/IngestedProductObserver.php
+  - 'app/Actions/Weather/**'
 ---
 
 # Pipeline
@@ -36,3 +37,6 @@ SPC publishes the Day 1 Convective Outlook as `swody1` (text) and `ptsdy1` (area
 
 ## SPC pairing no longer assumes one FIFO queue
 With the `deliveries` priority queue, swody1's first delivery can run before ptsdy1's ProcessIngestedProduct; the backfill re-match then finds the DeliveryLog row (dispatchOrSuppress guard) instead of the unique lock. Both orders deliver once (OutlookPairingDelayTest). Delivery content never reads risk areas, so sending earlier changes nothing.
+
+## The outlook report fetches SPC files at send time; a failed layer is never "none"
+`FetchSpcOutlooks` returns day_1..day_8 from SPC's public GeoJSON (days 1-3 under /products/outlook, days 4-8 under /products/exper/day4-8); a null day or a failed layer is "unavailable", an EMPTY layer is a valid quiet day. A result with any failed layer is never cached (complete results cache 2 min). `Day1OutlookFreshness` holds the report only until send time + 60 min (cat/torn/hail/wind must all exist); after that it sends with "not available" markers, and a missing Day 1 always sends (even for only_when_forecast). `BuildOutlookReport` payload is plain data (per-day `missing` list for absent hazard layers); never add models/Carbon. Locations are tested in PostGIS (`LocationsInOutlookAreas`: ST_MakeValid + ST_Intersects, one query per geometry, QueryException logged by class + SQLSTATE only). Graphics (`GetSpcOutlookGraphic`, keys day1/day2/day3/day48 only) are fetched in one pool inside `DeliverScheduledAlert::handle()`, failures cached 2 min as a sentinel, never on the queue.

@@ -9,6 +9,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | routes/api.php, app/Http/Controllers/Api/**, app/Http/Resources/** | .ai/rules/api.md |
 | app/Jobs/DeliverWeatherAlert.php, app/Jobs/** | .ai/rules/app-jobs.md |
 | app/Support/ChannelTypes/** | .ai/rules/channel-types.md |
+| app/Console/Commands/** | .ai/rules/commands.md |
 | app/Support/Delivery/** | .ai/rules/delivery.md |
 | docker/emwin-byteblaster/** | .ai/rules/emwin-byteblaster.md |
 | docker/emwin-http/** | .ai/rules/emwin-http.md |
@@ -17,5 +18,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Jobs/DeliverWeatherAlert.php, app/Jobs/DeliverScheduledAlert.php | .ai/rules/jobs.md |
 | app/Models/**, app/Models/Product.php, app/Models/ActiveWwa.php | .ai/rules/models.md |
 | app/Filament/Admin/Pages/** | .ai/rules/pages.md |
-| app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php | .ai/rules/pipeline.md |
+| app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php, app/Actions/Weather/** | .ai/rules/pipeline.md |
 | app/Support/**, app/Support/Integrations.php, app/Support/PhoneNumber.php | .ai/rules/support.md |
