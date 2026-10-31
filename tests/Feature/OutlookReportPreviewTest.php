@@ -3,9 +3,12 @@
 use App\Actions\Weather\FetchSpcOutlooks;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
+use App\Filament\Dashboard\Resources\AlertRules\Pages\EditAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\OutlookReportPreview;
+use App\Models\AlertRule;
 use App\Models\IngestedProduct;
 use App\Models\Location;
+use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\ProductCatalogSeeder;
@@ -149,4 +152,70 @@ test('an error while building the preview shows the friendly message and logs on
         ->assertSee('SPC is unavailable right now');
 
     Log::shouldHaveReceived('warning')->with('Outlook report preview failed', ['exception' => RuntimeException::class])->once();
+});
+
+test('a Free subscriber\'s preview never asks SPC and says the report is a paid feature', function () {
+    Http::fake(orpFiles());
+    $this->user->forceFill(['tier_override' => null])->save();
+
+    livewire(OutlookReportPreview::class)
+        ->call('load', [(string) $this->home->id])
+        ->assertSeeText('Available on paid plans.')
+        ->assertDontSeeText('Day 1 -');
+
+    Http::assertNothingSent();
+});
+
+test('a downgraded owner editing a kept outlook report gets no preview section and no SPC request', function () {
+    $this->seed(ProductCatalogSeeder::class);
+    Http::fake(orpFiles());
+    $rule = AlertRule::factory()->outlookReport()->for($this->user)->create();
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($this->user)->create());
+    $this->user->forceFill(['tier_override' => null])->save();
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertSchemaComponentHidden('outlookReportPreview');
+
+    Http::assertNothingSent();
+});
+
+test('a paid owner editing an outlook report gets the preview section', function () {
+    $this->seed(ProductCatalogSeeder::class);
+    Http::fake(orpFiles());
+    $rule = AlertRule::factory()->outlookReport()->for($this->user)->create();
+    $rule->notificationChannels()->attach(NotificationChannel::factory()->for($this->user)->create());
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertSchemaComponentVisible('outlookReportPreview');
+
+    Http::assertNothingSent();
+});
+
+test('during an SPC outage the preview asks SPC at most once a minute, for every subscriber', function () {
+    Carbon::setTestNow('2026-10-31 20:00:00 UTC');
+    Http::fake(['www.spc.noaa.gov/*' => Http::response('', 500)]);
+    $other = User::factory()->create(['tier_override' => Tier::Plus]);
+
+    livewire(OutlookReportPreview::class)
+        ->call('load', [])
+        ->call('load', [(string) $this->home->id])
+        ->assertSeeText('SPC is unavailable right now');
+    $this->actingAs($other);
+    livewire(OutlookReportPreview::class)
+        ->call('load', [])
+        ->assertSeeText('SPC is unavailable right now');
+    Http::assertSentCount(15);
+
+    Carbon::setTestNow('2026-10-31 20:01:01 UTC');
+    livewire(OutlookReportPreview::class)->call('load', []);
+    Http::assertSentCount(30);
+});
+
+test('the preview\'s SPC images and links send no referrer', function () {
+    Http::fake(orpFiles());
+
+    livewire(OutlookReportPreview::class)
+        ->call('load', [])
+        ->assertSee('<img src="https://www.spc.noaa.gov/products/outlook/day1otlk.png" alt="SPC Day 1 convective outlook" width="380" referrerpolicy="no-referrer"', escape: false)
+        ->assertSee('<a href="https://www.spc.noaa.gov/products/outlook/day1otlk.html" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">', escape: false);
 });

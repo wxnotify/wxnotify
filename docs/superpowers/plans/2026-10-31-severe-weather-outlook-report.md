@@ -12,6 +12,7 @@
 
 ## Global Constraints
 
+- Later change (2026-10-31, owner decision): the send time became the owner's LOCAL time (profile timezone, else UTC), no longer UTC; see the design spec's Rule behaviour section.
 - Follow `.ai/rules/index.md`: read the rule files matching each path you touch before editing (actions, alerts, app-jobs/jobs, models, filament, pages, pipeline, support, delivery, api, feature).
 - Pest feature tests; `Http::fake()` for every SPC call (no real network); fakes never mocked inline when a factory/state exists. Run tests in Docker: `docker exec wxnotify-nextgen-front-end-1 bash -c 'cd /var/www/html && DB_HOST=pgsql vendor/bin/pest --compact <paths>'`.
 - Run `vendor/bin/pint --format agent` on touched PHP files before each commit.

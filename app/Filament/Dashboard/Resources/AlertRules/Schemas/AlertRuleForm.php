@@ -462,8 +462,10 @@ class AlertRuleForm
     {
         return [
             // Collapsed, and the preview asks SPC nothing until it is opened (see OutlookReportPreview).
+            // Paid-only like the report itself; the widget refuses a Free subscriber on its own too.
             Section::make('Today\'s Report')
                 ->key('outlookReportPreview')
+                ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free)
                 ->description('What the Full report would look like right now, for the locations ticked below.')
                 ->collapsed()
                 ->schema([
@@ -497,13 +499,12 @@ class AlertRuleForm
 
     /**
      * The send time's help: its UTC equivalent today (or that times are UTC without a profile
-     * timezone), SPC's Day 1 issue times in UTC and the subscriber's time, the 60 minute wait and
-     * the 22:45 cap.
+     * timezone), SPC's Day 1 issue times in the subscriber's time (sorted by local clock, with UTC),
+     * the 60 minute wait and the 22:45 cap.
      */
     public static function outlookSendTimeHelp(?string $time): string
     {
         $timezone = Timezones::forUser(auth()->user());
-        $cycles = ['01:00', '06:00', '13:00', '16:30', '20:00'];
         $sentences = [];
 
         if ($timezone === null) {
@@ -511,14 +512,36 @@ class AlertRuleForm
             $sentences[] = 'SPC issues Day 1 outlooks at 0100, 0600, 1300, 1630 and 2000 UTC.';
         } else {
             $sentences[] = self::utcSendTimeHint($time, $timezone);
-            $local = array_map(fn (string $cycle): string => Carbon::now('UTC')->setTimeFromTimeString($cycle)->setTimezone($timezone)->format('g:i A'), $cycles);
-            $sentences[] = 'SPC issues Day 1 outlooks at 0100, 0600, 1300, 1630 and 2000 UTC ('.Arr::join($local, ', ', ' and ').' your time).';
+            $sentences[] = 'SPC issues Day 1 outlooks at '.Arr::join(self::localDay1Cycles($timezone), ', ', ' and ').' your time.';
         }
 
         $sentences[] = 'The report waits up to 60 minutes after your send time for the latest Day 1 outlook, then sends what it has.';
         $sentences[] = 'The latest send time is 22:45, so that wait ends before midnight '.($timezone === null ? 'UTC.' : 'your time.');
 
         return implode(' ', array_filter($sentences));
+    }
+
+    /**
+     * SPC's Day 1 issue times (today's UTC cycles) in the subscriber's time, sorted by local clock time,
+     * each with its UTC time, e.g. "7:00 AM (1300 UTC)"; one that falls on the local day before its UTC
+     * day (0100 UTC is the previous evening in the Americas) says "the evening before".
+     *
+     * @return list<string>
+     */
+    private static function localDay1Cycles(string $timezone): array
+    {
+        return collect(['01:00', '06:00', '13:00', '16:30', '20:00'])
+            ->map(function (string $cycle) use ($timezone): array {
+                $utc = Carbon::now('UTC')->setTimeFromTimeString($cycle);
+                $local = $utc->copy()->setTimezone($timezone);
+                $before = $local->toDateString() < $utc->toDateString() ? ' the evening before' : '';
+
+                return ['sort' => $local->format('H:i'), 'text' => $local->format('g:i A').$before.' ('.$utc->format('Hi').' UTC)'];
+            })
+            ->sortBy('sort')
+            ->pluck('text')
+            ->values()
+            ->all();
     }
 
     /**

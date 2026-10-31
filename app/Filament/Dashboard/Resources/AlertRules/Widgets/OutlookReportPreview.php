@@ -2,16 +2,19 @@
 
 namespace App\Filament\Dashboard\Resources\AlertRules\Widgets;
 
+use App\Actions\Alerts\SaveAlertRule;
 use App\Actions\Weather\BuildOutlookReport;
 use App\Actions\Weather\FetchSpcOutlooks;
 use App\Actions\Weather\FindActivePwo;
 use App\Actions\Weather\GetSpcOutlookGraphic;
+use App\Enums\Tier;
 use App\Models\IngestedProduct;
 use App\Support\OutlookReportPresenter;
 use App\Support\Timezones;
 use Filament\Widgets\Widget;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -23,6 +26,12 @@ use Throwable;
  * with the newly ticked locations while the section is open. FetchSpcOutlooks caches complete results
  * for 2 minutes. The ticked ids come from the browser, so only the signed-in subscriber's own locations
  * with a fix are used. A failure never throws: it shows a friendly message and logs the class only.
+ *
+ * Paid-only like the report: a Free subscriber (a downgraded owner, or a category set client-side)
+ * is never fetched for and sees SaveAlertRule::PAID_ONLY_MESSAGE; the form also hides the section.
+ * The fetched outlooks (complete or not) and a failure are memoised for 60 s for every preview, so
+ * an outage or a run of location ticks asks SPC at most once a minute; the dispatcher does not use
+ * this memo.
  */
 class OutlookReportPreview extends Widget
 {
@@ -31,6 +40,13 @@ class OutlookReportPreview extends Widget
     protected static bool $isLazy = false;
 
     protected static bool $isDiscovered = false;
+
+    private const MEMO_KEY = 'outlook-report-preview:outlooks';
+
+    private const MEMO_SECONDS = 60;
+
+    /** Memoised in place of a fetch that threw. */
+    private const FAILED = 'failed';
 
     /** Passed by Filament's Livewire schema component; the preview does not use it. */
     public ?Model $record = null;
@@ -58,6 +74,10 @@ class OutlookReportPreview extends Widget
             return ['status' => 'idle'];
         }
 
+        if (auth()->user()->tier() === Tier::Free) {
+            return ['status' => 'paid_only', 'message' => SaveAlertRule::PAID_ONLY_MESSAGE];
+        }
+
         try {
             return $this->report();
         } catch (Throwable $e) {
@@ -72,9 +92,9 @@ class OutlookReportPreview extends Widget
      */
     private function report(): array
     {
-        $outlooks = app(FetchSpcOutlooks::class)();
+        $outlooks = $this->outlooks();
 
-        if (array_filter($outlooks) === []) {
+        if ($outlooks === null || array_filter($outlooks) === []) {
             return ['status' => 'unavailable'];
         }
 
@@ -98,6 +118,38 @@ class OutlookReportPreview extends Widget
             'r' => OutlookReportPresenter::present($payload),
             'imageSrc' => GetSpcOutlookGraphic::urls(),
         ];
+    }
+
+    /**
+     * The SPC outlooks, memoised for every preview for 60 s; null when the fetch threw (the exception
+     * is logged by class once, when it happens).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function outlooks(): ?array
+    {
+        $memo = Cache::get(self::MEMO_KEY);
+
+        if (is_array($memo)) {
+            return $memo;
+        }
+
+        if ($memo === self::FAILED) {
+            return null;
+        }
+
+        try {
+            $outlooks = app(FetchSpcOutlooks::class)();
+        } catch (Throwable $e) {
+            Log::warning('Outlook report preview failed', ['exception' => $e::class]);
+            Cache::put(self::MEMO_KEY, self::FAILED, now()->addSeconds(self::MEMO_SECONDS));
+
+            return null;
+        }
+
+        Cache::put(self::MEMO_KEY, $outlooks, now()->addSeconds(self::MEMO_SECONDS));
+
+        return $outlooks;
     }
 
     private function activePwo(?string $day1IssuedAt): ?IngestedProduct

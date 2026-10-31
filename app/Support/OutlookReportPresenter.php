@@ -95,6 +95,8 @@ class OutlookReportPresenter
                 $lines[] = $day['date'];
             }
 
+            $lines[] = 'Outlook: '.$day['link'];
+
             if (! $day['available']) {
                 $lines[] = $day['unavailable'];
 
@@ -119,6 +121,8 @@ class OutlookReportPresenter
         if ($view['extended_dates'] !== null) {
             $lines[] = $view['extended_dates'];
         }
+
+        $lines[] = 'Outlook: '.$view['extended_link'];
 
         foreach ($view['extended'] as $day) {
             $inside = $day['inside'] !== null ? ' — '.$day['inside'] : '';

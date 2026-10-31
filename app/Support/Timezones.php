@@ -11,8 +11,9 @@ use IntlTimeZone;
 /**
  * The one place that decides what a stored timezone means. A Location's own
  * timezone always wins; a subscriber's profile timezone (users.timezone) is
- * only a fallback for a Location that has none (mobile locations) and for the
- * dashboard charts. A stored profile value counts only if it is a canonical
+ * a fallback for a Location that has none (mobile locations) and for the
+ * dashboard charts, and it is the timezone of a rule with no Location (the
+ * outlook report's send time and day, via forRule()/forUserOrDefault()). A stored profile value counts only if it is a canonical
  * IANA identifier (the same list the timezone select offers); anything else is
  * treated as unset, so a subscriber with no profile timezone resolves exactly
  * as the app did before the setting existed.

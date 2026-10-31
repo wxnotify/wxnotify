@@ -200,9 +200,19 @@ test('the send time help names SPC\'s Day 1 issue times in UTC and the subscribe
 
     livewire(CreateAlertRule::class)
         ->set('data.category', 'outlook_report')
-        ->assertSee('SPC issues Day 1 outlooks at 0100, 0600, 1300, 1630 and 2000 UTC (7:00 PM, 12:00 AM, 7:00 AM, 10:30 AM and 2:00 PM your time).')
+        ->assertSee('SPC issues Day 1 outlooks at 12:00 AM (0600 UTC), 7:00 AM (1300 UTC), 10:30 AM (1630 UTC), 2:00 PM (2000 UTC) and 7:00 PM the evening before (0100 UTC) your time.')
         ->assertSee('The report waits up to 60 minutes after your send time for the latest Day 1 outlook, then sends what it has.')
         ->assertSee('The latest send time is 22:45, so that wait ends before midnight your time.');
+});
+
+test('for an owner ahead of UTC the issue times are sorted by local clock time with none the evening before', function () {
+    Carbon::setTestNow('2026-10-31 12:00:00 UTC');
+    $this->user->update(['timezone' => 'Asia/Tokyo']);
+
+    livewire(CreateAlertRule::class)
+        ->set('data.category', 'outlook_report')
+        ->assertSee('SPC issues Day 1 outlooks at 1:30 AM (1630 UTC), 5:00 AM (2000 UTC), 10:00 AM (0100 UTC), 3:00 PM (0600 UTC) and 10:00 PM (1300 UTC) your time.')
+        ->assertDontSee('evening before');
 });
 
 test('without a profile timezone the send time help says times are in UTC', function () {
@@ -210,7 +220,8 @@ test('without a profile timezone the send time help says times are in UTC', func
         ->set('data.category', 'outlook_report')
         ->set('data.delivery_time', '14:30')
         ->assertSee('Times are in UTC until you set a timezone in your profile.')
-        ->assertDontSee('your time).')
+        ->assertSee('SPC issues Day 1 outlooks at 0100, 0600, 1300, 1630 and 2000 UTC.')
+        ->assertDontSee('UTC) your time')
         ->assertSee('The latest send time is 22:45, so that wait ends before midnight UTC.');
 });
 

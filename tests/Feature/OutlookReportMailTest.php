@@ -206,10 +206,10 @@ test('the plain text alternative carries the same facts without html', function 
     $mail = new OutlookReportMail(ORM_SUBJECT, ormPayload(['pwo' => ['title' => 'Public Severe Weather Outlook', 'text' => 'PWO <TEXT> & more', 'issued_at' => '2026-10-31T12:51:00+00:00']]), ORM_BRIEF, ormImages());
 
     $mail->assertSeeInText('WxNotify Test')
-        ->assertSeeInText("DAY 1 - 🟡 Slight\nOctober 31, 2026\nHail 15% · Wind 30% · Tornado 5%")
+        ->assertSeeInText("DAY 1 - 🟡 Slight\nOctober 31, 2026\nOutlook: https://www.spc.noaa.gov/products/outlook/day1otlk.html\nHail 15% · Wind 30% · Tornado 5%")
         ->assertSeeInText('Home: 🟡 Slight — Hail 15% · Wind 30% · Tornado 2%')
         ->assertSeeInText('Honolulu Condo: ⚪ None')
-        ->assertSeeInText("DAY 3 - 🟤 General thunderstorms\nNovember 2, 2026\nAny severe 5%")
+        ->assertSeeInText("DAY 3 - 🟤 General thunderstorms\nNovember 2, 2026\nOutlook: https://www.spc.noaa.gov/products/outlook/day3otlk.html\nAny severe 5%")
         ->assertSeeInText('Day 5: 🟡 15% — Inside: Home')
         ->assertSeeInText('Day 6: ❔ Not available')
         ->assertSeeInText("PUBLIC SEVERE WEATHER OUTLOOK\nIssued Sat, Oct 31 12:51 UTC\nPWO <TEXT> & more")
@@ -413,9 +413,9 @@ test('a hazard level whose file failed reads not available in the html and the t
         ->and($visible)->toContain('Home 🟡 Slight Hail 15% · Wind 30% · Tornado not available')
         ->and($visible)->toContain('Honolulu Condo ⚪ None Hail none · Wind none · Tornado not available')
         ->and($visible)->toContain('Any severe not available');
-    $mail->assertSeeInText("DAY 1 - 🟡 Slight\nOctober 31, 2026\nHail 15% · Wind 30% · Tornado not available")
+    $mail->assertSeeInText("DAY 1 - 🟡 Slight\nOctober 31, 2026\nOutlook: https://www.spc.noaa.gov/products/outlook/day1otlk.html\nHail 15% · Wind 30% · Tornado not available")
         ->assertSeeInText('Home: 🟡 Slight — Hail 15% · Wind 30% · Tornado not available')
-        ->assertSeeInText("DAY 3 - 🟤 General thunderstorms\nNovember 2, 2026\nAny severe not available");
+        ->assertSeeInText("DAY 3 - 🟤 General thunderstorms\nNovember 2, 2026\nOutlook: https://www.spc.noaa.gov/products/outlook/day3otlk.html\nAny severe not available");
 });
 
 test('a failed graphic is cached as a failure, so a second call asks SPC no more', function () {
@@ -505,7 +505,7 @@ test('the report opens with the SPC link and a note that only the maximum risks 
     $mail = new OutlookReportMail(ORM_SUBJECT, ormPayload(), ORM_BRIEF, []);
     $html = $mail->render();
 
-    expect($html)->toContain('<a href="https://www.spc.noaa.gov/" target="_blank" rel="noopener noreferrer"')
+    expect($html)->toContain('<a href="https://www.spc.noaa.gov/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"')
         ->and(ormVisible($html))->toContain('From the NOAA Storm Prediction Center convective outlooks.')
         ->and(ormVisible($html))->toContain('Only the maximum risk and probabilities are shown for each day and category.');
     $mail->assertSeeInText('From the NOAA Storm Prediction Center (https://www.spc.noaa.gov/) convective outlooks.')
@@ -522,8 +522,8 @@ test('each day heading is followed by its date in gray, and days 4 to 8 by their
         ->and($visible)->toContain('Day 3 - 🟤 General thunderstorms November 2, 2026')
         ->and($visible)->toContain('Days 4-8 November 3, 2026 - November 7, 2026')
         ->and($html)->toMatch('/<p[^>]*color: #6b7280;[^>]*>October 31, 2026<\/p>/');
-    $mail->assertSeeInText("DAY 2 - 🟢 Marginal\nNovember 1, 2026\n")
-        ->assertSeeInText("DAYS 4-8\nNovember 3, 2026 - November 7, 2026\n");
+    $mail->assertSeeInText("DAY 2 - 🟢 Marginal\nNovember 1, 2026\nOutlook: https://www.spc.noaa.gov/products/outlook/day2otlk.html\n")
+        ->assertSeeInText("DAYS 4-8\nNovember 3, 2026 - November 7, 2026\nOutlook: https://www.spc.noaa.gov/products/exper/day4-8/\n");
 });
 
 test('a payload queued before report dates existed renders without dates', function () {
@@ -533,14 +533,14 @@ test('a payload queued before report dates existed renders without dates', funct
 
     expect(ormVisible($mail->render()))->toContain('Day 1 - 🟡 Slight Hail 15%')
         ->and(ormVisible($mail->render()))->not->toContain('2026 -');
-    $mail->assertSeeInText("DAY 1 - 🟡 Slight\nHail 15%")
-        ->assertSeeInText("DAYS 4-8\nDay 4:");
+    $mail->assertSeeInText("DAY 1 - 🟡 Slight\nOutlook: https://www.spc.noaa.gov/products/outlook/day1otlk.html\nHail 15%")
+        ->assertSeeInText("DAYS 4-8\nOutlook: https://www.spc.noaa.gov/products/exper/day4-8/\nDay 4:");
 });
 
 test('each graphic is shown at twice its former width and links to its SPC outlook page in a new tab', function (string $key, string $page) {
     $html = (new OutlookReportMail(ORM_SUBJECT, ormPayload(), ORM_BRIEF, ormImages()))->render();
 
-    expect($html)->toMatch('/<a href="'.preg_quote($page, '/').'" target="_blank" rel="noopener noreferrer"[^>]*><img src="cid:spc-'.$key.'" alt="[^"]+" width="380" style="[^"]*width: 380px;/');
+    expect($html)->toMatch('/<a href="'.preg_quote($page, '/').'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"[^>]*><img src="cid:spc-'.$key.'" alt="[^"]+" width="380" referrerpolicy="no-referrer" style="[^"]*width: 380px;/');
 })->with([
     'day 1' => ['day1', 'https://www.spc.noaa.gov/products/outlook/day1otlk.html'],
     'day 2' => ['day2', 'https://www.spc.noaa.gov/products/outlook/day2otlk.html'],

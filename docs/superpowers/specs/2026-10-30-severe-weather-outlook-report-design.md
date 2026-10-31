@@ -66,6 +66,7 @@ For every other channel (email, and any long-form channel). Subject, e.g.
   A payload queued before `report_date` existed shows no dates.
 - Each graphic is shown at 380 px wide (twice the first version's 190 px) above that day's levels, links to its SPC
   outlook page in a new tab (`outlook/day{1,2,3}otlk.html`, `exper/day4-8/`) and has alt text.
+  The text part prints each page as "Outlook: <url>" under the day's date.
 
 - For each of Days 1, 2, 3: the SPC outlook graphic, the max category, and the max hail, wind and tornado
   probability levels (Day 3 has only an "any severe" probability, so it shows that); and, for each chosen
@@ -119,7 +120,8 @@ call.
   labelled "Send time", default 14:30), the same local hour year-round, 15-minute granularity because the scheduler
   ticks every 15 minutes, latest 22:45 local so the 60 minute wait cannot pass the subscriber's midnight. The form
   shows the UTC equivalent for today ("That is 14:30 UTC today."; without a profile timezone it says times are in
-  UTC), SPC's Day 1 issue times (0100, 0600, 1300, 1630, 2000 UTC, with the local equivalents) and the 60 minute
+  UTC), SPC's Day 1 issue times in local time sorted by clock, each with its UTC time, one on the previous local
+  day marked "the evening before" (UTC times only without a profile timezone), and the 60 minute
   wait. A rule edited to a time still ahead today (local) runs again today, as `AlertRule`'s `delivery_time` change
   handling does for every scheduled category. The once-a-day stamp is the local date; the due check, the grace
   and Day 1's expected cycle compare instants (the send time converted to UTC).
@@ -129,6 +131,10 @@ call.
   nothing until it is first opened (the `OutlookReportPreview` widget loads on expand; `FetchSpcOutlooks` caches
   complete results for 2 minutes), reloads when the ticked locations change only while it is open, shows a
   loading line first, and shows "SPC is unavailable right now" instead of an error when SPC cannot be read.
+  It is paid-only like the report: hidden for a Free subscriber, and the widget itself never fetches for one
+  ("Available on paid plans."). Previews share a 60 s memo of the fetched outlooks (and of a failure), so an outage
+  or a run of location ticks asks SPC at most once a minute; the dispatcher does not use it. SPC's images and links
+  carry `referrerpolicy="no-referrer"`.
 - Per rule: `message_body_style` (Brief/Full), send time, "send" mode (`every_day` or `only_when_forecast`), and the chosen
   locations.
 - "Only when something is forecast": any Marginal or higher category on Days 1-3, or a 15% or higher area on

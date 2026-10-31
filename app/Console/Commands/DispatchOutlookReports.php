@@ -32,6 +32,9 @@ use Throwable;
  * rule sends at most once per local day at or after its send time, both in the rule owner's timezone
  * (Timezones::forRule(): the profile timezone, else UTC), tracked by last_scheduled_run_on (the local
  * date), like DispatchScheduledAlerts. The grace and Day 1's expected cycle compare instants.
+ * Because the stamp is a local date, changing the profile timezone can skip or repeat one day's report.
+ * An outlook rule has no location_id, so Timezones::forRule() reads no Location (a null foreign key
+ * resolves without a query) and needs no eager load.
  *
  * SPC is asked once per run, only when a rule is due, and the result is shared by every due rule.
  * A Day 1 that is not yet the expected cycle (or is unavailable) holds the rule back, unstamped, for

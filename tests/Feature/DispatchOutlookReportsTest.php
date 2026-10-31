@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\User;
 use Database\Factories\UserFactory;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -545,4 +546,20 @@ test('the report is dated with the owner\'s local date', function () {
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
     Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->report['report_date'] === '2026-10-31');
+});
+
+test('working out each rule\'s timezone queries no location per rule', function () {
+    Carbon::setTestNow('2026-10-31 14:30:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles());
+    dorRule();
+    dorRule();
+    dorRule();
+
+    DB::enableQueryLog();
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+    $locationQueries = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'from "locations"'));
+
+    Queue::assertPushed(DeliverScheduledAlert::class, 3);
+    expect($locationQueries)->toHaveCount(1);
 });
