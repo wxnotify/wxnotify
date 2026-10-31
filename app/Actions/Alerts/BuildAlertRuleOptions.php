@@ -42,11 +42,15 @@ class BuildAlertRuleOptions
         $registry = app(ChannelTypeRegistry::class);
 
         return [
-            'categories' => collect(AlertCategory::cases())->reject(fn (AlertCategory $category): bool => $category === AlertCategory::OutlookReport)->map(fn (AlertCategory $category): array => [
-                'value' => $category->value,
-                'label' => $category->label(),
-                'description' => $category->description(),
-            ])->values()->all(),
+            'categories' => collect(AlertCategory::cases())
+                ->reject(fn (AlertCategory $category): bool => $category === AlertCategory::OutlookReport)
+                ->map(fn (AlertCategory $category): array => [
+                    'value' => $category->value,
+                    'label' => $category->label(),
+                    'description' => $category->description(),
+                ])
+                ->values()
+                ->all(),
             'products' => [
                 'weather_alerts' => $this->groups(AlertCategory::WeatherAlerts, Product::query()->whereIn('family', self::WEATHER_FAMILIES)->where('status', 'active')),
                 'spc_wpc' => $this->groups(AlertCategory::SpcWpc, Product::query()->where('family', 'spc_wpc')->where('status', 'active')),

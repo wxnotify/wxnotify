@@ -31,8 +31,9 @@ use Spatie\Activitylog\Support\CauserResolver;
  * `alert_rule_location` are no longer written for such a rule. An SPC & WPC product's risk levels
  * (the pivot's `risk_levels`) come from its entry's own `risk_levels`, else the flat `risk_levels`,
  * limited to the levels that product offers; the rule's own `risk_levels` holds their union for
- * older readers. An outlook report keeps its `delivery_time`, `report_mode` and (owner-scoped) `location_ids`
- * pivot; every other category clears `report_mode` and the pivot. A stored product-based rule saved with neither key keeps its products, their
+ * older readers. An outlook report keeps its `delivery_time`, `report_mode` and an owner-scoped
+ * `alert_rule_location` pivot from `location_ids`; every other category clears `report_mode` and
+ * that pivot. A stored product-based rule saved with neither key keeps its products, their
  * settings and its product-based columns as stored.
  */
 class SaveAlertRule
@@ -122,8 +123,9 @@ class SaveAlertRule
 
     /**
      * Pivot syncs. A product-based rule's products, their settings and their own locations are
-     * replaced together (left alone on the keep path); every other category has none, and the
-     * rule's own location list is no longer used. A product's locations are only ever the rule
+     * replaced together (left alone on the keep path); every other category has none. The
+     * rule's own location list (`alert_rule_location`) is used only by an outlook report and is
+     * emptied for every other category. A product's locations are only ever the rule
      * owner's own (others are dropped here as well as refused by validation). The channel list
      * always applies.
      *

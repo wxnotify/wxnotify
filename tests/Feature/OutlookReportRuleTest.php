@@ -8,9 +8,12 @@ use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\NotificationChannel;
+use App\Models\Product;
 use App\Models\User;
+use Database\Seeders\ProductCatalogSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -151,4 +154,56 @@ test('the API still lists and shows a dashboard-made outlook report', function (
         ->assertJsonPath('data.0.id', $rule->id)
         ->assertJsonPath('data.0.category', 'outlook_report')
         ->assertJsonPath('data.0.category_label', 'Severe Weather Outlook Report');
+});
+
+test('the API refuses a PUT that makes a rule an outlook report, and can move one to another category', function () {
+    $user = User::factory()->create();
+    $token = $user->createToken('Pixel 9', ['app'])->plainTextToken;
+    $location = Location::factory()->for($user)->create();
+    $channel = NotificationChannel::factory()->for($user)->create();
+    $rule = AlertRule::factory()->outlookReport()->for($user)->create();
+    $rule->locations()->sync([$location->id]);
+
+    app('auth')->forgetGuards();
+    $this->withToken($token)->putJson("/api/v1/alert-rules/{$rule->id}", [
+        'category' => 'outlook_report', 'delivery_time' => '08:05', 'report_mode' => 'every_day',
+        'location_ids' => [$location->id], 'channel_ids' => [$channel->id],
+    ])->assertUnprocessable()->assertJsonValidationErrors('category');
+
+    app('auth')->forgetGuards();
+    $this->withToken($token)->putJson("/api/v1/alert-rules/{$rule->id}", [
+        'category' => 'daily_summary', 'location_id' => $location->id, 'delivery_time' => '07:00', 'channel_ids' => [$channel->id],
+    ])->assertOk()->assertJsonPath('data.category', 'daily_summary');
+
+    expect($rule->fresh())->report_mode->toBeNull()
+        ->and($rule->locations()->count())->toBe(0);
+});
+
+test('switching a product rule to an outlook report drops its products and keeps only the owner\'s locations', function () {
+    $this->seed(ProductCatalogSeeder::class);
+    $user = User::factory()->create();
+    $mine = Location::factory()->for($user)->create();
+    $theirs = Location::factory()->create();
+    $channel = NotificationChannel::factory()->for($user)->create();
+    $product = Product::where('family', 'spc_wpc')->whereNotNull('risk_level_options')->orderBy('id')->firstOrFail();
+
+    $rule = (new SaveAlertRule)($user, [
+        'category' => 'spc_wpc',
+        'product_settings' => [['product_id' => $product->id, 'matching_mode' => 'risk_area', 'location_ids' => [$mine->id]]],
+        'risk_levels' => array_slice($product->risk_level_options, 0, 2),
+        'channel_ids' => [$channel->id],
+    ]);
+    expect(DB::table('alert_rule_product_location')->where('alert_rule_id', $rule->id)->count())->toBe(1);
+
+    $rule = (new SaveAlertRule)($user, [
+        'category' => 'outlook_report', 'delivery_time' => '09:15', 'report_mode' => 'every_day',
+        'location_ids' => [$mine->id, $theirs->id], 'channel_ids' => [$channel->id],
+    ], $rule);
+
+    expect($rule->products)->toBeEmpty()
+        ->and(DB::table('alert_rule_product_location')->where('alert_rule_id', $rule->id)->count())->toBe(0)
+        ->and($rule)->matching_mode->toBeNull()->wfo->toBeNull()->county_zone_codes->toBeNull()->risk_levels->toBeNull()
+        ->and($rule->report_mode)->toBe(OutlookReportMode::EveryDay)
+        ->and($rule->outlookSendTime())->toBe('09:15')
+        ->and($rule->locations->pluck('id')->all())->toBe([$mine->id]);
 });
