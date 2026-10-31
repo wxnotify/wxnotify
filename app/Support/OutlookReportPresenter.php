@@ -9,13 +9,16 @@ use Illuminate\Support\Carbon;
 /**
  * Turns a BuildOutlookReport payload into display strings for the Full outlook report email, so the
  * mail views stay logic-free. A day that could not be fetched reads as unavailable, never as "no
- * storms"; a chosen location outside every area reads as None.
+ * storms", and so does a single level whose file failed ("not available"); a chosen location outside
+ * every area reads as None.
  */
 class OutlookReportPresenter
 {
     private const UNAVAILABLE = '❔';
 
     private const NONE = 'none';
+
+    private const NOT_AVAILABLE = 'not available';
 
     private const SEPARATOR = ' · ';
 
@@ -119,31 +122,44 @@ class OutlookReportPresenter
             'label' => $category?->label(),
             'unavailable' => $number === 1 && $day1Missing ? 'Day 1 outlook not yet available' : "Day {$number} outlook not available",
             'alt' => "SPC Day {$number} convective outlook",
-            'levels' => $available ? self::dayLevels($number, $day) : null,
+            'levels' => $available ? self::dayLevels($number, $day, self::missing($day)) : null,
             'issued' => $available ? self::issued($day['issued_at'] ?? null) : null,
-            'locations' => $available ? array_map(fn (array $row): array => self::locationRow($number, $row), $day['locations'] ?? []) : [],
+            'locations' => $available ? array_map(fn (array $row): array => self::locationRow($number, $row, self::missing($day)), $day['locations'] ?? []) : [],
         ];
     }
 
     /**
+     * The levels whose SPC file failed (see BuildOutlookReport): they read "not available", never none.
+     *
      * @param  array<string, mixed>  $day
+     * @return list<string>
      */
-    private static function dayLevels(int $number, array $day): string
+    private static function missing(array $day): array
+    {
+        return is_array($day['missing'] ?? null) ? array_values(array_filter($day['missing'], is_string(...))) : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $day
+     * @param  list<string>  $missing
+     */
+    private static function dayLevels(int $number, array $day, array $missing): string
     {
         if ($number === 3) {
-            return 'Any severe '.self::level($day['any_severe'] ?? null);
+            return 'Any severe '.self::level($day['any_severe'] ?? null, in_array('any_severe', $missing, true));
         }
 
-        return self::hazards($day['hail'] ?? null, $day['wind'] ?? null, $day['tornado'] ?? null);
+        return self::hazards($day['hail'] ?? null, $day['wind'] ?? null, $day['tornado'] ?? null, $missing);
     }
 
     /**
      * Day 3 has no per-hazard levels, and a location in no hazard area needs no levels line.
      *
      * @param  array<string, mixed>  $row
+     * @param  list<string>  $missing
      * @return array{label: string, circle: string, category: string, levels: ?string}
      */
-    private static function locationRow(int $number, array $row): array
+    private static function locationRow(int $number, array $row, array $missing): array
     {
         $category = OutlookCategory::tryFrom((string) ($row['category'] ?? '')) ?? OutlookCategory::None;
         $hail = $row['hail'] ?? null;
@@ -154,7 +170,7 @@ class OutlookReportPresenter
             'label' => (string) $row['label'],
             'circle' => $category->emoji(),
             'category' => $category->label(),
-            'levels' => $number === 3 || ($hail === null && $wind === null && $tornado === null) ? null : self::hazards($hail, $wind, $tornado),
+            'levels' => $number === 3 || ($hail === null && $wind === null && $tornado === null && $missing === []) ? null : self::hazards($hail, $wind, $tornado, $missing),
         ];
     }
 
@@ -186,17 +202,24 @@ class OutlookReportPresenter
         ];
     }
 
-    private static function hazards(mixed $hail, mixed $wind, mixed $tornado): string
+    /**
+     * @param  list<string>  $missing
+     */
+    private static function hazards(mixed $hail, mixed $wind, mixed $tornado, array $missing): string
     {
         return implode(self::SEPARATOR, [
-            'Hail '.self::level($hail),
-            'Wind '.self::level($wind),
-            'Tornado '.self::level($tornado),
+            'Hail '.self::level($hail, in_array('hail', $missing, true)),
+            'Wind '.self::level($wind, in_array('wind', $missing, true)),
+            'Tornado '.self::level($tornado, in_array('tornado', $missing, true)),
         ]);
     }
 
-    private static function level(mixed $value): string
+    private static function level(mixed $value, bool $isMissing = false): string
     {
+        if ($isMissing) {
+            return self::NOT_AVAILABLE;
+        }
+
         return is_string($value) && $value !== '' ? $value : self::NONE;
     }
 

@@ -394,3 +394,23 @@ test('the Days 4-8 overview graphic is left out when every day 4 to 8 is unavail
         ->and(ormVisible($html))->toContain('Day 4 ❔ Not available')
         ->and($html)->toContain('cid:spc-day1');
 });
+
+test('a hazard level whose file failed reads not available in the html and the text, per location too', function () {
+    $payload = ormPayload();
+    $payload['days'][1]['tornado'] = null;
+    $payload['days'][1]['missing'] = ['tornado'];
+    $payload['days'][1]['locations'][0]['tornado'] = null;
+    $payload['days'][3]['any_severe'] = null;
+    $payload['days'][3]['missing'] = ['any_severe'];
+
+    $mail = new OutlookReportMail(ORM_SUBJECT, $payload, ORM_BRIEF, []);
+    $visible = ormVisible($mail->render());
+
+    expect($visible)->toContain('Hail 15% · Wind 30% · Tornado not available')
+        ->and($visible)->toContain('Home 🟡 Slight Hail 15% · Wind 30% · Tornado not available')
+        ->and($visible)->toContain('Honolulu Condo ⚪ None Hail none · Wind none · Tornado not available')
+        ->and($visible)->toContain('Any severe not available');
+    $mail->assertSeeInText("DAY 1: 🟡 Slight\nHail 15% · Wind 30% · Tornado not available")
+        ->assertSeeInText('Home: 🟡 Slight — Hail 15% · Wind 30% · Tornado not available')
+        ->assertSeeInText("DAY 3: 🟤 General thunderstorms\nAny severe not available");
+});

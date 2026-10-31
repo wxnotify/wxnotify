@@ -87,6 +87,7 @@ test('the payload carries categories, levels and per-location rows for a fixture
         'wind' => null,
         'tornado' => '2%',
         'any_severe' => null,
+        'missing' => [],
         'locations' => [
             ['label' => 'Inside', 'category' => 'slight', 'hail' => '15%', 'wind' => null, 'tornado' => '2%'],
             ['label' => 'Honolulu', 'category' => 'none', 'hail' => null, 'wind' => null, 'tornado' => null],
@@ -275,4 +276,19 @@ test('a self-intersecting bow-tie polygon is made valid and still finds a point 
     $ids = app(LocationsInOutlookAreas::class)($bowTie, collect([$lobe, $outside]));
 
     expect($ids)->toBe([$lobe->id]);
+});
+
+test('an absent hazard layer is listed as missing while an empty one is none', function () {
+    $outlooks = olkOutlooks();
+    unset($outlooks['day_1']['layers']['torn']);
+    $outlooks['day_3'] = olkDay(['cat' => [olkFeature('TSTM')]]);
+
+    $payload = app(BuildOutlookReport::class)($outlooks, collect([olkInside()]));
+
+    expect($payload['days'][1]['missing'])->toBe(['tornado'])
+        ->and($payload['days'][1]['tornado'])->toBeNull()
+        ->and($payload['days'][1]['wind'])->toBeNull()
+        ->and($payload['days'][2]['missing'])->toBe([])
+        ->and($payload['days'][3]['missing'])->toBe(['any_severe'])
+        ->and($payload['days'][3]['available'])->toBeTrue();
 });

@@ -12,7 +12,9 @@ use Illuminate\Support\Collection;
  *
  * A day that is null, or lacks its category layer (days 1-3) or its probability layer (days 4-8), is
  * unavailable; an empty layer is a valid quiet day. A Day 1 without `cat` is unavailable like in
- * Day1OutlookFreshness, which also sets `day1_missing`. Locations without a fix are skipped.
+ * Day1OutlookFreshness, which also sets `day1_missing`. On an available day a level whose own file
+ * failed (hail, wind, tornado on Days 1-2; any_severe on Day 3) is listed in `missing`, never read as
+ * none. Locations without a fix are skipped.
  *
  * @phpstan-type Row array{label: string, category: string, hail: ?string, wind: ?string, tornado: ?string}
  */
@@ -70,9 +72,11 @@ class BuildOutlookReport
         if ($outlook === null || ! array_key_exists('cat', $layers)) {
             return [
                 'available' => false, 'issued_at' => null, 'category' => null,
-                'hail' => null, 'wind' => null, 'tornado' => null, 'any_severe' => null, 'locations' => [],
+                'hail' => null, 'wind' => null, 'tornado' => null, 'any_severe' => null, 'missing' => [], 'locations' => [],
             ];
         }
+
+        $missing = $this->missingLevels($day, $layers);
 
         $categoryByLocation = $this->highestPerLocation($layers['cat'], $locations, fn (string $label): int => OutlookCategory::fromLabel($label)->rank());
         $hail = $this->highestPerLocation($layers['hail'] ?? [], $locations, $this->probabilityRank(...));
@@ -95,8 +99,23 @@ class BuildOutlookReport
             'wind' => $this->percent($this->highestRank($layers['wind'] ?? [], $this->probabilityRank(...))),
             'tornado' => $this->percent($this->highestRank($layers['torn'] ?? [], $this->probabilityRank(...))),
             'any_severe' => $day === 3 ? $this->percent($this->highestRank($layers['prob'] ?? [], $this->probabilityRank(...))) : null,
+            'missing' => $missing,
             'locations' => $rows,
         ];
+    }
+
+    /**
+     * The levels whose file could not be fetched (absent layer), as opposed to an empty layer, which is
+     * a real "none": hail, wind and tornado on Days 1-2, any_severe on Day 3. Their values stay null.
+     *
+     * @param  array<string, mixed>  $layers
+     * @return list<string>
+     */
+    private function missingLevels(int $day, array $layers): array
+    {
+        $levels = $day === 3 ? ['any_severe' => 'prob'] : ['hail' => 'hail', 'wind' => 'wind', 'tornado' => 'torn'];
+
+        return array_keys(array_filter($levels, fn (string $layer): bool => ! array_key_exists($layer, $layers)));
     }
 
     /**

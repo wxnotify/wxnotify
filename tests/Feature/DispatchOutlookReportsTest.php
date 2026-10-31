@@ -223,6 +223,25 @@ test('an unavailable Day 1 after the grace hour sends with day1_missing', functi
         && str_starts_with($job->title, 'Severe Wx Report - ❔ D1 |'));
 });
 
+test('a failed Day 1 hail file holds the rule within the grace hour and sends it marked missing after', function () {
+    Carbon::setTestNow('2026-10-31 14:35:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake([DOR_BASE.'outlook/day1otlk_hail.nolyr.geojson' => Http::response('', 503)] + dorFiles());
+    $rule = dorRule([], NotificationChannel::factory()->for(User::factory())->email()->create());
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertNothingPushed();
+    expect($rule->fresh()->last_scheduled_run_on)->toBeNull();
+
+    Carbon::setTestNow('2026-10-31 15:30:00');
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->report['days'][1]['missing'] === ['hail']
+        && $job->report['day1_missing'] === false);
+    expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe('2026-10-31');
+});
+
 test('an SPC outage after the grace hour still sends the unavailable report', function () {
     Carbon::setTestNow('2026-10-31 15:31:00');
     Queue::fake([DeliverScheduledAlert::class]);

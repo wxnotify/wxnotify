@@ -18,7 +18,8 @@ use Throwable;
  * JSON) counts as that file being unavailable, never as "no storms"; an empty feature list
  * is a valid quiet day. Only each feature's LABEL and geometry are kept.
  *
- * A result with any unavailable day is not cached, so the next call asks SPC again.
+ * A result in which any file failed (a whole day, or one layer of it) is not cached, so the next
+ * call asks SPC again.
  */
 class FetchSpcOutlooks
 {
@@ -37,7 +38,7 @@ class FetchSpcOutlooks
 
         $result = $this->fetch();
 
-        if (! in_array(null, $result, true)) {
+        if ($this->isComplete($result)) {
             Cache::put('spc-outlooks', $result, now()->addMinutes(2));
         }
 
@@ -74,6 +75,24 @@ class FetchSpcOutlooks
         }
 
         return $result;
+    }
+
+    /**
+     * Whether every requested file parsed (an empty layer counts; a failed one does not).
+     *
+     * @param  array<string, mixed>  $result
+     */
+    private function isComplete(array $result): bool
+    {
+        foreach (array_keys($this->files()) as $key) {
+            [$day, $layer] = explode(':', $key);
+
+            if (! array_key_exists($layer, $result["day_{$day}"]['layers'] ?? [])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function configure(PendingRequest $request): PendingRequest
