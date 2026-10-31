@@ -43,7 +43,7 @@ class CreateAlertRule extends CreateRecord
     {
         $this->saveInput = ProductMatchingTable::toSaveInput($data);
 
-        return app(SaveAlertRule::class)->attributes(auth()->user(), $this->saveInput);
+        return AlertRuleForm::saveForForm(fn (): array => app(SaveAlertRule::class)->attributes(auth()->user(), $this->saveInput));
     }
 
     protected function getRedirectUrl(): string

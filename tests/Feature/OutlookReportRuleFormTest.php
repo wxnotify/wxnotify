@@ -5,12 +5,16 @@ use App\Enums\OutlookReportMode;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\EditAlertRule;
+use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
+use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
 use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use Database\Seeders\ProductCatalogSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\CheckboxList;
+use Illuminate\Validation\ValidationException;
 
 use function Pest\Livewire\livewire;
 
@@ -186,4 +190,37 @@ test('without a profile timezone the send time hint is left out', function () {
         ->set('data.delivery_time', '14:30')
         ->assertDontSee('your time.')
         ->assertSee('The latest send time is 22:45 UTC');
+});
+
+test('a downgraded owner saving a kept outlook report on Edit is told it is a paid feature', function () {
+    $rule = AlertRule::factory()->outlookReport()->for($this->user)->create(['name' => 'Chase report']);
+    $rule->notificationChannels()->attach($this->channel);
+    $this->user->forceFill(['tier_override' => null])->save();
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->fillForm(['name' => 'Renamed'])
+        ->call('save')
+        ->assertHasFormErrors(['category'])
+        ->assertSee('Available on paid plans.')
+        ->assertDontSee('The selected category is invalid.');
+
+    expect($rule->fresh()->name)->toBe('Chase report');
+});
+
+test('a downgraded owner can still pause and delete a kept outlook report from the list', function () {
+    $rule = AlertRule::factory()->outlookReport()->for($this->user)->create();
+    $other = AlertRule::factory()->outlookReport()->for($this->user)->create();
+    $this->user->forceFill(['tier_override' => null])->save();
+
+    livewire(ListAlertRules::class)
+        ->call('updateTableColumnState', 'is_active', (string) $rule->id, false)
+        ->callAction(TestAction::make('delete')->table($other));
+
+    expect($rule->fresh()->is_active)->toBeFalse()
+        ->and(AlertRule::find($other->id))->toBeNull();
+});
+
+test('a SaveAlertRule refusal reached from the form is shown on the category field', function () {
+    expect(fn () => AlertRuleForm::saveForForm(fn () => throw ValidationException::withMessages(['category' => 'Available on paid plans.'])))
+        ->toThrow(fn (ValidationException $e) => expect($e->errors())->toBe(['data.category' => ['Available on paid plans.']]));
 });

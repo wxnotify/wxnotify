@@ -40,6 +40,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Exists;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class AlertRuleForm
@@ -67,6 +68,26 @@ class AlertRuleForm
     }
 
     /**
+     * Runs a SaveAlertRule call for a dashboard page, re-keying its validation errors to the form's
+     * `data.` state path so they show on the fields (the API keeps the bare keys).
+     *
+     * @template T
+     *
+     * @param  callable(): T  $save
+     * @return T
+     */
+    public static function saveForForm(callable $save): mixed
+    {
+        try {
+            return $save();
+        } catch (ValidationException $e) {
+            throw ValidationException::withMessages(
+                collect($e->errors())->mapWithKeys(fn (array $messages, string $key): array => ["data.{$key}" => $messages])->all(),
+            );
+        }
+    }
+
+    /**
      * The outlook report is a paid-tier feature: a Free subscriber sees it disabled.
      */
     private static function isPaidOnlyForUser(?AlertCategory $category): bool
@@ -86,6 +107,10 @@ class AlertRuleForm
                     ])->all())
                     // A disabled option is also refused on the server (Radio's `in` rule lists only enabled options).
                     ->disableOptionWhen(fn (string $value): bool => self::isPaidOnlyForUser(AlertCategory::tryFrom($value)))
+                    // ...so a downgraded owner saving a kept outlook report is told why, not "invalid".
+                    ->validationMessages([
+                        'in' => fn (?string $state): ?string => self::isPaidOnlyForUser(AlertCategory::tryFrom((string) $state)) ? SaveAlertRule::PAID_ONLY_MESSAGE : null,
+                    ])
                     ->required()
                     ->live()
                     ->afterStateUpdated(function (Set $set, Get $get, ?AlertRule $record): void {
