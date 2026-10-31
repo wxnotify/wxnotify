@@ -49,12 +49,13 @@ beforeEach(function (): void {
 });
 
 /**
- * Runs every job that is due, oldest first, the way the production worker does (one try each). See
- * DeliverWeatherAlertUniqueTest for why the memory cap and timeout are lifted.
+ * Runs every job that is due the way the production worker does (one try each): the `deliveries` queue
+ * first, then `default`, oldest first within each, so a delivery runs before a product queued earlier.
+ * See DeliverWeatherAlertUniqueTest for why the memory cap and timeout are lifted.
  */
 function chanPairingRunDueJobs(): void
 {
-    Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true, '--tries' => 1, '--sleep' => 0, '--timeout' => 0, '--memory' => 1_000_000]);
+    Artisan::call('queue:work', ['connection' => 'database', '--queue' => 'deliveries,default', '--stop-when-empty' => true, '--tries' => 1, '--sleep' => 0, '--timeout' => 0, '--memory' => 1_000_000]);
 }
 
 function chanPairingWaitOutDelay(): void
@@ -528,3 +529,29 @@ test('a fallback that throws too is logged, never thrown into the queue', functi
         'exception' => RuntimeException::class,
     ]);
 });
+
+test('with deliveries run before products queued earlier, each rule and channel still gets the outlook once, with its risk areas, in either bulletin order', function (string $first, int $delaySeconds) {
+    Mail::fake();
+    $this->freezeTime();
+    config(['wxnotify.outlook_pairing_delay_seconds' => $delaySeconds]);
+    [$rule, $channel] = chanPairingOutlookRule();
+    $riskAreaRule = chanPairingRiskAreaRule();
+    $firstBulletin = chanPairingBulletin($first);
+    $this->travel(1)->seconds();
+    $secondBulletin = chanPairingBulletin($first === 'ptsdy1' ? 'swody1' : 'ptsdy1');
+    $swody1 = $first === 'swody1' ? $firstBulletin : $secondBulletin;
+
+    chanPairingRunDueJobs();
+    chanPairingWaitOutDelay();
+    chanPairingRunDueJobs();
+
+    expect(DeliveryLog::where('alert_rule_id', $rule->id)->where('notification_channel_id', $channel->id)->sole()->ingested_product_id)->toBe($swody1->id)
+        ->and(DeliveryLog::where('alert_rule_id', $riskAreaRule->id)->sole()->ingested_product_id)->toBe($swody1->id)
+        ->and(DeliveryLog::count())->toBe(2)
+        ->and(chanPairingQueuedJobNames())->toBe([]);
+    Mail::assertSent(ChannelMessageMail::class, 2);
+})->with([
+    'the outline first' => ['ptsdy1', 60],
+    'the text first' => ['swody1', 60],
+    'the text first, no pairing delay' => ['swody1', 0],
+]);

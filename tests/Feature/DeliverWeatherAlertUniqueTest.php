@@ -17,9 +17,9 @@ use Illuminate\Support\Facades\Mail;
 
 /**
  * These tests queue onto the real database driver (not the sync connection the suite defaults to,
- * and not Queue::fake()) so a delivery job sits in the jobs table behind whatever was queued before
- * it, exactly as it does on the single production worker, and ShouldBeUnique's lock is taken at
- * dispatch and released by the worker.
+ * and not Queue::fake()) so a delivery job sits in the jobs table on its `deliveries` queue until the
+ * worker reaches it, as on the production worker, and ShouldBeUnique's lock is taken at dispatch and
+ * released by the worker.
  */
 const CHAN_UNIQUE_RISK_POLYGONS = [
     'Moderate' => [['lat' => 33, 'lon' => -97], ['lat' => 33, 'lon' => -94], ['lat' => 36, 'lon' => -94], ['lat' => 36, 'lon' => -97]],
@@ -31,13 +31,14 @@ function chanUseDatabaseQueue(): void
 }
 
 /**
- * Runs every queued job, oldest first, the way the production worker does (one try each). The memory
- * cap is lifted because a parallel test process has already grown past the worker's 128 MB default,
- * which would stop it after the first job; no timeout keeps its alarm signal out of the test process.
+ * Runs every queued job the way the production worker does (one try each): by default the `deliveries`
+ * queue first, then `default`, oldest first within each. The memory cap is lifted because a parallel test
+ * process has already grown past the worker's 128 MB default, which would stop it after the first job; no
+ * timeout keeps its alarm signal out of the test process.
  */
-function chanRunQueuedJobs(): void
+function chanRunQueuedJobs(string $queues = 'deliveries,default'): void
 {
-    Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true, '--tries' => 1, '--sleep' => 0, '--timeout' => 0, '--memory' => 1_000_000]);
+    Artisan::call('queue:work', ['connection' => 'database', '--queue' => $queues, '--stop-when-empty' => true, '--tries' => 1, '--sleep' => 0, '--timeout' => 0, '--memory' => 1_000_000]);
 }
 
 /**
@@ -74,7 +75,10 @@ test('an SPC Day 1 outlook re-matched by its areal outline before the first deli
     expect(DB::table('jobs')->pluck('payload')->map(fn (string $payload): string => json_decode($payload, true)['displayName'])->all())
         ->toBe([ProcessIngestedProduct::class, ProcessIngestedProduct::class]);
 
-    chanRunQueuedJobs();
+    // Both products are processed before any delivery runs (more than one worker, or deliveries queued
+    // behind a running job), so the re-match finds the first delivery still queued.
+    chanRunQueuedJobs('default');
+    chanRunQueuedJobs('deliveries');
 
     expect(DeliveryLog::where('alert_rule_id', $rule->id)->where('notification_channel_id', $channel->id)->where('ingested_product_id', $swody1->id)->count())->toBe(1);
     Mail::assertSent(ChannelMessageMail::class, 1);

@@ -1,0 +1,19 @@
+# Optional local-development override: runs the queue worker as queue:listen,
+# which boots the app for every job, so code and settings changes apply without
+# a `php artisan queue:restart` (at ~1.5 jobs/s, too slow for production
+# bursts). Same queues, same order and the same single try as compose.yaml:
+#
+#   docker compose -f compose.yaml -f compose.dev-listen.yaml up -d queue
+#
+# The image's healthcheck-queue looks for a `queue:work` process, which
+# queue:listen only has while a job runs, so this checks for the listener.
+services:
+    queue:
+        command: 'php artisan queue:listen --queue=deliveries,default --tries=1 --sleep=1'
+        healthcheck:
+            test:
+                - CMD
+                - pgrep
+                - '-f'
+                - 'queue:listen'
+            start_period: 10s

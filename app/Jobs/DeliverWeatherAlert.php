@@ -85,7 +85,11 @@ class DeliverWeatherAlert implements ShouldBeUnique, ShouldQueue
         public readonly int $ingestedProductId,
         public readonly ?int $locationId = null,
         public readonly array $segmentIds = [],
-    ) {}
+    ) {
+        // The worker reads `deliveries` before `default`, so an alert never waits behind a burst of
+        // products being processed (see compose.yaml's queue service).
+        $this->onQueue('deliveries');
+    }
 
     /**
      * Ids only: the lock key is stored in the cache store, so it must never carry personal data.

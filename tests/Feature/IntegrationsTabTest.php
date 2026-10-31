@@ -6,6 +6,7 @@ use App\Settings\IntegrationSettings;
 use App\Support\Delivery\HeartbeatUrlGuard;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Spatie\Activitylog\Models\Activity;
 
@@ -158,6 +159,32 @@ test('saving email overrides stores them and empty values become null', function
     expect($settings->email_mailer)->toBeNull()
         ->and($settings->email_from_address)->toBeNull()
         ->and($settings->email_from_name)->toBeNull();
+});
+
+test('saving a changed email setting tells the long-lived queue workers to restart, since they apply it only at boot', function (array $change) {
+    $this->freezeTime();
+
+    livewire(AppSettings::class)
+        ->fillForm($change)
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertNotified();
+
+    expect(Cache::get('illuminate:queue:restart'))->toBe(now()->getTimestamp());
+})->with([
+    'the relay' => [['email_relay_enabled' => false]],
+    'the mailer' => [['email_mailer' => 'smtp']],
+    'the from address' => [['email_from_address' => 'alerts@example.test']],
+    'the from name' => [['email_from_name' => 'WxNotify Alerts']],
+]);
+
+test('saving without an email change leaves the queue workers running', function () {
+    livewire(AppSettings::class)
+        ->fillForm(['exception_reporting_enabled' => true])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Cache::has('illuminate:queue:restart'))->toBeFalse();
 });
 
 test('a saved integration change is written to the audit log', function () {

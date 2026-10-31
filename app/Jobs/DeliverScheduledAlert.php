@@ -41,7 +41,11 @@ class DeliverScheduledAlert implements ShouldQueue
         public readonly string $body,
         public readonly ?array $report = null,
         public readonly ?string $batchKey = null,
-    ) {}
+    ) {
+        // The worker reads `deliveries` before `default`, so a summary or threshold alert never waits
+        // behind a burst of products being processed (see compose.yaml's queue service).
+        $this->onQueue('deliveries');
+    }
 
     public function handle(ChannelDispatcher $dispatcher): void
     {

@@ -92,6 +92,19 @@ services:
         restart: unless-stopped
         profiles:
             - server-c
+    # A persistent worker: it boots the app once (queue:listen re-booted it for
+    # every job, ~1.2 s each, capping a burst at ~1.5 jobs/s). It reads the
+    # `deliveries` queue (DeliverWeatherAlert, DeliverScheduledAlert) before
+    # `default`, so an alert never waits behind products being processed.
+    # --tries=1: a failed job is never re-run (a retry re-sends billed
+    # messages). --timeout=60 stays below the database queue's retry_after
+    # (90 s) and above the longest send budget (50 s), or a slow send would be
+    # handed out a second time. --memory=192 restarts it well below PHP's 256M
+    # memory_limit; --max-time=3600 recycles it hourly. It keeps running the
+    # code and settings it booted with: every deploy must run
+    # `php artisan queue:restart` (Docker's restart policy starts it again).
+    # For local work without restarts, add the queue:listen override:
+    # `docker compose -f compose.yaml -f compose.dev-listen.yaml up -d queue`.
     queue:
         build:
             context: './docker/8.4'
@@ -110,8 +123,11 @@ services:
         depends_on:
             - pgsql
             - redis
-        command: 'php artisan queue:listen --tries=1'
+        command: 'php artisan queue:work --queue=deliveries,default --tries=1 --sleep=1 --timeout=60 --memory=192 --max-time=3600'
         stop_signal: SIGTERM
+        # Room for the job in hand to finish (at most --timeout) after SIGTERM
+        # before Docker kills it; Docker's default is 10 s.
+        stop_grace_period: 70s
         healthcheck:
             test:
                 - CMD

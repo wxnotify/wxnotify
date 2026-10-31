@@ -30,7 +30,10 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 use UnitEnum;
 
 class AppSettings extends Page implements HasForms
@@ -165,6 +168,8 @@ class AppSettings extends Page implements HasForms
                 }
             }
 
+            $emailSettingsBefore = $this->emailSettings();
+
             DB::transaction(function () use ($data): void {
                 foreach ([GeneralSettings::class, TierThresholdSettings::class, FeatureFlagsSettings::class, IntegrationSettings::class] as $class) {
                     $settings = app($class);
@@ -174,6 +179,10 @@ class AppSettings extends Page implements HasForms
 
                 $this->saveSecrets($data);
             });
+
+            if ($this->emailSettings() !== $emailSettingsBefore) {
+                $this->restartQueueWorkers();
+            }
         } finally {
             foreach (Secret::cases() as $secret) {
                 $this->data[$secret->settingsProperty()] = null;
@@ -182,6 +191,37 @@ class AppSettings extends Page implements HasForms
         }
 
         Notification::make()->success()->title('Settings saved')->send();
+    }
+
+    /**
+     * The email settings ApplyEmailSettings applies once at boot.
+     *
+     * @return array{relay: bool, mailer: ?string, from_address: ?string, from_name: ?string}
+     */
+    private function emailSettings(): array
+    {
+        $settings = app(IntegrationSettings::class);
+
+        return [
+            'relay' => $settings->email_relay_enabled,
+            'mailer' => $settings->email_mailer,
+            'from_address' => $settings->email_from_address,
+            'from_name' => $settings->email_from_name,
+        ];
+    }
+
+    /**
+     * A long-lived queue:work applied the email settings when it booted, so it is told to finish its
+     * current job and exit; its process manager (Docker's restart policy) starts it again with the new
+     * settings. queue:listen boots per job and ignores the signal. A failure here never fails the save.
+     */
+    private function restartQueueWorkers(): void
+    {
+        try {
+            Artisan::call('queue:restart');
+        } catch (Throwable $e) {
+            Log::warning('App settings: could not signal the queue workers to restart', ['exception' => $e::class]);
+        }
     }
 
     /**
@@ -333,7 +373,7 @@ class AppSettings extends Page implements HasForms
                     $this->endpointField('status_page_url', 'Status page URL', 'status_page_enabled'),
                 ]),
             Section::make('Email')
-                ->description('Credentials for the chosen mailer stay in .env. A long-lived queue:work needs a restart to pick up a change (queue:listen, as in this stack, does not).')
+                ->description('Credentials for the chosen mailer stay in .env. Saving a change here restarts the queue workers (queue:restart), which apply these settings only when they start; a worker without a process manager to start it again stays stopped.')
                 ->schema([
                     Toggle::make('email_relay_enabled')
                         ->label('Email relay enabled')
