@@ -1,10 +1,13 @@
 <?php
 
+use App\Actions\Alerts\SaveAlertRule;
 use App\Actions\Weather\RenderAlertSubject;
 use App\Enums\AlertCategory;
 use App\Enums\OutlookReportMode;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Models\AlertRule;
+use App\Models\Location;
+use App\Models\NotificationChannel;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
@@ -77,3 +80,75 @@ test('every category renders in the alerts table and the subject renderer', func
 
     expect((new RenderAlertSubject)($rule))->toBeString()->not->toBeEmpty();
 })->with(fn () => AlertCategory::cases());
+
+test('saving an outlook report stores the time and mode and only the owner\'s locations', function () {
+    $user = User::factory()->create();
+    $mine = Location::factory()->for($user)->create();
+    $theirs = Location::factory()->create();
+    $channel = NotificationChannel::factory()->for($user)->create();
+
+    $rule = (new SaveAlertRule)($user, [
+        'category' => 'outlook_report',
+        'delivery_time' => '08:05',
+        'report_mode' => 'only_when_forecast',
+        'location_ids' => [$mine->id, $theirs->id],
+        'channel_ids' => [$channel->id],
+    ]);
+
+    expect($rule)
+        ->category->toBe(AlertCategory::OutlookReport)
+        ->report_mode->toBe(OutlookReportMode::OnlyWhenForecast)
+        ->location_id->toBeNull()
+        ->and($rule->outlookSendTime())->toBe('08:05')
+        ->and($rule->locations->pluck('id')->all())->toBe([$mine->id])
+        ->and($rule->notificationChannels->pluck('id')->all())->toBe([$channel->id]);
+});
+
+test('switching an outlook report to another category clears its mode and locations', function () {
+    $user = User::factory()->create();
+    $location = Location::factory()->for($user)->create();
+    $channel = NotificationChannel::factory()->for($user)->create();
+    $rule = (new SaveAlertRule)($user, [
+        'category' => 'outlook_report', 'delivery_time' => '08:05', 'report_mode' => 'every_day',
+        'location_ids' => [$location->id], 'channel_ids' => [$channel->id],
+    ]);
+
+    $rule = (new SaveAlertRule)($user, [
+        'category' => 'daily_summary', 'location_id' => $location->id, 'delivery_time' => '07:00', 'channel_ids' => [$channel->id],
+    ], $rule);
+
+    expect($rule->category)->toBe(AlertCategory::DailySummary)
+        ->and($rule->report_mode)->toBeNull()
+        ->and($rule->locations)->toBeEmpty()
+        ->and($rule->location_id)->toBe($location->id);
+});
+
+test('the API refuses to write an outlook report and leaves it out of the options', function () {
+    $user = User::factory()->create();
+    $token = $user->createToken('Pixel 9', ['app'])->plainTextToken;
+    $location = Location::factory()->for($user)->create();
+    $channel = NotificationChannel::factory()->for($user)->create();
+
+    app('auth')->forgetGuards();
+    $this->withToken($token)->postJson('/api/v1/alert-rules', [
+        'category' => 'outlook_report', 'delivery_time' => '08:05', 'report_mode' => 'every_day',
+        'location_ids' => [$location->id], 'channel_ids' => [$channel->id],
+    ])->assertUnprocessable()->assertJsonValidationErrors('category');
+
+    app('auth')->forgetGuards();
+    $values = collect($this->withToken($token)->getJson('/api/v1/alert-rule-options')->assertOk()->json('data.categories'))->pluck('value');
+
+    expect($values)->not->toContain('outlook_report')->toContain('daily_summary');
+});
+
+test('the API still lists and shows a dashboard-made outlook report', function () {
+    $user = User::factory()->create();
+    $token = $user->createToken('Pixel 9', ['app'])->plainTextToken;
+    $rule = AlertRule::factory()->outlookReport()->for($user)->create();
+
+    app('auth')->forgetGuards();
+    $this->withToken($token)->getJson('/api/v1/alert-rules')->assertOk()
+        ->assertJsonPath('data.0.id', $rule->id)
+        ->assertJsonPath('data.0.category', 'outlook_report')
+        ->assertJsonPath('data.0.category_label', 'Severe Weather Outlook Report');
+});

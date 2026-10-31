@@ -51,7 +51,7 @@ class SaveAlertRuleRequest extends FormRequest
         $category = AlertCategory::tryFrom((string) $this->input('category'));
 
         $rules = [
-            'category' => ['required', Rule::enum(AlertCategory::class)],
+            'category' => ['required', Rule::enum(AlertCategory::class)->except([AlertCategory::OutlookReport])],
             'name' => ['nullable', 'string', 'max:255'],
             'channel_ids' => ['required', 'array', 'min:1'],
             'channel_ids.*' => ['integer', Rule::exists('notification_channels', 'id')->where('user_id', $user->id)],

@@ -38,7 +38,7 @@ test('it lists the categories, the matching modes and the active products groupe
 
     $response = optionsCall($this)->assertOk();
 
-    expect(collect($response->json('data.categories'))->pluck('value')->all())->toBe(array_map(fn (AlertCategory $c) => $c->value, AlertCategory::cases()))
+    expect(collect($response->json('data.categories'))->pluck('value')->all())->toBe(collect(AlertCategory::cases())->reject(fn (AlertCategory $c) => $c === AlertCategory::OutlookReport)->map(fn (AlertCategory $c) => $c->value)->values()->all())
         ->and(collect($response->json('data.matching_modes'))->pluck('value')->all())->toContain('nationwide', 'location', 'wfo', 'county_zone', 'polygon', 'risk_area');
 
     $tornado = Product::where('code', 'TO.W')->sole();

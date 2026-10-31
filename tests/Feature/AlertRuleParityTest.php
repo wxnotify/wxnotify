@@ -307,3 +307,30 @@ test('the API stores product_settings exactly as it stores the flat input that e
     'office' => ['wfo', ['wfo' => 'OKX']],
     'county and zone' => ['county_zone', ['county_zone_codes' => ['NYC103', 'NYZ072']]],
 ]);
+
+test('saving an outlook report persists its own columns and clears every other category column', function () {
+    $user = User::factory()->create();
+    $location = Location::factory()->for($user)->create();
+    $channel = NotificationChannel::factory()->for($user)->create();
+
+    $rule = (new SaveAlertRule)($user, [
+        'category' => 'outlook_report', 'delivery_time' => '06:45', 'report_mode' => 'only_when_forecast',
+        'location_ids' => [$location->id], 'channel_ids' => [$channel->id],
+        'variable' => 'wind_speed', 'threshold_value' => 40, 'radius_miles' => 20, 'matching_mode' => 'nationwide',
+    ]);
+
+    $shape = storedShape($rule);
+
+    expect($shape)
+        ->category->toBe('outlook_report')
+        ->delivery_time->toStartWith('06:45')
+        ->report_mode->toBe('only_when_forecast')
+        ->variable->toBeNull()
+        ->threshold_value->toBeNull()
+        ->radius_miles->toBeNull()
+        ->matching_mode->toBeNull()
+        ->has_location->toBeFalse()
+        ->products->toBe([])
+        ->locations->toBe(1)
+        ->channels->toBe(1);
+});

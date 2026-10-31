@@ -31,7 +31,8 @@ use Spatie\Activitylog\Support\CauserResolver;
  * `alert_rule_location` are no longer written for such a rule. An SPC & WPC product's risk levels
  * (the pivot's `risk_levels`) come from its entry's own `risk_levels`, else the flat `risk_levels`,
  * limited to the levels that product offers; the rule's own `risk_levels` holds their union for
- * older readers. A stored product-based rule saved with neither key keeps its products, their
+ * older readers. An outlook report keeps its `delivery_time`, `report_mode` and (owner-scoped) `location_ids`
+ * pivot; every other category clears `report_mode` and the pivot. A stored product-based rule saved with neither key keeps its products, their
  * settings and its product-based columns as stored.
  */
 class SaveAlertRule
@@ -43,11 +44,12 @@ class SaveAlertRule
         'threshold' => ['variable', 'direction', 'threshold_value', 'timeframe', 'location_id', 'delivery_time'],
         'daily_summary' => ['location_id', 'delivery_time'],
         'lightning' => ['location_id', 'radius_miles'],
+        'outlook_report' => ['delivery_time', 'report_mode'],
     ];
 
     private const ALL_CATEGORY_COLUMNS = [
         'matching_mode', 'wfo', 'county_zone_codes', 'risk_levels', 'variable', 'direction',
-        'threshold_value', 'timeframe', 'location_id', 'delivery_time', 'radius_miles',
+        'threshold_value', 'timeframe', 'location_id', 'delivery_time', 'radius_miles', 'report_mode',
     ];
 
     private const CATEGORIES_WITH_PRODUCTS = ['weather_alerts', 'spc_wpc'];
@@ -155,11 +157,25 @@ class SaveAlertRule
                     array_values(array_intersect($entry['location_ids'], $ownedLocationIds)),
                 ))->all());
 
-                $rule->locations()->sync([]);
+                $rule->locations()->sync($rule->category === AlertCategory::OutlookReport ? $this->ownedLocationIds($rule, $data['location_ids'] ?? []) : []);
             }
 
             $rule->notificationChannels()->sync($data['channel_ids'] ?? []);
         });
+    }
+
+    /**
+     * The given location ids that belong to the rule's owner, de-duplicated, in the given order.
+     *
+     * @param  iterable<mixed>  $ids
+     * @return list<int>
+     */
+    private function ownedLocationIds(AlertRule $rule, iterable $ids): array
+    {
+        $wanted = collect($ids)->filter(fn ($id): bool => is_numeric($id))->map(fn ($id): int => (int) $id)->unique()->values();
+        $owned = DB::table('locations')->where('user_id', $rule->user_id)->whereIn('id', $wanted->all())->pluck('id')->map(fn ($id): int => (int) $id);
+
+        return $wanted->intersect($owned)->values()->all();
     }
 
     /**
