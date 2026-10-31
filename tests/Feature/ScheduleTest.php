@@ -18,6 +18,18 @@ test('the scheduled alert dispatch cannot overlap itself', function () {
         ->and($event->expiresAt)->toBe(30);
 });
 
+test('the outlook report dispatch runs every fifteen minutes and cannot overlap itself', function () {
+    Artisan::call('schedule:list');
+
+    $event = collect(app(Schedule::class)->events())
+        ->first(fn (Event $event): bool => str_contains($event->command, 'alerts:dispatch-outlook-reports'));
+
+    expect($event)->not->toBeNull()
+        ->and($event->expression)->toBe('*/15 * * * *')
+        ->and($event->withoutOverlapping)->toBeTrue()
+        ->and($event->expiresAt)->toBe(30);
+});
+
 test('expired app sign-ins are pruned daily so their device channels go with them', function () {
     Artisan::call('schedule:list');
 

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Weather\GetRadarSnapshot;
 use App\Actions\Weather\RenderAlertSubject;
+use App\Enums\AlertCategory;
 use App\Enums\ChannelTransport;
 use App\Enums\MessageBodyStyle;
 use App\Models\AlertRule;
@@ -21,8 +22,9 @@ use Illuminate\Support\Str;
 /**
  * Dispatched once per AlertRule x NotificationChannel by
  * App\Console\Commands\DispatchScheduledAlerts, for Threshold Alerts and
- * Daily Weather Summary — the two categories with no IngestedProduct behind
- * them, just a composed message. Mirrors App\Jobs\DeliverWeatherAlert's
+ * Daily Weather Summary, and by DispatchOutlookReports for the Severe Weather
+ * Outlook Report (whose passed-in title is used as the subject) — categories
+ * with no IngestedProduct behind them, just a composed message. Mirrors App\Jobs\DeliverWeatherAlert's
  * DeliveryLog/Apprise shape exactly; the only difference is the message
  * arrives pre-built rather than being derived from a product's raw text.
  */
@@ -31,7 +33,7 @@ class DeliverScheduledAlert implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * @param  array<string, mixed>|null  $report  the Full Daily Summary's structured payload; null for Brief, Free, Threshold, and for jobs queued before this property existed
+     * @param  array<string, mixed>|null  $report  the Full Daily Summary's (or the outlook report's) structured payload; null for Brief, Free, Threshold, and for jobs queued before this property existed
      * @param  string|null  $batchKey  shared by every job of one run of the rule (one per channel), so the app shows the run as one alert; null (or uninitialized) for jobs queued before this property existed
      */
     public function __construct(
@@ -90,7 +92,9 @@ class DeliverScheduledAlert implements ShouldQueue
             return;
         }
 
-        $title = app(RenderAlertSubject::class)($rule);
+        // The outlook report's subject is the per-day emoji line built at dispatch, not the rule's name.
+        $isOutlookReport = $rule->category === AlertCategory::OutlookReport;
+        $title = $isOutlookReport ? $this->title : app(RenderAlertSubject::class)($rule);
         $channelType = app(ChannelTypeRegistry::class)->find($channel->channel_type);
         // Str::limit's word-preserving mode collapses line breaks to spaces, so it must never
         // touch a body bound for a real inbox — see DeliverWeatherAlert for the same rule.
@@ -114,7 +118,9 @@ class DeliverScheduledAlert implements ShouldQueue
         // exactly once here and never dereferenced again.
         $report = $this->report ?? null;
 
-        if ($report !== null && $channelType?->supportsRichContent() === true) {
+        if ($report !== null && $channelType?->supportsRichContent() === true && $isOutlookReport) {
+            $meta['outlook_report'] = $report;
+        } elseif ($report !== null && $channelType?->supportsRichContent() === true) {
             $radarSite = $report['radar_site'] ?? null;
 
             $meta['daily_summary'] = $report;

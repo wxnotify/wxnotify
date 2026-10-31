@@ -1,0 +1,141 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Actions\Weather\BuildOutlookReport;
+use App\Actions\Weather\FetchSpcOutlooks;
+use App\Actions\Weather\FindActivePwo;
+use App\Enums\AlertCategory;
+use App\Enums\OutlookReportMode;
+use App\Jobs\DeliverScheduledAlert;
+use App\Models\AlertRule;
+use App\Models\IngestedProduct;
+use App\Models\NotificationChannel;
+use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\Day1OutlookFreshness;
+use App\Support\OutlookReportText;
+use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Throwable;
+
+/**
+ * Sends the daily Severe Weather Outlook Report. Runs every 15 minutes (see bootstrap/app.php); each
+ * rule sends at most once per UTC day at or after its UTC send time, tracked by last_scheduled_run_on.
+ *
+ * SPC is asked once per run, only when a rule is due, and the result is shared by every due rule.
+ * A Day 1 that is not yet the expected cycle (or is unavailable) holds the rule back, unstamped, for
+ * up to 60 minutes past its send time; after that the report goes out as fetched (an unavailable
+ * Day 1 then shows as missing). A rule that fails is logged by exception class, left unstamped and
+ * does not stop the others.
+ */
+class DispatchOutlookReports extends Command
+{
+    private const GRACE_MINUTES = 60;
+
+    protected $signature = 'alerts:dispatch-outlook-reports';
+
+    protected $description = 'Deliver due Severe Weather Outlook Report rules';
+
+    public function handle(FetchSpcOutlooks $fetchOutlooks, BuildOutlookReport $buildReport, FindActivePwo $findPwo): int
+    {
+        $now = Carbon::now('UTC');
+
+        $rules = AlertRule::query()
+            ->where('is_active', true)
+            ->where('category', AlertCategory::OutlookReport)
+            ->whereNotNull('delivery_time')
+            ->where(fn (Builder $query) => $query->whereNull('last_scheduled_run_on')->orWhere('last_scheduled_run_on', '<', $now->toDateString()))
+            ->with(['locations', 'notificationChannels'])
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (AlertRule $rule): bool => $now->gte($this->sendTime($rule, $now)));
+
+        if ($rules->isEmpty()) {
+            $this->info('No outlook reports due.');
+
+            return self::SUCCESS;
+        }
+
+        $outlooks = $fetchOutlooks();
+        $pwo = $this->activePwo($findPwo, $outlooks['day_1']['issued_at'] ?? null);
+        $dispatched = 0;
+
+        foreach ($rules as $rule) {
+            try {
+                $dispatched += $this->deliver($rule, $outlooks, $pwo, $buildReport, $now);
+            } catch (Throwable $e) {
+                Log::warning('Outlook report failed', ['rule_id' => $rule->id, 'exception' => $e::class]);
+            }
+        }
+
+        $this->info("Dispatched {$dispatched} outlook report(s).");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>  $outlooks
+     * @return int the number of jobs dispatched
+     */
+    private function deliver(AlertRule $rule, array $outlooks, ?IngestedProduct $pwo, BuildOutlookReport $buildReport, Carbon $now): int
+    {
+        $sendTime = $this->sendTime($rule, $now);
+
+        if (! Day1OutlookFreshness::isCurrent($outlooks['day_1'] ?? null, $sendTime)
+            && $now->lt($sendTime->copy()->addMinutes(self::GRACE_MINUTES))) {
+            return 0;
+        }
+
+        $payload = $buildReport($outlooks, $rule->locations, $pwo);
+
+        $sendNothing = $rule->report_mode === OutlookReportMode::OnlyWhenForecast
+            && ! $payload['something_forecast']
+            && ! $payload['day1_missing'];
+
+        $title = OutlookReportText::subject($payload);
+        $body = OutlookReportText::brief($payload);
+        $report = $this->hasRichChannel($rule) ? $payload : null;
+        $batchKey = (string) Str::uuid();
+
+        return DB::transaction(function () use ($rule, $now, $sendNothing, $title, $body, $report, $batchKey): int {
+            $rule->forceFill(['last_scheduled_run_on' => $now->toDateString()])->save();
+
+            if ($sendNothing) {
+                return 0;
+            }
+
+            foreach ($rule->notificationChannels as $channel) {
+                DeliverScheduledAlert::dispatch($rule->id, $channel->id, $title, $body, $report, $batchKey);
+            }
+
+            return $rule->notificationChannels->count();
+        });
+    }
+
+    private function sendTime(AlertRule $rule, Carbon $now): Carbon
+    {
+        return $now->copy()->setTimeFromTimeString($rule->outlookSendTime());
+    }
+
+    private function hasRichChannel(AlertRule $rule): bool
+    {
+        $registry = app(ChannelTypeRegistry::class);
+
+        return $rule->notificationChannels->contains(fn (NotificationChannel $channel): bool => $registry->find($channel->channel_type)?->supportsRichContent() === true);
+    }
+
+    private function activePwo(FindActivePwo $findPwo, ?string $day1IssuedAt): ?IngestedProduct
+    {
+        try {
+            return $findPwo($day1IssuedAt);
+        } catch (Throwable $e) {
+            Log::warning('Active PWO lookup failed', ['exception' => $e::class]);
+
+            return null;
+        }
+    }
+}

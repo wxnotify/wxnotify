@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('shapefile:scan')->daily();
         $schedule->command('alerts:dispatch-scheduled')->everyFifteenMinutes()->withoutOverlapping(30);
+        $schedule->command('alerts:dispatch-outlook-reports')->everyFifteenMinutes()->withoutOverlapping(30);
         $schedule->command('traccar:poll-positions')->everyFiveMinutes()->withoutOverlapping();
         $schedule->command('pipeline:prune-deliveries')->hourly();
         $schedule->command('sanctum:prune-expired --hours=24')->daily();

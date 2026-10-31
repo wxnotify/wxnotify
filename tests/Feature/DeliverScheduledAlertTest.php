@@ -10,6 +10,7 @@ use App\Models\IngestedProduct;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
+use App\Support\Delivery\DeliveryResult;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -335,4 +336,33 @@ test('the batch key is written on success, failure and skipped rows', function (
         ['status' => 'failure', 'batch_key' => 'batch-fail'],
         ['status' => 'skipped', 'batch_key' => 'batch-skip'],
     ]);
+});
+
+test('an outlook report uses the passed-in subject and hands its report to a rich channel as outlook_report', function () {
+    $rule = AlertRule::factory()->outlookReport()->create();
+    $channel = NotificationChannel::factory()->for($rule->user)->email()->create();
+    $report = ['days' => [], 'extended' => [], 'pwo' => null, 'something_forecast' => false, 'day1_missing' => false];
+    $dispatcher = Mockery::mock(ChannelDispatcher::class);
+    $dispatcher->shouldReceive('send')->once()
+        ->withArgs(fn (NotificationChannel $sent, string $body, ?string $title, array $meta): bool => $sent->is($channel)
+            && $body === 'D1 ⚪'
+            && $title === 'Severe Wx Report - ⚪ D1'
+            && $meta['outlook_report'] === $report
+            && ! array_key_exists('daily_summary', $meta))
+        ->andReturn(DeliveryResult::delivered());
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Severe Wx Report - ⚪ D1', 'D1 ⚪', $report, 'batch-1'))->handle($dispatcher);
+
+    expect(DeliveryLog::sole()->subject)->toBe('Severe Wx Report - ⚪ D1');
+});
+
+test('an outlook report to a non-rich channel carries no report', function () {
+    $rule = AlertRule::factory()->outlookReport()->create();
+    $channel = NotificationChannel::factory()->for($rule->user)->mobilePush()->create();
+    $dispatcher = Mockery::mock(ChannelDispatcher::class);
+    $dispatcher->shouldReceive('send')->once()
+        ->withArgs(fn (NotificationChannel $sent, string $body, ?string $title, array $meta): bool => ! array_key_exists('outlook_report', $meta))
+        ->andReturn(DeliveryResult::delivered());
+
+    (new DeliverScheduledAlert($rule->id, $channel->id, 'Severe Wx Report - ⚪ D1', 'D1 ⚪', ['days' => []]))->handle($dispatcher);
 });
