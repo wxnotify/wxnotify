@@ -3,9 +3,10 @@
 namespace App\Actions\Weather;
 
 use App\Models\Location;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Throwable;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Which of the given locations lie inside, or on the edge of, one GeoJSON outlook geometry.
@@ -23,7 +24,7 @@ class LocationsInOutlookAreas
      */
     public function __invoke(array $geometry, Collection $locations): array
     {
-        $points = $locations->filter(fn ($location): bool => $location->hasFix())->values();
+        $points = $locations->filter(fn (Location $location): bool => $location->hasFix())->values();
 
         if ($points->isEmpty() || ! isset($geometry['type'], $geometry['coordinates'])) {
             return [];
@@ -40,12 +41,14 @@ class LocationsInOutlookAreas
         // parse error cannot poison an outer transaction.
         try {
             $found = DB::transaction(fn (): array => DB::select(
-                'WITH shape AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(?::text), 4326) AS geom) '
+                'WITH shape AS (SELECT ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(?::text), 4326)) AS geom) '
                 ."SELECT p.id FROM (VALUES {$rows}) AS p(id, lng, lat) CROSS JOIN shape "
                 .'WHERE ST_Intersects(shape.geom, ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4326))',
                 $bindings,
             ));
-        } catch (Throwable) {
+        } catch (QueryException $e) {
+            Log::warning('Outlook geometry refused by PostGIS', ['exception' => $e::class, 'sqlstate' => $e->getCode()]);
+
             return [];
         }
 

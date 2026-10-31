@@ -6,6 +6,7 @@ use App\Models\IngestedProduct;
 use App\Models\Location;
 use App\Models\Product;
 use App\Support\OutlookReportText;
+use Illuminate\Database\QueryException;
 
 function olkBox(float $west, float $south, float $east, float $north): array
 {
@@ -247,4 +248,31 @@ test('locations in outlook areas returns nothing for no locations or a malformed
 
     expect(app(LocationsInOutlookAreas::class)(olkArea(), collect()))->toBe([])
         ->and(app(LocationsInOutlookAreas::class)(['type' => 'Polygon'], collect([$location])))->toBe([]);
+});
+
+test('a geometry PostGIS refuses matches nothing, logs only the class and SQLSTATE, and keeps the transaction usable', function () {
+    $location = olkInside();
+    $broken = ['type' => 'SECRETTEXT', 'coordinates' => []];
+    Log::spy();
+
+    $result = DB::transaction(function () use ($broken, $location): array {
+        $found = app(LocationsInOutlookAreas::class)($broken, collect([$location]));
+
+        return [$found, app(LocationsInOutlookAreas::class)(olkArea(), collect([$location]))];
+    });
+
+    expect($result)->toBe([[], [$location->id]]);
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message, array $context): bool => array_keys($context) === ['exception', 'sqlstate']
+        && $context['exception'] === QueryException::class
+        && ! str_contains(json_encode($context), 'SECRETTEXT'));
+});
+
+test('a self-intersecting bow-tie polygon is made valid and still finds a point in a lobe', function () {
+    $bowTie = ['type' => 'Polygon', 'coordinates' => [[[-98, 35], [-96, 37], [-96, 35], [-98, 37], [-98, 35]]]];
+    $lobe = olkInside(['lat' => 36.0, 'lng' => -97.9]);
+    $outside = olkInside(['lat' => 36.0, 'lng' => -95.0]);
+
+    $ids = app(LocationsInOutlookAreas::class)($bowTie, collect([$lobe, $outside]));
+
+    expect($ids)->toBe([$lobe->id]);
 });
