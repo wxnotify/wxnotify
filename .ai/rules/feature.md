@@ -18,3 +18,6 @@ In Laravel 13 `Queue::fake()` still takes `ShouldBeUnique` locks and never relea
 
 ## Delayed-job tests: use the database queue driver and travel the clock
 The suite runs on the `sync` queue by default, which the outlook pairing treats as delay 0. A test of a delayed job must switch to the `database` queue driver (`beforeEach`), run `queue:work --tries=1` and move the frozen clock past `available_at` (not run at 59 s, run at 61 s) instead of calling `handle()` directly (only the deleted-product and throwing cases may).
+
+## Tests that run the worker pass the production queue order
+Pass `'--queue' => 'deliveries,default'` to `queue:work` in tests; without it the worker reads only `default` and never runs a delivery. DeliverWeatherAlertUniqueTest drains `default` then `deliveries` to keep the unique-lock path.

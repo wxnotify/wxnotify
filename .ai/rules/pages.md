@@ -16,3 +16,6 @@ Container logs are untrusted text: DockerEngineClient::logs strips ANSI/control 
 
 ## The Heartbeat "Send test ping" buttons send a real, pinned GET and never show the URL
 Each heartbeat ping URL field on AppSettings has a suffix action (`testHeartbeat_<field>`) that tests the value currently typed (saved or not) through `App\Actions\Pipeline\SendTestHeartbeatPing`: the same `HeartbeatUrlGuard::requestOptions()` pin, no redirects, 5 s timeout as `SendHeartbeatPing`, after `forget()`-ing the guard's cached verdict so a retest after fixing DNS is not blocked for 5 minutes. A Healthchecks ping URL carries a secret UUID, so the notification is a fixed string plus the numeric HTTP status (or the guard's own message): never the URL, exception text or body, and nothing is logged. A successful test counts as a real check-in. The button is added only to the heartbeat fields (`endpointField(..., testPing: true)`).
+
+## Boot-time settings must trigger queue:restart on save
+ApplyEmailSettings applies relay/mailer/from only at boot, so AppSettings::save() runs `queue:restart` when one of those four changed (never otherwise; other settings are scoped and re-read per job). Failure to signal is logged by exception class and never fails the save. A new boot-time-applied setting must join `emailSettings()` or long-lived workers keep the old value.
