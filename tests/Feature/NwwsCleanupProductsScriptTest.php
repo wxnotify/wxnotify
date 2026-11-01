@@ -12,11 +12,11 @@ function nwwsCleanupRun(string $dir, array $extraEnv = []): ProcessResult
     ])->run(['sh', 'docker/nwws/cleanup-products.sh']);
 }
 
-function nwwsCleanupFile(string $path, int $daysOld): void
+function nwwsCleanupFile(string $path, float $daysOld): void
 {
     File::ensureDirectoryExists(dirname($path));
     File::put($path, 'product');
-    touch($path, time() - ($daysOld * 86400) - 60);
+    touch($path, time() - (int) ($daysOld * 86400) - 60);
 }
 
 beforeEach(function () {
@@ -80,7 +80,7 @@ test('an invalid retention falls back to 7 days and warns', function (string $va
         ->and($result->output())->toContain('older than 7 day(s)')
         ->and(File::exists($this->products.'/kbou/old.txt'))->toBeFalse()
         ->and(File::exists($this->products.'/kbou/recent.txt'))->toBeTrue();
-})->with(['abc', '0', '-3', '2.5', '']);
+})->with(['abc', '0', '00', '-3', '2.5', '', '99999999999999999999']);
 
 test('a valid retention is honoured without a warning', function () {
     nwwsCleanupFile($this->products.'/kbou/four.txt', 4);
@@ -125,3 +125,58 @@ test('the summary line reports the number of deleted files', function () {
 
     expect(trim($result->output()))->toBe('nwws retention: deleted 3 file(s) older than 7 day(s)');
 });
+
+test('the cutoff is exact hours, not whole days', function () {
+    nwwsCleanupFile($this->products.'/a/six-and-a-half.txt', 6.5);
+    nwwsCleanupFile($this->products.'/a/seven-and-a-half.txt', 7.5);
+
+    nwwsCleanupRun($this->products);
+
+    expect(File::exists($this->products.'/a/six-and-a-half.txt'))->toBeTrue()
+        ->and(File::exists($this->products.'/a/seven-and-a-half.txt'))->toBeFalse();
+});
+
+test('a one day retention keeps 20 hours and deletes 28 hours', function () {
+    nwwsCleanupFile($this->products.'/a/twenty.txt', 20 / 24);
+    nwwsCleanupFile($this->products.'/a/twenty-eight.txt', 28 / 24);
+
+    nwwsCleanupRun($this->products, ['NWWS_RETENTION_DAYS' => '1']);
+
+    expect(File::exists($this->products.'/a/twenty.txt'))->toBeTrue()
+        ->and(File::exists($this->products.'/a/twenty-eight.txt'))->toBeFalse();
+});
+
+test('a zero padded retention is read as decimal', function () {
+    nwwsCleanupFile($this->products.'/a/ten.txt', 10);
+    nwwsCleanupFile($this->products.'/a/five.txt', 5);
+
+    $result = nwwsCleanupRun($this->products, ['NWWS_RETENTION_DAYS' => '007']);
+
+    expect($result->errorOutput())->toBe('')
+        ->and($result->output())->toContain('older than 7 day(s)')
+        ->and(File::exists($this->products.'/a/ten.txt'))->toBeFalse()
+        ->and(File::exists($this->products.'/a/five.txt'))->toBeTrue();
+});
+
+test('a newline in a file name cannot redirect a deletion', function () {
+    nwwsCleanupFile($this->products."/x\n".$this->products.'/kden/new.txt', 30);
+    nwwsCleanupFile($this->products.'/kden/new.txt', 1);
+
+    $result = nwwsCleanupRun($this->products);
+
+    expect(File::exists($this->products.'/kden/new.txt'))->toBeTrue()
+        ->and($result->output())->toContain('deleted 1 file(s)');
+});
+
+test('an empty or root directory is refused without running find', function (string $dir) {
+    $bin = $this->root.'/bin';
+    File::ensureDirectoryExists($bin);
+    File::put($bin.'/find', "#!/bin/sh\ntouch \"".$this->root."/find-ran\"\n");
+    chmod($bin.'/find', 0755);
+
+    $result = nwwsCleanupRun($dir, ['PATH' => $bin.':/usr/bin:/bin']);
+
+    expect($result->exitCode())->toBe(0)
+        ->and($result->errorOutput())->toContain('refusing')
+        ->and(File::exists($this->root.'/find-ran'))->toBeFalse();
+})->with(['/', '//', '']);
