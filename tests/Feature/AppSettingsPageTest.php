@@ -26,6 +26,12 @@ test('the page loads the current values of both settings groups', function () {
         ]);
 });
 
+test('the save button sits below the form with space between them', function () {
+    livewire(AppSettings::class)
+        ->assertSeeHtml('<div style="margin-top: 1.5rem;">')
+        ->assertSee('Save settings');
+});
+
 test('the message prefix field is hidden until the toggle is turned on', function () {
     $component = livewire(AppSettings::class);
 
