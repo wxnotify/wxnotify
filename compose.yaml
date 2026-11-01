@@ -136,9 +136,11 @@ services:
         restart: unless-stopped
         profiles:
             - server-c
-    # The shapefile scan's own worker (ScanShapefileLayersJob, up to 15
-    # minutes): on the `queue` worker it would hold the only worker that
-    # delivers alerts for that long. It reads only the `long` queue of the
+    # The long-job worker: the shapefile scan (ScanShapefileLayersJob, up to 15
+    # minutes) and the hourly product storage scan (ScanProductStorageJob),
+    # which is why it mounts the product volumes, read-only. On the `queue`
+    # worker a scan would hold the only worker that delivers alerts for that
+    # long. It reads only the `long` queue of the
     # `database_long` connection, the same jobs table as `database` but with
     # retry_after 960 s (DB_QUEUE_LONG_RETRY_AFTER), above --timeout=900, so a
     # running scan is never handed out a second time; retry_after is per
@@ -158,6 +160,8 @@ services:
             - 'host.docker.internal:host-gateway'
         volumes:
             - '.:/var/www/html'
+            - 'nwws-products:/products:ro'
+            - 'emwin-products:/emwin-products:ro'
         networks:
             - sail
         depends_on:

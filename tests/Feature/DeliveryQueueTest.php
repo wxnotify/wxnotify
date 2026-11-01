@@ -159,6 +159,13 @@ test('the long worker reads only the long queue, runs a scan once, and lets it f
         ->and(chanComposeSeconds($service['stop_grace_period']))->toBeGreaterThan($timeout);
 });
 
+test('the long worker mounts both product volumes read-only so the storage scan can read them', function () {
+    $volumes = chanComposeService('compose.yaml', 'queue-long')['volumes'];
+
+    expect($volumes)->toContain('nwws-products:/products:ro')
+        ->toContain('emwin-products:/emwin-products:ro');
+});
+
 test('the no-restart development override reads the same queues in the same order and runs a job once', function () {
     $command = chanComposeService('compose.dev-listen.yaml', 'queue')['command'];
 

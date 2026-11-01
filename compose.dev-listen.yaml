@@ -5,7 +5,8 @@
 #
 #   docker compose -f compose.yaml -f compose.dev-listen.yaml up -d queue
 #
-# The shapefile scan's `queue-long` worker is not overridden and stays a
+# The `queue-long` worker (shapefile and product storage scans) is not
+# overridden and stays a
 # queue:work (restart it after changing the scan code); this override's queue
 # never reads the `long` queue, so start it too when you need a scan to run:
 #
