@@ -51,19 +51,19 @@ test('formats an imperial card in the place timezone', function () {
         ->and($card['available'])->toBeTrue()
         ->and($card['timezone'])->toBe('America/Denver')
         ->and($card['current'])->toBe([
-            'temperature' => '78°F',
+            'temperature' => '78°',
             'temperature_value' => 78,
             'condition' => 'Mostly cloudy',
             'condition_code' => 'MostlyCloudy',
-            'feels_like' => '82°F',
+            'feels_like' => '82°',
             'wind' => '9 mph SE',
             'humidity' => '74%',
             'uv_index' => 3,
             'is_daylight' => true,
         ])
-        ->and($card['hours'][0])->toBe(['label' => '3 PM', 'time' => '2026-11-01T15:00:00-07:00', 'temperature' => '80°F', 'precip_chance' => '30%', 'condition_code' => 'Rain'])
+        ->and($card['hours'][0])->toBe(['label' => '3 PM', 'time' => '2026-11-01T15:00:00-07:00', 'temperature' => '80°', 'precip_chance' => '30%', 'condition_code' => 'Rain'])
         ->and($card['days'][0])->toBe([
-            'label' => 'Today', 'date' => '2026-11-01', 'high' => '81°F', 'low' => '69°F', 'precip_chance' => '40%',
+            'label' => 'Today', 'date' => '2026-11-01', 'high' => '81°', 'low' => '69°', 'precip_chance' => '40%',
             'condition_code' => 'Rain', 'sunrise' => '6:48 AM', 'sunset' => '5:12 PM',
         ])
         ->and($card['days'][1]['label'])->toBe('Mon');
@@ -72,10 +72,10 @@ test('formats an imperial card in the place timezone', function () {
 test('formats the same input for a metric subscriber', function () {
     $card = FormatPlaceWeather::forUser(fpwWeather(), new Units(UnitSystem::Metric), $this->fpwLocation);
 
-    expect($card['current']['temperature'])->toBe('26°C')
+    expect($card['current']['temperature'])->toBe('26°')
         ->and($card['current']['temperature_value'])->toBe(26)
         ->and($card['current']['wind'])->toBe('14 km/h SE')
-        ->and($card['days'][0]['high'])->toBe('27°C');
+        ->and($card['days'][0]['high'])->toBe('27°');
 });
 
 test('omits fields the source did not send', function () {

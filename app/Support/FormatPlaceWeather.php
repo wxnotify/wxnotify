@@ -127,7 +127,7 @@ final class FormatPlaceWeather
 
     private static function temperature(float|int $celsius, Units $units): string
     {
-        return $units->temperature(Units::fahrenheitFromCelsius((float) $celsius));
+        return Units::number($units->temperatureValue(Units::fahrenheitFromCelsius((float) $celsius))).'°';
     }
 
     private static function temperatureOrNull(mixed $celsius, Units $units): ?string
