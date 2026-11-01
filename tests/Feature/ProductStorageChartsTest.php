@@ -18,7 +18,7 @@ beforeEach(function () {
     $this->actingAs(User::factory()->create(['is_staff' => true]));
 });
 
-function chartData(string $widget): array
+function storageChartData(string $widget): array
 {
     $instance = livewire($widget)->instance();
 
@@ -40,7 +40,7 @@ test('a bucket chart shows the latest complete scan buckets largest first in GB'
     ProductStorageBucket::factory()->create(['product_storage_scan_id' => $scan->id, 'dimension' => $dimension, 'label' => 'Big', 'bytes' => 3_221_225_472]);
     ProductStorageBucket::factory()->create(['product_storage_scan_id' => $scan->id, 'dimension' => $dimension === StorageDimension::Source ? StorageDimension::FileKind : StorageDimension::Source, 'label' => 'Other dimension', 'bytes' => 5]);
 
-    $data = chartData($widget);
+    $data = storageChartData($widget);
 
     expect($data['labels'])->toBe(['Big', 'Small'])
         ->and($data['datasets'][0]['data'])->toBe([3.0, 1.0]);
@@ -49,7 +49,7 @@ test('a bucket chart shows the latest complete scan buckets largest first in GB'
 test('a bucket chart is empty without a complete scan', function (string $widget) {
     ProductStorageScan::factory()->failed()->create();
 
-    $data = chartData($widget);
+    $data = storageChartData($widget);
 
     expect($data['labels'])->toBe([])->and($data['datasets'][0]['data'])->toBe([]);
 })->with([StorageBySourceChart::class, StorageByCatalogGroupChart::class, StorageByFileKindChart::class]);
@@ -67,7 +67,7 @@ test('the growth chart plots complete scans oldest first and ignores failed ones
     ProductStorageScan::factory()->failed()->create(['finished_at' => now()->subHours(3)]);
     ProductStorageScan::factory()->create(['finished_at' => now()->subDays(40)]);
 
-    $data = chartData(StorageGrowthChart::class);
+    $data = storageChartData(StorageGrowthChart::class);
 
     expect($data['labels'])->toHaveCount(2)
         ->and($data['datasets'][0]['data'])->toBe([1.0, 3.0])
@@ -77,7 +77,7 @@ test('the growth chart plots complete scans oldest first and ignores failed ones
 });
 
 test('the growth chart is empty without scans', function () {
-    $data = chartData(StorageGrowthChart::class);
+    $data = storageChartData(StorageGrowthChart::class);
 
     expect($data['labels'])->toBe([])->and($data['datasets'][0]['data'])->toBe([]);
 });
@@ -100,7 +100,7 @@ test('a bucket under 5 MB keeps its raw bytes and the tooltip callback is presen
     $scan = ProductStorageScan::factory()->create();
     ProductStorageBucket::factory()->create(['product_storage_scan_id' => $scan->id, 'dimension' => StorageDimension::FileKind, 'label' => 'Tiny', 'bytes' => 2_200_000]);
 
-    $data = chartData(StorageByFileKindChart::class);
+    $data = storageChartData(StorageByFileKindChart::class);
     $instance = livewire(StorageByFileKindChart::class)->instance();
     $options = (new ReflectionMethod($instance, 'getOptions'))->invoke($instance);
 
@@ -112,7 +112,7 @@ test('a bucket under 5 MB keeps its raw bytes and the tooltip callback is presen
 test('the growth chart carries raw bytes for its size datasets', function () {
     ProductStorageScan::factory()->create(['nwws_bytes' => 2_200_000, 'emwin_byteblaster_bytes' => 5, 'emwin_http_bytes' => 0]);
 
-    $data = chartData(StorageGrowthChart::class);
+    $data = storageChartData(StorageGrowthChart::class);
 
     expect($data['datasets'][0]['bytes'])->toBe([2_200_000])->and($data['datasets'][1]['bytes'])->toBe([5]);
 });

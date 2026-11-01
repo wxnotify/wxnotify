@@ -3,7 +3,7 @@
 use App\Support\ProductStorage\DiskGauge;
 use App\Support\ProductStorage\DiskReading;
 
-function gaugeTempDir(): string
+function diskGaugeTempDir(): string
 {
     $dir = sys_get_temp_dir().'/gauge-'.uniqid('', true);
     mkdir($dir, 0777, true);
@@ -31,8 +31,8 @@ test('percent rounds to one decimal and an unavailable reading has none', functi
 });
 
 test('two roots on one filesystem give a single product disk reading', function () {
-    $nwws = gaugeTempDir();
-    $emwin = gaugeTempDir();
+    $nwws = diskGaugeTempDir();
+    $emwin = diskGaugeTempDir();
     config(['services.pipeline.products_path' => $nwws, 'services.pipeline.emwin_products_path' => $emwin]);
 
     $readings = (new DiskGauge)->readings();
@@ -49,7 +49,7 @@ test('two roots on one filesystem give a single product disk reading', function 
 });
 
 test('a missing root gives an unavailable reading and is never merged', function () {
-    $emwin = gaugeTempDir();
+    $emwin = diskGaugeTempDir();
     config(['services.pipeline.products_path' => sys_get_temp_dir().'/gauge-missing-'.uniqid(), 'services.pipeline.emwin_products_path' => $emwin]);
 
     $readings = (new DiskGauge)->readings();
@@ -70,7 +70,7 @@ test('paths returns the two configured roots', function () {
     expect((new DiskGauge)->paths())->toBe(['nwws' => '/a', 'emwin' => '/b']);
 });
 
-function gaugeWithDevices(?int $nwwsDevice, ?int $emwinDevice): DiskGauge
+function diskGaugeWithDevices(?int $nwwsDevice, ?int $emwinDevice): DiskGauge
 {
     return new class($nwwsDevice, $emwinDevice) extends DiskGauge
     {
@@ -84,11 +84,11 @@ function gaugeWithDevices(?int $nwwsDevice, ?int $emwinDevice): DiskGauge
 }
 
 test('available roots on different devices give two readings', function (?int $nwwsDevice, ?int $emwinDevice, array $labels) {
-    $nwws = gaugeTempDir();
-    $emwin = gaugeTempDir();
+    $nwws = diskGaugeTempDir();
+    $emwin = diskGaugeTempDir();
     config(['services.pipeline.products_path' => $nwws, 'services.pipeline.emwin_products_path' => $emwin]);
 
-    $readings = gaugeWithDevices($nwwsDevice, $emwinDevice)->readings();
+    $readings = diskGaugeWithDevices($nwwsDevice, $emwinDevice)->readings();
 
     expect(array_map(fn (DiskReading $reading) => $reading->label, $readings))->toBe($labels);
 

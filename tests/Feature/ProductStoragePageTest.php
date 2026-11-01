@@ -21,7 +21,7 @@ function storagePageTempDir(): string
     return $dir;
 }
 
-function bindGaugeReadings(DiskReading ...$readings): void
+function storageBindGaugeReadings(DiskReading ...$readings): void
 {
     app()->instance(DiskGauge::class, new class($readings) extends DiskGauge
     {
@@ -112,7 +112,7 @@ test('an unreadable product root shows unavailable and no percentage', function 
 });
 
 test('the product and everything-else split uses the scan disk figures', function () {
-    bindGaugeReadings(new DiskReading('Product disk', '/x', 10 * 1024 ** 3, 100 * 1024 ** 3));
+    storageBindGaugeReadings(new DiskReading('Product disk', '/x', 10 * 1024 ** 3, 100 * 1024 ** 3));
     ProductStorageScan::factory()->create([
         'disks' => [['label' => 'Product disk', 'product_bytes' => 4 * 1024 ** 3, 'used_bytes' => 10 * 1024 ** 3, 'total_bytes' => 100 * 1024 ** 3]],
     ]);
@@ -123,7 +123,7 @@ test('the product and everything-else split uses the scan disk figures', functio
 });
 
 test('the gauge colour follows the band', function (int $used, string $colour) {
-    bindGaugeReadings(new DiskReading('Product disk', '/x', $used, 100));
+    storageBindGaugeReadings(new DiskReading('Product disk', '/x', $used, 100));
 
     livewire(ProductStorage::class)->assertSeeHtml("width:{$used}%;background:{$colour}");
 })->with([
