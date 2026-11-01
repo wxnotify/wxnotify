@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('alerts:dispatch-outlook-reports')->everyFifteenMinutes()->withoutOverlapping(30);
         $schedule->command('traccar:poll-positions')->everyFiveMinutes()->withoutOverlapping();
         $schedule->command('pipeline:prune-deliveries')->hourly();
+        $schedule->command('storage:scan-products')->hourly()->withoutOverlapping(60);
         $schedule->command('sanctum:prune-expired --hours=24')->daily();
         $schedule->job(new RecordQueueHeartbeat)->everyMinute();
     })
