@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\PlaceController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\PushTokenController;
 use App\Http\Controllers\Api\V1\SavedLocationController;
+use App\Http\Controllers\Api\V1\WeatherController;
 use App\Http\Controllers\Api\V1\ZoneController;
 use App\Http\Controllers\IngestEmwinProductController;
 use App\Http\Controllers\IngestGlmFlashesController;
@@ -64,6 +65,7 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/channels/{id}', [ChannelController::class, 'destroy'])->whereNumber('id')->name('api.v1.channels.destroy');
         Route::get('/map', MapController::class)->name('api.v1.map');
         Route::get('/active-alerts', ActiveAlertController::class)->name('api.v1.active-alerts');
+        Route::get('/weather', WeatherController::class)->name('api.v1.weather');
         Route::get('/alert-rule-options', AlertRuleOptionsController::class)->name('api.v1.alert-rule-options');
         Route::get('/nws-offices', NwsOfficeController::class)->name('api.v1.nws-offices');
         Route::get('/products', [ProductController::class, 'index'])->name('api.v1.products.index');
