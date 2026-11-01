@@ -76,7 +76,7 @@ function gaugeWithDevices(?int $nwwsDevice, ?int $emwinDevice): DiskGauge
     {
         public function __construct(private ?int $nwwsDevice, private ?int $emwinDevice) {}
 
-        protected function deviceOf(string $path): ?int
+        public function deviceOf(string $path): ?int
         {
             return $path === $this->paths()['nwws'] ? $this->nwwsDevice : $this->emwinDevice;
         }

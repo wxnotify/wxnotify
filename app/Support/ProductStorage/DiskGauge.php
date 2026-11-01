@@ -36,7 +36,7 @@ class DiskGauge
         return [$nwws, $emwin];
     }
 
-    protected function deviceOf(string $path): ?int
+    public function deviceOf(string $path): ?int
     {
         $stat = @stat($path);
 
