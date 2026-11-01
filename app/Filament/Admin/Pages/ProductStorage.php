@@ -3,6 +3,10 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Filament\Admin\Widgets\ProductStorageStats;
+use App\Filament\Admin\Widgets\StorageByCatalogGroupChart;
+use App\Filament\Admin\Widgets\StorageByFileKindChart;
+use App\Filament\Admin\Widgets\StorageBySourceChart;
+use App\Filament\Admin\Widgets\StorageGrowthChart;
 use App\Jobs\ScanProductStorageJob;
 use App\Models\ProductStorageScan;
 use App\Support\ProductStorage\Bytes;
@@ -47,6 +51,19 @@ class ProductStorage extends Page
     protected function getHeaderWidgets(): array
     {
         return [ProductStorageStats::class];
+    }
+
+    /**
+     * @return array<class-string>
+     */
+    protected function getFooterWidgets(): array
+    {
+        return [StorageBySourceChart::class, StorageByFileKindChart::class, StorageByCatalogGroupChart::class, StorageGrowthChart::class];
+    }
+
+    public function getFooterWidgetsColumns(): int|array
+    {
+        return 2;
     }
 
     protected function getHeaderActions(): array
