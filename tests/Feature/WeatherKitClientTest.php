@@ -51,7 +51,7 @@ test('attribution requests the attribution endpoint', function () {
 
     expect((new WeatherKitClient)->attribution())->toBe(['serviceName' => 'Weather']);
 
-    Http::assertSent(fn (Request $request) => parse_url($request->url(), PHP_URL_PATH) === '/api/v1/attribution/en'
+    Http::assertSent(fn (Request $request) => parse_url($request->url(), PHP_URL_PATH) === '/attribution/en'
         && str_starts_with($request->header('Authorization')[0], 'Bearer '));
 });
 

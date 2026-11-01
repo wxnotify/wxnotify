@@ -17,6 +17,8 @@ final class WeatherKitClient
 {
     private const BASE_URL = 'https://weatherkit.apple.com/api/v1';
 
+    private const ATTRIBUTION_URL = 'https://weatherkit.apple.com/attribution';
+
     private const LANGUAGE = 'en';
 
     private const TIMEOUT_SECONDS = 10;
@@ -29,7 +31,7 @@ final class WeatherKitClient
     public function weather(float $lat, float $lng, string $timezone): ?array
     {
         return $this->get(
-            '/weather/'.self::LANGUAGE.'/'.$lat.'/'.$lng,
+            self::BASE_URL.'/weather/'.self::LANGUAGE.'/'.$lat.'/'.$lng,
             ['dataSets' => 'currentWeather,forecastHourly,forecastDaily', 'timezone' => $timezone],
         );
     }
@@ -39,14 +41,14 @@ final class WeatherKitClient
      */
     public function attribution(): ?array
     {
-        return $this->get('/attribution/'.self::LANGUAGE);
+        return $this->get(self::ATTRIBUTION_URL.'/'.self::LANGUAGE);
     }
 
     /**
      * @param  array<string, string>  $query
      * @return array<string, mixed>|null
      */
-    private function get(string $path, array $query = []): ?array
+    private function get(string $url, array $query = []): ?array
     {
         $token = $this->token->token();
 
@@ -58,7 +60,7 @@ final class WeatherKitClient
             $response = Http::withToken($token)
                 ->acceptJson()
                 ->timeout(self::TIMEOUT_SECONDS)
-                ->get(self::BASE_URL.$path, $query);
+                ->get($url, $query);
         } catch (Throwable $e) {
             $this->logFailure('exception '.class_basename($e));
 
