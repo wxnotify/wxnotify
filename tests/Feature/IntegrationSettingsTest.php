@@ -62,6 +62,7 @@ test('each integration maps to its expected properties', function (Integration $
     'archival' => [Integration::Archival, 'archival_enabled', 'archival_endpoint'],
     'status page' => [Integration::StatusPage, 'status_page_enabled', 'status_page_url'],
     'email relay' => [Integration::EmailRelay, 'email_relay_enabled', null],
+    'map tiles' => [Integration::MapTiles, 'map_tiles_enabled', null],
 ]);
 
 test('endpoint() returns the stored short urls endpoint', function () {

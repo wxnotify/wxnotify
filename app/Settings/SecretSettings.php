@@ -23,6 +23,13 @@ class SecretSettings extends Settings
 
     public ?string $traccar_polling_token;
 
+    /**
+     * The separate map tiler's key. Not a Secret case: it has no .env
+     * fallback, is edited in the Integrations tab's Map tiles section, and is
+     * read only through App\Support\MapTiles.
+     */
+    public ?string $map_tiles_api_key;
+
     public static function group(): string
     {
         return 'secrets';
@@ -40,6 +47,7 @@ class SecretSettings extends Settings
             'paddle_webhook_secret',
             'firebase_service_account',
             'traccar_polling_token',
+            'map_tiles_api_key',
         ];
     }
 }

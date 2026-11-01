@@ -48,6 +48,12 @@ class IntegrationSettings extends Settings
 
     public ?string $email_from_name;
 
+    public bool $map_tiles_enabled;
+
+    public ?string $map_tiles_provider;
+
+    public ?string $map_tiles_style;
+
     public static function group(): string
     {
         return 'integrations';

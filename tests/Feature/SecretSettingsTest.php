@@ -25,7 +25,9 @@ test('every slot defaults to null and every slot is flagged encrypted', function
             ->and(SecretSettings::encrypted())->toContain($secret->settingsProperty());
     }
 
-    expect(SecretSettings::encrypted())->toHaveCount(count(Secret::cases()));
+    // Plus map_tiles_api_key, which is encrypted here but is not a Secret case (no .env fallback).
+    expect(SecretSettings::encrypted())->toHaveCount(count(Secret::cases()) + 1)
+        ->toContain('map_tiles_api_key');
 });
 
 test('the enum maps each secret to its property and fallback config key', function (Secret $secret, string $property, string $configKey) {

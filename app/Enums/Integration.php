@@ -12,6 +12,7 @@ enum Integration: string
     case Archival = 'archival';
     case StatusPage = 'status_page';
     case EmailRelay = 'email_relay';
+    case MapTiles = 'map_tiles';
 
     /**
      * The boolean property on IntegrationSettings that switches this integration.
@@ -32,7 +33,7 @@ enum Integration: string
             self::ReverseGeocoding => 'reverse_geocoding_endpoint',
             self::Archival => 'archival_endpoint',
             self::StatusPage => 'status_page_url',
-            self::ExceptionReporting, self::EmailRelay, self::Heartbeat => null,
+            self::ExceptionReporting, self::EmailRelay, self::Heartbeat, self::MapTiles => null,
         };
     }
 }

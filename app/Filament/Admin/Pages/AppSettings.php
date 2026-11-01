@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Actions\Pipeline\SendTestHeartbeatPing;
+use App\Enums\MapTileProvider;
 use App\Enums\Secret;
 use App\Settings\FeatureFlagsSettings;
 use App\Settings\GeneralSettings;
@@ -26,7 +27,9 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Arr;
@@ -65,6 +68,8 @@ class AppSettings extends Page implements HasForms
         'email_mailer',
         'email_from_address',
         'email_from_name',
+        'map_tiles_provider',
+        'map_tiles_style',
     ];
 
     /**
@@ -178,6 +183,7 @@ class AppSettings extends Page implements HasForms
                 }
 
                 $this->saveSecrets($data);
+                $this->saveMapTilesKey($data);
             });
 
             if ($this->emailSettings() !== $emailSettingsBefore) {
@@ -188,6 +194,9 @@ class AppSettings extends Page implements HasForms
                 $this->data[$secret->settingsProperty()] = null;
                 $this->data["clear_{$secret->settingsProperty()}"] = false;
             }
+
+            $this->data['map_tiles_api_key'] = null;
+            $this->data['clear_map_tiles_api_key'] = false;
         }
 
         Notification::make()->success()->title('Settings saved')->send();
@@ -252,6 +261,106 @@ class AppSettings extends Page implements HasForms
         $settings = app(SecretSettings::class);
         $settings->fill($changes);
         $settings->save();
+    }
+
+    /**
+     * The map tiler's key lives with the secrets (encrypted, owner-only, never
+     * pre-filled) but is edited beside its toggle; the remove checkbox wins.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function saveMapTilesKey(array $data): void
+    {
+        if (auth()->user()?->is_owner !== true) {
+            return;
+        }
+
+        if (! empty($data['clear_map_tiles_api_key'])) {
+            $key = null;
+        } elseif (filled($data['map_tiles_api_key'] ?? null)) {
+            $key = trim((string) $data['map_tiles_api_key']);
+        } else {
+            return;
+        }
+
+        $settings = app(SecretSettings::class);
+        $settings->map_tiles_api_key = $key;
+        $settings->save();
+    }
+
+    private function mapTilesKeyStored(): bool
+    {
+        try {
+            return filled(app(SecretSettings::class)->map_tiles_api_key);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function isOwner(): bool
+    {
+        return auth()->user()?->is_owner === true;
+    }
+
+    private function mapTilesSection(): Section
+    {
+        $enabled = fn (Get $get): bool => (bool) $get('map_tiles_enabled');
+        $styles = fn (Get $get): array => MapTileProvider::tryFrom((string) $get('map_tiles_provider'))?->styles() ?? [];
+
+        return Section::make('Map tiles')
+            ->description('Every map (the Locations and device maps, the location pickers and the admin maps) draws OpenStreetMap\'s public tiles unless a separate map tiler is switched on here.')
+            ->schema([
+                Toggle::make('map_tiles_enabled')
+                    ->label('Use a separate map tiler')
+                    ->helperText('If the tiler\'s tiles fail to load (a wrong key, an exceeded quota), each map switches itself to OpenStreetMap for that page view, so a mistake shows OpenStreetMap again rather than a blank map. Open a map after saving to check the tiles you chose are the ones drawn.')
+                    ->live()
+                    ->rules([fn (): Closure => $this->mapTilesKeyAvailableRule()]),
+                Select::make('map_tiles_provider')
+                    ->label('Provider')
+                    ->native()
+                    ->options(MapTileProvider::options())
+                    ->in(array_keys(MapTileProvider::options()))
+                    ->live()
+                    ->afterStateUpdated(fn (Set $set): mixed => $set('map_tiles_style', null))
+                    ->required($enabled)
+                    ->visible($enabled),
+                Select::make('map_tiles_style')
+                    ->label('Style')
+                    ->native()
+                    ->options($styles)
+                    ->in(fn (Get $get): array => array_keys($styles($get)))
+                    ->required($enabled)
+                    ->visible($enabled),
+                TextInput::make('map_tiles_api_key')
+                    ->label('API key')
+                    ->password()
+                    ->autocomplete('new-password')
+                    ->maxLength(255)
+                    ->helperText(fn (): string => ($this->mapTilesKeyStored() ? 'Set. Enter a new value to replace it.' : 'Not set.')
+                        .' The key is visible in the browser\'s tile requests, so restrict it to this site\'s domain at the provider.')
+                    ->required(fn (Get $get): bool => (bool) $get('map_tiles_enabled') && ! $this->mapTilesKeyStored())
+                    ->validationMessages(['required' => 'Enter the map tiler\'s API key.'])
+                    ->visible(fn (Get $get): bool => $this->isOwner() && (bool) $get('map_tiles_enabled')),
+                Checkbox::make('clear_map_tiles_api_key')
+                    ->label('Remove the stored map tiler key')
+                    ->dehydrated()
+                    ->visible(fn (Get $get): bool => $this->isOwner() && ! $get('map_tiles_enabled') && $this->mapTilesKeyStored()),
+                Text::make('Only the owner can enter the API key.')
+                    ->visible(fn (Get $get): bool => ! $this->isOwner() && (bool) $get('map_tiles_enabled')),
+            ]);
+    }
+
+    /**
+     * A staff user who is not the owner cannot type the key, so they may only
+     * switch the tiler on once the owner has stored one.
+     */
+    private function mapTilesKeyAvailableRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value && ! $this->isOwner() && ! $this->mapTilesKeyStored()) {
+                $fail('The map tiler has no API key yet. Ask the owner to enter it first.');
+            }
+        };
     }
 
     private function secretsTab(): Tab
@@ -397,6 +506,7 @@ class AppSettings extends Page implements HasForms
                         ->maxLength(255)
                         ->visible($whenEnabled('email_relay_enabled')),
                 ]),
+            $this->mapTilesSection(),
         ]);
     }
 
