@@ -117,3 +117,17 @@ test('changing the team id or service id issues a new token for the same key id'
     expect($second)->toBeString()->not->toBe($first)
         ->and(wkPart($second, 1)[$field === 'team_id' ? 'iss' : 'sub'])->toBe('CHANGED');
 })->with(['team_id', 'service_id']);
+
+test('a relative key path is looked up under storage', function () {
+    $dir = 'app/wk-test-'.uniqid();
+    $path = storage_path($dir.'/AuthKey_TEST.p8');
+    mkdir(dirname($path), 0777, true);
+    file_put_contents($path, wkGenerateKeyPair()['private']);
+    wkConfigure(['private_key_path' => $dir.'/AuthKey_TEST.p8']);
+
+    $token = (new WeatherKitToken)->token();
+    unlink($path);
+    rmdir(dirname($path));
+
+    expect($token)->toBeString();
+});

@@ -74,14 +74,35 @@ final class WeatherKitToken
             return str_replace('\n', "\n", $inline);
         }
 
-        $path = $this->value('private_key_path');
+        $path = $this->keyFilePath($this->value('private_key_path'));
 
-        if ($path === null || ! is_file($path) || ! is_readable($path)) {
+        if ($path === null) {
             return null;
         }
 
         $contents = @file_get_contents($path);
 
         return is_string($contents) && trim($contents) !== '' ? $contents : null;
+    }
+
+    /**
+     * A relative key path is looked up under storage/ and then the project root, so
+     * `app/apple/AuthKey_XXXX.p8` means storage/app/apple/AuthKey_XXXX.p8.
+     */
+    private function keyFilePath(?string $path): ?string
+    {
+        if ($path === null) {
+            return null;
+        }
+
+        $candidates = str_starts_with($path, '/') ? [$path] : [$path, storage_path($path), base_path($path)];
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate) && is_readable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }

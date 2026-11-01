@@ -81,11 +81,11 @@ return [
     ],
 
     'weatherkit' => [
-        'team_id' => env('WEATHERKIT_TEAM_ID'),
-        'service_id' => env('WEATHERKIT_SERVICE_ID'),
-        'key_id' => env('WEATHERKIT_KEY_ID'),
-        'private_key' => env('WEATHERKIT_PRIVATE_KEY'),
-        'private_key_path' => env('WEATHERKIT_PRIVATE_KEY_PATH'),
+        'team_id' => env('WEATHERKIT_TEAM_ID', env('APPLE_WEATHER_KIT_TEAM_ID')),
+        'service_id' => env('WEATHERKIT_SERVICE_ID', env('APPLE_WEATHER_KIT_BUNDLE_ID')),
+        'key_id' => env('WEATHERKIT_KEY_ID', env('APPLE_WEATHER_KIT_KEY_ID')),
+        'private_key' => env('WEATHERKIT_PRIVATE_KEY', env('APPLE_WEATHER_KIT_PRIVATE_KEY')),
+        'private_key_path' => env('WEATHERKIT_PRIVATE_KEY_PATH', env('APPLE_WEATHER_KIT_PRIVATE_KEY_PATH')),
     ],
 
 ];
