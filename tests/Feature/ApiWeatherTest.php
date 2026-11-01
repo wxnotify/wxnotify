@@ -148,6 +148,23 @@ test('a WeatherKit failure still answers 200 with an unavailable card and no att
         ->assertJsonPath('data.places.0.label', 'Home');
 });
 
+test('an attribution failure still credits Apple Weather next to an available card', function () {
+    Http::fake([
+        'weatherkit.apple.com/api/v1/weather/*' => Http::response(apwWeatherBody()),
+        'weatherkit.apple.com/attribution/*' => Http::response('', 500),
+    ]);
+    ($this->place)('Home', 40.7128, -74.006);
+
+    ($this->call)()->assertOk()
+        ->assertJsonPath('data.selected.available', true)
+        ->assertJsonPath('data.attribution', [
+            'name' => 'Apple Weather',
+            'logo_light_url' => null,
+            'logo_dark_url' => null,
+            'legal_url' => 'https://developer.apple.com/weatherkit/data-source-attribution/',
+        ]);
+});
+
 test('metric and imperial subscribers get their own strings from one cached lookup', function () {
     apwFakeWeatherKit();
     ($this->place)('Home', 40.7128, -74.006);

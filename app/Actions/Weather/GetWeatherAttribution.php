@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Cache;
  * The Apple Weather attribution every WeatherKit card must carry: the service name, the light and
  * dark logos (Apple sends partial paths, resolved against weatherkit.apple.com; the largest scale
  * sent is used) and the legal attribution page. Cached for a day; an unavailable lookup is
- * remembered for 60 seconds.
+ * remembered for 60 seconds and answered with a static fallback (never null), because Apple's terms
+ * require the credit next to every card.
  */
 class GetWeatherAttribution
 {
@@ -21,7 +22,7 @@ class GetWeatherAttribution
      */
     private const LEGAL_URL = 'https://developer.apple.com/weatherkit/data-source-attribution/';
 
-    private const DEFAULT_NAME = 'Weather';
+    private const DEFAULT_NAME = 'Apple Weather';
 
     private const CACHE_KEY = 'weatherkit:attribution';
 
@@ -32,9 +33,9 @@ class GetWeatherAttribution
     public function __construct(private readonly WeatherKitClient $client) {}
 
     /**
-     * @return array{name: string, logo_light_url: ?string, logo_dark_url: ?string, legal_url: ?string}|null
+     * @return array{name: string, logo_light_url: ?string, logo_dark_url: ?string, legal_url: string}
      */
-    public function __invoke(): ?array
+    public function __invoke(): array
     {
         $cached = Cache::get(self::CACHE_KEY);
 
@@ -43,7 +44,7 @@ class GetWeatherAttribution
         }
 
         if ($cached === false) {
-            return null;
+            return self::fallback();
         }
 
         $payload = $this->client->attribution();
@@ -51,7 +52,7 @@ class GetWeatherAttribution
         if ($payload === null) {
             Cache::put(self::CACHE_KEY, false, self::FAILURE_TTL_SECONDS);
 
-            return null;
+            return self::fallback();
         }
 
         $serviceName = $payload['serviceName'] ?? null;
@@ -66,6 +67,21 @@ class GetWeatherAttribution
         Cache::put(self::CACHE_KEY, $attribution, self::SUCCESS_TTL_SECONDS);
 
         return $attribution;
+    }
+
+    /**
+     * The credit used while the attribution lookup is unavailable: the name and the fixed legal link.
+     *
+     * @return array{name: string, logo_light_url: null, logo_dark_url: null, legal_url: string}
+     */
+    public static function fallback(): array
+    {
+        return [
+            'name' => self::DEFAULT_NAME,
+            'logo_light_url' => null,
+            'logo_dark_url' => null,
+            'legal_url' => self::LEGAL_URL,
+        ];
     }
 
     /**
@@ -84,7 +100,9 @@ class GetWeatherAttribution
                 return $path;
             }
 
-            return str_starts_with($path, '/') ? self::ASSET_BASE_URL.$path : null;
+            if (str_starts_with($path, '/')) {
+                return self::ASSET_BASE_URL.$path;
+            }
         }
 
         return null;

@@ -72,16 +72,16 @@ class WeatherController extends Controller
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>
      */
-    private function attribution(GetWeatherAttribution $attribution): ?array
+    private function attribution(GetWeatherAttribution $attribution): array
     {
         try {
             return $attribution();
         } catch (Throwable $e) {
             report($e);
 
-            return null;
+            return GetWeatherAttribution::fallback();
         }
     }
 }

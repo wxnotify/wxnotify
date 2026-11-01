@@ -106,3 +106,14 @@ test('missing or unusable credentials give no token and never throw', function (
     'unreadable key path' => [['private_key' => null, 'private_key_path' => '/nonexistent/AuthKey.p8'], false],
     'garbage pem' => [['private_key' => 'not a pem'], true],
 ]);
+
+test('changing the team id or service id issues a new token for the same key id', function (string $field) {
+    wkConfigure(['private_key' => wkGenerateKeyPair()['private']]);
+    $first = (new WeatherKitToken)->token();
+
+    config(['services.weatherkit.'.$field => 'CHANGED']);
+    $second = (new WeatherKitToken)->token();
+
+    expect($second)->toBeString()->not->toBe($first)
+        ->and(wkPart($second, 1)[$field === 'team_id' ? 'iss' : 'sub'])->toBe('CHANGED');
+})->with(['team_id', 'service_id']);

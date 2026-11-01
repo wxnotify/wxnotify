@@ -92,14 +92,18 @@ test('non-array json returns null', function () {
     expect((new WeatherKitClient)->weather(1.0, 2.0, 'UTC'))->toBeNull();
 });
 
-test('no usable credentials means no http request', function (bool $configured, bool $usable) {
+test('no usable credentials means no http request and one secret-free log per window', function (bool $configured, bool $usable) {
     if ($configured) {
         wkcConfigure($usable);
     } else {
         config(['services.weatherkit' => ['team_id' => null, 'service_id' => null, 'key_id' => null, 'private_key' => null, 'private_key_path' => null]]);
     }
     Http::fake();
-    Log::shouldReceive('warning')->zeroOrMoreTimes();
+
+    $logged = [];
+    Log::shouldReceive('warning')->once()->andReturnUsing(function (string $message, array $context = []) use (&$logged) {
+        $logged = [$message, $context];
+    });
 
     $client = new WeatherKitClient;
 
@@ -107,6 +111,13 @@ test('no usable credentials means no http request', function (bool $configured, 
         ->and($client->attribution())->toBeNull();
 
     Http::assertNothingSent();
+
+    $text = json_encode($logged);
+    expect($text)->toContain('no usable token')
+        ->not->toContain('PRIVATE KEY')
+        ->not->toContain('KEY123')
+        ->not->toContain('TEAM')
+        ->not->toContain('not a pem');
 })->with([
     'unconfigured' => [false, false],
     'garbage pem' => [true, false],

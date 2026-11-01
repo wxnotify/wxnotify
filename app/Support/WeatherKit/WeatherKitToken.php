@@ -31,16 +31,17 @@ final class WeatherKitToken
         }
 
         $keyId = (string) $this->value('key_id');
+        $teamId = (string) $this->value('team_id');
+        $serviceId = (string) $this->value('service_id');
+        $cacheKey = 'weatherkit:token:'.hash('sha256', $teamId."\0".$serviceId."\0".$keyId);
 
         try {
-            $cached = Cache::get('weatherkit:token:'.$keyId);
+            $cached = Cache::get($cacheKey);
 
             if (is_string($cached) && $cached !== '') {
                 return $cached;
             }
 
-            $teamId = (string) $this->value('team_id');
-            $serviceId = (string) $this->value('service_id');
             $now = time();
 
             $token = JWT::encode([
@@ -50,7 +51,7 @@ final class WeatherKitToken
                 'exp' => $now + self::LIFETIME_SECONDS,
             ], (string) $this->privateKey(), 'ES256', $keyId, ['id' => $teamId.'.'.$serviceId]);
 
-            Cache::put('weatherkit:token:'.$keyId, $token, self::CACHE_SECONDS);
+            Cache::put($cacheKey, $token, self::CACHE_SECONDS);
 
             return $token;
         } catch (Throwable) {

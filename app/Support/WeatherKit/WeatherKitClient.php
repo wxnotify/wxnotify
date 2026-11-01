@@ -21,7 +21,7 @@ final class WeatherKitClient
 
     private const LANGUAGE = 'en';
 
-    private const TIMEOUT_SECONDS = 10;
+    private const TIMEOUT_SECONDS = 4;
 
     public function __construct(private readonly WeatherKitToken $token = new WeatherKitToken) {}
 
@@ -53,6 +53,8 @@ final class WeatherKitClient
         $token = $this->token->token();
 
         if ($token === null) {
+            $this->logFailure('no usable token');
+
             return null;
         }
 

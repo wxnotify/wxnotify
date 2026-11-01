@@ -334,22 +334,28 @@ test('attribution without logos or a name still names the service', function () 
     Http::fake(['weatherkit.apple.com/*' => Http::response(['logoLight@1x' => '/assets/light.png'])]);
 
     expect(app(GetWeatherAttribution::class)())->toBe([
-        'name' => 'Weather',
+        'name' => 'Apple Weather',
         'logo_light_url' => 'https://weatherkit.apple.com/assets/light.png',
         'logo_dark_url' => null,
         'legal_url' => 'https://developer.apple.com/weatherkit/data-source-attribution/',
     ]);
 });
 
-test('a failed attribution is null and cached for sixty seconds', function () {
+test('a failed attribution is the static Apple Weather credit and is retried after sixty seconds', function () {
+    $fallback = [
+        'name' => 'Apple Weather',
+        'logo_light_url' => null,
+        'logo_dark_url' => null,
+        'legal_url' => 'https://developer.apple.com/weatherkit/data-source-attribution/',
+    ];
     Http::fake(['weatherkit.apple.com/*' => Http::sequence()
         ->push('', 500)
         ->push(['serviceName' => 'Weather'])]);
 
-    expect(app(GetWeatherAttribution::class)())->toBeNull();
+    expect(app(GetWeatherAttribution::class)())->toBe($fallback);
 
     Carbon::setTestNow(now()->addSeconds(59));
-    expect(app(GetWeatherAttribution::class)())->toBeNull();
+    expect(app(GetWeatherAttribution::class)())->toBe($fallback);
     Http::assertSentCount(1);
 
     Carbon::setTestNow(now()->addSeconds(2));
@@ -359,4 +365,18 @@ test('a failed attribution is null and cached for sixty seconds', function () {
         'logo_dark_url' => null,
         'legal_url' => 'https://developer.apple.com/weatherkit/data-source-attribution/',
     ]);
+});
+
+test('a malformed largest logo scale falls through to the next scale', function () {
+    Http::fake(['weatherkit.apple.com/*' => Http::response([
+        'logoLight@3x' => 'not-a-path.png',
+        'logoLight@2x' => '/assets/light@2x.png',
+        'logoDark@3x' => 'http://insecure.example/dark.png',
+        'logoDark@1x' => '/assets/dark@1x.png',
+    ])]);
+
+    $attribution = app(GetWeatherAttribution::class)();
+
+    expect($attribution['logo_light_url'])->toBe('https://weatherkit.apple.com/assets/light@2x.png')
+        ->and($attribution['logo_dark_url'])->toBe('https://weatherkit.apple.com/assets/dark@1x.png');
 });
