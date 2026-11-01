@@ -90,6 +90,20 @@ final class Units
         return $this->isMetric() ? $value / self::KM_PER_MILE : $value;
     }
 
+    /**
+     * Metric-source conversions (WeatherKit sends Celsius and km/h) into the imperial values the rest
+     * of this class formats; independent of the subscriber's system.
+     */
+    public static function fahrenheitFromCelsius(float $celsius): float
+    {
+        return $celsius * 9 / 5 + 32;
+    }
+
+    public static function mphFromKilometersPerHour(float $kph): float
+    {
+        return $kph / self::KM_PER_MILE;
+    }
+
     public function kilometersToMiles(float $value): float
     {
         return $this->isMetric() ? $value / self::KM_PER_MILE : $value;
