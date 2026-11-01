@@ -2,6 +2,7 @@
     <x-filament::section heading="Location map" compact>
         @include('filament.partials.leaflet-loader')
         @include('filament.partials.map-helpers')
+        @include('filament.partials.map-tiles')
 
         {{-- wire:ignore on the root: Leaflet owns the map div and JS owns the caption. --}}
         <div
@@ -153,9 +154,7 @@
                     if (state.destroyed) { return; }
 
                     state.map = L.map(mapEl).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '&copy; OpenStreetMap contributors',
-                    }).addTo(state.map);
+                    window.wxTileLayer().addTo(state.map);
 
                     refresh();
                     state.timer = setInterval(refresh, REFRESH_MS);

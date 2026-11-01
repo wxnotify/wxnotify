@@ -7,6 +7,8 @@
         x-init="window.initShapefileLayerMap($el, @js(route('admin.shapefile-layers.geojson', ['shapefileLayer' => $this->record->id])))"
     ></div>
 
+    @include('filament.partials.map-tiles')
+
     <script>
         // Defined as a plain global function, not inline inside x-init: Alpine/Livewire
         // evaluate x-init expressions in a wrapped scope that does not reliably resolve
@@ -18,9 +20,7 @@
         window.initShapefileLayerMap = function (el, geojsonUrl) {
             function initMap() {
                 const map = L.map(el).setView([39.8283, -98.5795], 4);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap contributors',
-                }).addTo(map);
+                window.wxTileLayer().addTo(map);
                 fetch(geojsonUrl)
                     .then((response) => response.json())
                     .then((geojson) => {

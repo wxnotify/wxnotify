@@ -14,6 +14,7 @@ use App\Observers\IngestedProductObserver;
 use App\Observers\LocationZoneObserver;
 use App\Observers\UserActivityObserver;
 use App\Support\ApplyEmailSettings;
+use App\Support\ApplyMapTileSettings;
 use App\Support\ClientIp;
 use App\Support\Filament\AdminLogoutResponse;
 use App\Support\Pipeline\UnmanagedPipelineStack;
@@ -64,6 +65,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->app->make(ApplyEmailSettings::class)();
+        $this->app->make(ApplyMapTileSettings::class)();
 
         ClientIp::configureProxies();
 

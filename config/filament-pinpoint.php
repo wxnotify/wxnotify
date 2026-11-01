@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\MapTiles;
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -36,15 +38,10 @@ return [
     |
     | Settings used when provider = 'leaflet'.
     |
-    | tile_url       - Tile server URL. Default: OpenStreetMap (free).
-    |                  Other free options:
-    |                  CartoDB Light:  https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png
-    |                  CartoDB Dark:   https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png
-    |
-    | tile_url_dark  - Optional dark mode tile URL. If set, will be used when
-    |                  Filament is in dark mode. Leave null to always use tile_url.
-    |
-    | tile_attribution - Attribution text (required by OpenStreetMap ToS).
+    | tile_url, tile_url_dark and tile_attribution are NOT read from .env: they
+    | default to OpenStreetMap here and are replaced at boot from App settings
+    | (Integrations > Map tiles) by App\Support\ApplyMapTileSettings, so the
+    | location picker uses the same tiles as every other map (App\Support\MapTiles).
     |
     | nominatim_url  - Nominatim API base URL for search & reverse geocoding.
     |                  For production heavy-usage, consider self-hosting or
@@ -52,9 +49,9 @@ return [
     |
     */
     'leaflet' => [
-        'tile_url' => env('LEAFLET_TILE_URL', 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
-        'tile_url_dark' => env('LEAFLET_TILE_URL_DARK', null),
-        'tile_attribution' => env('LEAFLET_TILE_ATTRIBUTION', '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'),
+        'tile_url' => MapTiles::OSM_URL,
+        'tile_url_dark' => null,
+        'tile_attribution' => MapTiles::OSM_ATTRIBUTION,
         'nominatim_url' => env('NOMINATIM_URL', 'https://nominatim.openstreetmap.org'),
     ],
 

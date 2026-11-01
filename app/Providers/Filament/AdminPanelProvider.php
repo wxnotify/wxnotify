@@ -16,6 +16,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -52,6 +53,13 @@ class AdminPanelProvider extends PanelProvider
                 AdminStatsOverview::class,
                 AlertRulesByCategoryChart::class,
             ])
+            ->renderHook(
+                // The shared base-map tiles and their fallback, in <head> so they are set before any map
+                // (including the Pinpoint location picker) creates its tile layer. Signed-in pages only: a
+                // separate tiler's key is in the config, and the sign-in pages have no map.
+                PanelsRenderHook::HEAD_END,
+                fn (): string => auth()->check() ? view('filament.partials.map-tiles')->render() : '',
+            )
             ->plugins([
                 CommandCenterPlugin::make(),
                 ServiceDeskAdminPlugin::make(),

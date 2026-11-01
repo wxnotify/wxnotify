@@ -95,6 +95,13 @@ class DashboardPanelProvider extends PanelProvider
                 fn (): View => view('filament.dashboard.did-you-know'),
             )
             ->renderHook(
+                // The shared base-map tiles and their fallback, in <head> so they are set before any map
+                // (including the Pinpoint location picker) creates its tile layer. Signed-in pages only: a
+                // separate tiler's key is in the config, and the sign-in pages have no map.
+                PanelsRenderHook::HEAD_END,
+                fn (): string => auth()->check() ? view('filament.partials.map-tiles')->render() : '',
+            )
+            ->renderHook(
                 PanelsRenderHook::CONTENT_START,
                 fn (): string => app(MaintenanceModeGuard::class)->isMaintenanceActive()
                     ? view('filament.dashboard.maintenance-banner', ['message' => app(MaintenanceModeGuard::class)->message()])->render()
