@@ -80,4 +80,12 @@ return [
         'polling_token' => env('TRACCAR_POLLING_TOKEN'),
     ],
 
+    'weatherkit' => [
+        'team_id' => env('WEATHERKIT_TEAM_ID'),
+        'service_id' => env('WEATHERKIT_SERVICE_ID'),
+        'key_id' => env('WEATHERKIT_KEY_ID'),
+        'private_key' => env('WEATHERKIT_PRIVATE_KEY'),
+        'private_key_path' => env('WEATHERKIT_PRIVATE_KEY_PATH'),
+    ],
+
 ];
