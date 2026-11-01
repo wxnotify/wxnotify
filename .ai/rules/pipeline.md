@@ -4,6 +4,7 @@ paths:
   - app/Actions/Weather/MatchWeatherAlertRules.php
   - app/Observers/IngestedProductObserver.php
   - 'app/Actions/Weather/**'
+  - app/Actions/Weather/GetPlaceWeather.php
 ---
 
 # Pipeline
@@ -40,3 +41,6 @@ With the `deliveries` priority queue, swody1's first delivery can run before pts
 
 ## The outlook report fetches SPC files at send time (and for the form preview); a failed layer is never "none"
 `FetchSpcOutlooks` returns day_1..day_8 from SPC's public GeoJSON (days 1-3 under /products/outlook, days 4-8 under /products/exper/day4-8); a null day or a failed layer is "unavailable", an EMPTY layer is a valid quiet day. A result with any failed layer is never cached (complete results cache 2 min). `Day1OutlookFreshness` holds the report only until send time + 60 min (cat/torn/hail/wind must all exist); after that it sends with "not available" markers, and a missing Day 1 always sends (even for only_when_forecast). `BuildOutlookReport` payload is plain data (per-day `missing` list for absent hazard layers); never add models/Carbon. Locations are tested in PostGIS (`LocationsInOutlookAreas`: ST_MakeValid + ST_Intersects, one query per geometry, QueryException logged by class + SQLSTATE only). Graphics (`GetSpcOutlookGraphic`, keys day1/day2/day3/day48 only) are SPC's full-size images (1 MiB cap per image, shown at 380 px, each linked to its SPC outlook page), fetched in one pool inside `DeliverScheduledAlert::handle()`, failures cached 2 min as a sentinel, never on the queue. The payload carries `report_date` (the send date in the owner's timezone) for the gray date lines; a payload without it renders without dates. The rule form's collapsed "Today's Report" preview also calls `FetchSpcOutlooks`, only after expand and only for paid users.
+
+## GetPlaceWeather is WeatherKit-only, separate from the NWS actions
+GetPlaceWeather / GetWeatherAttribution serve only the mobile Weather card from Apple WeatherKit (credentials via services.weatherkit.*; token() === null means unavailable, isConfigured() is true even for a garbage PEM). They never fall back to NWS and the NWS actions (GetCurrentConditions etc.) are untouched. See the WeatherController rule for the endpoint contract.

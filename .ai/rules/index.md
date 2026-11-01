@@ -19,6 +19,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/**, app/Models/Product.php, app/Models/ActiveWwa.php | .ai/rules/models.md |
 | docker/nwws/** | .ai/rules/nwws.md |
 | app/Filament/Admin/Pages/** | .ai/rules/pages.md |
-| app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php, app/Actions/Weather/** | .ai/rules/pipeline.md |
+| app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php, app/Actions/Weather/**, app/Actions/Weather/GetPlaceWeather.php | .ai/rules/pipeline.md |
 | app/Actions/Storage/** | .ai/rules/storage.md |
 | app/Support/**, app/Support/Integrations.php, app/Support/PhoneNumber.php | .ai/rules/support.md |
+| app/Http/Controllers/Api/V1/WeatherController.php | .ai/rules/v1.md |
