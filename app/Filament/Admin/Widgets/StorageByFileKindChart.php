@@ -10,6 +10,8 @@ class StorageByFileKindChart extends ChartWidget
 {
     use BucketChart;
 
+    protected ?string $pollingInterval = null;
+
     protected ?string $heading = 'Storage by file type';
 
     protected function dimension(): StorageDimension

@@ -10,6 +10,8 @@ class StorageBySourceChart extends ChartWidget
 {
     use BucketChart;
 
+    protected ?string $pollingInterval = null;
+
     protected ?string $heading = 'Storage by source';
 
     protected function dimension(): StorageDimension

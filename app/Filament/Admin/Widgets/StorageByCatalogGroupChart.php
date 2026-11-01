@@ -10,6 +10,8 @@ class StorageByCatalogGroupChart extends ChartWidget
 {
     use BucketChart;
 
+    protected ?string $pollingInterval = null;
+
     protected ?string $heading = 'Storage by catalog group';
 
     protected function dimension(): StorageDimension

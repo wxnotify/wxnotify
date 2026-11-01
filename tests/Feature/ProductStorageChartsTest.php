@@ -89,3 +89,30 @@ test('the page renders all four charts', function () {
         ->assertSeeLivewire(StorageByFileKindChart::class)
         ->assertSeeLivewire(StorageGrowthChart::class);
 });
+
+test('no chart polls on its own', function (string $widget) {
+    $instance = livewire($widget)->instance();
+
+    expect((new ReflectionMethod($instance, 'getPollingInterval'))->invoke($instance))->toBeNull();
+})->with([StorageBySourceChart::class, StorageByCatalogGroupChart::class, StorageByFileKindChart::class, StorageGrowthChart::class]);
+
+test('a bucket under 5 MB keeps its raw bytes and the tooltip callback is present', function () {
+    $scan = ProductStorageScan::factory()->create();
+    ProductStorageBucket::factory()->create(['product_storage_scan_id' => $scan->id, 'dimension' => StorageDimension::FileKind, 'label' => 'Tiny', 'bytes' => 2_200_000]);
+
+    $data = chartData(StorageByFileKindChart::class);
+    $instance = livewire(StorageByFileKindChart::class)->instance();
+    $options = (new ReflectionMethod($instance, 'getOptions'))->invoke($instance);
+
+    expect($data['datasets'][0]['bytes'])->toBe([2_200_000])
+        ->and($data['datasets'][0]['data'])->toBe([0.0])
+        ->and((string) $options)->toContain('callbacks')->toContain('dataset.bytes');
+});
+
+test('the growth chart carries raw bytes for its size datasets', function () {
+    ProductStorageScan::factory()->create(['nwws_bytes' => 2_200_000, 'emwin_byteblaster_bytes' => 5, 'emwin_http_bytes' => 0]);
+
+    $data = chartData(StorageGrowthChart::class);
+
+    expect($data['datasets'][0]['bytes'])->toBe([2_200_000])->and($data['datasets'][1]['bytes'])->toBe([5]);
+});
