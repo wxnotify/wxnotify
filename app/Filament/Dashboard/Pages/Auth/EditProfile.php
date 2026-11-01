@@ -31,7 +31,7 @@ class EditProfile extends BaseEditProfile
                     ->searchable()
                     ->getTimezoneFromBrowser()
                     ->hint(fn (Get $get): ?string => blank($this->getUser()->timezone) && filled($get('timezone'))
-                        ? 'Detected from your browser, not saved yet. Click Save changes to use it for your alerts.'
+                        ? 'Not saved yet. Click Save changes to use this timezone for your alerts.'
                         : null)
                     ->hintColor('warning')
                     ->afterStateUpdated(function (?string $state, Set $set): void {

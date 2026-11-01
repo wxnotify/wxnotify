@@ -69,7 +69,7 @@ test('a browser-detected legacy alias is normalised or cleared so an unrelated s
         ->and($stored === null || Timezones::isValid($stored))->toBeTrue();
 });
 
-const TIMEZONE_NOT_SAVED_NOTE = 'Detected from your browser, not saved yet. Click Save changes to use it for your alerts.';
+const TIMEZONE_NOT_SAVED_NOTE = 'Not saved yet. Click Save changes to use this timezone for your alerts.';
 
 test('a timezone the browser filled in is flagged as not saved yet', function () {
     livewire(EditProfile::class)
