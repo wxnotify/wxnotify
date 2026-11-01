@@ -58,6 +58,12 @@ class ProductStorage extends Page
                 ->disabled(fn (): bool => $this->scanIsRunning())
                 ->tooltip(fn (): ?string => $this->scanIsRunning() ? 'A scan is already running' : null)
                 ->action(function (): void {
+                    if ($this->scanIsRunning()) {
+                        Notification::make()->title('A scan is already running')->warning()->send();
+
+                        return;
+                    }
+
                     ScanProductStorageJob::dispatch();
 
                     Notification::make()->title('Scan queued')->success()->send();

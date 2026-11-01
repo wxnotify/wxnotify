@@ -146,6 +146,16 @@ test('scan now is disabled while a fresh scan is running', function () {
     livewire(ProductStorage::class)->assertActionDisabled('scanNow');
 });
 
+test('scan now refuses to queue when a scan started after the page rendered', function () {
+    $page = livewire(ProductStorage::class);
+
+    ProductStorageScan::factory()->running()->create(['started_at' => now()->subMinute()]);
+
+    $page->callAction('scanNow');
+
+    Queue::assertNothingPushed();
+});
+
 test('scan now is enabled when the running scan is stale', function () {
     ProductStorageScan::factory()->running()->create(['started_at' => now()->subMinutes(30)]);
 
