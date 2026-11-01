@@ -337,6 +337,7 @@ class AppSettings extends Page implements HasForms
                     ->autocomplete('new-password')
                     ->maxLength(255)
                     ->helperText(fn (): string => ($this->mapTilesKeyStored() ? 'Set. Enter a new value to replace it.' : 'Not set.')
+                        .' The key belongs to the chosen provider. A key from one provider will not work with another, so changing the provider needs the new provider\'s key.'
                         .' The key is visible in the browser\'s tile requests, so restrict it to this site\'s domain at the provider.')
                     ->required(fn (Get $get): bool => (bool) $get('map_tiles_enabled') && ! $this->mapTilesKeyStored())
                     ->validationMessages(['required' => 'Enter the map tiler\'s API key.'])

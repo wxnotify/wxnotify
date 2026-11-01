@@ -39,7 +39,9 @@ class MapTiles
      *     attribution: string,
      *     dark_url: null,
      *     options: array{maxZoom: int, tileSize: int, zoomOffset: int, detectRetina: bool},
-     *     fallback: array{url: string, attribution: string, options: array{maxZoom: int, tileSize: int, zoomOffset: int, detectRetina: bool}}|null
+     *     fallback: array{url: string, attribution: string, options: array{maxZoom: int, tileSize: int, zoomOffset: int, detectRetina: bool}}|null,
+     *     match_prefix: string|null,
+     *     logo: array{href: string, src: string, alt: string}|null
      * }
      */
     public static function forFrontend(): array
@@ -54,14 +56,18 @@ class MapTiles
                 'dark_url' => null,
                 'options' => self::OPTIONS,
                 'fallback' => null,
+                'match_prefix' => null,
+                'logo' => null,
             ];
         }
 
         [$provider, $style, $key] = $tiler;
+        $url = $provider->tileUrl($style, $key);
+        $logo = $provider->logo();
 
         return [
             'provider' => $provider->label(),
-            'url' => $provider->tileUrl($style, $key),
+            'url' => $url,
             'attribution' => $provider->attribution($style),
             'dark_url' => null,
             'options' => self::OPTIONS,
@@ -70,6 +76,31 @@ class MapTiles
                 'attribution' => self::OSM_ATTRIBUTION,
                 'options' => self::OPTIONS,
             ],
+            'match_prefix' => strstr($url, '{z}', true) ?: null,
+            'logo' => $logo === null ? null : [
+                'href' => $logo['href'],
+                'src' => $logo['hosted'] ? $logo['src'] : asset($logo['src']),
+                'alt' => $logo['alt'],
+            ],
+        ];
+    }
+
+    /**
+     * What every signed-in page's <head> needs to recognise the tiler's layers
+     * (also Pinpoint's) and to fall back: the tile URL up to `{z}`, which
+     * holds no key, never the URL itself. Only pages that render a map print
+     * the full URL (forFrontend()).
+     *
+     * @return array{match_prefix: string|null, fallback: array{url: string, attribution: string, options: array{maxZoom: int, tileSize: int, zoomOffset: int, detectRetina: bool}}|null, logo: array{href: string, src: string, alt: string}|null}
+     */
+    public static function forHead(): array
+    {
+        $tiles = self::forFrontend();
+
+        return [
+            'match_prefix' => $tiles['match_prefix'],
+            'fallback' => $tiles['fallback'],
+            'logo' => $tiles['logo'],
         ];
     }
 

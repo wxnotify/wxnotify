@@ -74,6 +74,25 @@ enum MapTileProvider: string
         };
     }
 
+    /**
+     * The provider logo a map must show bottom-left, linking to the provider,
+     * or null when its terms ask only for the text credit (Stadia Maps,
+     * Thunderforest). Mapbox requires its logo on every map, including in
+     * Leaflet; the file is Mapbox's own SVG from its attribution guide,
+     * bundled unmodified (see the comment inside it). MapTiler requires its
+     * logo on Free plans and documents hot-linking its hosted file.
+     *
+     * @return array{href: string, src: string, alt: string, hosted: bool}|null
+     */
+    public function logo(): ?array
+    {
+        return match ($this) {
+            self::Mapbox => ['href' => 'https://www.mapbox.com/', 'src' => 'images/map-logos/mapbox-logo.svg', 'alt' => 'Mapbox logo', 'hosted' => false],
+            self::MapTiler => ['href' => 'https://www.maptiler.com/', 'src' => 'https://api.maptiler.com/resources/logo.svg', 'alt' => 'MapTiler logo', 'hosted' => true],
+            self::StadiaMaps, self::Thunderforest => null,
+        };
+    }
+
     public function attribution(string $style): string
     {
         return match ($this) {

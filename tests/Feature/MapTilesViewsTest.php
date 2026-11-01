@@ -1,15 +1,19 @@
 <?php
 
 use App\Enums\Tier;
+use App\Filament\Admin\Pages\AppSettings;
 use App\Filament\Admin\Resources\ShapefileLayers\ShapefileLayerResource;
+use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\Locations\LocationResource;
 use App\Filament\Dashboard\Resources\Locations\Widgets\LocationsMapWidget;
+use App\Filament\Dashboard\Resources\TraccarServers\TraccarServerResource;
 use App\Filament\Dashboard\Resources\TraccarServers\Widgets\TraccarDevicesMapWidget;
 use App\Models\ShapefileLayer;
 use App\Models\User;
 use App\Settings\SecretSettings;
 use App\Support\ApplyMapTileSettings;
 use Filament\Facades\Filament;
+use Filament\Pages\Dashboard;
 
 use function Pest\Livewire\livewire;
 
@@ -19,9 +23,14 @@ const TILES_VIEW_THUNDERFOREST_URL = 'https://tile.thunderforest.com/transport/{
 
 function tilesViewUseThunderforest(): void
 {
+    tilesViewUse('thunderforest', 'transport');
+}
+
+function tilesViewUse(string $provider, string $style): void
+{
     setIntegrationSetting('map_tiles_enabled', true);
-    setIntegrationSetting('map_tiles_provider', 'thunderforest');
-    setIntegrationSetting('map_tiles_style', 'transport');
+    setIntegrationSetting('map_tiles_provider', $provider);
+    setIntegrationSetting('map_tiles_style', $style);
 
     $secrets = app(SecretSettings::class);
     $secrets->map_tiles_api_key = 'FAKE_view_key';
@@ -103,4 +112,68 @@ test('the location picker page uses OpenStreetMap by default', function () {
 
     expect($html)->toContain(str_replace('/', '\/', TILES_VIEW_OSM_URL))
         ->not->toContain('thunderforest');
+});
+
+test('pages without a map never carry the tiler key, only the key-free fallback hook', function (string $page) {
+    tilesViewUseThunderforest();
+    [$panel, $user, $url] = match ($page) {
+        'app settings as owner' => ['admin', User::factory()->create(['is_staff' => true, 'is_owner' => true]), fn (): string => AppSettings::getUrl(panel: 'admin')],
+        'app settings as staff' => ['admin', test()->staff, fn (): string => AppSettings::getUrl(panel: 'admin')],
+        'dashboard home' => ['dashboard', test()->subscriber, fn (): string => Dashboard::getUrl(panel: 'dashboard')],
+        'alert rules list' => ['dashboard', test()->subscriber, fn (): string => AlertRuleResource::getUrl('index', panel: 'dashboard')],
+    };
+    Filament::setCurrentPanel($panel);
+    $this->actingAs($user);
+
+    $this->get($url())
+        ->assertOk()
+        ->assertDontSee('FAKE_view_key', false)
+        ->assertSee('"match_prefix":"https://tile.thunderforest.com/transport/"', false)
+        ->assertSee('L.TileLayer.addInitHook', false);
+})->with(['app settings as owner', 'app settings as staff', 'dashboard home', 'alert rules list']);
+
+test('every page that renders a map carries the tile url with the key', function (string $page) {
+    tilesViewUseThunderforest();
+    [$panel, $user, $url] = match ($page) {
+        'locations list' => ['dashboard', test()->subscriber, fn (): string => LocationResource::getUrl('index', panel: 'dashboard')],
+        'location create' => ['dashboard', test()->subscriber, fn (): string => LocationResource::getUrl('create', panel: 'dashboard')],
+        'traccar servers list' => ['dashboard', test()->subscriber, fn (): string => TraccarServerResource::getUrl('index', panel: 'dashboard')],
+        'shapefile map' => ['admin', test()->staff, fn (): string => ShapefileLayerResource::getUrl('map', ['record' => ShapefileLayer::factory()->create()], panel: 'admin')],
+    };
+    Filament::setCurrentPanel($panel);
+    $this->actingAs($user);
+
+    $html = $this->get($url())->assertOk()->getContent();
+
+    expect(str_contains($html, TILES_VIEW_THUNDERFOREST_URL) || str_contains($html, str_replace('/', '\/', TILES_VIEW_THUNDERFOREST_URL)))->toBeTrue();
+})->with(['locations list', 'location create', 'traccar servers list', 'shapefile map']);
+
+test('the provider logo control is wired for Mapbox and MapTiler only, and removed on fallback', function (?string $provider, ?string $style, ?string $logo) {
+    if ($provider !== null) {
+        tilesViewUse($provider, $style);
+    }
+    tilesViewPanel('locations widget');
+
+    $html = livewire(LocationsMapWidget::class)->html();
+
+    expect($html)->toContain("L.control({ position: 'bottomleft' })")
+        ->toContain('layer.wxLogoControl.remove()');
+
+    if ($logo === null) {
+        expect($html)->toContain('"logo":null');
+    } else {
+        expect($html)->toContain($logo);
+    }
+})->with([
+    'mapbox' => ['mapbox', 'outdoors-v12', '/images/map-logos/mapbox-logo.svg","alt":"Mapbox logo"'],
+    'maptiler' => ['maptiler', 'streets-v4', '"logo":{"href":"https://www.maptiler.com/","src":"https://api.maptiler.com/resources/logo.svg"'],
+    'stadia' => ['stadia', 'outdoors', null],
+    'thunderforest' => ['thunderforest', 'atlas', null],
+    'off' => [null, null, null],
+]);
+
+test('only an authentication or quota answer to the probe switches the map', function () {
+    tilesViewPanel('locations widget');
+
+    expect(livewire(LocationsMapWidget::class)->html())->toContain('[401, 403, 429].includes(response.status)');
 });

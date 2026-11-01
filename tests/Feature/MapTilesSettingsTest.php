@@ -37,7 +37,8 @@ test('the map tile fields are hidden until the toggle is on, and the fallback is
         ->assertFormFieldVisible('map_tiles_provider')
         ->assertFormFieldVisible('map_tiles_style')
         ->assertFormFieldVisible('map_tiles_api_key')
-        ->assertSee("restrict it to this site's domain");
+        ->assertSee("restrict it to this site's domain")
+        ->assertSee('A key from one provider will not work with another');
 });
 
 test('the style choices follow the chosen provider and a provider change clears the style', function () {

@@ -35,7 +35,7 @@ test('the map tiler is off by default with no provider, style or key', function 
         ->and(Integration::MapTiles->enabledProperty())->toBe('map_tiles_enabled');
 });
 
-test('with the toggle off every map uses OpenStreetMap exactly as before, with no fallback', function () {
+test('with the toggle off every map gets OpenStreetMap tiles with the linked credit, maxZoom 19 and no fallback or logo', function () {
     expect(MapTiles::forFrontend())->toBe([
         'provider' => 'OpenStreetMap',
         'url' => TILES_OSM_URL,
@@ -43,6 +43,8 @@ test('with the toggle off every map uses OpenStreetMap exactly as before, with n
         'dark_url' => null,
         'options' => ['maxZoom' => 19, 'tileSize' => 256, 'zoomOffset' => 0, 'detectRetina' => false],
         'fallback' => null,
+        'match_prefix' => null,
+        'logo' => null,
     ]);
 });
 
@@ -66,7 +68,10 @@ test('each provider and style builds its documented raster tile url with the key
             'url' => TILES_OSM_URL,
             'attribution' => TILES_OSM_ATTRIBUTION,
             'options' => ['maxZoom' => 19, 'tileSize' => 256, 'zoomOffset' => 0, 'detectRetina' => false],
-        ]);
+        ])
+        ->and($url)->toStartWith($tiles['match_prefix'])
+        ->and($tiles['match_prefix'])->toContain("/{$style}/")
+        ->not->toContain('FAKE_tiles_key_123');
 })->with([
     'maptiler streets' => ['maptiler', 'streets-v4', 'https://api.maptiler.com/maps/streets-v4/256/{z}/{x}/{y}{r}.png?key=FAKE_tiles_key_123'],
     'maptiler outdoor' => ['maptiler', 'outdoor-v4', 'https://api.maptiler.com/maps/outdoor-v4/256/{z}/{x}/{y}{r}.png?key=FAKE_tiles_key_123'],
@@ -165,4 +170,28 @@ test('the location picker keeps OpenStreetMap when the settings cannot be read',
     app(ApplyMapTileSettings::class)();
 
     expect(config('filament-pinpoint.leaflet.tile_url'))->toBe(TILES_OSM_URL);
+});
+
+test('Mapbox and MapTiler get their official logo, the other providers and OpenStreetMap get none', function (?string $provider, ?string $style, ?array $logo) {
+    if ($provider !== null) {
+        tilesConfigure($provider, $style);
+    }
+
+    expect(MapTiles::forFrontend()['logo'])->toBe($logo);
+})->with([
+    'mapbox' => fn (): array => ['mapbox', 'streets-v12', ['href' => 'https://www.mapbox.com/', 'src' => asset('images/map-logos/mapbox-logo.svg'), 'alt' => 'Mapbox logo']],
+    'maptiler' => ['maptiler', 'hybrid', ['href' => 'https://www.maptiler.com/', 'src' => 'https://api.maptiler.com/resources/logo.svg', 'alt' => 'MapTiler logo']],
+    'stadia' => ['stadia', 'outdoors', null],
+    'thunderforest' => ['thunderforest', 'atlas', null],
+    'off' => [null, null, null],
+]);
+
+test('the page-head variant carries no tile url and no key', function () {
+    tilesConfigure('mapbox', 'satellite-streets-v12');
+
+    $head = MapTiles::forHead();
+
+    expect(array_keys($head))->toBe(['match_prefix', 'fallback', 'logo'])
+        ->and($head['match_prefix'])->toBe('https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/')
+        ->and(json_encode($head))->not->toContain('FAKE_tiles_key_123');
 });

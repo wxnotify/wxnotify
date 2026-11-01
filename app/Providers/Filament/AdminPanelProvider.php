@@ -54,11 +54,11 @@ class AdminPanelProvider extends PanelProvider
                 AlertRulesByCategoryChart::class,
             ])
             ->renderHook(
-                // The shared base-map tiles and their fallback, in <head> so they are set before any map
-                // (including the Pinpoint location picker) creates its tile layer. Signed-in pages only: a
-                // separate tiler's key is in the config, and the sign-in pages have no map.
+                // The key-free map tile fallback (and provider logo), in <head> so it is installed before any
+                // map, the Pinpoint location picker included, creates its tile layer. Signed-in pages only:
+                // the sign-in pages have no map. The tile URL with the key is printed only by map pages.
                 PanelsRenderHook::HEAD_END,
-                fn (): string => auth()->check() ? view('filament.partials.map-tiles')->render() : '',
+                fn (): string => auth()->check() ? view('filament.partials.map-tile-fallback')->render() : '',
             )
             ->plugins([
                 CommandCenterPlugin::make(),
