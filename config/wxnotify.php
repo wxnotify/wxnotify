@@ -122,4 +122,8 @@ return [
         'attribution' => 'USGS The National Map · NOAA/NWS MRMS',
     ],
 
+    'storage' => [
+        'snapshot_retention_days' => (int) env('STORAGE_SNAPSHOT_RETENTION_DAYS', 90),
+    ],
+
 ];
