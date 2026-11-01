@@ -19,3 +19,6 @@ Each heartbeat ping URL field on AppSettings has a suffix action (`testHeartbeat
 
 ## Boot-time settings must trigger queue:restart on save
 ApplyEmailSettings applies relay/mailer/from only at boot, so AppSettings::save() runs `queue:restart` when one of those four changed (never otherwise; other settings are scoped and re-read per job). Failure to signal is logged by exception class and never fails the save. A new boot-time-applied setting must join `emailSettings()` or long-lived workers keep the old value.
+
+## The map tiler setting is boot-time but not an emailSettings() member; its key is owner-only
+`ApplyMapTileSettings` applies the tile config at boot but is deliberately NOT in `emailSettings()`/`queue:restart`: only web requests render maps (revisit if a queued job ever renders a map). The tiler key lives in `SecretSettings` but is not a `Secret` case (no .env fallback); it is edited in the Integrations tab by the owner only, never pre-filled, wiped from component state in `save()`'s `finally`, and its remove checkbox shows only while the tiler is off. After deploying run `php artisan migrate` then `php artisan settings:clear-cache` (until then the App settings page errors and MapTiles silently stays on OpenStreetMap).
