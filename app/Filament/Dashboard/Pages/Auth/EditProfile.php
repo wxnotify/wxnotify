@@ -6,6 +6,7 @@ use App\Enums\UnitSystem;
 use App\Support\Timezones;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Forms\Components\ToggleButtons;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Tapp\FilamentTimezoneField\Forms\Components\TimezoneSelect;
@@ -29,6 +30,10 @@ class EditProfile extends BaseEditProfile
                     ->label('Timezone')
                     ->searchable()
                     ->getTimezoneFromBrowser()
+                    ->hint(fn (Get $get): ?string => blank($this->getUser()->timezone) && filled($get('timezone'))
+                        ? 'Detected from your browser, not saved yet. Click Save changes to use it for your alerts.'
+                        : null)
+                    ->hintColor('warning')
                     ->afterStateUpdated(function (?string $state, Set $set): void {
                         if (filled($state) && ! Timezones::isValid($state)) {
                             $set('timezone', Timezones::normalise($state));

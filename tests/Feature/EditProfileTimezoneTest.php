@@ -68,3 +68,36 @@ test('a browser-detected legacy alias is normalised or cleared so an unrelated s
     expect($stored)->not->toBe('America/Indianapolis')
         ->and($stored === null || Timezones::isValid($stored))->toBeTrue();
 });
+
+const TIMEZONE_NOT_SAVED_NOTE = 'Detected from your browser, not saved yet. Click Save changes to use it for your alerts.';
+
+test('a timezone the browser filled in is flagged as not saved yet', function () {
+    livewire(EditProfile::class)
+        ->fillForm(['timezone' => 'America/Denver'])
+        ->assertSee(TIMEZONE_NOT_SAVED_NOTE);
+});
+
+test('the not-saved note goes away once the timezone has been saved', function () {
+    livewire(EditProfile::class)
+        ->fillForm(['timezone' => 'America/Denver'])
+        ->assertSee(TIMEZONE_NOT_SAVED_NOTE)
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertDontSee(TIMEZONE_NOT_SAVED_NOTE);
+
+    expect($this->user->fresh()->timezone)->toBe('America/Denver');
+});
+
+test('no not-saved note is shown when a timezone is already saved', function () {
+    $this->user->update(['timezone' => 'America/Chicago']);
+
+    livewire(EditProfile::class)
+        ->assertDontSee(TIMEZONE_NOT_SAVED_NOTE)
+        ->fillForm(['timezone' => 'America/Denver'])
+        ->assertDontSee(TIMEZONE_NOT_SAVED_NOTE);
+});
+
+test('no not-saved note is shown while the timezone field is empty', function () {
+    livewire(EditProfile::class)
+        ->assertDontSee(TIMEZONE_NOT_SAVED_NOTE);
+});
