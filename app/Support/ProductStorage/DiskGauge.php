@@ -25,8 +25,8 @@ class DiskGauge
         $emwin = $this->read('EMWIN disk', $paths['emwin']);
 
         if ($nwws->isAvailable() && $emwin->isAvailable()) {
-            $nwwsDevice = @stat($paths['nwws'])['dev'] ?? null;
-            $emwinDevice = @stat($paths['emwin'])['dev'] ?? null;
+            $nwwsDevice = $this->deviceOf($paths['nwws']);
+            $emwinDevice = $this->deviceOf($paths['emwin']);
 
             if ($nwwsDevice !== null && $nwwsDevice === $emwinDevice) {
                 return [new DiskReading('Product disk', $nwws->path, $nwws->usedBytes, $nwws->totalBytes)];
@@ -34,6 +34,13 @@ class DiskGauge
         }
 
         return [$nwws, $emwin];
+    }
+
+    protected function deviceOf(string $path): ?int
+    {
+        $stat = @stat($path);
+
+        return $stat === false ? null : $stat['dev'];
     }
 
     private function read(string $label, string $path): DiskReading

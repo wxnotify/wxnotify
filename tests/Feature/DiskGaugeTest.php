@@ -69,3 +69,33 @@ test('paths returns the two configured roots', function () {
 
     expect((new DiskGauge)->paths())->toBe(['nwws' => '/a', 'emwin' => '/b']);
 });
+
+function gaugeWithDevices(?int $nwwsDevice, ?int $emwinDevice): DiskGauge
+{
+    return new class($nwwsDevice, $emwinDevice) extends DiskGauge
+    {
+        public function __construct(private ?int $nwwsDevice, private ?int $emwinDevice) {}
+
+        protected function deviceOf(string $path): ?int
+        {
+            return $path === $this->paths()['nwws'] ? $this->nwwsDevice : $this->emwinDevice;
+        }
+    };
+}
+
+test('available roots on different devices give two readings', function (?int $nwwsDevice, ?int $emwinDevice, array $labels) {
+    $nwws = gaugeTempDir();
+    $emwin = gaugeTempDir();
+    config(['services.pipeline.products_path' => $nwws, 'services.pipeline.emwin_products_path' => $emwin]);
+
+    $readings = gaugeWithDevices($nwwsDevice, $emwinDevice)->readings();
+
+    expect(array_map(fn (DiskReading $reading) => $reading->label, $readings))->toBe($labels);
+
+    rmdir($nwws);
+    rmdir($emwin);
+})->with([
+    'different devices' => [1, 2, ['NWWS disk', 'EMWIN disk']],
+    'same device' => [7, 7, ['Product disk']],
+    'both lookups failed' => [null, null, ['NWWS disk', 'EMWIN disk']],
+]);
