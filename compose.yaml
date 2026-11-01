@@ -249,6 +249,7 @@ services:
             NWWS_ARCHIVEDIR: /products
             NWWS_PAN_RUN: /pan-notify.sh
             NWWS_RETRY: 'true'
+            NWWS_RETENTION_DAYS: '${NWWS_RETENTION_DAYS:-7}'
             NWWS_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/nwws-products'
             PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
         volumes:

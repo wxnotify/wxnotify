@@ -11,5 +11,7 @@ FROM alpine:3.20
 RUN apk add --no-cache curl ca-certificates
 COPY --from=build /nwws-go-client /nwws-go-client
 COPY docker/nwws/pan-notify.sh /pan-notify.sh
-RUN chmod +x /pan-notify.sh
-ENTRYPOINT ["/nwws-go-client"]
+COPY docker/nwws/cleanup-products.sh /cleanup-products.sh
+COPY docker/nwws/entrypoint.sh /entrypoint.sh
+RUN chmod +x /pan-notify.sh /cleanup-products.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
