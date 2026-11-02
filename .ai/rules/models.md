@@ -3,6 +3,7 @@ paths:
   - 'app/Models/**'
   - app/Models/Product.php
   - app/Models/ActiveWwa.php
+  - app/Models/OutlookReportRun.php
 ---
 
 # Models
@@ -42,3 +43,6 @@ Whether an event covers a place comes from `active_wwa_areas` (`ActiveWwa::areas
 `User::canCreateLocation()`/`locationLimit()` (`free_locations`/`plus_locations`) cap every location EXCEPT phone-app ones (saved places and Traccar devices); `canCreatePhoneLocation()`/`phoneLocationLimit()` (`free_phone_locations`/`plus_phone_locations`, Pro null) cap `type = mobile` AND `mobile_source = app`. Use `Location::phoneApp()` / `notPhoneApp()`; `notPhoneApp()` is written null-safe (a `NOT (a AND b)` would drop rows whose `mobile_source` is NULL, i.e. every stationary place). The alert-rule options carry both `can_create_location` and `can_share_phone_location`.
 
 `Location::saving` refuses (LocationLimitReached) any edit that moves a saved location into the phone-app class, or out of it while the general limit is full: otherwise turning a phone location into a stationary place frees its phone slot for unlimited places. Only `EnableLocationSharing` creates phone-app rows: a NEW one without `app_token_id` is refused (factory `mobileApp()` with no token links a throwaway token and deletes it after create), and `CreateLocation`/`EditLocation` never take `mobile_source` from the form (Mobile from the dashboard is always Traccar). `EditLocation` never takes `mobile_source` from the form and shows a notification instead; the API update ignores type/source. A phone location is never deleted because its phone went away (it stays and still counts) -- the dashboard delete refuses only a LINKED one.
+
+## Outlook run: maps expire after 30 days on READ, the payload stays
+OutlookReportRun::MAP_DAYS = 30. mapsExpired() (created_at <= now - 30 days) is computed on read in PresentAppOutlookReport and the map controller, so a missed prune never serves an expired map; outlook:prune-maps (daily) deletes outlook-maps/{batch_key}, nulls `maps` only if deleteDirectory() succeeded (the local disk has throw=false, so ALWAYS check put()/deleteDirectory() for false), and sweeps orphan folders left by user deletion (cascade removes rows, not files). The payload row lives as long as its delivery row: if delivery_logs pruning is ever added, it must take the stored run with it. Maps are served only through GET /api/v1/outlook-maps/{batchKey}/{key}, signed (1 hour) and throttled by the named limiter app-outlook-map; signed links are issued only in the owner's own alert detail.

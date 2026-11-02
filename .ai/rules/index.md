@@ -16,7 +16,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | tests/Feature/** | .ai/rules/feature.md |
 | app/Filament/**, resources/views/filament/** | .ai/rules/filament.md |
 | app/Jobs/DeliverWeatherAlert.php, app/Jobs/DeliverScheduledAlert.php | .ai/rules/jobs.md |
-| app/Models/**, app/Models/Product.php, app/Models/ActiveWwa.php | .ai/rules/models.md |
+| app/Models/**, app/Models/Product.php, app/Models/ActiveWwa.php, app/Models/OutlookReportRun.php | .ai/rules/models.md |
 | docker/nwws/** | .ai/rules/nwws.md |
 | app/Filament/Admin/Pages/** | .ai/rules/pages.md |
 | app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php, app/Actions/Weather/**, app/Actions/Weather/GetPlaceWeather.php, app/Actions/Weather/GetUserWeatherPlaces.php | .ai/rules/pipeline.md |
