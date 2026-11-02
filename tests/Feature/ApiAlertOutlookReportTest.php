@@ -4,6 +4,8 @@ use App\Models\DeliveryLog;
 use App\Models\OutlookReportRun;
 use App\Models\User;
 use App\Support\OutlookReportPresenter;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 
@@ -148,4 +150,15 @@ test('another users alert is 404 and another users run with the same batch key i
     $this->withToken($this->token)->getJson("/api/v1/alerts/{$mine->id}")
         ->assertOk()
         ->assertJsonPath('data.outlook_report', null);
+});
+
+test('the map route uses its own named limiter, keyed per client address and set to 60 a minute', function () {
+    $route = app('router')->getRoutes()->getByName('api.v1.outlook-maps.show');
+
+    expect($route->gatherMiddleware())->toContain('throttle:app-outlook-map')->not->toContain('throttle:60,1');
+
+    $limit = RateLimiter::limiter('app-outlook-map')(Request::create('/', 'GET', server: ['REMOTE_ADDR' => '203.0.113.9']));
+
+    expect($limit->maxAttempts)->toBe(60)
+        ->and($limit->key)->toBe('app-outlook-map:203.0.113.9');
 });

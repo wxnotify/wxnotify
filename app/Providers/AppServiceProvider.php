@@ -85,6 +85,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('app-auth', fn (Request $request) => Limit::perMinute(10)
             ->by('app-auth:'.(ClientIp::for($request) ?? $request->ip())));
 
+        RateLimiter::for('app-outlook-map', fn (Request $request) => Limit::perMinute(60)
+            ->by('app-outlook-map:'.(ClientIp::for($request) ?? $request->ip())));
+
         RateLimiter::for('app-authorize', fn (Request $request) => Limit::perMinute(20)
             ->by('app-authorize:'.($request->user()?->id ?? ClientIp::for($request) ?? $request->ip())));
 

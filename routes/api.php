@@ -40,7 +40,7 @@ Route::prefix('v1')->group(function (): void {
 
     Route::get('/outlook-maps/{batchKey}/{key}', [OutlookMapController::class, 'show'])
         ->where('key', 'day1|day2|day3|day48')
-        ->middleware(['signed', 'throttle:60,1'])
+        ->middleware(['signed', 'throttle:app-outlook-map'])
         ->name('api.v1.outlook-maps.show');
 
     Route::middleware(['auth:sanctum', 'ability:app', ExtendAppTokenExpiry::class, 'throttle:app-api'])->group(function (): void {
