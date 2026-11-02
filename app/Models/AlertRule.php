@@ -149,7 +149,7 @@ class AlertRule extends Model
 
     public function products(): BelongsToMany
     {
-        return $this->belongsToMany(Product::class)->withPivot(['matching_mode', 'wfo', 'county_zone_codes', 'risk_levels']);
+        return $this->belongsToMany(Product::class)->withPivot(['matching_mode', 'wfo', 'county_zone_codes', 'risk_levels', 'custom_subject_template']);
     }
 
     /**
@@ -236,6 +236,21 @@ class AlertRule extends Model
         }
 
         return $this->alertTemplate?->category === $this->category ? $this->alertTemplate : null;
+    }
+
+    /**
+     * The subject set on one product of this rule, or null when the product has none, is not on the
+     * rule or the owner is on the Free tier (the stored value is kept).
+     */
+    public function customSubjectFor(int $productId): ?string
+    {
+        if ($this->user->tier() === Tier::Free) {
+            return null;
+        }
+
+        $subject = $this->products->firstWhere('id', $productId)?->pivot->custom_subject_template;
+
+        return filled($subject) ? trim($subject) : null;
     }
 
     public function effectiveCustomSubjectTemplate(): ?string

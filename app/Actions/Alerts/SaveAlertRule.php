@@ -149,11 +149,14 @@ class SaveAlertRule
 
                 $riskLevels = $this->riskLevelsByProduct($rule->category, $data, $settings, $rule);
 
+                $storedSubjects = DB::table('alert_rule_product')->where('alert_rule_id', $rule->id)->pluck('custom_subject_template', 'product_id');
+
                 $rule->products()->sync(collect($settings)->mapWithKeys(fn (array $entry): array => [$entry['product_id'] => [
                     'matching_mode' => $entry['matching_mode'],
                     'wfo' => $entry['wfo'],
                     'county_zone_codes' => $entry['county_zone_codes'],
                     'risk_levels' => isset($riskLevels[$entry['product_id']]) ? json_encode($riskLevels[$entry['product_id']]) : null,
+                    'custom_subject_template' => array_key_exists('custom_subject_template', $entry) ? $entry['custom_subject_template'] : ($storedSubjects[$entry['product_id']] ?? null),
                 ]])->all());
 
                 // Only the rule owner's own locations, whatever the caller validated.
@@ -197,7 +200,7 @@ class SaveAlertRule
      * `product_ids` with one shared mode; null when the input carries neither (the keep path).
      *
      * @param  array<string, mixed>  $data
-     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string, risk_levels: ?list<string>}>|null
+     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string, risk_levels: ?list<string>, custom_subject_template?: ?string}>|null
      */
     public function productSettings(array $data): ?array
     {
@@ -225,7 +228,7 @@ class SaveAlertRule
 
     /**
      * @param  array<string, mixed>  $entry
-     * @return array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string, risk_levels: ?list<string>}
+     * @return array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: ?string, risk_levels: ?list<string>, custom_subject_template?: ?string}
      */
     private static function normaliseEntry(array $entry): array
     {
@@ -233,7 +236,12 @@ class SaveAlertRule
         $usesLocations = in_array($mode, [MatchingMode::Location, MatchingMode::Polygon, MatchingMode::RiskArea], true);
         $codes = $mode === MatchingMode::CountyZone ? ($entry['county_zone_codes'] ?? null) : null;
 
+        $subject = array_key_exists('custom_subject_template', $entry)
+            ? ['custom_subject_template' => filled($entry['custom_subject_template']) ? trim((string) $entry['custom_subject_template']) : null]
+            : [];
+
         return [
+            ...$subject,
             'product_id' => (int) $entry['product_id'],
             'matching_mode' => $mode?->value,
             'location_ids' => $usesLocations
@@ -256,7 +264,7 @@ class SaveAlertRule
      * save) cannot merge them by renaming the rule; only a product it adds takes the flat list.
      *
      * @param  array<string, mixed>  $data
-     * @param  list<array{product_id: int, risk_levels: ?list<string>}>  $settings
+     * @param  list<array{product_id: int, risk_levels: ?list<string>, custom_subject_template?: ?string}>  $settings
      * @return array<int, list<string>>
      */
     private function riskLevelsByProduct(?AlertCategory $category, array $data, array $settings, ?AlertRule $stored): array
@@ -283,7 +291,7 @@ class SaveAlertRule
      * its flat list is, as a set, the union of the stored products' levels: the client is echoing back
      * what it read, not changing it. Empty otherwise (the flat list then applies to every product).
      *
-     * @param  list<array{product_id: int, risk_levels: ?list<string>}>  $settings
+     * @param  list<array{product_id: int, risk_levels: ?list<string>, custom_subject_template?: ?string}>  $settings
      * @param  list<string>  $shared
      * @return array<int, list<string>>
      */

@@ -430,3 +430,59 @@ test('a product\'s locations are only ever the rule owner\'s own', function () {
 
     expect(($this->productLocationRows)($rule))->toBe([[$this->tornado->id, $this->location->id]]);
 });
+
+describe('per-product custom subjects', function () {
+    beforeEach(function () {
+        $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+
+        $this->subjectRows = fn (AlertRule $rule): array => DB::table('alert_rule_product')->where('alert_rule_id', $rule->id)->orderBy('product_id')
+            ->pluck('custom_subject_template', 'product_id')
+            ->map(fn ($subject): ?string => $subject)
+            ->all();
+
+        $this->subjectData = fn (array $subjects): array => ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_settings' => [
+            ['product_id' => $this->tornado->id, 'matching_mode' => 'nationwide', ...$subjects[0]],
+            ['product_id' => $this->severe->id, 'matching_mode' => 'nationwide', ...$subjects[1]],
+        ]];
+    });
+
+    test('a subject is trimmed and stored on its own product alone; blank ones store null', function () {
+        $rule = ($this->save)(($this->subjectData)([['custom_subject_template' => '  Tornado: {{ event }}  '], ['custom_subject_template' => '   ']]));
+        $blank = ($this->save)(($this->subjectData)([['custom_subject_template' => ''], ['custom_subject_template' => 'Severe']]));
+
+        expect(($this->subjectRows)($rule))->toBe([$this->tornado->id => 'Tornado: {{ event }}', $this->severe->id => null])
+            ->and(($this->subjectRows)($blank))->toBe([$this->tornado->id => null, $this->severe->id => 'Severe']);
+    });
+
+    test('entries that omit the key keep the stored subjects, and an explicit null clears only its product', function () {
+        $rule = ($this->save)(($this->subjectData)([['custom_subject_template' => 'One'], ['custom_subject_template' => 'Two']]));
+
+        ($this->save)(($this->subjectData)([[], []]), $rule);
+        expect(($this->subjectRows)($rule))->toBe([$this->tornado->id => 'One', $this->severe->id => 'Two']);
+
+        ($this->save)(($this->subjectData)([['custom_subject_template' => null], []]), $rule);
+        expect(($this->subjectRows)($rule))->toBe([$this->tornado->id => null, $this->severe->id => 'Two']);
+    });
+
+    test('the flat product_ids shape keeps stored subjects, gives a new product none and drops removed ones', function () {
+        $rule = ($this->save)(($this->subjectData)([['custom_subject_template' => 'One'], ['custom_subject_template' => 'Two']]));
+
+        ($this->save)(($this->weatherData)(['product_ids' => [$this->tornado->category->value => [$this->tornado->id, $this->flood->id]]]), $rule);
+
+        expect(($this->subjectRows)($rule))->toBe([$this->tornado->id => 'One', $this->flood->id => null]);
+    });
+
+    test('customSubjectFor returns the subject for a paid owner and null otherwise', function () {
+        $rule = ($this->save)(($this->subjectData)([['custom_subject_template' => 'One'], ['custom_subject_template' => ' ']]));
+        $rule = $rule->fresh();
+
+        expect($rule->customSubjectFor($this->tornado->id))->toBe('One')
+            ->and($rule->customSubjectFor($this->severe->id))->toBeNull()
+            ->and($rule->customSubjectFor($this->flood->id))->toBeNull();
+
+        $this->user->forceFill(['tier_override' => Tier::Free])->save();
+
+        expect($rule->fresh()->customSubjectFor($this->tornado->id))->toBeNull()
+            ->and(($this->subjectRows)($rule)[$this->tornado->id])->toBe('One');
+    });
+});
