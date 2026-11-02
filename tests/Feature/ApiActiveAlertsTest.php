@@ -158,6 +158,28 @@ test('only the first 25 located places are looked at, and another user\'s places
     expect(($this->call)()->assertOk()->json('data'))->toBe([]);
 });
 
+test('the calling device\'s location is looked at even past 25 other places, with a cache entry per token', function () {
+    foreach (range(1, 25) as $n) {
+        ($this->place)("Place {$n}", 'COZ040');
+    }
+    $tokenB = $this->user->createToken('iPad', ['app']);
+    $tokenA = $this->user->tokens()->where('name', 'iPhone')->first();
+    $phoneB = Location::factory()->for($this->user)->mobileApp($tokenB->accessToken)->withFix(40.0, -105.0)->create(['label' => 'Phone B', 'forecast_zone_ugc' => 'COZ555', 'county_ugc' => 'COC999']);
+    $phoneA = Location::factory()->for($this->user)->mobileApp($tokenA)->withFix(40.0, -105.0)->create(['label' => 'Phone A', 'forecast_zone_ugc' => 'COZ556', 'county_ugc' => 'COC999']);
+    ($this->event)('B Warning', 'warning', 'COZ555');
+    ($this->event)('A Warning', 'warning', 'COZ556');
+
+    $asB = ($this->call)($tokenB->plainTextToken)->assertOk();
+    $asA = ($this->call)()->assertOk();
+
+    expect(collect($asB->json('data'))->pluck('event')->all())->toContain('B Warning', 'A Warning')
+        ->and(collect($asA->json('data'))->pluck('event')->all())->toContain('B Warning', 'A Warning')
+        ->and(collect($asB->json('data'))->firstWhere('event', 'B Warning')['place_ids'])->toBe([$phoneB->id])
+        ->and(collect($asA->json('data'))->firstWhere('event', 'A Warning')['place_ids'])->toBe([$phoneA->id])
+        ->and(Cache::has("app-active-alerts:v3:{$this->user->id}:{$tokenB->accessToken->id}"))->toBeTrue()
+        ->and(Cache::has("app-active-alerts:v3:{$this->user->id}:{$tokenA->id}"))->toBeTrue();
+});
+
 test('view_url is the latest bulletin page, and the payload carries nothing but the documented fields', function () {
     ($this->place)('Home', 'COZ040');
     $tornado = ($this->event)('Tornado Warning', 'warning', 'COZ040', ['headline' => 'SECRET-HEADLINE']);
@@ -225,7 +247,7 @@ test('the result is cached for 60 seconds per subscriber', function () {
     expect(($this->call)()->assertOk()->json('data'))->toHaveCount(2);
 
     $other = User::factory()->create();
-    expect(Cache::has("app-active-alerts:v2:{$other->id}"))->toBeFalse();
+    expect(Cache::has("app-active-alerts:v3:{$other->id}:none"))->toBeFalse();
 });
 
 test('a place with a fire weather zone sees a Red Flag Warning issued for that fire zone', function () {

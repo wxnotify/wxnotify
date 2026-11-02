@@ -12,7 +12,7 @@ class ActiveAlertController extends Controller
 {
     public function __invoke(Request $request, GetActiveAlertsForUser $active): AnonymousResourceCollection
     {
-        $result = $active($request->user());
+        $result = $active($request->user(), $request->user()->currentAccessToken()?->id);
 
         return ActiveAlertResource::collection($result['events'])
             ->additional(['meta' => ['has_places' => $result['has_places'], 'generated_at' => $result['generated_at']]]);

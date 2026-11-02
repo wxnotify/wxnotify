@@ -3,6 +3,7 @@
 namespace App\Actions\Alerts;
 
 use App\Actions\Weather\GetActiveAlertsForLocation;
+use App\Actions\Weather\GetUserWeatherPlaces;
 use App\Models\ActiveWwa;
 use App\Models\IngestedProduct;
 use App\Models\User;
@@ -14,13 +15,11 @@ use Illuminate\Support\Facades\Cache;
  * The warnings, watches and advisories in effect at any of a subscriber's located places (the phone
  * included), one entry per event with the labels and ids of the places it affects, for the app's Alerts
  * screen. Events come only from GetActiveAlertsForLocation::activeFor() (the zone rows), never an
- * event's own columns. Test products and every other family are left out. Looks at the first 25
- * located places; cached 60 seconds per subscriber (the key is versioned so a changed shape is never served stale).
+ * event's own columns. Test products and every other family are left out. Looks at the same places, in the same order and cap, as the weather endpoint
+ * (GetUserWeatherPlaces, this device's location first); cached 60 seconds per subscriber (the key is versioned so a changed shape is never served stale).
  */
 class GetActiveAlertsForUser
 {
-    private const MAX_LOCATIONS = 25;
-
     private const CACHE_SECONDS = 60;
 
     private const FAMILIES = ['warning', 'watch', 'advisory'];
@@ -28,21 +27,21 @@ class GetActiveAlertsForUser
     /**
      * @return array{events: list<array{id: int, event: string, family: string, places: list<string>, place_ids: list<int>, expires: ?string, view_url: ?string}>, has_places: bool, generated_at: string}
      */
-    public function __invoke(User $user): array
+    public function __invoke(User $user, ?int $appTokenId = null): array
     {
         return Cache::remember(
-            "app-active-alerts:v2:{$user->id}",
+            "app-active-alerts:v3:{$user->id}:".($appTokenId ?? 'none'),
             now()->addSeconds(self::CACHE_SECONDS),
-            fn (): array => $this->compute($user),
+            fn (): array => $this->compute($user, $appTokenId),
         );
     }
 
     /**
      * @return array{events: list<array<string, mixed>>, has_places: bool, generated_at: string}
      */
-    private function compute(User $user): array
+    private function compute(User $user, ?int $appTokenId): array
     {
-        $locations = $user->locations()->whereNotNull('lat')->whereNotNull('lng')->orderBy('id')->limit(self::MAX_LOCATIONS)->get();
+        $locations = app(GetUserWeatherPlaces::class)($user, $appTokenId);
 
         if ($locations->isEmpty()) {
             return ['events' => [], 'has_places' => false, 'generated_at' => now()->toIso8601String()];
@@ -102,7 +101,7 @@ class GetActiveAlertsForUser
     }
 
     /**
-     * The affected Location ids in the order of the sorted labels, each once.
+     * The affected Location ids, each once, ordered by their labels (not necessarily one-to-one with `places`, since equal labels collapse there).
      *
      * @param  array<int, string>  $labelsById
      * @return list<int>
