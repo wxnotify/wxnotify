@@ -14,3 +14,6 @@ paths:
 
 ## Active alerts carry place_ids; cache key is v2
 /api/v1/active-alerts events carry place_ids (Location ids, same order as the places labels) so the app can filter events by the selected place. Cache key is app-active-alerts:v2:{user}; bump it whenever the cached shape changes so a deploy never serves old shapes. If two locations share a label, places collapses them but place_ids lists both ids.
+
+## Active alerts use the weather place list; cache key is v3 per token
+GetActiveAlertsForUser takes its places from GetUserWeatherPlaces (this device's location first, then other phones, then id, cap 25) so the app's per-place filter never hides a warning for the selected chip. Cache key is app-active-alerts:v3:{user}:{tokenId|none} and supersedes the earlier v2 note; bump it whenever the cached shape changes.
