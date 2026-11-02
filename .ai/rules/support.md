@@ -3,6 +3,7 @@ paths:
   - 'app/Support/**'
   - app/Support/Integrations.php
   - app/Support/PhoneNumber.php
+  - app/Support/FormatPlaceWeather.php
 ---
 
 # Support
@@ -51,3 +52,6 @@ Numbers go through `App\Support\PhoneNumber` (NANP only; area code AND exchange 
 
 ## International numbers: NANP first, trunk zero refused, WhatsApp 10-14
 `normalizeInternational()` tries NANP first (a bare 10-digit number is therefore read as US/Canada: WhatsApp's help text and `+52 •••• 5678`-style hint say so) and is a strict superset of `normalize()` for NANP input. On the international path any parenthesised group starting with 0 (`(0)`, `(01)`) is refused anywhere (trunk-prefix habit stores a malformed number); `+39 06...` and groups like `(30)` stay valid. WhatsApp's own rule narrows to 10-14 E.164 digits (Apprise drops 8/9/15). Mexican `+521` vs `+52` is not canonicalised (owner item).
+
+## Weather card fields: all optional, omitted when null; next_hour sentence
+The /api/v1/weather card carries current.gust/pressure/pressure_trend/visibility/dew_point/cloud_cover, hours[] (up to 24, each with optional wind) and a card-level next_hour sentence ("Rain starting in 12 min", "No rain expected in the next hour"). Every one is omitted when WeatherKit did not send it, never 0 or "null"; old cached entries lack the keys and must degrade by omission. forecastNextHour is requested with the other datasets; it is absent outside Apple's supported countries (what Apple does with the request there is unverified, check a non-US place after deploy). A precipitating minute is chance >= 50% or >= 0.1 mm/h.
