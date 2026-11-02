@@ -12,6 +12,7 @@
     $noLocationsMessage = $getNoLocationsMessage();
     $canCreateLocation = $canCreateLocation();
     $helperTexts = $getHelperTexts();
+    $offersCustomSubjects = $offersCustomSubjects();
     $actionContext = ['schemaComponent' => $getKey()];
     $officeListId = $field::officeListId();
     // Disjoint class lists, so Alpine's object syntax can swap them without dropping a shared class.
@@ -48,6 +49,11 @@
         exactly when every row of this table is on. A bulk change that flips an SPC & WPC
         risk-level product asks for ONE $wire.$refresh() afterwards (the deferred changes travel
         with it), so the server-rendered risk-level checklist matches what is now switched on.
+
+        A paid subscriber's switched-on row shows its subject. Its own flag (subjectOpen, not the
+        location list's open) reveals the text input, which exists only while revealed on a
+        switched-on row; the deferred wire:model keeps what was typed when the row is switched
+        off and on.
     --}}
     <div
         wire:key="{{ $statePath }}.locations.{{ md5(json_encode($locationOptions)) }}"
@@ -88,7 +94,9 @@
                 return {
                     path,
                     open: false,
+                    subjectOpen: false,
                     get on() { return !! this.$wire.get(path + '.enabled') },
+                    get subject() { return String(this.$wire.get(path + '.custom_subject_template') ?? '').trim() },
                     get mode() { return this.$wire.get(path + '.matching_mode') },
                     get locationIds() { return (this.$wire.get(path + '.location_ids') ?? []).map(Number) },
                     toggle(live) { this.$wire.set(path + '.enabled', ! this.on, live) },
@@ -219,6 +227,55 @@
                             </div>
                             @if (filled($product->description))
                                 <p class="text-gray-500 dark:text-gray-400">{{ $product->description }}</p>
+                            @endif
+
+                            @if ($offersCustomSubjects)
+                                @php
+                                    $subject = is_string($row['custom_subject_template'] ?? null) ? trim($row['custom_subject_template']) : '';
+                                @endphp
+
+                                <div x-show="on" @if (! $isOn) x-cloak @endif class="mt-2">
+                                    <div class="flex min-w-0 items-center gap-2">
+                                        <span
+                                            x-show="subject === ''"
+                                            @if ($subject !== '') x-cloak @endif
+                                            class="text-gray-500 dark:text-gray-400"
+                                        >Uses the default subject</span>
+                                        <span
+                                            x-show="subject !== ''"
+                                            @if ($subject === '') x-cloak @endif
+                                            x-text="subject"
+                                            class="min-w-0 truncate text-gray-700 dark:text-gray-300"
+                                        >{{ $subject }}</span>
+                                        <button
+                                            type="button"
+                                            x-on:click="subjectOpen = ! subjectOpen"
+                                            x-bind:aria-expanded="subjectOpen"
+                                            aria-label="Subject for {{ $product->name }}"
+                                            x-text="subject === '' ? 'Custom subject' : 'Edit'"
+                                            class="fi-link fi-size-sm shrink-0 font-semibold text-primary-600 dark:text-primary-400"
+                                        >{{ $subject === '' ? 'Custom subject' : 'Edit' }}</button>
+                                    </div>
+
+                                    <template x-if="on && subjectOpen">
+                                        <div class="mt-2">
+                                            <div class="fi-input-wrp">
+                                                <div class="fi-input-wrp-content-ctn">
+                                                    <input
+                                                        type="text"
+                                                        maxlength="255"
+                                                        autocomplete="off"
+                                                        aria-label="Custom subject for {{ $product->name }}"
+                                                        class="fi-input"
+                                                        wire:model="{{ $rowPath }}.custom_subject_template"
+                                                        x-on:keydown.enter.prevent
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p class="mt-1 text-gray-500 dark:text-gray-400">{{ $subjectHelperTextFor($product) }}</p>
+                                        </div>
+                                    </template>
+                                </div>
                             @endif
                         </td>
 

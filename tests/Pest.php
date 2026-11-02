@@ -101,7 +101,7 @@ function something()
  * the form holds it. Overrides replace any key (e.g. `location_ids`, `wfo`, `enabled`).
  *
  * @param  array<string, mixed>  $overrides
- * @return array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}
+ * @return array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>, custom_subject_template: string}
  */
 function alertWizardRow(Product $product, string $mode, array $overrides = []): array
 {
@@ -112,6 +112,7 @@ function alertWizardRow(Product $product, string $mode, array $overrides = []): 
         'location_ids' => [],
         'wfo' => null,
         'county_zone_codes' => [],
+        'custom_subject_template' => '',
         ...$overrides,
     ];
 }

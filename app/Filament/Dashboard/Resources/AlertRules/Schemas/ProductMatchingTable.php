@@ -7,12 +7,14 @@ use App\Actions\Weather\SearchUgcCodes;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
 use App\Enums\ProductCategory;
+use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
 use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\ProductMatching;
+use App\Support\SubjectPlaceholders;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Field;
@@ -33,8 +35,9 @@ use WeakMap;
  * and description, and its matching mode with that mode's inputs, one row per product.
  *
  * State, `product_settings.{category}`: a list of rows `{product_id, enabled, matching_mode,
- * location_ids, wfo, county_zone_codes}`, one per product of the category whether it is on or
- * not, seeded by formState() (never by field defaults: the step is built dynamically).
+ * location_ids, wfo, county_zone_codes, custom_subject_template}`, one per product of the
+ * category whether it is on or not, seeded by formState() (never by field defaults: the step is
+ * built dynamically). `custom_subject_template` is the product's own subject ('' for none).
  *
  * A custom field with a Blade view of native inputs, not Filament Selects or a Repeater: the
  * table-mode Repeater was about 46,000 DOM nodes and a 9.6 MB response for the 143 Weather
@@ -43,6 +46,11 @@ use WeakMap;
  * the mode's inputs and its helper text are Alpine (a switched-off row looks like any other; only its switch says it is off). Only the
  * county/zone picker and "add a location" are server actions (modals), since they need the
  * existing Filament fields.
+ *
+ * A paid subscriber's switched-on row also shows its subject ("Uses the default subject" or a
+ * preview) with a button that reveals one text input; the input exists only while revealed on a
+ * switched-on row (an Alpine template), so the table stays light, and its deferred binding keeps
+ * what was typed when the row is switched off and on.
  */
 class ProductMatchingTable extends Field
 {
@@ -143,7 +151,7 @@ class ProductMatchingTable extends Field
             ->orderBy('sort_order')
             ->orderBy('id')
             // The example itself is up to several KB a product: only whether there is one is read here.
-            ->select(['id', 'name', 'description', 'category', 'has_polygon', 'risk_level_options'])
+            ->select(['id', 'name', 'description', 'category', 'family', 'has_polygon', 'has_vtec', 'has_ugc', 'risk_level_options'])
             ->selectRaw("(example IS NOT NULL AND btrim(example, E' \\t\\r\\n') <> '') AS has_example")
             ->get();
     }
@@ -156,7 +164,7 @@ class ProductMatchingTable extends Field
      * its stored settings (an old-style rule's products read the rule's own); anything else starts
      * switched off at its default.
      *
-     * @return array<string, list<array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}>>
+     * @return array<string, list<array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>, custom_subject_template: string}>>
      */
     public static function formState(User $user, AlertCategory $alertCategory, ?AlertRule $rule = null, mixed $currentState = null): array
     {
@@ -177,15 +185,18 @@ class ProductMatchingTable extends Field
     }
 
     /**
-     * @return array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}
+     * A watched product's row: its stored settings and its own stored subject ('' for none).
+     *
+     * @return array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>, custom_subject_template: string}
      */
     private static function storedRow(User $user, AlertCategory $alertCategory, Product $product, AlertRule $rule, ?int $firstLocationId): array
     {
         $settings = $rule->settingsFor($product->id);
         $default = ProductMatching::defaultRow($user, $alertCategory, $product, $firstLocationId);
+        $subject = (string) $rule->products->firstWhere('id', $product->id)?->pivot->custom_subject_template;
 
         if ($settings?->mode === null) {
-            return [...$default, 'enabled' => true];
+            return [...$default, 'enabled' => true, 'custom_subject_template' => $subject];
         }
 
         return [
@@ -195,6 +206,7 @@ class ProductMatchingTable extends Field
             'location_ids' => $settings->locations->pluck('id')->map(fn ($id): int => (int) $id)->sort()->values()->all(),
             'wfo' => $settings->wfo,
             'county_zone_codes' => $settings->countyZoneCodes,
+            'custom_subject_template' => $subject,
         ];
     }
 
@@ -208,10 +220,14 @@ class ProductMatchingTable extends Field
      * `$this->data`, where a tampered request can add keys no table validated. Only keys named
      * after a product category are read.
      *
+     * For a paid owner every row carries its `custom_subject_template` (trimmed, null for none), so
+     * the save is always explicit. A Free owner's rows carry none, which keeps any stored subject
+     * (ignored while Free, back on an upgrade) and sets no new one.
+     *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public static function toSaveInput(array $data): array
+    public static function toSaveInput(array $data, User $owner): array
     {
         $alertCategory = AlertCategory::tryFrom((string) ($data['category'] ?? ''));
 
@@ -231,6 +247,7 @@ class ProductMatchingTable extends Field
                 'location_ids' => self::ids($row['location_ids'] ?? []),
                 'wfo' => self::officeCode($row['wfo'] ?? null),
                 'county_zone_codes' => self::codes($row['county_zone_codes'] ?? []),
+                ...(self::ownerMaySetSubjects($owner) ? ['custom_subject_template' => self::subject($row['custom_subject_template'] ?? null)] : []),
                 ...($alertCategory === AlertCategory::SpcWpc ? ['risk_levels' => self::levels($data['risk_levels'][$category] ?? [])] : []),
             ])
             ->all())
@@ -265,6 +282,30 @@ class ProductMatchingTable extends Field
     public static function enabledProductIds(mixed $state): array
     {
         return collect(self::enabledRows($state))->map(fn (array $row): int => (int) $row['product_id'])->unique()->values()->all();
+    }
+
+    /**
+     * Free owners cannot set a subject, per product or rule-wide.
+     */
+    public static function ownerMaySetSubjects(User $owner): bool
+    {
+        return $owner->tier() !== Tier::Free;
+    }
+
+    /**
+     * Whether the rows offer their subject control (the signed-in subscriber is on a paid tier).
+     */
+    public function offersCustomSubjects(): bool
+    {
+        return $this->lookup('offersCustomSubjects', fn (): bool => self::ownerMaySetSubjects(auth()->user()));
+    }
+
+    /**
+     * The placeholders that can carry a value for this product, shown under its subject input.
+     */
+    public function subjectHelperTextFor(Product $product): string
+    {
+        return SubjectPlaceholders::helperText($product);
     }
 
     protected function setUp(): void
@@ -538,6 +579,7 @@ class ProductMatchingTable extends Field
             ->map(fn ($id): int => (int) $id)
             ->all();
         $problems = [];
+        $checksSubjects = $this->offersCustomSubjects();
 
         foreach ($rows as $row) {
             $product = $this->products->get((int) $row['product_id']);
@@ -546,6 +588,10 @@ class ProductMatchingTable extends Field
                 $problems[] = 'Choose products from this list only.';
 
                 continue;
+            }
+
+            if ($checksSubjects) {
+                $problems = [...$problems, ...$this->subjectProblems($product, $row['custom_subject_template'] ?? null)];
             }
 
             $mode = MatchingMode::tryFrom((string) ($row['matching_mode'] ?? ''));
@@ -565,6 +611,24 @@ class ProductMatchingTable extends Field
         }
 
         return array_values(array_unique($problems));
+    }
+
+    /**
+     * A product's own subject: text of at most 255 characters once trimmed, in the wording the
+     * rule-wide subject box uses.
+     *
+     * @return list<string>
+     */
+    private function subjectProblems(Product $product, mixed $subject): array
+    {
+        $attribute = "custom subject for {$product->name}";
+
+        return match (true) {
+            $subject === null => [],
+            ! is_string($subject) => [__('validation.string', ['attribute' => $attribute])],
+            mb_strlen(trim($subject)) > 255 => [__('validation.max.string', ['attribute' => $attribute, 'max' => 255])],
+            default => [],
+        };
     }
 
     /**
@@ -741,6 +805,11 @@ class ProductMatchingTable extends Field
             ->unique()
             ->values()
             ->all();
+    }
+
+    private static function subject(mixed $subject): ?string
+    {
+        return is_string($subject) && trim($subject) !== '' ? trim($subject) : null;
     }
 
     private static function officeCode(mixed $code): ?string

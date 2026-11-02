@@ -102,6 +102,7 @@ it('preselects the lowest-id location, not the first one created', function () {
         'location_ids' => [5],
         'wfo' => null,
         'county_zone_codes' => [],
+        'custom_subject_template' => '',
     ]);
 });
 

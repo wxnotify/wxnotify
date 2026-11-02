@@ -17,6 +17,7 @@ use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use App\Support\SubjectPlaceholders;
 use Database\Seeders\ProductCatalogSeeder;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Radio;
@@ -1715,3 +1716,187 @@ test('switching every product off leaves nothing to save', function () {
 
     expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
 });
+
+/**
+ * The server-rendered markup of one product's row in the alert wizard's product table, with any
+ * Alpine `<template>` content (which the browser never renders until Alpine adds it) removed.
+ */
+function alertRuleResourceRenderedRow(string $html, Product $product): string
+{
+    expect(preg_match('/<tr[^>]*data-product-id="'.$product->id.'".*?<\/tr>/s', $html, $match))->toBe(1);
+
+    return preg_replace('/<template\b.*?<\/template>/s', '', $match[0]);
+}
+
+test('a subject typed on one switched-on product is stored on that product only', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $tornadoWatch = Product::where('code', 'TO.A')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            "product_settings.{$tornadoWarning->category->value}" => [
+                alertWizardRow($tornadoWarning, 'nationwide', ['custom_subject_template' => '  {product} for {location} {until}  ']),
+                alertWizardRow($tornadoWatch, 'nationwide'),
+            ],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $rule = AlertRule::where('user_id', $this->user->id)->sole();
+
+    expect($rule->products->firstWhere('id', $tornadoWarning->id)->pivot->custom_subject_template)->toBe('{product} for {location} {until}')
+        ->and($rule->products->firstWhere('id', $tornadoWatch->id)->pivot->custom_subject_template)->toBeNull();
+});
+
+test('editing shows each product\'s stored subject in its row, and an empty one for a product without', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $tornadoWatch = Product::where('code', 'TO.A')->sole();
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'weather_alerts',
+        'product_settings' => [
+            ['product_id' => $tornadoWarning->id, 'matching_mode' => 'nationwide', 'custom_subject_template' => '{product} now'],
+            ['product_id' => $tornadoWatch->id, 'matching_mode' => 'nationwide'],
+        ],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $category = $tornadoWarning->category->value;
+
+    $component->assertFormSet([
+        "product_settings.{$category}.".alertWizardRowIndex($component, $tornadoWarning).'.custom_subject_template' => '{product} now',
+        "product_settings.{$category}.".alertWizardRowIndex($component, $tornadoWatch).'.custom_subject_template' => '',
+    ]);
+});
+
+test('a switched-off row\'s subject is not saved, and clearing a subject saves none', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $tornadoWatch = Product::where('code', 'TO.A')->sole();
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'weather_alerts',
+        'product_settings' => [['product_id' => $tornadoWarning->id, 'matching_mode' => 'nationwide', 'custom_subject_template' => '{product} now']],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $category = $tornadoWarning->category->value;
+    $watchIndex = alertWizardRowIndex($component, $tornadoWatch);
+
+    $component
+        ->set("data.product_settings.{$category}.".alertWizardRowIndex($component, $tornadoWarning).'.custom_subject_template', '   ')
+        ->set("data.product_settings.{$category}.{$watchIndex}.custom_subject_template", 'Never saved')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->products->pluck('pivot.custom_subject_template', 'id')->all())->toBe([$tornadoWarning->id => null]);
+});
+
+test('a product\'s subject may be 255 characters but not 256', function (int $length, bool $passes) {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    $component = livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'nationwide', ['custom_subject_template' => str_repeat('a', $length)])],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create');
+
+    if ($passes) {
+        $component->assertHasNoFormErrors();
+        expect(AlertRule::where('user_id', $this->user->id)->sole()->customSubjectFor($tornadoWarning->id))->toBe(str_repeat('a', 255));
+    } else {
+        $component->assertHasFormErrors(["product_settings.{$tornadoWarning->category->value}"])
+            ->assertSee('The custom subject for Tornado Warning field must not be greater than 255 characters.');
+        expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+    }
+})->with([
+    '255 characters' => [255, true],
+    '256 characters' => [256, false],
+]);
+
+test('a product\'s subject must be text', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm([
+            'category' => 'weather_alerts',
+            "product_settings.{$tornadoWarning->category->value}" => [alertWizardRow($tornadoWarning, 'nationwide', ['custom_subject_template' => ['{product}']])],
+            'channel_ids' => [$this->channel->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(["product_settings.{$tornadoWarning->category->value}"])
+        ->assertSee('The custom subject for Tornado Warning field must be a string.');
+});
+
+test('a paid subscriber\'s switched-on row offers a subject, and a switched-off row renders no subject input', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $tornadoWatch = Product::where('code', 'TO.A')->sole();
+
+    $component = livewire(CreateAlertRule::class)->fillForm([
+        'category' => 'weather_alerts',
+        "product_settings.{$tornadoWarning->category->value}" => [
+            alertWizardRow($tornadoWarning, 'nationwide', ['custom_subject_template' => '{product} now']),
+            alertWizardRow($tornadoWatch, 'nationwide', ['enabled' => false]),
+        ],
+    ]);
+    $html = $component->html();
+    $onRow = alertRuleResourceRenderedRow($html, $tornadoWarning);
+    $offRow = alertRuleResourceRenderedRow($html, $tornadoWatch);
+
+    expect($html)->toContain('Uses the default subject')
+        ->and($onRow)->toContain('{product} now')
+        ->and($onRow)->toContain('Edit')
+        ->and($html)->toContain('wire:model="data.product_settings.'.$tornadoWarning->category->value.'.0.custom_subject_template"')
+        ->and($html)->toContain(e(SubjectPlaceholders::helperText($tornadoWarning)))
+        ->and($offRow)->toContain('Custom subject')
+        ->and($onRow.$offRow)->not->toContain('custom_subject_template"');
+});
+
+test('a Free subscriber\'s product table has no subject control, and a save with one raises no error and keeps the stored subject', function () {
+    $tornadoWarning = Product::where('code', 'TO.W')->sole();
+    $tornadoWatch = Product::where('code', 'TO.A')->sole();
+    $rule = app(SaveAlertRule::class)($this->user, [
+        'category' => 'weather_alerts',
+        'product_settings' => [['product_id' => $tornadoWarning->id, 'matching_mode' => 'nationwide', 'custom_subject_template' => 'From before the downgrade']],
+        'channel_ids' => [$this->channel->id],
+    ]);
+
+    $component = livewire(EditAlertRule::class, ['record' => $rule->id]);
+    $category = $tornadoWarning->category->value;
+    $watchIndex = alertWizardRowIndex($component, $tornadoWatch);
+
+    expect($component->html())->not->toContain('Uses the default subject')
+        ->and($component->html())->not->toMatch('/product_settings\.\w+\.\d+\.custom_subject_template"/');
+
+    $component
+        ->set("data.product_settings.{$category}.{$watchIndex}.enabled", true)
+        ->set("data.product_settings.{$category}.{$watchIndex}.matching_mode", 'nationwide')
+        ->set("data.product_settings.{$category}.{$watchIndex}.custom_subject_template", str_repeat('a', 300))
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($rule->fresh()->products->pluck('pivot.custom_subject_template', 'id')->all())
+        ->toEqual([$tornadoWarning->id => 'From before the downgrade', $tornadoWatch->id => null]);
+});
+
+test('the rule-wide subject is the default for a product rule and keeps its old label elsewhere', function (string $category, string $label, string $otherLabel) {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+
+    livewire(CreateAlertRule::class)
+        ->fillForm(['category' => $category])
+        ->assertSee($label)
+        ->assertDontSee($otherLabel);
+})->with([
+    'weather alerts' => ['weather_alerts', 'Default subject line (optional)', 'Custom subject line (optional)'],
+    'spc & wpc' => ['spc_wpc', 'Default subject line (optional)', 'Custom subject line (optional)'],
+    'threshold' => ['threshold', 'Custom subject line (optional)', 'Default subject line (optional)'],
+]);

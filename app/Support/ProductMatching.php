@@ -69,9 +69,10 @@ final class ProductMatching
     /**
      * A switched-off table row at the product's default mode. Location-based
      * modes preselect the subscriber's first saved location (lowest id);
-     * pass $firstLocationId to skip the lookup when building many rows.
+     * pass $firstLocationId to skip the lookup when building many rows. The row
+     * has no subject of its own (an empty `custom_subject_template`).
      *
-     * @return array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>}
+     * @return array{product_id: int, enabled: bool, matching_mode: string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>, custom_subject_template: string}
      */
     public static function defaultRow(User $user, AlertCategory $category, Product $product, ?int $firstLocationId = null): array
     {
@@ -94,6 +95,7 @@ final class ProductMatching
             'location_ids' => $locationIds,
             'wfo' => null,
             'county_zone_codes' => [],
+            'custom_subject_template' => '',
         ];
     }
 

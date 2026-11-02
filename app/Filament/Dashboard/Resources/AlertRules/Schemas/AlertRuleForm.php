@@ -301,10 +301,15 @@ class AlertRuleForm
                         ? 'Brief sends the short circle summary to every channel; Full also sends the detailed email to email channels.'
                         : null)
                     ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free),
+                // On a product rule this is the default for every product without its own subject (set on the product step).
                 TextInput::make('custom_subject_template')
-                    ->label('Custom subject line (optional)')
+                    ->label(fn (Get $get): string => ProductMatchingTable::supports(AlertCategory::tryFrom((string) $get('category')))
+                        ? 'Default subject line (optional)'
+                        : 'Custom subject line (optional)')
                     ->maxLength(255)
-                    ->helperText('Leave blank to use the default. Placeholders: {product}, {location}, {category}, {until}, {states}, {wfo}.')
+                    ->helperText(fn (Get $get): string => ProductMatchingTable::supports(AlertCategory::tryFrom((string) $get('category')))
+                        ? 'Used for every product without its own subject; a subject set on a product overrides it. Leave blank to use the default. Placeholders: {product}, {location}, {category}, {until}, {states}, {wfo}.'
+                        : 'Leave blank to use the default. Placeholders: {product}, {location}, {category}, {until}, {states}, {wfo}.')
                     ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free),
                 self::alertTemplateSelect()
                     ->visible(fn (Get $get): bool => auth()->user()->tier() !== Tier::Free

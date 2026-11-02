@@ -41,7 +41,7 @@ class CreateAlertRule extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $this->saveInput = ProductMatchingTable::toSaveInput($data);
+        $this->saveInput = ProductMatchingTable::toSaveInput($data, auth()->user());
 
         return AlertRuleForm::saveForForm(fn (): array => app(SaveAlertRule::class)->attributes(auth()->user(), $this->saveInput));
     }

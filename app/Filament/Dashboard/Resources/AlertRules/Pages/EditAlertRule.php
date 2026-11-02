@@ -85,7 +85,7 @@ class EditAlertRule extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $this->saveInput = ProductMatchingTable::toSaveInput($data);
+        $this->saveInput = ProductMatchingTable::toSaveInput($data, auth()->user());
 
         return AlertRuleForm::saveForForm(fn (): array => app(SaveAlertRule::class)->attributes(auth()->user(), $this->saveInput, $this->record));
     }
