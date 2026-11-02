@@ -5,6 +5,7 @@ paths:
   - app/Observers/IngestedProductObserver.php
   - 'app/Actions/Weather/**'
   - app/Actions/Weather/GetPlaceWeather.php
+  - app/Actions/Weather/GetUserWeatherPlaces.php
 ---
 
 # Pipeline
@@ -44,3 +45,6 @@ With the `deliveries` priority queue, swody1's first delivery can run before pts
 
 ## GetPlaceWeather is WeatherKit-only, separate from the NWS actions
 GetPlaceWeather / GetWeatherAttribution serve only the mobile Weather card from Apple WeatherKit (credentials via services.weatherkit.*; token() === null means unavailable, isConfigured() is true even for a garbage PEM). They never fall back to NWS and the NWS actions (GetCurrentConditions etc.) are untouched. See the WeatherController rule for the endpoint contract.
+
+## Weather places: this token's own phone location first
+GET /api/v1/weather orders places: the Location linked to the calling app token (app_token_id) first, then the user's other phone (mobile_source=app) locations, then by id; max 25. This supersedes the earlier "phone first" wording in the WeatherController rule: a subscriber can have several phone locations (one per device) and each device must see its own first.
