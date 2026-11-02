@@ -46,7 +46,12 @@ class StoreOutlookReportRun
             $path = "outlook-maps/{$batchKey}/{$key}.{$extension}";
 
             try {
-                Storage::disk('local')->put($path, $graphic['bytes']);
+                if (Storage::disk('local')->put($path, $graphic['bytes']) === false) {
+                    Log::warning('Outlook report map copy failed', ['reason' => 'write_returned_false']);
+
+                    continue;
+                }
+
                 $maps[$key] = ['path' => $path, 'mime' => $graphic['mime']];
             } catch (Throwable $e) {
                 Log::warning('Outlook report map copy failed', ['exception' => $e::class]);

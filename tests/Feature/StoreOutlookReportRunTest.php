@@ -76,6 +76,23 @@ it('saves the run and logs only the exception class when a disk write throws', f
         && ! str_contains(json_encode($context), 'secret'))->once();
 });
 
+it('treats a write that returns false as no map and still stores the other maps', function () {
+    $disk = Mockery::mock(Filesystem::class);
+    $disk->shouldReceive('put')->with('outlook-maps/batch-5/day1.png', 'A')->andReturn(false);
+    $disk->shouldReceive('put')->with('outlook-maps/batch-5/day2.png', 'B')->andReturn(true);
+    Storage::shouldReceive('disk')->with('local')->andReturn($disk);
+    Log::spy();
+
+    $run = app(StoreOutlookReportRun::class)(storeOutlookRule(), 'batch-5', [], [
+        'day1' => ['bytes' => 'A', 'mime' => 'image/png'],
+        'day2' => ['bytes' => 'B', 'mime' => 'image/png'],
+    ]);
+
+    expect(OutlookReportRun::count())->toBe(1)
+        ->and($run->fresh()->maps)->toBe(['day2' => ['path' => 'outlook-maps/batch-5/day2.png', 'mime' => 'image/png']]);
+    Log::shouldHaveReceived('warning')->once();
+});
+
 it('reports expiry from the map retention days', function () {
     expect(OutlookReportRun::factory()->create()->mapsExpired())->toBeFalse()
         ->and(OutlookReportRun::factory()->old()->create()->mapsExpired())->toBeTrue();
