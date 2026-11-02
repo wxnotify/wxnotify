@@ -362,3 +362,101 @@ test('the new placeholders are empty without a bulletin, as for a scheduled aler
 
     expect((new RenderAlertSubject)(untilRule('Check [{until}] [{states}] [{wfo}]'), null, $location))->toBe('Check [] [] []');
 });
+
+function productSubjectRule(Tier $tier, array $pivots, array $attributes = []): AlertRule
+{
+    $rule = AlertRule::factory()->for(User::factory()->create(['tier_override' => $tier]))->create([
+        'category' => 'weather_alerts',
+        'matching_mode' => 'nationwide',
+        'location_id' => null,
+        ...$attributes,
+    ]);
+    $rule->products()->attach($pivots);
+
+    return $rule->fresh();
+}
+
+function productSubjectSegments(IngestedProduct $bulletin, Product ...$products): Collection
+{
+    return new Collection(array_map(
+        fn (Product $product): IngestedProductSegment => IngestedProductSegment::factory()->create(['ingested_product_id' => $bulletin->id, 'product_id' => $product->id]),
+        $products,
+    ));
+}
+
+test('a product\'s own subject beats the attached Message template and the rule-wide subject', function () {
+    $tornado = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = productSubjectRule(Tier::Plus, [$tornado->id => ['custom_subject_template' => '{product} by {wfo}']], ['custom_subject_template' => 'Rule-wide']);
+    $rule->update(['alert_template_id' => AlertTemplate::factory()->for($rule->user)->create(['subject_template' => 'From template'])->id]);
+    $bulletin = IngestedProduct::factory()->create(['product_id' => $tornado->id, 'cccc' => 'KOKX']);
+
+    $result = (new RenderAlertSubject)($rule->fresh(), $tornado, null, $bulletin, productSubjectSegments($bulletin, $tornado));
+
+    expect($result)->toBe('Tornado Warning by OKX');
+});
+
+test('a product without its own subject still renders the template, then the rule-wide subject, then the default name', function () {
+    $tornado = Product::factory()->create(['name' => 'Tornado Warning']);
+    $bulletin = IngestedProduct::factory()->create(['product_id' => $tornado->id]);
+
+    $withTemplate = productSubjectRule(Tier::Plus, [$tornado->id => ['custom_subject_template' => null]], ['custom_subject_template' => 'Rule-wide']);
+    $withTemplate->update(['alert_template_id' => AlertTemplate::factory()->for($withTemplate->user)->create(['subject_template' => 'From template'])->id]);
+    $ruleWide = productSubjectRule(Tier::Plus, [$tornado->id => ['custom_subject_template' => '  ']], ['custom_subject_template' => 'Rule-wide']);
+    $plain = productSubjectRule(Tier::Plus, [$tornado->id]);
+
+    expect((new RenderAlertSubject)($withTemplate->fresh(), $tornado, null, $bulletin, productSubjectSegments($bulletin, $tornado)))->toBe('From template')
+        ->and((new RenderAlertSubject)($ruleWide, $tornado, null, $bulletin, productSubjectSegments($bulletin, $tornado)))->toBe('Rule-wide')
+        ->and((new RenderAlertSubject)($plain, $tornado, null, $bulletin, productSubjectSegments($bulletin, $tornado)))->toBe('Tornado Warning');
+});
+
+test('placeholders render inside a product subject', function () {
+    $tornado = Product::factory()->create(['name' => 'Tornado Warning']);
+    $location = Location::factory()->create(['timezone' => 'America/Denver', 'label' => 'Home']);
+    $rule = productSubjectRule(Tier::Plus, [$tornado->id => ['custom_subject_template' => '{product} for {location} {until}']]);
+    $bulletin = IngestedProduct::factory()->create(['product_id' => $tornado->id]);
+    $segments = productSubjectSegments($bulletin, $tornado);
+    $segments->first()->update(['vtec_end' => Carbon::parse('2026-07-15 04:00:00 UTC')]);
+
+    expect((new RenderAlertSubject)($rule, $tornado, $location, $bulletin, $segments))->toBe('Tornado Warning for Home until 10:00pm MDT');
+});
+
+test('with several matched products the first matched segment\'s subject is used and {product} still names them all', function () {
+    $a = Product::factory()->create(['name' => 'A']);
+    $b = Product::factory()->create(['name' => 'B']);
+    $rule = productSubjectRule(Tier::Plus, [
+        $a->id => ['custom_subject_template' => 'A-subject: {product}'],
+        $b->id => ['custom_subject_template' => 'B-subject: {product}'],
+    ]);
+    $bulletin = IngestedProduct::factory()->create(['product_id' => $b->id]);
+
+    $result = (new RenderAlertSubject)($rule, ['A', 'B'], null, $bulletin, productSubjectSegments($bulletin, $a, $b));
+
+    expect($result)->toBe('A-subject: A + B');
+});
+
+test('a product the rule does not watch never supplies the subject', function () {
+    $watched = Product::factory()->create(['name' => 'Watched']);
+    $unwatched = Product::factory()->create(['name' => 'Unwatched']);
+    $rule = productSubjectRule(Tier::Plus, [$watched->id => ['custom_subject_template' => 'Watched subject']]);
+    $bulletin = IngestedProduct::factory()->create(['product_id' => $unwatched->id]);
+
+    $result = (new RenderAlertSubject)($rule, $watched, null, $bulletin, productSubjectSegments($bulletin, $unwatched, $watched));
+
+    expect($result)->toBe('Watched');
+});
+
+test('a bulletin without matched segments uses its own product\'s subject', function () {
+    $tornado = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = productSubjectRule(Tier::Plus, [$tornado->id => ['custom_subject_template' => 'Own subject']]);
+    $bulletin = IngestedProduct::factory()->create(['product_id' => $tornado->id]);
+
+    expect((new RenderAlertSubject)($rule, $tornado, null, $bulletin))->toBe('Own subject');
+});
+
+test('a Free owner\'s stored product subject is ignored', function () {
+    $tornado = Product::factory()->create(['name' => 'Tornado Warning']);
+    $rule = productSubjectRule(Tier::Free, [$tornado->id => ['custom_subject_template' => 'Own subject']]);
+    $bulletin = IngestedProduct::factory()->create(['product_id' => $tornado->id]);
+
+    expect((new RenderAlertSubject)($rule, $tornado, null, $bulletin, productSubjectSegments($bulletin, $tornado)))->toBe('Tornado Warning');
+});

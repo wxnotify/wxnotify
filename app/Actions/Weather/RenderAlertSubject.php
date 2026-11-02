@@ -18,7 +18,8 @@ use Illuminate\Support\Collection;
  * Renders a per-rule custom notification subject/title via plain
  * placeholder substitution -- logic-less strtr(), nothing executable,
  * since a subscriber-authored template runs on every dispatch of their
- * alerts. Priority: an attached AlertTemplate's subject_template first
+ * alerts. Priority: the matched product's own subject on the rule
+ * (AlertRule::customSubjectFor()), then an attached AlertTemplate's subject_template first
  * (via effectiveAlertTemplate(), tier- and category-gated), then the
  * rule's own custom_subject_template (via
  * effectiveCustomSubjectTemplate()), then AlertRule::displayName() (the
@@ -48,15 +49,21 @@ class RenderAlertSubject
     {
         $eventNames = $this->eventNames($product);
         $templateSubject = $rule->effectiveAlertTemplate()?->subject_template;
-        $subjectTemplate = filled($templateSubject) ? $templateSubject : $rule->effectiveCustomSubjectTemplate();
+        $segments ??= new Collection;
+        $productId = $this->productId($bulletin, $segments);
+        $productSubject = $productId === null ? null : $rule->customSubjectFor($productId);
+
+        $subjectTemplate = match (true) {
+            filled($productSubject) => $productSubject,
+            filled($templateSubject) => $templateSubject,
+            default => $rule->effectiveCustomSubjectTemplate(),
+        };
 
         if (blank($subjectTemplate)) {
             return $this->defaultSubject($rule, $eventNames);
         }
 
         $location ??= $rule->location;
-
-        $segments ??= new Collection;
 
         $subject = strtr($subjectTemplate, [
             '{product}' => $eventNames === [] ? $rule->category->label() : implode(' + ', $eventNames),
@@ -71,6 +78,18 @@ class RenderAlertSubject
     }
 
     /**
+     * The product the subject is about: the first matched segment's, else the bulletin's own.
+     *
+     * @param  Collection<int, IngestedProductSegment>  $segments
+     */
+    private function productId(?IngestedProduct $bulletin, Collection $segments): ?int
+    {
+        $productId = $segments->first()?->product_id ?? $bulletin?->product_id;
+
+        return $productId === null ? null : (int) $productId;
+    }
+
+    /**
      * "WFO OKX" for a rule that follows an office, else "your area". A rule saved per product holds
      * the office on the matched product's settings (the first matched segment's product, else the
      * bulletin's), not on the rule.
@@ -79,8 +98,8 @@ class RenderAlertSubject
      */
     private function officeOrArea(AlertRule $rule, ?IngestedProduct $bulletin, Collection $segments): string
     {
-        $productId = $segments->first()?->product_id ?? $bulletin?->product_id;
-        $wfo = $rule->wfo ?? ($productId === null ? null : $rule->settingsFor((int) $productId)?->wfo);
+        $productId = $this->productId($bulletin, $segments);
+        $wfo = $rule->wfo ?? ($productId === null ? null : $rule->settingsFor($productId)?->wfo);
 
         return $wfo !== null ? "WFO {$wfo}" : 'your area';
     }
