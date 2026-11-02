@@ -162,7 +162,8 @@ class DispatchOutlookReports extends Command
 
     /**
      * The Full report goes only to a rule that is not Brief (Full or unset) and has a channel that can
-     * render it; a Brief rule sends the Brief text to every channel, email included.
+     * render it (email) or keep it for the app (a phone, which still gets the Brief text as its push);
+     * a Brief rule sends the Brief text to every channel, email included.
      */
     private function wantsFullReport(AlertRule $rule): bool
     {
@@ -172,7 +173,7 @@ class DispatchOutlookReports extends Command
 
         $registry = app(ChannelTypeRegistry::class);
 
-        return $rule->notificationChannels->contains(fn (NotificationChannel $channel): bool => $registry->find($channel->channel_type)?->supportsRichContent() === true);
+        return $rule->notificationChannels->contains(fn (NotificationChannel $channel): bool => $channel->channel_type === 'mobile_push' || $registry->find($channel->channel_type)?->supportsRichContent() === true);
     }
 
     private function activePwo(FindActivePwo $findPwo, ?string $day1IssuedAt): ?IngestedProduct

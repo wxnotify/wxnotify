@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Alerts\StoreOutlookReportRun;
 use App\Actions\Weather\GetRadarSnapshot;
 use App\Actions\Weather\GetSpcOutlookGraphic;
 use App\Actions\Weather\RenderAlertSubject;
@@ -19,6 +20,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Dispatched once per AlertRule x NotificationChannel by
@@ -135,6 +137,10 @@ class DeliverScheduledAlert implements ShouldQueue
 
         $result = $dispatcher->send($channel, $body, $title, $meta);
 
+        if ($isOutlookReport && $report !== null && $batchKey !== null && $result->success && $channel->channel_type === 'mobile_push' && $rule->effectiveMessageBodyStyle() !== MessageBodyStyle::Brief) {
+            $this->keepOutlookRun($rule, $batchKey, $report, $meta['outlook_report_images'] ?? null);
+        }
+
         // ingested_product_id stays null (the column's default): Threshold
         // Alerts and Daily Weather Summary have no IngestedProduct behind
         // them at all, per this job's own docblock.
@@ -150,6 +156,21 @@ class DeliverScheduledAlert implements ShouldQueue
             'batch_key' => $batchKey,
             'dispatched_at' => now(),
         ]);
+    }
+
+    /**
+     * Keeps the run (and a copy of its maps) for the app; a storage failure never fails the delivery.
+     *
+     * @param  array<string, mixed>  $report
+     * @param  array<string, array{bytes: string, mime: string}|null>|null  $graphics  already fetched for this job, else fetched here
+     */
+    private function keepOutlookRun(AlertRule $rule, string $batchKey, array $report, ?array $graphics): void
+    {
+        try {
+            app(StoreOutlookReportRun::class)($rule, $batchKey, $report, $graphics ?? $this->outlookGraphics($report));
+        } catch (Throwable $e) {
+            logger()->warning('Outlook report run could not be stored', ['exception' => $e::class]);
+        }
     }
 
     /**

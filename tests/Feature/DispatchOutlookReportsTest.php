@@ -323,11 +323,33 @@ test('a rule with a phone and an email channel passes the report to both jobs wi
         ]))->toBeTrue();
 });
 
-test('a rule with only non-rich channels gets no report', function () {
+test('a rule with neither a rich nor a mobile channel gets no report', function () {
+    Carbon::setTestNow('2026-10-31 14:30:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles());
+    dorRule([], NotificationChannel::factory()->for(dorPaid())->webhook()->create());
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->report === null);
+});
+
+test('a rule whose only channel is a phone queues the report while the body stays the brief', function () {
     Carbon::setTestNow('2026-10-31 14:30:00');
     Queue::fake([DeliverScheduledAlert::class]);
     Http::fake(dorFiles());
     dorRule([], NotificationChannel::factory()->for(dorPaid())->mobilePush()->create());
+
+    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
+
+    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->report !== null && $job->body === 'D1 🟡  D2 ⚪  D3 ⚪  D4-8 ⚪');
+});
+
+test('a Brief rule with only a phone queues no report', function () {
+    Carbon::setTestNow('2026-10-31 14:30:00');
+    Queue::fake([DeliverScheduledAlert::class]);
+    Http::fake(dorFiles());
+    dorRule(['message_body_style' => MessageBodyStyle::Brief], NotificationChannel::factory()->for(dorPaid())->mobilePush()->create());
 
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
