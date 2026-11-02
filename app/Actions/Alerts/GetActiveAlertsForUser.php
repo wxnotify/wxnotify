@@ -12,10 +12,10 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * The warnings, watches and advisories in effect at any of a subscriber's located places (the phone
- * included), one entry per event with the labels of the places it affects, for the app's Alerts
+ * included), one entry per event with the labels and ids of the places it affects, for the app's Alerts
  * screen. Events come only from GetActiveAlertsForLocation::activeFor() (the zone rows), never an
  * event's own columns. Test products and every other family are left out. Looks at the first 25
- * located places; cached 60 seconds per subscriber.
+ * located places; cached 60 seconds per subscriber (the key is versioned so a changed shape is never served stale).
  */
 class GetActiveAlertsForUser
 {
@@ -26,12 +26,12 @@ class GetActiveAlertsForUser
     private const FAMILIES = ['warning', 'watch', 'advisory'];
 
     /**
-     * @return array{events: list<array{id: int, event: string, family: string, places: list<string>, expires: ?string, view_url: ?string}>, has_places: bool, generated_at: string}
+     * @return array{events: list<array{id: int, event: string, family: string, places: list<string>, place_ids: list<int>, expires: ?string, view_url: ?string}>, has_places: bool, generated_at: string}
      */
     public function __invoke(User $user): array
     {
         return Cache::remember(
-            "app-active-alerts:{$user->id}",
+            "app-active-alerts:v2:{$user->id}",
             now()->addSeconds(self::CACHE_SECONDS),
             fn (): array => $this->compute($user),
         );
@@ -50,7 +50,7 @@ class GetActiveAlertsForUser
 
         $lookup = app(GetActiveAlertsForLocation::class);
 
-        /** @var array<int, array{wwa: ActiveWwa, places: list<string>, ends: list<?CarbonInterface>, bulletins: list<?int>}> $grouped */
+        /** @var array<int, array{wwa: ActiveWwa, places: list<string>, place_ids: array<int, string>, ends: list<?CarbonInterface>, bulletins: list<?int>}> $grouped */
         $grouped = [];
 
         foreach ($locations as $location) {
@@ -61,6 +61,7 @@ class GetActiveAlertsForUser
 
                 $grouped[$wwa->id]['wwa'] ??= $wwa;
                 $grouped[$wwa->id]['places'][] = (string) $location->label;
+                $grouped[$wwa->id]['place_ids'][$location->id] = (string) $location->label;
                 $grouped[$wwa->id]['ends'][] = $wwa->expires;
                 $grouped[$wwa->id]['bulletins'][] = $wwa->getAttribute('covering_ingested_product_id');
             }
@@ -89,6 +90,7 @@ class GetActiveAlertsForUser
                     'event' => $wwa->eventName(),
                     'family' => (string) $wwa->eventFamily(),
                     'places' => $places,
+                    'place_ids' => $this->placeIds($grouped[$wwa->id]['place_ids']),
                     'expires' => $wwa->expires?->toIso8601String(),
                     'view_url' => $this->viewUrl($wwa, $grouped[$wwa->id]['bulletins'], $coveringBulletins),
                 ];
@@ -97,6 +99,17 @@ class GetActiveAlertsForUser
             ->all();
 
         return ['events' => $events, 'has_places' => true, 'generated_at' => now()->toIso8601String()];
+    }
+
+    /**
+     * The affected Location ids in the order of the sorted labels, each once.
+     *
+     * @param  array<int, string>  $labelsById
+     * @return list<int>
+     */
+    private function placeIds(array $labelsById): array
+    {
+        return collect($labelsById)->sort(SORT_NATURAL | SORT_FLAG_CASE)->keys()->map(fn ($id): int => (int) $id)->all();
     }
 
     /**

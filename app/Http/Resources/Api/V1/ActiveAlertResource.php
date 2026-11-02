@@ -8,7 +8,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * One event in effect at the subscriber's places. Public fields only: never zones, polygons or bulletin text.
  *
- * @property array{id: int, event: string, family: string, places: list<string>, expires: ?string, view_url: ?string} $resource
+ * @property array{id: int, event: string, family: string, places: list<string>, place_ids: list<int>, expires: ?string, view_url: ?string} $resource
  */
 class ActiveAlertResource extends JsonResource
 {
@@ -22,6 +22,7 @@ class ActiveAlertResource extends JsonResource
             'event' => $this->resource['event'],
             'family' => $this->resource['family'],
             'places' => $this->resource['places'],
+            'place_ids' => $this->resource['place_ids'],
             'expires' => $this->resource['expires'],
             'view_url' => $this->resource['view_url'],
         ];

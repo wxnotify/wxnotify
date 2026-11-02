@@ -21,7 +21,7 @@ class WeatherController extends Controller
         $request->validate(['location' => ['sometimes', 'integer']]);
 
         $user = $request->user();
-        $located = $places($user);
+        $located = $places($user, $request->user()->currentAccessToken()?->id);
         $selected = null;
         $card = null;
         $credit = null;

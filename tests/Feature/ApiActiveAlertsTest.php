@@ -83,6 +83,23 @@ test('an event at two places is listed once with both labels, sorted', function 
         ->and($response->json('data.0.places'))->toBe(['Cabin', 'Home']);
 });
 
+test('each event lists the ids of the places it affects, in the order of its labels', function () {
+    $home = ($this->place)('Home', 'COZ040');
+    $cabin = ($this->place)('Cabin', 'COZ040');
+    $farm = ($this->place)('Farm', 'COZ041');
+    $flood = ($this->event)('Flood Watch', 'watch', 'COZ040');
+    $wind = ($this->event)('Wind Advisory', 'advisory', 'COZ041');
+    $other = User::factory()->create();
+    Location::factory()->for($other)->create(['label' => 'Theirs', 'lat' => 40.0, 'lng' => -105.0, 'forecast_zone_ugc' => 'COZ040', 'county_ugc' => 'COC999']);
+
+    $data = collect(($this->call)()->assertOk()->json('data'))->keyBy('id');
+
+    expect($data[$flood->id]['places'])->toBe(['Cabin', 'Home'])
+        ->and($data[$flood->id]['place_ids'])->toBe([$cabin->id, $home->id])
+        ->and($data[$wind->id]['places'])->toBe(['Farm'])
+        ->and($data[$wind->id]['place_ids'])->toBe([$farm->id]);
+});
+
 test('the end is the latest across the places, and none when any place has none', function () {
     ($this->place)('Home', 'COZ040');
     ($this->place)('Cabin', 'COZ041');
@@ -151,7 +168,7 @@ test('view_url is the latest bulletin page, and the payload carries nothing but 
     $response = ($this->call)()->assertOk();
 
     expect($response->json('data.0.view_url'))->toBe($bulletin->fresh()->viewUrl())->not->toBeNull()
-        ->and(array_keys($response->json('data.0')))->toBe(['id', 'event', 'family', 'places', 'expires', 'view_url'])
+        ->and(array_keys($response->json('data.0')))->toBe(['id', 'event', 'family', 'places', 'place_ids', 'expires', 'view_url'])
         ->and($response->getContent())->not->toContain('SECRET-HEADLINE')->not->toContain('SECRET-BULLETIN-BODY')->not->toContain('COZ040');
 });
 
@@ -208,7 +225,7 @@ test('the result is cached for 60 seconds per subscriber', function () {
     expect(($this->call)()->assertOk()->json('data'))->toHaveCount(2);
 
     $other = User::factory()->create();
-    expect(Cache::has("app-active-alerts:{$other->id}"))->toBeFalse();
+    expect(Cache::has("app-active-alerts:v2:{$other->id}"))->toBeFalse();
 });
 
 test('a place with a fire weather zone sees a Red Flag Warning issued for that fire zone', function () {

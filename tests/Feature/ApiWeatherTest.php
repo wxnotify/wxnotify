@@ -109,6 +109,44 @@ test('the phone is listed first and is the default card', function () {
     expect(apwWeatherCalls())->toBe(1);
 });
 
+test('the calling device\'s own location is listed first, whichever device that is', function () {
+    apwFakeWeatherKit();
+    $tokenB = $this->user->createToken('iPad', ['app']);
+    $home = ($this->place)('Home', 40.7128, -74.006);
+    $phoneA = Location::factory()->for($this->user)->mobileApp($this->token->accessToken)->withFix(34.05, -118.24)->create(['label' => 'Phone A']);
+    $phoneB = Location::factory()->for($this->user)->mobileApp($tokenB->accessToken)->withFix(35.0, -119.0)->create(['label' => 'Phone B']);
+
+    $asB = ($this->call)('', $tokenB->plainTextToken)->assertOk();
+    expect(collect($asB->json('data.places'))->pluck('id')->all())->toBe([$phoneB->id, $phoneA->id, $home->id]);
+    $asB->assertJsonPath('data.selected.id', $phoneB->id)->assertJsonPath('data.places.0.is_phone', true)->assertJsonPath('data.places.1.is_phone', true);
+
+    $asA = ($this->call)()->assertOk();
+    expect(collect($asA->json('data.places'))->pluck('id')->all())->toBe([$phoneA->id, $phoneB->id, $home->id]);
+});
+
+test('a token with no linked location gets the phones first by id, then the rest', function () {
+    apwFakeWeatherKit();
+    $tokenB = $this->user->createToken('iPad', ['app']);
+    $home = ($this->place)('Home', 40.7128, -74.006);
+    $phoneA = Location::factory()->for($this->user)->mobileApp($this->token->accessToken)->withFix(34.05, -118.24)->create(['label' => 'Phone A']);
+
+    $response = ($this->call)('', $tokenB->plainTextToken)->assertOk();
+
+    expect(collect($response->json('data.places'))->pluck('id')->all())->toBe([$phoneA->id, $home->id]);
+});
+
+test('another subscriber\'s location never appears, even with a matching token id', function () {
+    apwFakeWeatherKit();
+    $other = User::factory()->create();
+    $otherToken = $other->createToken('iPhone', ['app']);
+    $theirs = Location::factory()->for($other)->mobileApp($otherToken->accessToken)->withFix(30.0, -90.0)->create(['label' => 'Theirs']);
+    $home = ($this->place)('Home', 40.7128, -74.006);
+
+    $ids = collect(($this->call)()->assertOk()->json('data.places'))->pluck('id')->all();
+
+    expect($ids)->toBe([$home->id])->not->toContain($theirs->id);
+});
+
 test('the location parameter selects another place with exactly one WeatherKit weather call', function () {
     apwFakeWeatherKit();
     ($this->place)('Home', 40.7128, -74.006);

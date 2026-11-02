@@ -9,8 +9,9 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
- * The subscriber's places the Weather card can show: those with a position, the phone (the app
- * location) first, then by id, at most 25.
+ * The subscriber's places the Weather card can show: those with a position, the calling device's own
+ * location first (when `$appTokenId` is given), then the other phones (the app locations), then by id,
+ * at most 25.
  */
 class GetUserWeatherPlaces
 {
@@ -19,11 +20,17 @@ class GetUserWeatherPlaces
     /**
      * @return Collection<int, Location>
      */
-    public function __invoke(User $user): Collection
+    public function __invoke(User $user, ?int $appTokenId = null): Collection
     {
-        return $user->locations()
+        $query = $user->locations()
             ->whereNotNull('lat')
-            ->whereNotNull('lng')
+            ->whereNotNull('lng');
+
+        if ($appTokenId !== null) {
+            $query->orderByRaw('case when app_token_id = ? then 0 else 1 end', [$appTokenId]);
+        }
+
+        return $query
             ->orderByRaw('case when type = ? and mobile_source = ? then 0 else 1 end', [LocationType::Mobile->value, MobileSource::App->value])
             ->orderBy('id')
             ->limit(self::MAX_PLACES)
