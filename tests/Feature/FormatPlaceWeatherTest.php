@@ -28,8 +28,8 @@ function fpwWeather(string $timezone = 'America/Denver'): array
             'is_daylight' => true,
         ],
         'hours' => [
-            ['time' => '2026-11-01T15:00:00-07:00', 'temperature_c' => 26.7, 'precip_chance' => 30, 'condition' => 'Rain', 'condition_code' => 'Rain'],
-            ['time' => '2026-11-01T16:00:00-07:00', 'temperature_c' => 25.0, 'precip_chance' => null, 'condition' => 'Clear', 'condition_code' => 'Clear'],
+            ['time' => '2026-11-01T15:00:00-07:00', 'temperature_c' => 26.7, 'precip_chance' => 30, 'condition' => 'Rain', 'condition_code' => 'Rain', 'is_daylight' => true],
+            ['time' => '2026-11-01T16:00:00-07:00', 'temperature_c' => 25.0, 'precip_chance' => null, 'condition' => 'Clear', 'condition_code' => 'Clear', 'is_daylight' => null],
         ],
         'days' => [
             ['date' => '2026-11-01', 'high_c' => 27.2, 'low_c' => 20.6, 'precip_chance' => 40, 'condition' => 'Rain', 'condition_code' => 'Rain', 'sunrise' => '2026-11-01T06:48:00-07:00', 'sunset' => '2026-11-01T17:12:00-07:00'],
@@ -61,7 +61,7 @@ test('formats an imperial card in the place timezone', function () {
             'uv_index' => 3,
             'is_daylight' => true,
         ])
-        ->and($card['hours'][0])->toBe(['label' => '3 PM', 'time' => '2026-11-01T15:00:00-07:00', 'temperature' => '80°', 'precip_chance' => '30%', 'condition_code' => 'Rain'])
+        ->and($card['hours'][0])->toBe(['label' => '3 PM', 'time' => '2026-11-01T15:00:00-07:00', 'temperature' => '80°', 'precip_chance' => '30%', 'condition_code' => 'Rain', 'is_daylight' => true])
         ->and($card['days'][0])->toBe([
             'label' => 'Today', 'date' => '2026-11-01', 'high' => '81°', 'low' => '69°', 'precip_chance' => '40%',
             'condition_code' => 'Rain', 'sunrise' => '6:48 AM', 'sunset' => '5:12 PM',
@@ -87,7 +87,7 @@ test('omits fields the source did not send', function () {
 
     expect($card)->not->toHaveKey('as_of')
         ->and($card['current'])->not->toHaveKeys(['wind', 'uv_index', 'humidity', 'feels_like', 'is_daylight'])
-        ->and($card['hours'][1])->not->toHaveKey('precip_chance')
+        ->and($card['hours'][1])->not->toHaveKeys(['precip_chance', 'is_daylight'])
         ->and($card['days'][1])->not->toHaveKeys(['precip_chance', 'sunrise', 'sunset']);
 });
 
@@ -109,6 +109,13 @@ test('Today follows the place date when UTC is already tomorrow', function () {
 
     expect($card['days'][0]['label'])->toBe('Today')
         ->and($card['hours'][0]['label'])->toBe('9 PM');
+});
+
+test('an hour after dark passes is_daylight false through', function () {
+    $weather = fpwWeather();
+    $weather['hours'][0]['is_daylight'] = false;
+
+    expect(FormatPlaceWeather::forUser($weather, new Units, $this->fpwLocation)['hours'][0]['is_daylight'])->toBeFalse();
 });
 
 test('drops hours already past and days before today in the place timezone', function () {

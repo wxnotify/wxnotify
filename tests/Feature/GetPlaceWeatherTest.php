@@ -40,7 +40,7 @@ function gpwFixture(): array
             'forecastStart' => sprintf('2026-11-01T%02d:00:00Z', $hour),
             'cloudCover' => 0.5,
             'conditionCode' => $index % 2 === 0 ? 'MostlyCloudy' : 'ScatteredThunderstorms',
-            'daylight' => true,
+            'daylight' => $hour < 20,
             'humidity' => 0.6,
             'precipitationAmount' => 0,
             'precipitationChance' => 0.1 * $index,
@@ -169,8 +169,17 @@ test('keeps the next six hours, skipping hours already started', function () {
             'precip_chance' => 30,
             'condition' => 'Scattered thunderstorms',
             'condition_code' => 'ScatteredThunderstorms',
+            'is_daylight' => true,
         ])
         ->and($hours[1]['condition'])->toBe('Mostly cloudy');
+});
+
+test('each hour carries WeatherKit\'s daylight flag, false after dark', function () {
+    Http::fake(['weatherkit.apple.com/*' => Http::response(gpwFixture())]);
+
+    $hours = app(GetPlaceWeather::class)(gpwLocation())['hours'];
+
+    expect(array_column($hours, 'is_daylight'))->toBe([true, true, true, true, false, false]);
 });
 
 test('keeps today plus the next four days in the place timezone', function () {
@@ -195,7 +204,7 @@ test('a value WeatherKit did not send is null, never zero', function () {
     $fixture = gpwFixture();
     Arr::forget($fixture, ['currentWeather.uvIndex', 'currentWeather.temperatureApparent', 'currentWeather.windDirection', 'currentWeather.daylight']);
     foreach ($fixture['forecastHourly']['hours'] as $i => $hour) {
-        unset($fixture['forecastHourly']['hours'][$i]['precipitationChance']);
+        unset($fixture['forecastHourly']['hours'][$i]['precipitationChance'], $fixture['forecastHourly']['hours'][$i]['daylight']);
     }
     foreach ($fixture['forecastDaily']['days'] as $i => $day) {
         unset($fixture['forecastDaily']['days'][$i]['precipitationChance'], $fixture['forecastDaily']['days'][$i]['sunrise'], $fixture['forecastDaily']['days'][$i]['temperatureMax']);
@@ -209,6 +218,7 @@ test('a value WeatherKit did not send is null, never zero', function () {
         ->and($weather['current']['wind_direction'])->toBeNull()
         ->and($weather['current']['is_daylight'])->toBeNull()
         ->and($weather['hours'][0]['precip_chance'])->toBeNull()
+        ->and($weather['hours'][0]['is_daylight'])->toBeNull()
         ->and($weather['days'][0]['precip_chance'])->toBeNull()
         ->and($weather['days'][0]['sunrise'])->toBeNull()
         ->and($weather['days'][0]['high_c'])->toBeNull()

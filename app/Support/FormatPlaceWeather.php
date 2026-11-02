@@ -48,7 +48,9 @@ final class FormatPlaceWeather
                 'temperature' => self::temperature($hour['temperature_c'], $units),
             ] + self::present([
                 'precip_chance' => self::percent($hour['precip_chance'] ?? null),
-            ]) + ['condition_code' => $hour['condition_code']];
+            ]) + ['condition_code' => $hour['condition_code']] + self::present([
+                'is_daylight' => $hour['is_daylight'] ?? null,
+            ]);
         }
 
         foreach ($weather['days'] ?? [] as $day) {

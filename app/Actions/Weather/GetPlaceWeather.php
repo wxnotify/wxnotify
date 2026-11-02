@@ -18,7 +18,7 @@ use Illuminate\Support\Str;
  *
  * Shape: as_of, timezone, current (temperature_c, feels_like_c, condition, condition_code,
  * wind_kph, wind_direction, humidity, uv_index, is_daylight), hours (the next 6 hours starting
- * after now) and days (today plus the next 4, dated in the place's timezone).
+ * after now, each with is_daylight) and days (today plus the next 4, dated in the place's timezone).
  */
 class GetPlaceWeather
 {
@@ -97,7 +97,7 @@ class GetPlaceWeather
     }
 
     /**
-     * @return list<array{time: string, temperature_c: float, precip_chance: ?int, condition: string, condition_code: string}>
+     * @return list<array{time: string, temperature_c: float, precip_chance: ?int, condition: string, condition_code: string, is_daylight: ?bool}>
      */
     private function hours(mixed $hours, string $timezone): array
     {
@@ -121,6 +121,7 @@ class GetPlaceWeather
                 'precip_chance' => $this->percent($hour['precipitationChance'] ?? null),
                 'condition' => $this->humanise($hour['conditionCode'] ?? null),
                 'condition_code' => $this->code($hour['conditionCode'] ?? null),
+                'is_daylight' => is_bool($hour['daylight'] ?? null) ? $hour['daylight'] : null,
             ];
 
             if (count($result) === self::HOURS) {
