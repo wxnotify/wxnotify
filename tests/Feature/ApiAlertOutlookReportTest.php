@@ -59,7 +59,11 @@ test('the detail carries the presented report with signed map urls that serve th
 
     $this->get($report['extended_map_url'])->assertOk()->assertHeader('Content-Type', 'image/gif');
 
-    expect($response->getContent())->not->toContain('outlook-maps/')->not->toContain('error_detail')->not->toContain('"path"');
+    expect(json_encode($response->json(), JSON_UNESCAPED_SLASHES))
+        ->not->toContain($run->maps['day1']['path'])
+        ->not->toContain($run->maps['day48']['path'])
+        ->not->toContain('error_detail')
+        ->not->toContain('"path"');
 });
 
 test('an unsigned, tampered or expired map link is refused', function () {
@@ -73,7 +77,7 @@ test('an unsigned, tampered or expired map link is refused', function () {
     $this->get($signed)->assertForbidden();
 });
 
-test('the map route is 404 for a key never stored, a missing file, an expired run and an unknown key', function () {
+test('the map route is 404 for a key never stored, a key the route constraint rejects, an unknown run, a missing file and an expired run', function () {
     [$run] = outlookReportFixture($this->user);
     $link = fn (string $batchKey, string $key) => URL::temporarySignedRoute('api.v1.outlook-maps.show', now()->addHour(), ['batchKey' => $batchKey, 'key' => $key]);
 
