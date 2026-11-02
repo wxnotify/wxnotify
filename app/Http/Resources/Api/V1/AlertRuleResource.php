@@ -71,13 +71,14 @@ class AlertRuleResource extends JsonResource
      * Every watched product's matching settings (AlertRule::settingsFor()), in the order the rule lists its products,
      * with an SPC & WPC product's own risk levels.
      *
-     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>, risk_levels?: list<string>}>
+     * @return list<array{product_id: int, matching_mode: ?string, location_ids: list<int>, wfo: ?string, county_zone_codes: list<string>, custom_subject_template: ?string, risk_levels?: list<string>}>
      */
     private function productSettings(AlertRule $rule): array
     {
         return $rule->products
             ->map(fn (Product $product): array => [
                 ...$this->entry($product->id, $rule->settingsFor($product->id)),
+                'custom_subject_template' => $rule->customSubjectFor($product->id),
                 ...($rule->category === AlertCategory::SpcWpc ? ['risk_levels' => $rule->riskLevelsFor($product->id)] : []),
             ])
             ->values()

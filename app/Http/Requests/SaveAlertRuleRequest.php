@@ -63,6 +63,10 @@ class SaveAlertRuleRequest extends FormRequest
             $rules['message_body_style'] = ['nullable', Rule::enum(MessageBodyStyle::class)];
             $rules['custom_subject_template'] = ['nullable', 'string', 'max:255'];
 
+            if (in_array($category, [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc], true) && $this->has('product_settings')) {
+                $rules['product_settings.*.custom_subject_template'] = ['nullable', 'string', 'max:255'];
+            }
+
             if (in_array($category, [AlertCategory::WeatherAlerts, AlertCategory::SpcWpc], true)) {
                 $rules['alert_template_id'] = ['nullable', Rule::exists('alert_templates', 'id')->where('user_id', $user->id)->where('category', $category->value)];
             }

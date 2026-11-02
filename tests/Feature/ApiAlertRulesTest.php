@@ -380,8 +380,8 @@ test('a rule is created with a mode of its own for each product and reads back a
 
     expect($response->json('data.product_ids'))->toBe([$this->tornado->id, $severe->id])
         ->and($response->json('data.product_settings'))->toBe([
-            ['product_id' => $this->tornado->id, 'matching_mode' => 'location', 'location_ids' => [$this->location->id], 'wfo' => null, 'county_zone_codes' => []],
-            ['product_id' => $severe->id, 'matching_mode' => 'wfo', 'location_ids' => [], 'wfo' => 'OKX', 'county_zone_codes' => []],
+            ['product_id' => $this->tornado->id, 'matching_mode' => 'location', 'location_ids' => [$this->location->id], 'wfo' => null, 'county_zone_codes' => [], 'custom_subject_template' => null],
+            ['product_id' => $severe->id, 'matching_mode' => 'wfo', 'location_ids' => [], 'wfo' => 'OKX', 'county_zone_codes' => [], 'custom_subject_template' => null],
         ]);
 
     $rule = AlertRule::find($response->json('data.id'));
@@ -413,7 +413,7 @@ test('a rule is replaced with new product settings and leaves no orphan rows', f
     ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", $body)->assertOk()
         ->assertJsonPath('data.product_ids', [$watch->id])
         ->assertJsonPath('data.matching_mode', 'nationwide')
-        ->assertJsonPath('data.product_settings', [['product_id' => $watch->id, 'matching_mode' => 'nationwide', 'location_ids' => [], 'wfo' => null, 'county_zone_codes' => []]]);
+        ->assertJsonPath('data.product_settings', [['product_id' => $watch->id, 'matching_mode' => 'nationwide', 'location_ids' => [], 'wfo' => null, 'county_zone_codes' => [], 'custom_subject_template' => null]]);
 
     expect(DB::table('alert_rule_product_location')->where('alert_rule_id', $id)->count())->toBe(0)
         ->and(DB::table('alert_rule_product')->where('alert_rule_id', $id)->count())->toBe(1);
@@ -624,4 +624,89 @@ test('reading rules does not query per product', function () {
     $withThree = count(DB::getQueryLog());
 
     expect($withThree)->toBe($withTwo);
+});
+
+/**
+ * A per-product body with a subject on each of two products, created by a paid subscriber.
+ *
+ * @return array{0: int, 1: Product}
+ */
+function apiSubjectsRule($test, array $subjects = ['{product} here', 'Severe: {location}']): array
+{
+    $test->user->forceFill(['tier_override' => Tier::Plus])->save();
+    $severe = Product::where('code', 'SV.W')->sole();
+    $body = perProductRuleBody($test);
+    $body['product_settings'][0]['custom_subject_template'] = $subjects[0];
+    $body['product_settings'][1]['custom_subject_template'] = $subjects[1];
+
+    return [ruleCall($test, 'POST', '/api/v1/alert-rules', $body)->assertCreated()->json('data.id'), $severe];
+}
+
+test('a paid subscriber stores a subject per product and the resource returns it on each entry', function () {
+    [$id, $severe] = apiSubjectsRule($this);
+
+    expect(DB::table('alert_rule_product')->where('alert_rule_id', $id)->pluck('custom_subject_template', 'product_id')->all())
+        ->toBe([$this->tornado->id => '{product} here', $severe->id => 'Severe: {location}']);
+
+    ruleCall($this, 'GET', "/api/v1/alert-rules/{$id}")->assertOk()
+        ->assertJsonPath('data.product_settings.0.custom_subject_template', '{product} here')
+        ->assertJsonPath('data.product_settings.1.custom_subject_template', 'Severe: {location}')
+        ->assertJsonPath('data.custom_subject_template', null);
+});
+
+test('an update whose entries omit the subject key keeps every stored product subject', function () {
+    [$id, $severe] = apiSubjectsRule($this);
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", perProductRuleBody($this))->assertOk()
+        ->assertJsonPath('data.product_settings.0.custom_subject_template', '{product} here')
+        ->assertJsonPath('data.product_settings.1.custom_subject_template', 'Severe: {location}');
+});
+
+test('a flat product_ids update keeps the subjects of the products that stay', function () {
+    [$id, $severe] = apiSubjectsRule($this);
+
+    $body = ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_ids' => [$this->tornado->id, $severe->id], 'matching_mode' => 'nationwide'];
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", $body)->assertOk();
+
+    expect(DB::table('alert_rule_product')->where('alert_rule_id', $id)->pluck('custom_subject_template', 'product_id')->all())
+        ->toBe([$this->tornado->id => '{product} here', $severe->id => 'Severe: {location}']);
+});
+
+test('an explicit null or empty subject clears just that product', function (mixed $cleared) {
+    [$id, $severe] = apiSubjectsRule($this);
+
+    $body = perProductRuleBody($this);
+    $body['product_settings'][0]['custom_subject_template'] = $cleared;
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", $body)->assertOk()
+        ->assertJsonPath('data.product_settings.0.custom_subject_template', null)
+        ->assertJsonPath('data.product_settings.1.custom_subject_template', 'Severe: {location}');
+})->with([null, '', '   ']);
+
+test('a per-product subject is trimmed and refused past 255 characters or when not a string', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
+
+    $body = perProductRuleBody($this);
+    $body['product_settings'][0]['custom_subject_template'] = '  {product}  ';
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertCreated()
+        ->assertJsonPath('data.product_settings.0.custom_subject_template', '{product}')->json('data.id');
+
+    foreach ([str_repeat('a', 256), ['x'], 12] as $bad) {
+        $body['product_settings'][0]['custom_subject_template'] = $bad;
+        ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", $body)->assertUnprocessable()
+            ->assertJsonValidationErrorFor('product_settings.0.custom_subject_template');
+    }
+
+    expect(DB::table('alert_rule_product')->where('alert_rule_id', $id)->where('product_id', $this->tornado->id)->value('custom_subject_template'))->toBe('{product}');
+});
+
+test('a Free subscriber\'s per-product subject is ignored without an error', function () {
+    $body = perProductRuleBody($this);
+    $body['product_settings'][0]['custom_subject_template'] = str_repeat('a', 300);
+
+    $id = ruleCall($this, 'POST', '/api/v1/alert-rules', $body)->assertCreated()
+        ->assertJsonPath('data.product_settings.0.custom_subject_template', null)->json('data.id');
+
+    expect(DB::table('alert_rule_product')->where('alert_rule_id', $id)->whereNotNull('custom_subject_template')->count())->toBe(0);
 });

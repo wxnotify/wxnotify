@@ -334,3 +334,43 @@ test('saving an outlook report persists its own columns and clears every other c
         ->locations->toBe(1)
         ->channels->toBe(1);
 });
+
+test('the dashboard and the API store the same per-product subjects', function (string $units) {
+    $system = UnitSystem::from($units);
+    $severe = Product::where('code', 'SV.W')->sole();
+
+    [$formUser, $formLocation, $formChannel] = paidSubscriber($system);
+    [$apiUser, $apiLocation, $apiChannel] = paidSubscriber($system);
+
+    $rows = [
+        alertWizardRow($this->tornado, 'nationwide', ['custom_subject_template' => '  {product} at {location}  ']),
+        alertWizardRow($severe, 'nationwide'),
+    ];
+    $formState = ['category' => 'weather_alerts', 'channel_ids' => [$formChannel], 'product_settings' => [
+        $this->tornado->category->value => array_values(array_filter($rows, fn (array $row): bool => Product::find($row['product_id'])->category === $this->tornado->category)),
+    ]];
+
+    if ($severe->category !== $this->tornado->category) {
+        $formState['product_settings'][$severe->category->value] = [$rows[1]];
+    }
+
+    $apiBody = ['category' => 'weather_alerts', 'channel_ids' => [$apiChannel], 'product_settings' => [
+        ['product_id' => $this->tornado->id, 'matching_mode' => 'nationwide', 'custom_subject_template' => '  {product} at {location}  '],
+        ['product_id' => $severe->id, 'matching_mode' => 'nationwide', 'custom_subject_template' => ''],
+    ]];
+
+    $this->actingAs($formUser);
+    livewire(CreateAlertRule::class)->fillForm($formState)->call('create')->assertHasNoFormErrors();
+    $fromDashboard = AlertRule::where('user_id', $formUser->id)->sole();
+
+    app('auth')->forgetGuards();
+    $token = $apiUser->createToken('Pixel 9', ['app'])->plainTextToken;
+    $this->withToken($token)->postJson('/api/v1/alert-rules', $apiBody)->assertCreated();
+    $fromApi = AlertRule::where('user_id', $apiUser->id)->sole();
+
+    $subjects = fn (AlertRule $rule): array => DB::table('alert_rule_product')->join('products', 'products.id', '=', 'alert_rule_product.product_id')
+        ->where('alert_rule_id', $rule->id)->orderBy('products.code')->pluck('alert_rule_product.custom_subject_template', 'products.code')->all();
+
+    expect($subjects($fromApi))->toBe(['SV.W' => null, 'TO.W' => '{product} at {location}'])
+        ->and($subjects($fromDashboard))->toBe($subjects($fromApi));
+})->with(['imperial', 'metric']);

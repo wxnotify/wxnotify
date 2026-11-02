@@ -17,7 +17,7 @@ use Illuminate\Http\Response;
 
 class AlertRuleController extends Controller
 {
-    private const WITH = ['products:id,name,risk_level_options', 'location:id,label', 'locations:id', 'productLocations:id', 'notificationChannels:id'];
+    private const WITH = ['products:id,name,risk_level_options', 'location:id,label', 'locations:id', 'productLocations:id', 'notificationChannels:id', 'user'];
 
     public function index(Request $request): AnonymousResourceCollection
     {
