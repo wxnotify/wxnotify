@@ -24,7 +24,12 @@ class PruneOutlookMaps extends Command
             ->chunkById(100, function ($runs) use (&$pruned): void {
                 foreach ($runs as $run) {
                     try {
-                        Storage::disk('local')->deleteDirectory('outlook-maps/'.$run->batch_key);
+                        if (! Storage::disk('local')->deleteDirectory('outlook-maps/'.$run->batch_key)) {
+                            Log::warning('Outlook map prune could not delete a run directory.');
+
+                            continue;
+                        }
+
                         $run->forceFill(['maps' => null])->save();
                         $pruned++;
                     } catch (Throwable $e) {

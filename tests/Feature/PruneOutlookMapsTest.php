@@ -54,7 +54,7 @@ it('skips a run that has no maps and is harmless when run twice', function () {
         ->and($old->refresh()->maps)->toBeNull();
 });
 
-it('still clears maps when the directory is already gone and keeps pruning the others', function () {
+it('still clears maps when the directory is already gone', function () {
     $gone = OutlookReportRun::factory()->withMaps()->old()->create();
     $other = OutlookReportRun::factory()->withMaps()->old()->create();
     pruneMapsStoreFiles($other);
@@ -64,6 +64,21 @@ it('still clears maps when the directory is already gone and keeps pruning the o
     expect($gone->refresh()->maps)->toBeNull()
         ->and($other->refresh()->maps)->toBeNull();
     Storage::disk('local')->assertMissing('outlook-maps/'.$other->batch_key.'/day1.png');
+});
+
+it('keeps maps recorded when a delete fails, so the run is retried, and still prunes the others', function () {
+    $failing = OutlookReportRun::factory()->withMaps()->old()->create();
+    $other = OutlookReportRun::factory()->withMaps()->old()->create();
+
+    $disk = Mockery::mock();
+    $disk->shouldReceive('deleteDirectory')->with('outlook-maps/'.$failing->batch_key)->once()->andReturn(false);
+    $disk->shouldReceive('deleteDirectory')->with('outlook-maps/'.$other->batch_key)->once()->andReturn(true);
+    Storage::shouldReceive('disk')->with('local')->andReturn($disk);
+
+    artisan('outlook:prune-maps')->expectsOutputToContain('for 1 outlook report runs')->assertSuccessful();
+
+    expect($failing->refresh()->maps)->not->toBeNull()
+        ->and($other->refresh()->maps)->toBeNull();
 });
 
 it('is scheduled daily', function () {
