@@ -6,6 +6,7 @@ paths:
   - 'app/Actions/Weather/**'
   - app/Actions/Weather/GetPlaceWeather.php
   - app/Actions/Weather/GetUserWeatherPlaces.php
+  - app/Actions/Weather/RenderAlertSubject.php
 ---
 
 # Pipeline
@@ -48,3 +49,6 @@ GetPlaceWeather / GetWeatherAttribution serve only the mobile Weather card from 
 
 ## Weather places: this token's own phone location first
 GET /api/v1/weather orders places: the Location linked to the calling app token (app_token_id) first, then the user's other phone (mobile_source=app) locations, then by id; max 25. This supersedes the earlier "phone first" wording in the WeatherController rule: a subscriber can have several phone locations (one per device) and each device must see its own first.
+
+## Subject precedence: product, template, rule-wide, default; first matched product decides
+Order: the product's own subject (AlertRule::customSubjectFor(), tier-gated: null for a Free owner, a product not on the rule, or blank), then the attached AlertTemplate's subject_template, then the rule's own custom_subject_template, then the default name. The product is the one named by the FIRST MATCHED segment's product_id (the segments THIS rule matched), else the bulletin's own product_id, through one private helper that officeOrArea() shares; a first product with no subject falls through to template/rule-wide/default and never borrows the second product's subject. The API returns the EFFECTIVE per-product subject (null for Free) while the rule-level field returns the raw stored value, on purpose. `AlertRule::products()` asks for the `custom_subject_template` pivot column: migrate BEFORE deploying code (workers included), and roll the code back before running the migration's down().

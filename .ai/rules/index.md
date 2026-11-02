@@ -5,7 +5,8 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/** | .ai/rules/actions.md |
-| app/Actions/Alerts/**, app/Actions/Alerts/GetActiveAlertsForUser.php | .ai/rules/alerts.md |
+| resources/views/filament/dashboard/alert-rules/** | .ai/rules/alert-rules.md |
+| app/Actions/Alerts/**, app/Actions/Alerts/GetActiveAlertsForUser.php, app/Actions/Alerts/SaveAlertRule.php | .ai/rules/alerts.md |
 | routes/api.php, app/Http/Controllers/Api/**, app/Http/Resources/** | .ai/rules/api.md |
 | app/Jobs/DeliverWeatherAlert.php, app/Jobs/**, app/Jobs/DeliverScheduledAlert.php | .ai/rules/app-jobs.md |
 | app/Support/ChannelTypes/** | .ai/rules/channel-types.md |
@@ -19,7 +20,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/**, app/Models/Product.php, app/Models/ActiveWwa.php, app/Models/OutlookReportRun.php | .ai/rules/models.md |
 | docker/nwws/** | .ai/rules/nwws.md |
 | app/Filament/Admin/Pages/** | .ai/rules/pages.md |
-| app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php, app/Actions/Weather/**, app/Actions/Weather/GetPlaceWeather.php, app/Actions/Weather/GetUserWeatherPlaces.php | .ai/rules/pipeline.md |
+| app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php, app/Actions/Weather/**, app/Actions/Weather/GetPlaceWeather.php, app/Actions/Weather/GetUserWeatherPlaces.php, app/Actions/Weather/RenderAlertSubject.php | .ai/rules/pipeline.md |
 | app/Actions/Storage/** | .ai/rules/storage.md |
 | app/Support/**, app/Support/Integrations.php, app/Support/PhoneNumber.php, app/Support/FormatPlaceWeather.php | .ai/rules/support.md |
 | app/Http/Controllers/Api/V1/WeatherController.php | .ai/rules/v1.md |
