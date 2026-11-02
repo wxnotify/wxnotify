@@ -434,6 +434,23 @@ test('with several matched products the first matched segment\'s subject is used
     expect($result)->toBe('A-subject: A + B');
 });
 
+test('a first matched product with no subject of its own never borrows a later product\'s subject', function () {
+    $a = Product::factory()->create(['name' => 'A']);
+    $b = Product::factory()->create(['name' => 'B']);
+    $bulletin = IngestedProduct::factory()->create(['product_id' => $a->id]);
+    $pivots = [$a->id => ['custom_subject_template' => null], $b->id => ['custom_subject_template' => 'B-subject']];
+    $render = fn (AlertRule $rule): string => (new RenderAlertSubject)($rule->fresh(), ['A', 'B'], null, $bulletin, productSubjectSegments($bulletin, $a, $b));
+
+    $withTemplate = productSubjectRule(Tier::Plus, $pivots, ['custom_subject_template' => 'Rule-wide']);
+    $withTemplate->update(['alert_template_id' => AlertTemplate::factory()->for($withTemplate->user)->create(['subject_template' => 'From template'])->id]);
+    $ruleWide = productSubjectRule(Tier::Plus, $pivots, ['custom_subject_template' => 'Rule-wide']);
+    $plain = productSubjectRule(Tier::Plus, $pivots);
+
+    expect($render($withTemplate))->toBe('From template')
+        ->and($render($ruleWide))->toBe('Rule-wide')
+        ->and($render($plain))->toBe('A + B');
+});
+
 test('a product the rule does not watch never supplies the subject', function () {
     $watched = Product::factory()->create(['name' => 'Watched']);
     $unwatched = Product::factory()->create(['name' => 'Unwatched']);

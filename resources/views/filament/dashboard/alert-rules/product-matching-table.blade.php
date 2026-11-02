@@ -251,7 +251,8 @@
                                             type="button"
                                             x-on:click="subjectOpen = ! subjectOpen"
                                             x-bind:aria-expanded="subjectOpen"
-                                            aria-label="Subject for {{ $product->name }}"
+                                            aria-label="{{ $subject === '' ? 'Custom subject' : 'Edit subject' }} for {{ $product->name }}"
+                                            x-bind:aria-label="(subject === '' ? 'Custom subject' : 'Edit subject') + ' for ' + @js($product->name)"
                                             x-text="subject === '' ? 'Custom subject' : 'Edit'"
                                             class="fi-link fi-size-sm shrink-0 font-semibold text-primary-600 dark:text-primary-400"
                                         >{{ $subject === '' ? 'Custom subject' : 'Edit' }}</button>

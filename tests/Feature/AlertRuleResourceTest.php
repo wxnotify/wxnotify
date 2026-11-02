@@ -1855,6 +1855,8 @@ test('a paid subscriber\'s switched-on row offers a subject, and a switched-off 
     expect($html)->toContain('Uses the default subject')
         ->and($onRow)->toContain('{product} now')
         ->and($onRow)->toContain('Edit')
+        ->and($onRow)->toContain('aria-label="Edit subject for '.e($tornadoWarning->name).'"')
+        ->and($offRow)->toContain('aria-label="Custom subject for '.e($tornadoWatch->name).'"')
         ->and($html)->toContain('wire:model="data.product_settings.'.$tornadoWarning->category->value.'.0.custom_subject_template"')
         ->and($html)->toContain(e(SubjectPlaceholders::helperText($tornadoWarning)))
         ->and($offRow)->toContain('Custom subject')

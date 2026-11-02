@@ -710,3 +710,21 @@ test('a Free subscriber\'s per-product subject is ignored without an error', fun
 
     expect(DB::table('alert_rule_product')->where('alert_rule_id', $id)->whereNotNull('custom_subject_template')->count())->toBe(0);
 });
+
+test('a downgraded owner reads a null subject but a save keeps the stored product subject', function () {
+    [$id, $severe] = apiSubjectsRule($this);
+    $this->user->forceFill(['tier_override' => Tier::Free])->save();
+    $stored = fn (): array => DB::table('alert_rule_product')->where('alert_rule_id', $id)->pluck('custom_subject_template', 'product_id')->all();
+    $expected = [$this->tornado->id => '{product} here', $severe->id => 'Severe: {location}'];
+
+    ruleCall($this, 'GET', "/api/v1/alert-rules/{$id}")->assertOk()
+        ->assertJsonPath('data.product_settings.0.custom_subject_template', null)
+        ->assertJsonPath('data.product_settings.1.custom_subject_template', null);
+
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", perProductRuleBody($this))->assertOk();
+    expect($stored())->toBe($expected);
+
+    $flat = ['category' => 'weather_alerts', 'channel_ids' => [$this->channel->id], 'product_ids' => [$this->tornado->id, $severe->id], 'matching_mode' => 'nationwide'];
+    ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", $flat)->assertOk();
+    expect($stored())->toBe($expected);
+});

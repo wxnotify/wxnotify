@@ -18,13 +18,13 @@ use Illuminate\Support\Collection;
  * Renders a per-rule custom notification subject/title via plain
  * placeholder substitution -- logic-less strtr(), nothing executable,
  * since a subscriber-authored template runs on every dispatch of their
- * alerts. Priority: the matched product's own subject on the rule
- * (AlertRule::customSubjectFor()), then an attached AlertTemplate's subject_template first
- * (via effectiveAlertTemplate(), tier- and category-gated), then the
- * rule's own custom_subject_template (via
- * effectiveCustomSubjectTemplate()), then AlertRule::displayName() (the
- * existing admin/list-table label, unchanged and untouched by this class)
- * when neither is set.
+ * alerts. Priority: the matched product's own subject on the rule (via
+ * AlertRule::customSubjectFor()), then an attached AlertTemplate's
+ * subject_template (via effectiveAlertTemplate(), tier- and
+ * category-gated), then the rule's own custom_subject_template (via
+ * effectiveCustomSubjectTemplate()), then the default name (via
+ * AlertRule::displayName(), the existing admin/list-table label,
+ * unchanged and untouched by this class) when none is set.
  *
  * The product argument is either the one Product that fired or, for a
  * bulletin that matched several events (a Hurricane Watch and a Small Craft
