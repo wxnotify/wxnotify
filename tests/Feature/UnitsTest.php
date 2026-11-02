@@ -54,6 +54,14 @@ test('inverse conversions round-trip', function () {
         ->and($units->kilometersToMiles($units->distanceValue(15.0)))->toEqualWithDelta(15.0, 1e-9);
 });
 
+test('metric-source pressure and distance convert to the imperial values the formatters take', function () {
+    expect(Units::inHgFromHectopascals(1019.9))->toEqualWithDelta(30.1176, 1e-4)
+        ->and((new Units)->pressure(Units::inHgFromHectopascals(1019.9)))->toBe('30.12 inHg')
+        ->and((new Units(UnitSystem::Metric))->pressure(Units::inHgFromHectopascals(1019.9)))->toBe('1020 hPa')
+        ->and(Units::milesFromKilometers(16.09344))->toEqualWithDelta(10.0, 1e-9)
+        ->and((new Units(UnitSystem::Metric))->distance(Units::milesFromKilometers(16.0), 0))->toBe('16 km');
+});
+
 test('units resolve from a user, a rule owner and a queued report, defaulting to imperial', function () {
     $metric = User::factory()->create(['unit_system' => 'metric']);
 

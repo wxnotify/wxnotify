@@ -217,3 +217,35 @@ test('metric and imperial subscribers get their own strings from one cached look
     expect($imperial)->toBe('55°')->and($other)->toBe('13°');
     expect(apwWeatherCalls())->toBe(1);
 });
+
+test('the selected card carries the details, hour wind and the next-hour line when Apple sends them', function () {
+    $body = apwWeatherBody();
+    $body['currentWeather'] += ['windGust' => 24.1, 'pressure' => 1019.9, 'pressureTrend' => 'rising', 'visibility' => 16090, 'temperatureDewPoint' => 8.9, 'cloudCover' => 0.75];
+    $body['forecastHourly']['hours'] = [['forecastStart' => '2026-11-01T16:00:00Z', 'temperature' => 13.0, 'conditionCode' => 'Rain', 'windSpeed' => 14.4]];
+    $body['forecastNextHour'] = [
+        'summary' => [['startTime' => '2026-11-01T15:20:00Z', 'condition' => 'rain', 'precipitationChance' => 0.9, 'precipitationIntensity' => 2.0]],
+        'minutes' => array_map(fn (int $offset) => [
+            'startTime' => Carbon::parse('2026-11-01T15:20:00Z')->addMinutes($offset)->toIso8601ZuluString(),
+            'precipitationChance' => $offset < 20 ? 0.9 : 0.0,
+            'precipitationIntensity' => $offset < 20 ? 2.0 : 0.0,
+        ], range(0, 70)),
+    ];
+    Http::fake([
+        'weatherkit.apple.com/api/v1/weather/*' => Http::response($body),
+        'weatherkit.apple.com/attribution/*' => Http::response(['serviceName' => 'Weather']),
+    ]);
+    ($this->place)('Home', 40.7128, -74.006);
+
+    $card = ($this->call)()->assertOk()->json('data.selected');
+
+    expect($card['next_hour'])->toBe('Rain ending in 20 min')
+        ->and($card['current'])->toMatchArray(['gust' => '15 mph', 'pressure' => '30.12 inHg', 'pressure_trend' => 'rising', 'visibility' => '10 mi', 'dew_point' => '48°', 'cloud_cover' => '75%'])
+        ->and($card['hours'][0]['wind'])->toBe('9 mph');
+});
+
+test('a place without a next-hour forecast gets no next-hour line', function () {
+    apwFakeWeatherKit();
+    ($this->place)('Home', 40.7128, -74.006);
+
+    expect(($this->call)()->assertOk()->json('data.selected'))->not->toHaveKey('next_hour');
+});

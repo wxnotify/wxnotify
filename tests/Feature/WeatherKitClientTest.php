@@ -39,7 +39,7 @@ test('weather requests the exact path with data sets, timezone and a bearer toke
 
         return parse_url($request->url(), PHP_URL_HOST) === 'weatherkit.apple.com'
             && parse_url($request->url(), PHP_URL_PATH) === '/api/v1/weather/en/40.7128/-74.006'
-            && $query['dataSets'] === 'currentWeather,forecastHourly,forecastDaily'
+            && $query['dataSets'] === 'currentWeather,forecastHourly,forecastDaily,forecastNextHour'
             && $query['timezone'] === 'America/New_York'
             && str_starts_with($request->header('Authorization')[0], 'Bearer ey');
     });

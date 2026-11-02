@@ -35,15 +35,16 @@ function gpwConfigure(): void
 function gpwFixture(): array
 {
     $hours = [];
-    foreach (range(13, 22) as $index => $hour) {
+    foreach (range(0, 29) as $index) {
+        $start = Carbon::parse('2026-11-01T13:00:00Z')->addHours($index);
         $hours[] = [
-            'forecastStart' => sprintf('2026-11-01T%02d:00:00Z', $hour),
+            'forecastStart' => $start->toIso8601ZuluString(),
             'cloudCover' => 0.5,
             'conditionCode' => $index % 2 === 0 ? 'MostlyCloudy' : 'ScatteredThunderstorms',
-            'daylight' => $hour < 20,
+            'daylight' => $start->hour >= 12 && $start->hour < 20,
             'humidity' => 0.6,
             'precipitationAmount' => 0,
-            'precipitationChance' => 0.1 * $index,
+            'precipitationChance' => 0.1 * ($index % 10),
             'precipitationType' => 'clear',
             'pressure' => 1015.2,
             'pressureTrend' => 'steady',
@@ -101,6 +102,38 @@ function gpwFixture(): array
         ],
         'forecastHourly' => ['name' => 'HourlyForecast', 'hours' => $hours],
         'forecastDaily' => ['name' => 'DailyForecast', 'days' => $days],
+        'forecastNextHour' => gpwNextHour(),
+    ];
+}
+
+/**
+ * Apple's NextHourForecastData: a minute array (ForecastMinute) starting one minute before "now"
+ * (15:19Z, already over at 15:20Z), dry for the first eleven minutes then raining, and its
+ * ForecastPeriodSummary list.
+ *
+ * @return array<string, mixed>
+ */
+function gpwNextHour(): array
+{
+    $minutes = [];
+    foreach (range(0, 89) as $offset) {
+        $minutes[] = [
+            'startTime' => Carbon::parse('2026-11-01T15:19:00Z')->addMinutes($offset)->toIso8601ZuluString(),
+            'precipitationChance' => $offset < 11 ? 0.05 : 0.8,
+            'precipitationIntensity' => $offset < 11 ? 0 : 1.25,
+            'perceivedPrecipitationIntensity' => $offset < 11 ? 0 : 0.4,
+        ];
+    }
+
+    return [
+        'name' => 'NextHourForecast',
+        'forecastStart' => '2026-11-01T15:19:00Z',
+        'forecastEnd' => '2026-11-01T16:49:00Z',
+        'summary' => [
+            ['startTime' => '2026-11-01T15:19:00Z', 'endTime' => '2026-11-01T15:30:00Z', 'condition' => 'clear', 'precipitationChance' => 0, 'precipitationIntensity' => 0],
+            ['startTime' => '2026-11-01T15:30:00Z', 'condition' => 'rain', 'precipitationChance' => 0.8, 'precipitationIntensity' => 1.25],
+        ],
+        'minutes' => $minutes,
     ];
 }
 
@@ -146,23 +179,31 @@ test('normalises current conditions with unit conversions', function () {
             'humidity' => 74,
             'uv_index' => 3,
             'is_daylight' => true,
+            'gust_kph' => 33.5,
+            'pressure_hpa' => 1016.4,
+            'pressure_trend' => 'falling',
+            'visibility_km' => 24.0,
+            'dew_point_c' => 8.0,
+            'cloud_cover' => 70,
         ]);
 });
 
-test('keeps the next six hours, skipping hours already started', function () {
+test('an unknown pressure trend is null', function () {
+    $fixture = gpwFixture();
+    $fixture['currentWeather']['pressureTrend'] = 'sideways';
+    Http::fake(['weatherkit.apple.com/*' => Http::response($fixture)]);
+
+    expect(app(GetPlaceWeather::class)(gpwLocation())['current']['pressure_trend'])->toBeNull();
+});
+
+test('keeps the next twenty-four hours, skipping hours already started', function () {
     Http::fake(['weatherkit.apple.com/*' => Http::response(gpwFixture())]);
 
     $hours = app(GetPlaceWeather::class)(gpwLocation())['hours'];
 
-    expect($hours)->toHaveCount(6)
-        ->and(array_column($hours, 'time'))->toBe([
-            '2026-11-01T11:00:00-05:00',
-            '2026-11-01T12:00:00-05:00',
-            '2026-11-01T13:00:00-05:00',
-            '2026-11-01T14:00:00-05:00',
-            '2026-11-01T15:00:00-05:00',
-            '2026-11-01T16:00:00-05:00',
-        ])
+    expect($hours)->toHaveCount(24)
+        ->and($hours[0]['time'])->toBe('2026-11-01T11:00:00-05:00')
+        ->and($hours[23]['time'])->toBe('2026-11-02T10:00:00-05:00')
         ->and($hours[0])->toBe([
             'time' => '2026-11-01T11:00:00-05:00',
             'temperature_c' => 13.0,
@@ -170,8 +211,35 @@ test('keeps the next six hours, skipping hours already started', function () {
             'condition' => 'Scattered thunderstorms',
             'condition_code' => 'ScatteredThunderstorms',
             'is_daylight' => true,
+            'wind_kph' => 15.2,
         ])
         ->and($hours[1]['condition'])->toBe('Mostly cloudy');
+});
+
+test('keeps the next-hour minutes still to come with their start times, and the summary', function () {
+    Http::fake(['weatherkit.apple.com/*' => Http::response(gpwFixture())]);
+
+    $nextHour = app(GetPlaceWeather::class)(gpwLocation())['next_hour'];
+
+    expect($nextHour['minutes'])->toHaveCount(75)
+        ->and($nextHour['minutes'][0])->toBe(['start' => '2026-11-01T10:20:00-05:00', 'chance' => 5, 'intensity_mm_h' => 0.0])
+        ->and($nextHour['minutes'][10])->toBe(['start' => '2026-11-01T10:30:00-05:00', 'chance' => 80, 'intensity_mm_h' => 1.25])
+        ->and($nextHour['summary'])->toBe([
+            ['start' => '2026-11-01T10:19:00-05:00', 'end' => '2026-11-01T10:30:00-05:00', 'condition' => 'clear'],
+            ['start' => '2026-11-01T10:30:00-05:00', 'end' => null, 'condition' => 'rain'],
+        ]);
+});
+
+test('next_hour is null when WeatherKit sends no next-hour forecast for the place', function () {
+    $fixture = gpwFixture();
+    unset($fixture['forecastNextHour']);
+    Http::fake(['weatherkit.apple.com/*' => Http::response($fixture)]);
+
+    $weather = app(GetPlaceWeather::class)(gpwLocation());
+
+    expect($weather)->toHaveKey('next_hour')
+        ->and($weather['next_hour'])->toBeNull()
+        ->and($weather['current']['temperature_c'])->toBe(12.6);
 });
 
 test('each hour carries WeatherKit\'s daylight flag, false after dark', function () {
@@ -179,7 +247,7 @@ test('each hour carries WeatherKit\'s daylight flag, false after dark', function
 
     $hours = app(GetPlaceWeather::class)(gpwLocation())['hours'];
 
-    expect(array_column($hours, 'is_daylight'))->toBe([true, true, true, true, false, false]);
+    expect(array_slice(array_column($hours, 'is_daylight'), 0, 6))->toBe([true, true, true, true, false, false]);
 });
 
 test('keeps today plus the next four days in the place timezone', function () {
@@ -202,9 +270,13 @@ test('keeps today plus the next four days in the place timezone', function () {
 
 test('a value WeatherKit did not send is null, never zero', function () {
     $fixture = gpwFixture();
-    Arr::forget($fixture, ['currentWeather.uvIndex', 'currentWeather.temperatureApparent', 'currentWeather.windDirection', 'currentWeather.daylight']);
+    Arr::forget($fixture, ['currentWeather.uvIndex', 'currentWeather.temperatureApparent', 'currentWeather.windDirection', 'currentWeather.daylight',
+        'currentWeather.windGust', 'currentWeather.pressure', 'currentWeather.pressureTrend', 'currentWeather.visibility', 'currentWeather.temperatureDewPoint', 'currentWeather.cloudCover']);
     foreach ($fixture['forecastHourly']['hours'] as $i => $hour) {
-        unset($fixture['forecastHourly']['hours'][$i]['precipitationChance'], $fixture['forecastHourly']['hours'][$i]['daylight']);
+        unset($fixture['forecastHourly']['hours'][$i]['precipitationChance'], $fixture['forecastHourly']['hours'][$i]['daylight'], $fixture['forecastHourly']['hours'][$i]['windSpeed']);
+    }
+    foreach ($fixture['forecastNextHour']['minutes'] as $i => $minute) {
+        unset($fixture['forecastNextHour']['minutes'][$i]['precipitationChance'], $fixture['forecastNextHour']['minutes'][$i]['precipitationIntensity']);
     }
     foreach ($fixture['forecastDaily']['days'] as $i => $day) {
         unset($fixture['forecastDaily']['days'][$i]['precipitationChance'], $fixture['forecastDaily']['days'][$i]['sunrise'], $fixture['forecastDaily']['days'][$i]['temperatureMax']);
@@ -219,6 +291,9 @@ test('a value WeatherKit did not send is null, never zero', function () {
         ->and($weather['current']['is_daylight'])->toBeNull()
         ->and($weather['hours'][0]['precip_chance'])->toBeNull()
         ->and($weather['hours'][0]['is_daylight'])->toBeNull()
+        ->and($weather['hours'][0]['wind_kph'])->toBeNull()
+        ->and(Arr::only($weather['current'], ['gust_kph', 'pressure_hpa', 'pressure_trend', 'visibility_km', 'dew_point_c', 'cloud_cover']))->each->toBeNull()
+        ->and($weather['next_hour']['minutes'][0])->toBe(['start' => '2026-11-01T10:20:00-05:00', 'chance' => null, 'intensity_mm_h' => null])
         ->and($weather['days'][0]['precip_chance'])->toBeNull()
         ->and($weather['days'][0]['sunrise'])->toBeNull()
         ->and($weather['days'][0]['high_c'])->toBeNull()

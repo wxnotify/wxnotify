@@ -17,12 +17,22 @@ use Illuminate\Support\Str;
  * send is null, never 0. Formatting to the account's unit system happens after the cache.
  *
  * Shape: as_of, timezone, current (temperature_c, feels_like_c, condition, condition_code,
- * wind_kph, wind_direction, humidity, uv_index, is_daylight), hours (the next 6 hours starting
- * after now, each with is_daylight) and days (today plus the next 4, dated in the place's timezone).
+ * wind_kph, wind_direction, humidity, uv_index, is_daylight, gust_kph, pressure_hpa, pressure_trend
+ * rising|falling|steady, visibility_km, dew_point_c, cloud_cover percent), hours (the next 24 hours
+ * starting after now, each with is_daylight and wind_kph), days (today plus the next 4, dated in
+ * the place's timezone) and next_hour (null when WeatherKit has no next-hour forecast for the place:
+ * it is only offered in some countries). next_hour keeps up to 75 minutes not yet over, each with its
+ * ISO start time so the formatter can measure offsets from its own now even from a 10 minute old
+ * cache entry, and Apple's summary periods with their precipitation kind.
  */
 class GetPlaceWeather
 {
-    private const HOURS = 6;
+    private const HOURS = 24;
+
+    /** Sixty minutes plus the ten a cached result can age, plus a little slack. */
+    private const NEXT_HOUR_MINUTES = 75;
+
+    private const PRESSURE_TRENDS = ['rising', 'falling', 'steady'];
 
     private const DAYS = 5;
 
@@ -33,7 +43,7 @@ class GetPlaceWeather
     public function __construct(private readonly WeatherKitClient $client) {}
 
     /**
-     * @return array{as_of: ?string, timezone: string, current: array<string, mixed>, hours: list<array<string, mixed>>, days: list<array<string, mixed>>}|null
+     * @return array{as_of: ?string, timezone: string, current: array<string, mixed>, hours: list<array<string, mixed>>, days: list<array<string, mixed>>, next_hour: array{summary: list<array{start: string, end: ?string, condition: string}>, minutes: list<array{start: string, chance: ?int, intensity_mm_h: ?float}>}|null}|null
      */
     public function __invoke(Location $location): ?array
     {
@@ -67,7 +77,7 @@ class GetPlaceWeather
 
     /**
      * @param  array<string, mixed>|null  $payload
-     * @return array{as_of: ?string, timezone: string, current: array<string, mixed>, hours: list<array<string, mixed>>, days: list<array<string, mixed>>}|null
+     * @return array{as_of: ?string, timezone: string, current: array<string, mixed>, hours: list<array<string, mixed>>, days: list<array<string, mixed>>, next_hour: array{summary: list<array{start: string, end: ?string, condition: string}>, minutes: list<array{start: string, chance: ?int, intensity_mm_h: ?float}>}|null}|null
      */
     private function normalise(?array $payload, string $timezone): ?array
     {
@@ -90,14 +100,21 @@ class GetPlaceWeather
                 'humidity' => $this->percent($current['humidity'] ?? null),
                 'uv_index' => $this->int($current['uvIndex'] ?? null),
                 'is_daylight' => is_bool($current['daylight'] ?? null) ? $current['daylight'] : null,
+                'gust_kph' => $this->float($current['windGust'] ?? null),
+                'pressure_hpa' => $this->float($current['pressure'] ?? null),
+                'pressure_trend' => in_array($current['pressureTrend'] ?? null, self::PRESSURE_TRENDS, true) ? $current['pressureTrend'] : null,
+                'visibility_km' => is_numeric($current['visibility'] ?? null) ? (float) $current['visibility'] / 1000 : null,
+                'dew_point_c' => $this->float($current['temperatureDewPoint'] ?? null),
+                'cloud_cover' => $this->percent($current['cloudCover'] ?? null),
             ],
             'hours' => $this->hours($payload['forecastHourly']['hours'] ?? null, $timezone),
             'days' => $this->days($payload['forecastDaily']['days'] ?? null, $timezone),
+            'next_hour' => $this->nextHour($payload['forecastNextHour'] ?? null, $timezone),
         ];
     }
 
     /**
-     * @return list<array{time: string, temperature_c: float, precip_chance: ?int, condition: string, condition_code: string, is_daylight: ?bool}>
+     * @return list<array{time: string, temperature_c: float, precip_chance: ?int, condition: string, condition_code: string, is_daylight: ?bool, wind_kph: ?float}>
      */
     private function hours(mixed $hours, string $timezone): array
     {
@@ -122,6 +139,7 @@ class GetPlaceWeather
                 'condition' => $this->humanise($hour['conditionCode'] ?? null),
                 'condition_code' => $this->code($hour['conditionCode'] ?? null),
                 'is_daylight' => is_bool($hour['daylight'] ?? null) ? $hour['daylight'] : null,
+                'wind_kph' => $this->float($hour['windSpeed'] ?? null),
             ];
 
             if (count($result) === self::HOURS) {
@@ -169,6 +187,62 @@ class GetPlaceWeather
         }
 
         return $result;
+    }
+
+    /**
+     * Apple's NextHourForecastData (minutes of ForecastMinute, summary of ForecastPeriodSummary),
+     * keeping the minutes not yet over; null when the data set is absent or has no such minute.
+     *
+     * @return array{summary: list<array{start: string, end: ?string, condition: string}>, minutes: list<array{start: string, chance: ?int, intensity_mm_h: ?float}>}|null
+     */
+    private function nextHour(mixed $nextHour, string $timezone): ?array
+    {
+        if (! is_array($nextHour) || ! is_array($nextHour['minutes'] ?? null)) {
+            return null;
+        }
+
+        $now = now();
+        $minutes = [];
+
+        foreach ($nextHour['minutes'] as $minute) {
+            $start = is_array($minute) ? $this->parse($minute['startTime'] ?? null) : null;
+
+            if ($start === null || $start->copy()->addMinute()->lessThanOrEqualTo($now)) {
+                continue;
+            }
+
+            $minutes[] = [
+                'start' => $start->setTimezone($timezone)->toIso8601String(),
+                'chance' => $this->percent($minute['precipitationChance'] ?? null),
+                'intensity_mm_h' => $this->float($minute['precipitationIntensity'] ?? null),
+            ];
+
+            if (count($minutes) === self::NEXT_HOUR_MINUTES) {
+                break;
+            }
+        }
+
+        if ($minutes === []) {
+            return null;
+        }
+
+        $summary = [];
+
+        foreach (is_array($nextHour['summary'] ?? null) ? $nextHour['summary'] : [] as $period) {
+            $start = is_array($period) ? $this->parse($period['startTime'] ?? null) : null;
+
+            if ($start === null || ! is_string($period['condition'] ?? null)) {
+                continue;
+            }
+
+            $summary[] = [
+                'start' => $start->setTimezone($timezone)->toIso8601String(),
+                'end' => $this->time($period['endTime'] ?? null, $timezone),
+                'condition' => $period['condition'],
+            ];
+        }
+
+        return ['summary' => $summary, 'minutes' => $minutes];
     }
 
     /**

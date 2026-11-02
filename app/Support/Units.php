@@ -91,7 +91,7 @@ final class Units
     }
 
     /**
-     * Metric-source conversions (WeatherKit sends Celsius and km/h) into the imperial values the rest
+     * Metric-source conversions (WeatherKit sends Celsius, km/h, hPa and km) into the imperial values the rest
      * of this class formats; independent of the subscriber's system.
      */
     public static function fahrenheitFromCelsius(float $celsius): float
@@ -102,6 +102,16 @@ final class Units
     public static function mphFromKilometersPerHour(float $kph): float
     {
         return $kph / self::KM_PER_MILE;
+    }
+
+    public static function inHgFromHectopascals(float $hectopascals): float
+    {
+        return $hectopascals / self::HPA_PER_INHG;
+    }
+
+    public static function milesFromKilometers(float $kilometers): float
+    {
+        return $kilometers / self::KM_PER_MILE;
     }
 
     public function kilometersToMiles(float $value): float

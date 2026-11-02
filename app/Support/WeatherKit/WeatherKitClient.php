@@ -32,7 +32,7 @@ final class WeatherKitClient
     {
         return $this->get(
             self::BASE_URL.'/weather/'.self::LANGUAGE.'/'.$lat.'/'.$lng,
-            ['dataSets' => 'currentWeather,forecastHourly,forecastDaily', 'timezone' => $timezone],
+            ['dataSets' => 'currentWeather,forecastHourly,forecastDaily,forecastNextHour', 'timezone' => $timezone],
         );
     }
 
