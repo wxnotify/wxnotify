@@ -6,7 +6,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Actions/** | .ai/rules/actions.md |
 | resources/views/filament/dashboard/alert-rules/** | .ai/rules/alert-rules.md |
-| app/Actions/Alerts/**, app/Actions/Alerts/GetActiveAlertsForUser.php, app/Actions/Alerts/SaveAlertRule.php | .ai/rules/alerts.md |
+| app/Actions/Alerts/**, app/Actions/Alerts/GetActiveAlertsForUser.php, app/Actions/Alerts/SaveAlertRule.php, app/Actions/Alerts/FindAppAlert.php | .ai/rules/alerts.md |
 | routes/api.php, app/Http/Controllers/Api/**, app/Http/Resources/** | .ai/rules/api.md |
 | app/Jobs/DeliverWeatherAlert.php, app/Jobs/**, app/Jobs/DeliverScheduledAlert.php | .ai/rules/app-jobs.md |
 | app/Support/ChannelTypes/** | .ai/rules/channel-types.md |

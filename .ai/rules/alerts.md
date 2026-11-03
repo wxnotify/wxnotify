@@ -3,6 +3,7 @@ paths:
   - 'app/Actions/Alerts/**'
   - app/Actions/Alerts/GetActiveAlertsForUser.php
   - app/Actions/Alerts/SaveAlertRule.php
+  - app/Actions/Alerts/FindAppAlert.php
 ---
 
 # Alerts
@@ -21,3 +22,6 @@ GetActiveAlertsForUser takes its places from GetUserWeatherPlaces (this device's
 
 ## Per-product subjects: absent key keeps, explicit empty clears
 `alert_rule_product.custom_subject_template` is a product's own subject. SaveAlertRule::productSettings() carries the key ONLY when the input entry had it (trimmed; blank = null) and syncRelations() reads the stored pivot subjects BEFORE `sync()` replaces the rows: an entry with the key writes it (null/empty clears), an entry without it, and the flat `product_ids` shape (the mobile app's), keep the stored value for every product that stays; a newly added product starts with none; a removed product loses it with its pivot row. The dashboard always sends the key for a paid owner and OMITS it for a Free owner (ProductMatchingTable::toSaveInput(), so a downgrade never wipes stored subjects); the API validates `product_settings.*.custom_subject_template` as nullable|string|max:255 in the paid-tier block only. Never make an omitted key clear a subject: the app would erase them on every save. Pivot subject changes are not activity-logged (same as risk_levels).
+
+## A push tap's alert reference is resolved by GET /api/v1/alerts/by-ref/{ref}
+A push for an alert with no product page carries `wxnotify://alert/{ref}` (AlertRef: `p.{rule}.{product}` or `b.{batch key}`) because the delivery row, and so the alert id, does not exist at send time. `FindAppAlert::byRef($user, $ref)` finds the subscriber's own group for it (same group identity as `inAlertGroup()`/`AppAlert::keyFor()`, lowest row id, needs a successful mobile push row) and returns null for a malformed, unknown, not-yet-written or someone else's reference; the route `GET /api/v1/alerts/by-ref/{ref}` answers the usual AlertDetailResource or a 404 and must stay registered before `/alerts/{id}`. The app's AlertOpen queues the read, then looks the alert up (3 s) and opens its detail; every failure falls back to the Inbox. The lookup is deliberately a 404, never an error, for a tap that beats the delivery-log write.
