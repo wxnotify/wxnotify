@@ -48,6 +48,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/alerts', [AlertController::class, 'index'])->name('api.v1.alerts.index');
         Route::post('/alerts/read-all', [AlertController::class, 'readAll'])->name('api.v1.alerts.read-all');
         Route::post('/alerts/read-ref', [AlertController::class, 'readByRef'])->name('api.v1.alerts.read-ref');
+        Route::get('/alerts/by-ref/{ref}', [AlertController::class, 'showByRef'])->name('api.v1.alerts.show-by-ref');
         Route::get('/alerts/{id}', [AlertController::class, 'show'])->whereNumber('id')->name('api.v1.alerts.show');
         Route::post('/alerts/{id}/read', [AlertController::class, 'read'])->whereNumber('id')->name('api.v1.alerts.read');
         Route::get('/alert-rules', [AlertRuleController::class, 'index'])->name('api.v1.alert-rules.index');

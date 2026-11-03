@@ -36,6 +36,14 @@ class AlertController extends Controller
         return new AlertDetailResource($find($request->user(), $id) ?? abort(404));
     }
 
+    /**
+     * The alert a push's tap link names, by its reference (AlertRef), for a tap that lands before the app knows the id.
+     */
+    public function showByRef(Request $request, string $ref, FindAppAlert $find): AlertDetailResource
+    {
+        return new AlertDetailResource($find->byRef($request->user(), $ref) ?? abort(404));
+    }
+
     public function read(Request $request, int $id, MarkAppAlertsRead $mark): JsonResponse
     {
         $unread = $mark->one($request->user(), $id) ?? abort(404);
