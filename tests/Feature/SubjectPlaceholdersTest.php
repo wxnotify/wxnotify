@@ -45,3 +45,10 @@ test('the helper text lists the placeholders separated by spaces', function () {
 
     expect(SubjectPlaceholders::helperText($product))->toBe('Placeholders: {product} {location} {category} {wfo}');
 });
+
+test('the real SPC and WPC discussions offer states but not wfo', function () {
+    foreach (['SPC.MD', 'WPC.MPD'] as $code) {
+        expect(SubjectPlaceholders::forProduct(Product::where('code', $code)->sole()))
+            ->toBe(['{product}', '{location}', '{category}', '{states}']);
+    }
+});

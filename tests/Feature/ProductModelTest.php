@@ -13,6 +13,12 @@ test('the backfill sets has_vtec/has_ugc correctly for the real seeded catalog, 
         ->and(Product::where('code', 'SPC.MD')->sole()->has_vtec)->toBeFalse();
 });
 
+test('the SPC and WPC discussions are marked as carrying UGC codes, as their bulletins do', function () {
+    expect(Product::where('code', 'SPC.MD')->sole()->has_ugc)->toBeTrue()
+        ->and(Product::where('code', 'WPC.MPD')->sole()->has_ugc)->toBeTrue()
+        ->and(Product::where('code', 'SPC.OUTLOOK')->sole()->has_ugc)->toBeFalse();
+});
+
 test('damage_tag_options casts to an array and is fillable', function () {
     $product = Product::factory()->create(['damage_tag_options' => ['TAG A', 'TAG B']]);
 

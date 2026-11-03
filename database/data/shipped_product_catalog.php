@@ -1651,7 +1651,7 @@ return [
         'category' => 'other_discussions_reports_and_outlooks',
         'wea_warning' => false,
         'has_vtec' => false,
-        'has_ugc' => false,
+        'has_ugc' => true,
         'damage_tag_options' => null,
     ],
     118 => [
@@ -2099,7 +2099,7 @@ return [
         'category' => 'flooding_and_hydrological',
         'wea_warning' => false,
         'has_vtec' => false,
-        'has_ugc' => false,
+        'has_ugc' => true,
         'damage_tag_options' => null,
     ],
     150 => [
