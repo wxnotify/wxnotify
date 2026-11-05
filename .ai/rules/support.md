@@ -4,6 +4,7 @@ paths:
   - app/Support/Integrations.php
   - app/Support/PhoneNumber.php
   - app/Support/FormatPlaceWeather.php
+  - app/Support/DeliveryFailureExplanation.php
 ---
 
 # Support
@@ -55,3 +56,6 @@ Numbers go through `App\Support\PhoneNumber` (NANP only; area code AND exchange 
 
 ## Weather card fields: all optional, omitted when null; next_hour sentence
 The /api/v1/weather card carries current.gust/pressure/pressure_trend/visibility/dew_point/cloud_cover, hours[] (up to 24, each with optional wind) and a card-level next_hour sentence ("Rain starting in 12 min", "No rain expected in the next hour"). Every one is omitted when WeatherKit did not send it, never 0 or "null"; old cached entries lack the keys and must degrade by omission. forecastNextHour is requested with the other datasets; it is absent outside Apple's supported countries (what Apple does with the request there is unverified, check a non-US place after deploy). A precipitating minute is chance >= 50% or >= 0.1 mm/h.
+
+## Subscribers see failure reasons only through DeliveryFailureExplanation, never error_detail
+The Recent Alerts status badge (failure, suppressed, skipped) opens a modal, and Needs attention shows the same reason, both from `App\Support\DeliveryFailureExplanation::for($status, $errorDetail)`: a fixed list of OUR OWN sentences (reason + suggested fix, `ours` for a problem only we can fix, `channels` for a link to the channels page). The stored `delivery_logs.error_detail` is only matched against it (anchored/exact patterns; BYO types' `failureMessage()` split into reason and fix), never passed through: an unrecognised text gets the generic sentence, so a provider message, URL or header can never reach the dashboard. Every new failure sentence (a `DeliveryResult::failed(...)` or `FcmResult::failed/unregistered(...)` literal, a guard or refusal constant, a transport `describe()` text) needs a rule entry and a place in the explicit-sentence list in `DeliveryFailureExplanationTest`; the literal-scan test fails until it has one. Never add a rule with a pass-through reason. A column action's trigger stays a button for every row unless `->disabledClick()` says otherwise, so keep it tied to `for() === null`.
