@@ -67,7 +67,16 @@ test('a channel whose latest attempt in 7 days failed is reported with a count a
 
     expect($rows)->toHaveCount(1)
         ->and($rows[0])->toMatchArray(['kind' => 'channel_failing', 'severity' => 'danger', 'subject' => 'My Discord', 'target' => ['type' => 'channels', 'id' => null]])
-        ->and($rows[0]['detail'])->toBe('its last delivery failed 3 hours ago (2 failures in 7 days)');
+        ->and($rows[0]['detail'])->toBe('its last delivery failed 3 hours ago (2 failures in 7 days): This delivery did not go through.')
+        ->and(json_encode($rows))->not->toContain('secret-destination')->not->toContain('hooks.example.com');
+});
+
+test('a failing channel says why in one of the fixed sentences, taken from its latest failure', function () {
+    $channel = NotificationChannel::factory()->for($this->user)->create(['label' => 'My webhook']);
+    DeliveryLog::factory()->for($this->user)->create(['notification_channel_id' => $channel->id, 'status' => 'failure', 'dispatched_at' => now()->subDays(2), 'error_detail' => 'Email delivery is turned off on this server.']);
+    DeliveryLog::factory()->for($this->user)->create(['notification_channel_id' => $channel->id, 'status' => 'failure', 'dispatched_at' => now()->subHours(3), 'error_detail' => 'Webhook delivery failed: the endpoint returned HTTP 404.']);
+
+    expect(attentionRows($this->user)[0]['detail'])->toBe('its last delivery failed 3 hours ago (2 failures in 7 days): Your endpoint refused the message.');
 });
 
 test('a success after the failures clears the channel; old failures do not count', function () {

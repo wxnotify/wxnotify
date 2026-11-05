@@ -9,13 +9,15 @@ use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Support\DeliveryFailureExplanation;
 use Illuminate\Support\Collection;
 
 /**
  * Things that stop (or may stop) a subscriber's alerts from doing their job,
  * as an ordered list of rows the My Alerts "Needs attention" widget renders.
  * Database only, scoped to the given user. Rows hold plain text (the view
- * escapes it) and never an error detail, destination, URL or token.
+ * escapes it) and never an error detail, destination, URL or token; a failing
+ * channel's cause is one of DeliveryFailureExplanation's fixed sentences, never the stored text.
  *
  * Order: failing channels, unverified channels, active alerts with no channel,
  * mobile locations whose device is gone, mobile locations with no position,
@@ -60,7 +62,7 @@ class GetAlertsNeedingAttention
             ->where('dispatched_at', '>=', $since);
 
         $latest = $attempts()
-            ->select(['notification_channel_id', 'status', 'dispatched_at'])
+            ->select(['notification_channel_id', 'status', 'dispatched_at', 'error_detail'])
             ->distinct('notification_channel_id')
             ->orderBy('notification_channel_id')->orderByDesc('dispatched_at')->orderByDesc('id')
             ->get()
@@ -92,7 +94,8 @@ class GetAlertsNeedingAttention
                     'severity' => 'danger',
                     'subject' => (string) $channel->label,
                     'detail' => 'its last delivery failed '.$latest[$channel->id]->dispatched_at->diffForHumans()
-                        .' ('.$failures.' '.($failures === 1 ? 'failure' : 'failures').' in '.self::WINDOW_DAYS.' days)',
+                        .' ('.$failures.' '.($failures === 1 ? 'failure' : 'failures').' in '.self::WINDOW_DAYS.' days): '
+                        .DeliveryFailureExplanation::for('failure', $latest[$channel->id]->error_detail)['reason'],
                     'target' => ['type' => 'channels', 'id' => null],
                 ]];
             });
