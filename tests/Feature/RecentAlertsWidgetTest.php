@@ -134,3 +134,18 @@ test('quiet hours and skipped rows can be explained too, and a success badge can
     expect($modal['heading'])->toBe('Why this alert was held back')
         ->and($modal['html'])->toContain('Held back during your quiet hours.');
 });
+
+test('only a badge that can be explained is a control, and another subscriber\'s delivery cannot be opened', function () {
+    $failed = DeliveryLog::factory()->for($this->subscriber)->failed()->create();
+    $sent = DeliveryLog::factory()->for($this->subscriber)->create(['status' => 'success']);
+    $others = DeliveryLog::factory()->for(User::factory())->failed()->create(['error_detail' => 'Email delivery is turned off on this server.']);
+
+    $component = livewire(RecentAlertsWidget::class);
+    $html = $component->html();
+
+    expect($html)->toContain("mountTableAction(&#039;explainDelivery&#039;, &#039;{$failed->id}&#039;)")
+        ->not->toContain("mountTableAction(&#039;explainDelivery&#039;, &#039;{$sent->id}&#039;)")
+        ->not->toContain("mountTableAction(&#039;explainDelivery&#039;, &#039;{$others->id}&#039;)");
+
+    $component->mountTableAction('explainDelivery', $others)->assertNotSet('mountedActions', [['name' => 'explainDelivery', 'arguments' => [], 'context' => ['table' => true, 'recordKey' => (string) $others->id]]]);
+});

@@ -1,10 +1,13 @@
 <?php
 
+use App\Support\ChannelTypes\BlueskyChannelType;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ChannelTypes\Contracts\ByoChannelType;
 use App\Support\ChannelTypes\NtfyChannelType;
+use App\Support\Delivery\BlueskyAccountGuard;
 use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\ChatServerGuard;
+use App\Support\Delivery\Transports\MessagingTransport;
 use App\Support\Delivery\Transports\TwilioVoiceTransport;
 use App\Support\DeliveryFailureExplanation;
 
@@ -30,15 +33,25 @@ test('a delivery that went out has nothing to explain', function () {
         ->and(DeliveryFailureExplanation::for('anything-else', 'text'))->toBeNull();
 });
 
-test('quiet hours and a turned-off rule are explained by status, whatever the stored text', function () {
+test('quiet hours are explained by status, whatever the stored text', function () {
     $quiet = DeliveryFailureExplanation::for('suppressed', null);
-    $skipped = DeliveryFailureExplanation::for('skipped', 'The rule was deactivated after this delivery was dispatched.');
 
     expect($quiet['reason'])->toBe('Held back during your quiet hours.')
-        ->and($quiet['fix'])->toContain('quiet hours')
-        ->and($skipped['reason'])->toBe('The alert was turned off before this delivery went out.')
-        ->and($skipped['fix'])->toContain('My Alerts')
-        ->and($skipped['ours'])->toBeFalse();
+        ->and($quiet['fix'])->toContain('quiet hours');
+});
+
+test('a skipped delivery says why from its stored reason, and only a deactivated rule is told to turn it back on', function () {
+    $off = DeliveryFailureExplanation::for('skipped', 'The rule was deactivated after this delivery was dispatched.');
+    $gone = DeliveryFailureExplanation::for('skipped', 'The ingested product no longer exists.');
+    $other = DeliveryFailureExplanation::for('skipped', 'Something new and unexpected, https://hooks.example.com/SECRET');
+
+    expect($off['reason'])->toBe('The alert was turned off before this delivery went out.')
+        ->and($off['fix'])->toContain('My Alerts')
+        ->and($gone['reason'])->toContain('no longer available')
+        ->and($gone['fix'])->not->toContain('turn the alert back on')
+        ->and($other['reason'])->toBe('This alert was skipped, so nothing was sent.')
+        ->and(json_encode($other))->not->toContain('SECRET')
+        ->and([$off['ours'], $gone['ours'], $other['ours']])->toBe([false, false, false]);
 });
 
 test('each kind of failure gets its reason, a fix, and whether it is ours', function (string $detail, string $reasonStartsWith, bool $ours, bool $channelsLink) {
@@ -56,13 +69,16 @@ test('each kind of failure gets its reason, a fix, and whether it is ours', func
     'webhook no secret' => ['This webhook channel is missing its URL or signing secret.', 'This channel is missing part of its setup.', false, true],
     'webhook headers' => ["Webhook delivery failed: this channel's extra headers are no longer valid.", 'This channel is missing part of its setup.', false, true],
     'no push token' => ['This device channel has no push token; open the app to register it again.', "This phone isn't registered", false, false],
-    'web push expired' => ['This browser subscription is no longer valid; re-enable Web Push from Notification Channels.', "This browser's push subscription has expired.", false, true],
+    'web push expired' => ['This browser subscription is no longer valid; re-enable Web Push from Notification Channels.', "This browser's push subscription is missing or has expired.", false, true],
     'web push rejected' => ['Push service rejected the message (HTTP 410).', "The browser's push service rejected", false, true],
     'plan' => ['This channel needs the Plus plan or higher.', 'Your plan no longer includes', false, true],
     'unconfirmed' => ['This number has not been confirmed yet.', "This channel hasn't been confirmed yet.", false, true],
     'private network' => ['That server is on a private or reserved network, which is not allowed.', "That address isn't allowed.", false, true],
     'apprise' => ['Apprise reported non-delivery.', "The service didn't accept the message.", false, true],
     'twilio' => ['Twilio refused the Account SID or auth token.', 'Twilio refused the Account SID or auth token.', false, true],
+    'firebase down' => ['Firebase could not be reached.', DeliveryFailureExplanation::OURS_REASON, true, false],
+    'firebase credentials' => ['Firebase rejected the server credentials (HTTP 401).', DeliveryFailureExplanation::OURS_REASON, true, false],
+    'device unregistered' => ['This device is no longer registered for push.', "This phone isn't registered", false, false],
     'mail off' => ['Email delivery is turned off on this server.', DeliveryFailureExplanation::OURS_REASON, true, false],
     'web push not configured' => ['Web Push is not configured on this server (missing VAPID keys).', DeliveryFailureExplanation::OURS_REASON, true, false],
 ]);
@@ -73,6 +89,13 @@ test('an unrecognised failure gets the generic text and none of the stored words
     expect($explanation['reason'])->toBe(DeliveryFailureExplanation::GENERIC_REASON)
         ->and($explanation['fix'])->toBe(DeliveryFailureExplanation::GENERIC_FIX)
         ->and(json_encode($explanation))->not->toContain('SECRET')->not->toContain('hooks.example.com');
+});
+
+test('a text that merely mentions a provider is never passed through', function () {
+    $legacy = explanationOf('Webhook delivery failed: Client error: POST https://hooks.example.com/SECRET resulted in a 500 Twilio-ish body {"error":"SECRET"}');
+
+    expect($legacy['reason'])->not->toContain('SECRET')
+        ->and(json_encode($legacy))->not->toContain('hooks.example.com')->not->toContain('SECRET');
 });
 
 test('a missing stored text is the generic failure', function () {
@@ -125,6 +148,17 @@ test('every fixed failure sentence in the delivery code is explained', function 
         'The proxy host name could not be resolved.',
         'Webhook delivery failed: the endpoint returned HTTP 429.',
         'The push service could not be reached.',
+        'Push is not configured on this server.',
+        'Could not get a Firebase access token.',
+        'Firebase could not be reached.',
+        'Firebase rejected the server credentials (HTTP 401).',
+        'This device is no longer registered for push.',
+        'Firebase rejected the message (HTTP 400).',
+        BlueskyAccountGuard::NOT_HOSTED_BY_BLUESKY,
+        BlueskyAccountGuard::UNVERIFIED,
+        BlueskyAccountGuard::HANDLE_NOT_FOUND,
+        BlueskyChannelType::ACCOUNT_CHANGED_MESSAGE,
+        MessagingTransport::SERVER_MISMATCH,
     ];
 
     foreach ($texts as $text) {
@@ -140,14 +174,14 @@ test('every literal failure message written in the app code is explained, so a n
             continue;
         }
 
-        preg_match_all("/DeliveryResult::failed\\(\\s*'((?:[^'\\\\]|\\\\.)*)'/", (string) file_get_contents($file->getPathname()), $matches);
+        preg_match_all('/(?:DeliveryResult|FcmResult)::(?:failed|unregistered)\(\s*([\'"])((?:(?!\1)[^\\\\]|\\\\.)*)\1/', (string) file_get_contents($file->getPathname()), $matches);
 
-        foreach ($matches[1] as $literal) {
-            $found[] = stripslashes($literal);
+        foreach ($matches[2] as $literal) {
+            $found[] = preg_replace('/\{\$[^}]+\}/', '400', stripslashes($literal));
         }
     }
 
-    expect(count($found))->toBeGreaterThan(15);
+    expect(count($found))->toBeGreaterThan(20);
 
     foreach ($found as $literal) {
         expect(explanationIsGeneric(explanationOf($literal)))->toBeFalse($literal);

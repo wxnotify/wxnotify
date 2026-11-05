@@ -76,7 +76,9 @@ class RecentAlertsWidget extends TableWidget
                         'suppressed', 'skipped' => 'warning',
                         default => 'gray',
                     })
-                    ->action($this->explainAction()),
+                    ->action($this->explainAction())
+                    ->disabledClick(fn (DeliveryLog $record): bool => DeliveryFailureExplanation::for($record->status, $record->error_detail) === null)
+                    ->tooltip(fn (DeliveryLog $record): ?string => DeliveryFailureExplanation::for($record->status, $record->error_detail) === null ? null : 'Tap to see why'),
                 TextColumn::make('dispatched_at')
                     ->label('When')
                     ->since()
