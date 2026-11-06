@@ -23,7 +23,11 @@ The mobile app already has its own Map tab (`GET /api/v1/map`, `GetMapWarnings`,
 - **Navigation:** a "Live Weather" group in the dashboard panel with two pages named **Map** and **Products**.
 - **Map content** and **Products behaviour** as listed above.
 
-## My calls (not yet confirmed by the owner)
+## What the owner confirmed (2026-11-05)
+
+All the calls below were confirmed, with one addition: **Dust Storm Warnings** are part of the short-fuse list. The page saying so when the NOAA radar is down is acceptable. Installing Reverb is still waiting for the owner's approval (the Map page does not need it, so it is planned and built first).
+
+## My calls
 
 **Both pages**
 - Filament pages in the dashboard panel, group `Live Weather`, Map first, Products second (slugs `live-weather/map` and `live-weather/products`). Available to every signed-in tier: the data is public NWS data.
@@ -34,7 +38,7 @@ The mobile app already has its own Map tab (`GET /api/v1/map`, `GetMapWarnings`,
 - **Frame list:** the backend reads NOAA's capabilities (cached 60 seconds) and returns the list of frame times, so the browser never parses XML. The site code is validated before any request, and the host is fixed.
 - **Looping:** all chosen frames are preloaded as tile layers and shown one at a time. The loop pauses when the browser tab is hidden and respects "reduce motion" (starts paused).
 - **Auto-refresh:** frame times are re-read every 2 minutes (the national composite updates about that often; site layers about every 5 minutes). If the viewer is on the newest frame it stays on the newest; a paused viewer is not moved. A banner says "Radar is N minutes old" when the newest frame is older than 15 minutes, and "Radar is unavailable right now" when the service does not answer.
-- **Short-fuse warnings:** Tornado, Severe Thunderstorm, Flash Flood, Special Marine, Extreme Wind and Snow Squall Warnings, with filter chips. They come from the active warnings the app already stores, for the part of the map the viewer is looking at, refreshed every 30 seconds. A new action based on `GetMapWarnings` takes a bounding box and an event filter instead of points and a radius. Tapping a polygon or a list row opens a popup (event, headline, expiry) with a "View product" link to the public product page; a list row also flies to its polygon.
+- **Short-fuse warnings:** Tornado, Severe Thunderstorm, Flash Flood, Special Marine, Extreme Wind, Snow Squall and Dust Storm Warnings, with filter chips. They come from the active warnings the app already stores, for the part of the map the viewer is looking at, refreshed every 30 seconds. A new action based on `GetMapWarnings` takes a bounding box and an event filter instead of points and a radius. Tapping a polygon or a list row opens a popup (event, headline, expiry) with a "View product" link to the public product page; a list row also flies to its polygon.
 - **SPC watches:** the active watch events (families watch, issued by SPC) from the same action.
 - **SPC convective outlooks:** Day 1, Day 2 and Day 3 categorical outlooks from the data `FetchSpcOutlooks` already fetches and caches, with a day selector and the standard category colours.
 - **Mesoscale Discussions:** the active SPC Mesoscale Discussions with their polygons from our ingested products. The pipeline stores no expiry for them, so the build adds one read from the discussion's own "VALID …Z – …Z" line. The popup shows the discussion number, areas affected and a link to its page.
@@ -50,7 +54,7 @@ The mobile app already has its own Map tab (`GET /api/v1/map`, `GetMapWarnings`,
 ## Needs the owner's approval before it is built
 
 1. **Installing Reverb:** the Products page needs `laravel/reverb` (Composer), `laravel-echo` and `pusher-js` (npm), a new `reverb` service in `compose.yaml` (`php artisan reverb:start`, scaled on Redis), the `REVERB_*` environment values, `BROADCAST_CONNECTION=reverb`, a WebSocket route on the web proxy, and TLS for `wss://`. This changes the project's dependencies and the deployment, so it needs approval first. The Map page needs none of it.
-2. **NOAA services:** the radar comes from a free public NOAA server (no key, no service guarantee). If it is down the page says so. Confirm that is acceptable.
+2. ~~**NOAA services**~~ Accepted by the owner: the radar comes from a free public NOAA server (no key, no service guarantee), and the page says so when it is down.
 
 ## Goals
 
