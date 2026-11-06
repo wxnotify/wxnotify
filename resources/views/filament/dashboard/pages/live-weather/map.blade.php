@@ -9,22 +9,25 @@
     @include('filament.partials.map-helpers')
     @include('filament.partials.map-tiles')
 
-    {{-- wire:ignore on the root: Leaflet owns the map div. --}}
-    <div
-        wire:ignore
-        x-data="{ state: {}, destroy() { window.destroyLiveWeatherMap(this.state); } }"
-        x-init="window.initLiveWeatherMap($el, $wire, state)"
-        data-live-weather-map
-        data-center="{{ implode(',', $opening['center']) }}"
-        data-zoom="{{ $opening['zoom'] }}"
-        data-config="{{ json_encode($config, JSON_THROW_ON_ERROR) }}"
-    >
-        <div data-map style="height: 70vh; min-height: 480px; border-radius: 0.5rem; overflow: hidden; position: relative; z-index: 0;"></div>
-        <p data-caption class="mt-2 text-sm text-gray-500 dark:text-gray-400"></p>
-    </div>
+    {{-- The map and its layer controls; each layer module finds its controls inside this wrapper. --}}
+    <div data-live-weather-page>
+        {{-- wire:ignore on the root: Leaflet owns the map div. --}}
+        <div
+            wire:ignore
+            x-data="{ state: {}, destroy() { window.destroyLiveWeatherMap(this.state); } }"
+            x-init="window.initLiveWeatherMap($el, $wire, state)"
+            data-live-weather-map
+            data-center="{{ implode(',', $opening['center']) }}"
+            data-zoom="{{ $opening['zoom'] }}"
+            data-config="{{ json_encode($config, JSON_THROW_ON_ERROR) }}"
+        >
+            <div data-map style="height: 70vh; min-height: 480px; border-radius: 0.5rem; overflow: hidden; position: relative; z-index: 0;"></div>
+            <p data-caption class="mt-2 text-sm text-gray-500 dark:text-gray-400"></p>
+        </div>
 
-    {{-- The layer partials, before the script (LATER TASKS: map-warnings, map-layers). --}}
-    @include('filament.dashboard.pages.live-weather.map-radar')
+        {{-- The layer partials, before the script (LATER TASKS: map-warnings, map-layers). --}}
+        @include('filament.dashboard.pages.live-weather.map-radar')
+    </div>
 
     <script>
         // Defined once per page. Each layer partial defines a window.wxLiveMap* module with
@@ -51,7 +54,7 @@
                 const captionEl = root.querySelector('[data-caption]');
                 const center = root.dataset.center.split(',').map(Number);
                 const zoom = Number(root.dataset.zoom);
-                const page = root.parentElement || document;
+                const page = root.closest('[data-live-weather-page]') || document;
 
                 state.destroyed = false;
                 state.timers = [];

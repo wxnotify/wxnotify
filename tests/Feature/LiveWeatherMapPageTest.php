@@ -166,11 +166,20 @@ test('the radar labels frames in the subscriber\'s profile timezone', function (
     livewire(Map::class)->assertSeeHtml('&quot;timezone&quot;:&quot;America\/Chicago&quot;');
 });
 
+test('the radar labels frames in the app timezone for a subscriber with no profile timezone', function () {
+    config(['app.timezone' => 'America/New_York']);
+    $this->actingAs(User::factory()->create(['timezone' => null]));
+
+    livewire(Map::class)->assertSeeHtml('&quot;timezone&quot;:&quot;America\/New_York&quot;');
+});
+
 test('the page renders the radar controls', function () {
     $this->actingAs(User::factory()->create());
 
     livewire(Map::class)
+        ->assertSeeHtmlInOrder(['data-live-weather-page', 'data-live-weather-map', 'data-radar-controls'])
         ->assertSeeHtml('data-radar-play')
+        ->assertDontSeeHtml('aria-pressed')
         ->assertSeeHtml('data-radar-step="-1"')
         ->assertSeeHtml('data-radar-step="1"')
         ->assertSeeHtml('data-radar-scrubber')

@@ -16,7 +16,7 @@ use UnitEnum;
  * The Live Weather map: radar, current warnings and SPC layers (added by later tasks) over the
  * base tiles. Public data only; every signed-in tier may open it. The only per-viewer inputs are
  * the opening view and the default radar site, both taken from the subscriber's own first located
- * saved place, and the profile timezone the frame times are shown in.
+ * saved place, and the profile timezone the frame times are shown in (else the app's).
  */
 class Map extends Page
 {
@@ -66,7 +66,7 @@ class Map extends Page
     /**
      * The radar part of the page config. Nothing here asks NOAA: the browser asks for frames later.
      *
-     * @return array{layers: list<string>, default_site: ?string, timezone: ?string}
+     * @return array{layers: list<string>, default_site: ?string, timezone: string}
      */
     public function getRadarConfig(): array
     {
@@ -75,7 +75,7 @@ class Map extends Page
         return [
             'layers' => array_keys(self::RADAR_LAYERS),
             'default_site' => $place === null ? null : NexradSites::nearest((float) $place->lat, (float) $place->lng),
-            'timezone' => Timezones::forUser(auth()->user()),
+            'timezone' => Timezones::forUserOrDefault(auth()->user()),
         ];
     }
 

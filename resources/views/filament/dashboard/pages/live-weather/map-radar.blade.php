@@ -60,7 +60,7 @@
 
     <div class="flex flex-wrap items-center gap-2">
         <button type="button" data-radar-step="-1" aria-label="Previous frame" class="{{ $buttonClasses }}">&lsaquo;</button>
-        <button type="button" data-radar-play aria-pressed="false" class="{{ $buttonClasses }} min-w-[4.5rem]">Play</button>
+        <button type="button" data-radar-play class="{{ $buttonClasses }} min-w-[4.5rem]">Play</button>
         <button type="button" data-radar-step="1" aria-label="Next frame" class="{{ $buttonClasses }}">&rsaquo;</button>
         <input type="range" data-radar-scrubber min="0" max="0" value="0" step="1" disabled aria-label="Radar frame time" class="min-w-[8rem] flex-1">
         <span data-radar-time class="min-w-[6rem] text-sm tabular-nums text-gray-700 dark:text-gray-300"></span>
@@ -132,7 +132,9 @@
             }
 
             // Where the viewer lands after new frames arrive. -1 means "keep the frames as they are".
-            // mode: 'choice' (a new layer or site), 'resize' (a new frame count) or 'refresh' (the timer).
+            // mode: 'choice' (a new layer or site), 'resize' (a new frame count), 'refresh' (the timer
+            // or the tab coming back) or 'catchup' (a paused viewer acts after their frame aged out:
+            // they land on the oldest frame, the one nearest where they were).
             function frameIndexAfterUpdate(mode, previousTime, wasOnNewest, playing, times) {
                 const newest = times.length - 1;
 
@@ -150,14 +152,22 @@
                     return newest;
                 }
 
+                if (mode === 'catchup') {
+                    return 0;
+                }
+
                 return playing ? 0 : -1;
+            }
+
+            // A layer or site change stays pending until one answer has been applied, so a timer or
+            // visibility refresh that overtakes it is applied as the choice it really is.
+            function effectiveMode(requestedMode, choicePending) {
+                return choicePending ? 'choice' : requestedMode;
             }
 
             // --- Time label ---
 
-            function timeFormatter(timezone) {
-                const options = { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' };
-
+            function makeFormatter(timezone, options) {
                 try {
                     return new Intl.DateTimeFormat(undefined, timezone ? Object.assign({ timeZone: timezone }, options) : options);
                 } catch (error) {
@@ -165,10 +175,24 @@
                 }
             }
 
-            function timeLabel(formatter, iso) {
-                const date = new Date(iso);
+            function timeFormatters(timezone) {
+                return {
+                    time: makeFormatter(timezone, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }),
+                    dateTime: makeFormatter(timezone, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }),
+                    day: makeFormatter(timezone, { year: 'numeric', month: '2-digit', day: '2-digit' }),
+                };
+            }
 
-                return isNaN(date.getTime()) ? '' : formatter.format(date);
+            // The frame's time, with a short date only when its local date is not the newest frame's.
+            function timeLabel(formatters, iso, newestIso) {
+                const date = new Date(iso);
+                const newest = new Date(newestIso);
+
+                if (isNaN(date.getTime())) { return ''; }
+
+                const sameDay = isNaN(newest.getTime()) || formatters.day.format(date) === formatters.day.format(newest);
+
+                return (sameDay ? formatters.time : formatters.dateTime).format(date);
             }
 
             // --- Banner state ---
@@ -228,7 +252,11 @@
                 const $wire = context.$wire;
                 const root = context.page.querySelector('[data-radar-controls]');
 
-                if (! root) { return; }
+                if (! root) {
+                    if (window.console) { console.warn('Live map: the radar controls are missing, so the radar is off.'); }
+
+                    return;
+                }
 
                 const ui = {
                     banner: root.querySelector('[data-radar-banner]'),
@@ -250,14 +278,17 @@
 
                 const radar = state.radar = {
                     choices: startingChoices(readStoredChoices(), config, siteIds),
-                    formatter: timeFormatter(config.timezone),
+                    formatters: timeFormatters(config.timezone),
                     result: null,
+                    pendingResult: null,
+                    choicePending: false,
                     times: [],
                     frameLayers: new Map(),
                     index: -1,
                     playing: ! prefersReducedMotion(),
                     loopTimer: null,
                     request: 0,
+                    siteRequest: 0,
                     listeners: [],
                 };
 
@@ -289,7 +320,6 @@
 
                 function showPlayState() {
                     ui.play.textContent = radar.playing ? 'Pause' : 'Play';
-                    ui.play.setAttribute('aria-pressed', radar.playing ? 'true' : 'false');
                 }
 
                 function showLegend(result) {
@@ -341,6 +371,7 @@
                     radar.frameLayers.forEach((layer) => layer.remove());
                     radar.frameLayers = new Map();
                     radar.result = null;
+                    radar.pendingResult = null;
                     radar.times = [];
                     radar.index = -1;
                     ui.scrubber.max = '0';
@@ -356,7 +387,7 @@
                     if (layers.length === 0) { return; }
 
                     const next = ((index % layers.length) + layers.length) % layers.length;
-                    const label = timeLabel(radar.formatter, radar.times[next]);
+                    const label = timeLabel(radar.formatters, radar.times[next], radar.times[radar.times.length - 1]);
 
                     if (layers[radar.index]) { layers[radar.index].setOpacity(0); }
 
@@ -373,10 +404,16 @@
                     const wasOnNewest = radar.index === radar.times.length - 1;
                     const index = frameIndexAfterUpdate(mode, previousTime, wasOnNewest, radar.playing, times);
 
-                    if (index < 0) { return; }
+                    if (index < 0) {
+                        // A paused viewer's frame aged out: they stay put; their next action catches up.
+                        radar.pendingResult = result;
+
+                        return;
+                    }
 
                     syncFrameLayers(result, times);
                     radar.result = result;
+                    radar.pendingResult = null;
                     radar.times = times;
                     radar.index = -1;
                     ui.scrubber.max = String(Math.max(times.length - 1, 0));
@@ -390,7 +427,10 @@
                 async function refresh(mode) {
                     const request = ++radar.request;
 
+                    if (mode === 'choice') { radar.choicePending = true; }
+
                     if (isSiteLayer() && radar.choices.site === '') {
+                        radar.choicePending = false;
                         clearFrames();
                         setBanner(CHOOSE_SITE);
 
@@ -407,13 +447,27 @@
 
                     if (state.destroyed || request !== radar.request || ! state.map) { return; }
 
-                    setBanner(bannerText(result, Date.now()));
+                    const applyMode = effectiveMode(mode, radar.choicePending);
+                    radar.choicePending = false;
 
-                    if (isUsable(result)) {
-                        applyResult(result, mode);
-                    } else if (mode === 'choice') {
-                        clearFrames();
+                    if (! isUsable(result)) {
+                        if (applyMode === 'choice') { clearFrames(); }
+                        setBanner(UNAVAILABLE);
+
+                        return;
                     }
+
+                    applyResult(result, applyMode);
+                    // From the frames on the map, which a paused viewer may still be looking at.
+                    setBanner(bannerText(radar.result, Date.now()));
+                }
+
+                // A paused viewer whose frame aged out moves to the fresh frames when they act.
+                function catchUp() {
+                    if (! radar.pendingResult) { return; }
+
+                    applyResult(radar.pendingResult, 'catchup');
+                    setBanner(bannerText(radar.result, Date.now()));
                 }
 
                 // --- The loop ---
@@ -431,29 +485,35 @@
                 }
 
                 function setPlaying(playing) {
+                    catchUp();
                     radar.playing = playing;
                     showPlayState();
                     startLoop();
                 }
 
                 function step(direction) {
+                    const caughtUp = !! radar.pendingResult;
+
                     setPlaying(false);
-                    showFrame(radar.index + direction);
+
+                    if (! caughtUp) { showFrame(radar.index + direction); }
                 }
 
                 // --- Control handlers ---
 
                 async function chooseNearestSite() {
+                    const request = ++radar.siteRequest;
                     let site = null;
 
                     try {
-                        const center = state.map.getCenter();
+                        const center = state.map.getCenter().wrap();
                         site = await $wire.nearestRadarSite(center.lat, center.lng);
                     } catch (error) {
                         site = null;
                     }
 
-                    if (state.destroyed) { return; }
+                    // A site picked by hand meanwhile wins over a late answer.
+                    if (state.destroyed || request !== radar.siteRequest) { return; }
 
                     if (siteIds.includes(site)) {
                         radar.choices.site = site;
@@ -478,6 +538,7 @@
                         return;
                     }
 
+                    radar.siteRequest++;
                     radar.choices.site = ui.site.value;
                     saveChoices();
                     refresh('choice');
@@ -494,7 +555,12 @@
                     radar.choices.frames = FRAME_COUNTS.includes(count) ? count : DEFAULT_FRAME_COUNT;
                     saveChoices();
 
-                    if (radar.result) { applyResult(radar.result, 'resize'); }
+                    const latest = radar.pendingResult || radar.result;
+
+                    if (latest) {
+                        applyResult(latest, 'resize');
+                        setBanner(bannerText(radar.result, Date.now()));
+                    }
                 });
 
                 listen(ui.play, 'click', () => setPlaying(! radar.playing));
@@ -502,8 +568,11 @@
                 listen(ui.forward, 'click', () => step(1));
 
                 listen(ui.scrubber, 'input', () => {
+                    const caughtUp = !! radar.pendingResult;
+
                     setPlaying(false);
-                    showFrame(Number(ui.scrubber.value));
+
+                    if (! caughtUp) { showFrame(Number(ui.scrubber.value)); }
                 });
 
                 listen(document, 'visibilitychange', () => {
@@ -540,7 +609,12 @@
                 state.radar = null;
             }
 
-            return { init: init, destroy: destroy };
+            return {
+                init: init,
+                destroy: destroy,
+                // Pure helpers, exposed for checks outside the page.
+                helpers: { frameIndexAfterUpdate: frameIndexAfterUpdate, effectiveMode: effectiveMode, bannerText: bannerText, timeLabel: timeLabel, timeFormatters: timeFormatters },
+            };
         })();
     }
 </script>
