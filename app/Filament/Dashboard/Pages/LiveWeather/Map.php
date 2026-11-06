@@ -2,11 +2,14 @@
 
 namespace App\Filament\Dashboard\Pages\LiveWeather;
 
+use App\Actions\Map\GetActiveMesoscaleDiscussions;
 use App\Actions\Map\GetLiveWarnings;
+use App\Actions\Weather\FetchSpcOutlooks;
 use App\Actions\Weather\GetRadarFrames;
 use App\Models\Location;
 use App\Support\LiveWarningKinds;
 use App\Support\NexradSites;
+use App\Support\SpcOutlookColors;
 use App\Support\Timezones;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -17,8 +20,8 @@ use Livewire\Attributes\Renderless;
 use UnitEnum;
 
 /**
- * The Live Weather map: radar, current warnings and SPC layers (added by later tasks) over the
- * base tiles. Public data only; every signed-in tier may open it. The only per-viewer inputs are
+ * The Live Weather map: radar, current warnings and the SPC layers (watches, convective outlook,
+ * Mesoscale Discussions) over the base tiles. Public data only; every signed-in tier may open it. The only per-viewer inputs are
  * the opening view and the default radar site, both taken from the subscriber's own first located
  * saved place, and the profile timezone the frame times are shown in (else the app's).
  */
@@ -38,6 +41,11 @@ class Map extends Page
         'site_reflectivity' => 'Reflectivity (site)',
         'site_velocity' => 'Velocity (site)',
     ];
+
+    /**
+     * The convective outlook days the map offers (the ones with a categorical layer).
+     */
+    protected const OUTLOOK_DAYS = [1, 2, 3];
 
     protected string $view = 'filament.dashboard.pages.live-weather.map';
 
@@ -171,6 +179,67 @@ class Map extends Page
         $result = app(GetLiveWarnings::class)(array_map(floatval(...), $bounds), $kind);
 
         return ['status' => 'ok', ...$result];
+    }
+
+    /**
+     * The SPC layers part of the page config: the kind the watches layer asks liveWarnings() for,
+     * the outlook days and the timezone discussion ends are shown in. Nothing here reads SPC data.
+     *
+     * @return array{watches_kind: string, outlook_days: list<int>, timezone: string}
+     */
+    public function getLayersConfig(): array
+    {
+        return [
+            'watches_kind' => LiveWarningKinds::WATCHES,
+            'outlook_days' => self::OUTLOOK_DAYS,
+            'timezone' => Timezones::forUserOrDefault(auth()->user()),
+        ];
+    }
+
+    /**
+     * The categorical convective outlook of a day, each area with its fill colour. The day comes
+     * from the browser: one outside OUTLOOK_DAYS is unavailable without asking SPC. A day, or its
+     * categorical file, that SPC could not give is unavailable too, never a quiet day; an
+     * available day with no areas is one.
+     *
+     * @return array{available: bool, issued_at: ?string, features: list<array{label: string, color: string, geometry: array<string, mixed>}>}
+     */
+    #[Renderless]
+    public function spcOutlook(int $day): array
+    {
+        $unavailable = ['available' => false, 'issued_at' => null, 'features' => []];
+
+        if (! in_array($day, self::OUTLOOK_DAYS, true)) {
+            return $unavailable;
+        }
+
+        $outlook = app(FetchSpcOutlooks::class)()["day_{$day}"] ?? null;
+        $areas = $outlook['layers']['cat'] ?? null;
+
+        if (! is_array($areas)) {
+            return $unavailable;
+        }
+
+        return [
+            'available' => true,
+            'issued_at' => $outlook['issued_at'] ?? null,
+            'features' => array_map(fn (array $area): array => [
+                'label' => $area['label'],
+                'color' => SpcOutlookColors::for($area['label']),
+                'geometry' => $area['geometry'],
+            ], $areas),
+        ];
+    }
+
+    /**
+     * The Mesoscale Discussions in effect (public SPC products; nothing per viewer).
+     *
+     * @return array{status: 'ok', discussions: list<array<string, mixed>>}
+     */
+    #[Renderless]
+    public function mesoscaleDiscussions(): array
+    {
+        return ['status' => 'ok', 'discussions' => app(GetActiveMesoscaleDiscussions::class)()];
     }
 
     /**

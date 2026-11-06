@@ -1,7 +1,6 @@
 @php
     $opening = $this->getOpeningView();
-    // A later task fills the layers key; the script below reads them.
-    $config = ['radar' => $this->getRadarConfig(), 'warnings' => $this->getWarningsConfig(), 'layers' => []];
+    $config = ['radar' => $this->getRadarConfig(), 'warnings' => $this->getWarningsConfig(), 'layers' => $this->getLayersConfig()];
 @endphp
 
 <x-filament-panels::page>
@@ -31,8 +30,9 @@
             @include('filament.dashboard.pages.live-weather.map-warnings')
         </div>
 
-        {{-- The other layer partials, before the script (LATER TASK: map-layers). --}}
+        {{-- The other layer partials, before the script. --}}
         @include('filament.dashboard.pages.live-weather.map-radar')
+        @include('filament.dashboard.pages.live-weather.map-layers')
     </div>
 
     <script>
@@ -86,6 +86,7 @@
 
                     startModule(window.wxLiveMapRadar);
                     startModule(window.wxLiveMapWarnings);
+                    startModule(window.wxLiveMapLayers);
                 }, () => {
                     if (! state.destroyed) { captionEl.textContent = "Couldn't load the map."; }
                 });

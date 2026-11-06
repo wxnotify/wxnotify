@@ -3,7 +3,9 @@
 use App\Filament\Dashboard\Pages\LiveWeather\Map;
 use App\Models\ActiveWwa;
 use App\Models\ActiveWwaArea;
+use App\Models\IngestedProduct;
 use App\Models\Location;
+use App\Models\Product;
 use App\Models\User;
 use App\Support\LiveWarningKinds;
 use App\Support\NexradSites;
@@ -283,4 +285,124 @@ test('the page renders the warnings panel beside the map and reads no warnings w
         ->assertSeeHtml('&quot;warnings&quot;:{&quot;kind&quot;:&quot;short_fuse&quot;');
 
     expect(collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'active_wwa'))->all())->toBe([]);
+});
+
+function liveWeatherMapOutlookPolygon(): array
+{
+    return ['type' => 'MultiPolygon', 'coordinates' => [[[[-97.5, 35.5], [-96.5, 35.5], [-96.5, 36.5], [-97.5, 35.5]]]]];
+}
+
+/**
+ * @param  list<string>  $labels
+ */
+function liveWeatherMapOutlookFile(array $labels): string
+{
+    return json_encode([
+        'type' => 'FeatureCollection',
+        'features' => array_map(fn (string $label): array => [
+            'type' => 'Feature',
+            'geometry' => liveWeatherMapOutlookPolygon(),
+            'properties' => ['LABEL' => $label, 'ISSUE_ISO' => '2026-11-05T12:56:00Z'],
+        ], $labels),
+    ]);
+}
+
+test('an outlook day gives its categorical areas with their colours and issue time', function () {
+    Cache::flush();
+    Http::fake([
+        'www.spc.noaa.gov/products/outlook/day2otlk_cat.nolyr.geojson' => Http::response(liveWeatherMapOutlookFile(['TSTM', 'SLGT', 'SIGN'])),
+        'www.spc.noaa.gov/*' => Http::response('', 404),
+    ]);
+    $this->actingAs(User::factory()->create());
+
+    expect(livewire(Map::class)->instance()->spcOutlook(2))->toBe([
+        'available' => true,
+        'issued_at' => '2026-11-05T12:56:00Z',
+        'features' => [
+            ['label' => 'TSTM', 'color' => '#c1e9c1', 'geometry' => liveWeatherMapOutlookPolygon()],
+            ['label' => 'SLGT', 'color' => '#f6f67b', 'geometry' => liveWeatherMapOutlookPolygon()],
+            ['label' => 'SIGN', 'color' => '#6b7280', 'geometry' => liveWeatherMapOutlookPolygon()],
+        ],
+    ]);
+});
+
+test('an outlook day with no areas is a quiet day, not unavailable', function () {
+    Cache::flush();
+    Http::fake([
+        'www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson' => Http::response(liveWeatherMapOutlookFile([])),
+        'www.spc.noaa.gov/*' => Http::response('', 404),
+    ]);
+    $this->actingAs(User::factory()->create());
+
+    expect(livewire(Map::class)->instance()->spcOutlook(1))->toBe(['available' => true, 'issued_at' => null, 'features' => []]);
+});
+
+test('an outlook day whose categorical file failed is unavailable, never a quiet day', function (array $files) {
+    Cache::flush();
+    Http::fake([...array_map(fn (string $body) => Http::response($body), $files), 'www.spc.noaa.gov/*' => Http::response('', 404)]);
+    $this->actingAs(User::factory()->create());
+
+    expect(livewire(Map::class)->instance()->spcOutlook(1))->toBe(['available' => false, 'issued_at' => null, 'features' => []]);
+})->with([
+    'every file failed' => [[]],
+    'only the tornado layer came' => [['www.spc.noaa.gov/products/outlook/day1otlk_torn.nolyr.geojson' => liveWeatherMapOutlookFile(['0.05'])]],
+    'an HTML error page' => [['www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson' => '<html>busy</html>']],
+]);
+
+test('an outlook day outside 1 to 3 is unavailable without asking SPC', function (int $day) {
+    Http::fake(['www.spc.noaa.gov/*' => Http::response(liveWeatherMapOutlookFile(['TSTM']))]);
+    $this->actingAs(User::factory()->create());
+
+    expect(livewire(Map::class)->instance()->spcOutlook($day))->toBe(['available' => false, 'issued_at' => null, 'features' => []]);
+    Http::assertNothingSent();
+})->with([0, 4, -1]);
+
+test('the mesoscale discussions method gives the current discussions', function () {
+    $this->travelTo('2026-08-20 23:58:00');
+    $md = IngestedProduct::factory()->createQuietly([
+        'product_id' => Product::query()->where('code', 'SPC.MD')->value('id'),
+        'text' => "MESOSCALE DISCUSSION 1572\n\nVALID 202355Z - 210200Z",
+        'polygon' => [['lat' => 33.31, 'lon' => -114.29], ['lat' => 34.5, 'lon' => -112.0], ['lat' => 32.0, 'lon' => -111.5]],
+        'received_at' => '2026-08-20 23:55:00',
+    ]);
+    $this->actingAs(User::factory()->create());
+
+    $result = livewire(Map::class)->instance()->mesoscaleDiscussions();
+
+    expect($result['status'])->toBe('ok')
+        ->and(array_column($result['discussions'], 'id'))->toBe([$md->id]);
+});
+
+test('the SPC layer methods are reachable from the browser without re-rendering the page', function (string $method) {
+    expect((new ReflectionMethod(Map::class, $method))->getAttributes(Renderless::class))->toHaveCount(1);
+})->with(['spcOutlook', 'mesoscaleDiscussions']);
+
+test('the layers config carries the watches kind, the outlook days and the subscriber\'s timezone', function () {
+    $this->actingAs(User::factory()->create(['timezone' => 'America/Chicago']));
+
+    expect(livewire(Map::class)->instance()->getLayersConfig())->toBe([
+        'watches_kind' => 'watches',
+        'outlook_days' => [1, 2, 3],
+        'timezone' => 'America/Chicago',
+    ]);
+});
+
+test('the page renders the SPC layer control, all off, and asks SPC for nothing while rendering', function () {
+    Http::fake(['www.spc.noaa.gov/*' => Http::response(liveWeatherMapOutlookFile(['TSTM']))]);
+    $this->actingAs(User::factory()->create());
+
+    $html = livewire(Map::class)
+        ->assertSeeHtmlInOrder(['data-live-weather-map', 'data-radar-controls', 'data-layers-control'])
+        ->assertSeeHtmlInOrder(['data-layer-toggle="watches"', 'data-layer-toggle="outlook"', 'data-layer-toggle="discussions"'])
+        ->assertSeeHtmlInOrder(['data-outlook-day', '<option value="1">Day 1</option>', '<option value="2">Day 2</option>', '<option value="3">Day 3</option>'])
+        ->assertSeeHtmlInOrder(['data-outlook-legend', '#c1e9c1', 'General thunder', '#ff7cff', 'High'])
+        ->assertSeeHtml('data-layers-notice')
+        ->assertSeeHtml('&quot;layers&quot;:{&quot;watches_kind&quot;:&quot;watches&quot;')
+        ->html();
+
+    preg_match_all('/<input[^>]*data-layer-toggle[^>]*>/', $html, $toggles);
+
+    expect($toggles[0])->toHaveCount(3)
+        ->and(collect($toggles[0])->filter(fn (string $toggle): bool => str_contains($toggle, 'checked'))->all())->toBe([]);
+    Http::assertNothingSent();
 });
