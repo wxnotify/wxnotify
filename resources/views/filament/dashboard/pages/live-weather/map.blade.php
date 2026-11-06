@@ -1,7 +1,7 @@
 @php
     $opening = $this->getOpeningView();
-    // Later tasks fill these keys (radar, warnings, layers); the script below reads them.
-    $config = ['radar' => [], 'warnings' => [], 'layers' => []];
+    // Later tasks fill the other keys (warnings, layers); the script below reads them.
+    $config = ['radar' => $this->getRadarConfig(), 'warnings' => [], 'layers' => []];
 @endphp
 
 <x-filament-panels::page>
@@ -23,36 +23,63 @@
         <p data-caption class="mt-2 text-sm text-gray-500 dark:text-gray-400"></p>
     </div>
 
-    {{-- LATER TASKS: include the layer partials here, before the script (map-radar, map-warnings, map-layers). --}}
+    {{-- The layer partials, before the script (LATER TASKS: map-warnings, map-layers). --}}
+    @include('filament.dashboard.pages.live-weather.map-radar')
 
     <script>
-        window.destroyLiveWeatherMap = function (state) {
-            state.destroyed = true;
+        // Defined once per page. Each layer partial defines a window.wxLiveMap* module with
+        // init(context) and destroy(state); a failing layer never stops the map or the others.
+        if (! window.destroyLiveWeatherMap) {
+            window.destroyLiveWeatherMap = function (state) {
+                state.destroyed = true;
 
-            (state.timers || []).forEach(clearInterval);
-            state.timers = [];
+                (state.modules || []).forEach((module) => {
+                    try { module.destroy(state); } catch (error) { /* a layer's teardown never blocks the map's */ }
+                });
+                state.modules = [];
 
-            if (state.map) { state.map.remove(); state.map = null; }
-        };
+                (state.timers || []).forEach(clearInterval);
+                state.timers = [];
 
-        window.initLiveWeatherMap = function (root, $wire, state) {
-            const mapEl = root.querySelector('[data-map]');
-            const captionEl = root.querySelector('[data-caption]');
-            const center = root.dataset.center.split(',').map(Number);
-            const zoom = Number(root.dataset.zoom);
+                if (state.map) { state.map.remove(); state.map = null; }
+            };
+        }
 
-            state.destroyed = false;
-            state.timers = [];
-            state.config = JSON.parse(root.dataset.config);
+        if (! window.initLiveWeatherMap) {
+            window.initLiveWeatherMap = function (root, $wire, state) {
+                const mapEl = root.querySelector('[data-map]');
+                const captionEl = root.querySelector('[data-caption]');
+                const center = root.dataset.center.split(',').map(Number);
+                const zoom = Number(root.dataset.zoom);
+                const page = root.parentElement || document;
 
-            window.whenLeafletReady(() => {
-                if (state.destroyed) { return; }
+                state.destroyed = false;
+                state.timers = [];
+                state.modules = [];
+                state.config = JSON.parse(root.dataset.config);
 
-                state.map = L.map(mapEl).setView(center, zoom);
-                window.wxTileLayer().addTo(state.map);
-            }, () => {
-                if (! state.destroyed) { captionEl.textContent = "Couldn't load the map."; }
-            });
-        };
+                const startModule = (module) => {
+                    if (! module) { return; }
+
+                    try {
+                        state.modules.push(module);
+                        module.init({ state: state, $wire: $wire, page: page });
+                    } catch (error) {
+                        if (window.console) { console.error(error); }
+                    }
+                };
+
+                window.whenLeafletReady(() => {
+                    if (state.destroyed) { return; }
+
+                    state.map = L.map(mapEl).setView(center, zoom);
+                    window.wxTileLayer().addTo(state.map);
+
+                    startModule(window.wxLiveMapRadar);
+                }, () => {
+                    if (! state.destroyed) { captionEl.textContent = "Couldn't load the map."; }
+                });
+            };
+        }
     </script>
 </x-filament-panels::page>
