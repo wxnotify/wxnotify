@@ -42,7 +42,7 @@ class GetRadarFrames
             return $this->unavailable($layer);
         }
 
-        $key = 'radar-frames:'.$layer.':'.($site === null ? '-' : strtolower($site));
+        $key = 'radar-frames:'.$layer.':'.($layer === 'composite' ? '-' : strtolower((string) $site));
         $cached = Cache::get($key);
 
         if (is_array($cached)) {
@@ -84,8 +84,8 @@ class GetRadarFrames
         $site = strtolower($site);
 
         return [
-            'wms_url' => str_replace('{site}', $site, (string) config('wxnotify.map.radar.site_wms_url')),
-            'wms_layer' => str_replace('{site}', $site, (string) config("wxnotify.map.radar.{$layerKey}")),
+            'wms_url' => str_replace('{site}', $site, (string) config('wxnotify.map.radar_sites.site_wms_url')),
+            'wms_layer' => str_replace('{site}', $site, (string) config("wxnotify.map.radar_sites.{$layerKey}")),
         ];
     }
 
@@ -154,7 +154,7 @@ class GetRadarFrames
             }
 
             $times = array_values(array_unique($times));
-            sort($times);
+            usort($times, fn (string $a, string $b): int => strtotime($a) <=> strtotime($b));
 
             return array_slice($times, -self::MAX_TIMES);
         } catch (Throwable) {

@@ -23,5 +23,5 @@ test('nearest returns the closest site for a point', function () {
 });
 
 test('nearest still answers for a point in the open Pacific', function () {
-    expect(NexradSites::nearest(30.0, -140.0))->toBeString()->and(NexradSites::exists(NexradSites::nearest(30.0, -140.0)))->toBeTrue();
+    expect(NexradSites::nearest(30.0, -140.0))->toBe('kbhx');
 });

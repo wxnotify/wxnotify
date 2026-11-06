@@ -158,3 +158,37 @@ test('an unknown layer, an unknown site or a missing site is refused before any 
     'injected site' => ['site_velocity', '../conus'],
     'site layer without a site' => ['site_reflectivity', null],
 ]);
+
+test('different site strings with composite share one request', function () {
+    Http::fake(['opengeo.ncep.noaa.gov/*' => Http::response(radarFramesCapabilities(['conus_bref_qcd']))]);
+
+    foreach (['a', 'b', '../c', 'KFWS'] as $site) {
+        (new GetRadarFrames)('composite', $site);
+    }
+
+    Http::assertSentCount(1);
+    expect(Cache::get('radar-frames:composite:-'))->not->toBeNull();
+});
+
+test('an invalid site or layer writes no cache entry', function () {
+    Http::fake();
+    Cache::spy();
+
+    (new GetRadarFrames)('site_velocity', '../x');
+    (new GetRadarFrames)('bogus', 'kfws');
+
+    Cache::shouldNotHaveReceived('put');
+    Http::assertNothingSent();
+});
+
+test('a range-style time dimension is unavailable', function () {
+    Http::fake(['opengeo.ncep.noaa.gov/*' => Http::response(radarFramesCapabilities(['conus_bref_qcd'], ['2026-11-06T00:00:00.000Z/2026-11-06T02:00:00.000Z/PT2M']))]);
+
+    expect((new GetRadarFrames)('composite')['status'])->toBe('unavailable');
+});
+
+test('duplicate times are collapsed and order follows the clock', function () {
+    Http::fake(['opengeo.ncep.noaa.gov/*' => Http::response(radarFramesCapabilities(['conus_bref_qcd'], ['2026-11-06T00:10:00Z', '2026-11-06T00:05:00.000Z', '2026-11-06T00:10:00Z']))]);
+
+    expect((new GetRadarFrames)('composite')['times'])->toBe(['2026-11-06T00:05:00.000Z', '2026-11-06T00:10:00Z']);
+});
