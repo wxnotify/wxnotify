@@ -75,19 +75,33 @@
             }
 
             // The box to ask for: finite, within ±90/±180, south below north. A view wider than the
-            // world is the whole world; a view across the antimeridian keeps its side of it. `cut`
-            // says the server will shrink it (wider than 120 or taller than 60 degrees).
+            // world is the whole world. A view across the antimeridian keeps the side holding more
+            // of it (the west one on a tie) and is cut at ±180. `cut` says the viewer is not seeing
+            // every warning in view: a side was dropped here, or the server will shrink the box
+            // (wider than 120 or taller than 60 degrees).
             function clampBounds(raw) {
                 let west = clampNumber(raw && raw.west, -Infinity, Infinity, -180);
                 let east = clampNumber(raw && raw.east, -Infinity, Infinity, 180);
+                let clipped = false;
 
                 if (east - west >= 360) {
                     west = -180;
                     east = 180;
                 } else {
                     const shift = Math.floor((west + 180) / 360) * 360;
-                    west = Math.max(-180, west - shift);
-                    east = Math.min(180, east - shift);
+                    west -= shift;
+                    east -= shift;
+
+                    if (east > 180) {
+                        clipped = true;
+
+                        if (east - 180 > 180 - west) {
+                            west = -180;
+                            east -= 360;
+                        } else {
+                            east = 180;
+                        }
+                    }
                 }
 
                 let south = clampNumber(raw && raw.south, -90, 90, -90);
@@ -98,7 +112,7 @@
 
                 return {
                     bounds: { south: south, west: west, north: north, east: east },
-                    cut: east - west > MAX_WIDTH || north - south > MAX_HEIGHT,
+                    cut: clipped || east - west > MAX_WIDTH || north - south > MAX_HEIGHT,
                 };
             }
 
@@ -237,6 +251,7 @@
                     popup: null,
                     request: 0,
                     moveTimer: null,
+                    pendingFly: null,
                     loaded: false,
                     listeners: [],
                 };
@@ -352,6 +367,13 @@
 
                 // --- The list ---
 
+                function cancelPendingFly() {
+                    if (warnings.pendingFly) {
+                        map.off('moveend', warnings.pendingFly);
+                        warnings.pendingFly = null;
+                    }
+                }
+
                 function flyTo(entry) {
                     const item = warnings.layers.get(entry.id);
 
@@ -367,6 +389,8 @@
                         if (! state.destroyed && warnings.layers.has(entry.id)) { openPopup(warnings.layers.get(entry.id).entry, target); }
                     };
 
+                    cancelPendingFly();
+
                     if (prefersReducedMotion()) {
                         map.fitBounds(bounds, Object.assign({ animate: false }, options));
                         openWhenThere();
@@ -374,7 +398,12 @@
                         return;
                     }
 
-                    map.once('moveend', openWhenThere);
+                    // Only the last row clicked opens its popup when the map arrives.
+                    warnings.pendingFly = () => {
+                        cancelPendingFly();
+                        openWhenThere();
+                    };
+                    map.on('moveend', warnings.pendingFly);
                     map.flyToBounds(bounds, Object.assign({ duration: 0.75 }, options));
                 }
 
@@ -451,6 +480,7 @@
                     } catch (error) {
                         if (window.console) { console.error(error); }
                         setNotice(UNAVAILABLE);
+                        renderList();
                     }
                 }
 
@@ -479,6 +509,7 @@
                 warnings.teardown = () => {
                     clearTimeout(warnings.moveTimer);
                     warnings.request++;
+                    cancelPendingFly();
                     closePopup();
                     warnings.listeners.forEach((remove) => remove());
                     warnings.listeners = [];

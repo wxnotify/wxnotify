@@ -216,6 +216,7 @@ test('invalid bounds are clamped and still queried within the limits', function 
     'missing keys' => [[], [-60.0, -30.0, 60.0, 30.0]],
     'beyond the poles and the antimeridian' => [['south' => -100.0, 'west' => -200.0, 'north' => -80.0, 'east' => -170.0], [-180.0, -90.0, -170.0, -80.0]],
     'south above north' => [['south' => 42.0, 'west' => -107.0, 'north' => 38.0, 'east' => -101.0], [-107.0, 38.0, -101.0, 42.0]],
+    'across the antimeridian keeps the west edge and stops at 180' => [['south' => 50.0, 'west' => 170.0, 'north' => 60.0, 'east' => -170.0], [170.0, 50.0, 180.0, 60.0]],
 ]);
 
 test('south above north is read as the box it names', function () {
@@ -238,4 +239,125 @@ test('the short-fuse kind names its seven warnings for the filter chips', functi
         'Extreme Wind Warning', 'Snow Squall Warning', 'Dust Storm Warning',
     ])
         ->and(LiveWarningKinds::eventNames(LiveWarningKinds::WATCHES))->toBe(['Tornado Watch', 'Severe Thunderstorm Watch']);
+});
+
+const LIVE_SECOND = 'POLYGON((-103.5 39.5, -103.5 40.5, -102.5 40.5, -102.5 39.5, -103.5 39.5))'; // also inside, east of Denver
+const LIVE_THIRD = 'POLYGON((-106.5 38.2, -106.5 39.2, -105.5 39.2, -105.5 38.2, -106.5 38.2))';  // also inside, south-west
+
+function liveWarningsWatchRow(string $office, string $number = '0679', array $attributes = []): ActiveWwa
+{
+    return liveWarningsEvent('TO', 'A', ['vtec_office' => $office, 'vtec_event_number' => $number, ...$attributes]);
+}
+
+function liveWarningsWatches(array $bounds): array
+{
+    return liveWarnings($bounds, LiveWarningKinds::WATCHES);
+}
+
+test('a watch held by two offices and the SPC row is one event without the SPC-only counties', function () {
+    $cae = liveWarningsWatchRow('KCAE');
+    liveWarningsArea($cae, LIVE_INSIDE, ['ugc_code' => 'COC001']);
+    $chs = liveWarningsWatchRow('KCHS');
+    liveWarningsArea($chs, LIVE_SECOND, ['ugc_code' => 'COC003']);
+    $spc = liveWarningsWatchRow('KWNS');
+    liveWarningsArea($spc, LIVE_INSIDE, ['ugc_code' => 'COC001']);
+    liveWarningsArea($spc, LIVE_SECOND, ['ugc_code' => 'COC003']);
+    liveWarningsArea($spc, LIVE_THIRD, ['ugc_code' => 'COC005']);
+
+    $events = liveWarningsWatches($this->box)['events'];
+
+    expect($events)->toHaveCount(1)
+        ->and($events[0]['id'])->toBe($cae->id)
+        ->and($events[0]['event'])->toBe('Tornado Watch')
+        ->and($events[0]['geometry']['geometries'])->toHaveCount(2)
+        ->and(json_encode($events[0]['geometry']))->not->toContain('-106.5');
+});
+
+test('a watch with only its SPC row is drawn from it', function () {
+    $spc = liveWarningsWatchRow('KWNS', '0700');
+    liveWarningsArea($spc, LIVE_INSIDE, ['ugc_code' => 'COC001']);
+    liveWarningsArea($spc, LIVE_THIRD, ['ugc_code' => 'COC005']);
+
+    $events = liveWarningsWatches($this->box)['events'];
+
+    expect($events)->toHaveCount(1)
+        ->and($events[0]['id'])->toBe($spc->id)
+        ->and($events[0]['geometry']['geometries'])->toHaveCount(2);
+});
+
+test('a county its office cancelled is not drawn even while the SPC row still holds it', function () {
+    $office = liveWarningsWatchRow('KMPX', '0698');
+    liveWarningsArea($office, LIVE_INSIDE, ['ugc_code' => 'COC001']);
+    liveWarningsArea($office, LIVE_THIRD, ['ugc_code' => 'COC005', 'status' => 'Cancelled']);
+    $spc = liveWarningsWatchRow('KWNS', '0698');
+    liveWarningsArea($spc, LIVE_INSIDE, ['ugc_code' => 'COC001']);
+    liveWarningsArea($spc, LIVE_THIRD, ['ugc_code' => 'COC005']);
+
+    $events = liveWarningsWatches($this->box)['events'];
+
+    expect($events)->toHaveCount(1)
+        ->and($events[0]['geometry']['geometries'])->toHaveCount(1)
+        ->and(json_encode($events[0]['geometry']))->not->toContain('-106.5');
+});
+
+test('a watch whose offices have all cleared it is not revived from the SPC row', function () {
+    $office = liveWarningsWatchRow('KJAX', '0678', ['status' => 'Cancelled']);
+    liveWarningsArea($office, LIVE_INSIDE, ['ugc_code' => 'COC001', 'status' => 'Cancelled']);
+    liveWarningsArea(liveWarningsWatchRow('KWNS', '0678'), LIVE_INSIDE, ['ugc_code' => 'COC001']);
+
+    expect(liveWarningsWatches($this->box)['events'])->toBe([]);
+});
+
+test('a merged watch keeps the lowest office row id whichever row arrived first or is in view, the latest row\'s headline and the end over all its rows', function () {
+    $spc = liveWarningsWatchRow('KWNS', '0679', ['headline' => 'SPC issued', 'updated_at' => now()->subMinutes(30)]);
+    liveWarningsArea($spc, LIVE_INSIDE, ['ugc_code' => 'COC001']);
+    $later = liveWarningsWatchRow('KCHS', '0679', ['headline' => 'Charleston extended', 'updated_at' => now()->subMinutes(5)]);
+    liveWarningsArea($later, LIVE_SECOND, ['ugc_code' => 'COC003', 'expires' => now()->addHours(4)]);
+    $earlier = liveWarningsWatchRow('KCAE', '0679', ['headline' => 'Columbia', 'updated_at' => now()->subMinutes(20)]);
+    liveWarningsArea($earlier, LIVE_INSIDE, ['ugc_code' => 'COC001', 'expires' => now()->addHours(2)]);
+
+    $first = liveWarningsWatches($this->box)['events'];
+    $second = liveWarningsWatches(['south' => 38.0, 'west' => -106.0, 'north' => 42.0, 'east' => -104.0])['events'];
+
+    expect($first)->toHaveCount(1)
+        ->and($first[0]['id'])->toBe($later->id)
+        ->and($first[0]['headline'])->toBe('Charleston extended')
+        ->and($first[0]['expires'])->toBe('2026-10-02T19:00:00+00:00')
+        ->and($second)->toHaveCount(1)
+        ->and($second[0]['id'])->toBe($later->id)
+        ->and($second[0]['expires'])->toBe('2026-10-02T19:00:00+00:00')
+        ->and($second[0]['geometry']['geometries'])->toHaveCount(1);
+});
+
+test('the cap counts merged watches, not their rows', function () {
+    config(['wxnotify.map.max_live_warnings' => 1]);
+    foreach (['KCAE', 'KCHS', 'KFFC'] as $office) {
+        liveWarningsArea(liveWarningsWatchRow($office), LIVE_INSIDE, ['ugc_code' => 'COC001']);
+    }
+
+    $result = liveWarningsWatches($this->box);
+
+    expect($result['events'])->toHaveCount(1)
+        ->and($result['truncated'])->toBeFalse();
+});
+
+test('an event ends when its last area ends, inside the box or not, wherever the box is', function () {
+    $wwa = liveWarningsEvent('FF');
+    liveWarningsArea($wwa, LIVE_INSIDE, ['ugc_code' => 'COZ001', 'expires' => '2026-10-02 14:00:00']);
+    liveWarningsArea($wwa, LIVE_OUTSIDE, ['ugc_code' => 'KSZ001', 'expires' => '2026-10-02 16:00:00']);
+    Carbon::setTestNow('2026-10-02 13:00:00');
+
+    $here = liveWarnings($this->box)['events'];
+    $there = liveWarnings(['south' => 38.0, 'west' => -100.0, 'north' => 42.0, 'east' => -96.0])['events'];
+
+    expect($here[0]['expires'])->toBe('2026-10-02T16:00:00+00:00')
+        ->and($here[0]['geometry']['geometries'])->toHaveCount(1)
+        ->and($there[0]['expires'])->toBe('2026-10-02T16:00:00+00:00');
+});
+
+test('short-fuse warnings of one VTEC number from two offices stay two events', function () {
+    liveWarningsArea(liveWarningsEvent('TO', 'W', ['vtec_office' => 'KBOU', 'vtec_event_number' => '0009']));
+    liveWarningsArea(liveWarningsEvent('TO', 'W', ['vtec_office' => 'KPUB', 'vtec_event_number' => '0009']), LIVE_SECOND);
+
+    expect(liveWarnings($this->box)['events'])->toHaveCount(2);
 });
