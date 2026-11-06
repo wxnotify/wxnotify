@@ -2,13 +2,17 @@
 
 namespace App\Filament\Dashboard\Pages\LiveWeather;
 
+use App\Actions\Map\GetLiveWarnings;
 use App\Actions\Weather\GetRadarFrames;
 use App\Models\Location;
+use App\Support\LiveWarningKinds;
 use App\Support\NexradSites;
 use App\Support\Timezones;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Renderless;
 use UnitEnum;
 
@@ -126,6 +130,47 @@ class Map extends Page
         usort($sites, fn (array $a, array $b): int => strnatcasecmp($a['name'], $b['name']) ?: strcmp($a['id'], $b['id']));
 
         return $sites;
+    }
+
+    /**
+     * The warnings part of the page config: the kind the list shows, its event names (one filter
+     * chip each) and the timezone the ends are shown in. Nothing here reads the warnings.
+     *
+     * @return array{kind: string, events: list<string>, timezone: string}
+     */
+    public function getWarningsConfig(): array
+    {
+        return [
+            'kind' => LiveWarningKinds::SHORT_FUSE,
+            'events' => LiveWarningKinds::eventNames(LiveWarningKinds::SHORT_FUSE),
+            'timezone' => Timezones::forUserOrDefault(auth()->user()),
+        ];
+    }
+
+    /**
+     * The current events of a kind within the viewer's box. Both come from the browser: the kind
+     * must be one of LiveWarningKinds and the box exactly four numeric edges, else nothing is read
+     * and the answer is "invalid"; GetLiveWarnings then clamps the box to a bounded one.
+     *
+     * @param  array<mixed>  $bounds
+     * @return array{status: 'ok'|'invalid', events: list<array<string, mixed>>, truncated: bool}
+     */
+    #[Renderless]
+    public function liveWarnings(array $bounds, string $kind): array
+    {
+        $validator = Validator::make(['bounds' => $bounds, 'kind' => $kind], [
+            'kind' => ['required', 'string', Rule::in(LiveWarningKinds::all())],
+            'bounds' => ['required', 'array:south,west,north,east', 'size:4'],
+            'bounds.*' => ['required', 'numeric'],
+        ]);
+
+        if ($validator->fails()) {
+            return ['status' => 'invalid', 'events' => [], 'truncated' => false];
+        }
+
+        $result = app(GetLiveWarnings::class)(array_map(floatval(...), $bounds), $kind);
+
+        return ['status' => 'ok', ...$result];
     }
 
     /**

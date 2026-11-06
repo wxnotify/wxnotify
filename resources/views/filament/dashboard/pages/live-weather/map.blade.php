@@ -1,7 +1,7 @@
 @php
     $opening = $this->getOpeningView();
-    // Later tasks fill the other keys (warnings, layers); the script below reads them.
-    $config = ['radar' => $this->getRadarConfig(), 'warnings' => [], 'layers' => []];
+    // A later task fills the layers key; the script below reads them.
+    $config = ['radar' => $this->getRadarConfig(), 'warnings' => $this->getWarningsConfig(), 'layers' => []];
 @endphp
 
 <x-filament-panels::page>
@@ -11,21 +11,27 @@
 
     {{-- The map and its layer controls; each layer module finds its controls inside this wrapper. --}}
     <div data-live-weather-page>
-        {{-- wire:ignore on the root: Leaflet owns the map div. --}}
-        <div
-            wire:ignore
-            x-data="{ state: {}, destroy() { window.destroyLiveWeatherMap(this.state); } }"
-            x-init="window.initLiveWeatherMap($el, $wire, state)"
-            data-live-weather-map
-            data-center="{{ implode(',', $opening['center']) }}"
-            data-zoom="{{ $opening['zoom'] }}"
-            data-config="{{ json_encode($config, JSON_THROW_ON_ERROR) }}"
-        >
-            <div data-map style="height: 70vh; min-height: 480px; border-radius: 0.5rem; overflow: hidden; position: relative; z-index: 0;"></div>
-            <p data-caption class="mt-2 text-sm text-gray-500 dark:text-gray-400"></p>
+        {{-- The map, with the warnings panel beside it (a drawer at the bottom on small screens). --}}
+        <div class="pb-14 lg:flex lg:items-start lg:gap-3 lg:pb-0">
+            {{-- wire:ignore on the root: Leaflet owns the map div. --}}
+            <div
+                wire:ignore
+                x-data="{ state: {}, destroy() { window.destroyLiveWeatherMap(this.state); } }"
+                x-init="window.initLiveWeatherMap($el, $wire, state)"
+                data-live-weather-map
+                data-center="{{ implode(',', $opening['center']) }}"
+                data-zoom="{{ $opening['zoom'] }}"
+                data-config="{{ json_encode($config, JSON_THROW_ON_ERROR) }}"
+                class="min-w-0 lg:flex-1"
+            >
+                <div data-map style="height: 70vh; min-height: 480px; border-radius: 0.5rem; overflow: hidden; position: relative; z-index: 0;"></div>
+                <p data-caption class="mt-2 text-sm text-gray-500 dark:text-gray-400"></p>
+            </div>
+
+            @include('filament.dashboard.pages.live-weather.map-warnings')
         </div>
 
-        {{-- The layer partials, before the script (LATER TASKS: map-warnings, map-layers). --}}
+        {{-- The other layer partials, before the script (LATER TASK: map-layers). --}}
         @include('filament.dashboard.pages.live-weather.map-radar')
     </div>
 
@@ -79,6 +85,7 @@
                     window.wxTileLayer().addTo(state.map);
 
                     startModule(window.wxLiveMapRadar);
+                    startModule(window.wxLiveMapWarnings);
                 }, () => {
                     if (! state.destroyed) { captionEl.textContent = "Couldn't load the map."; }
                 });

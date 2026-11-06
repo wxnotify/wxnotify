@@ -15,6 +15,8 @@ class WarningColors
         'Flood Warning' => '#00ff00',
         'Special Marine Warning' => '#ffa500',
         'Extreme Wind Warning' => '#ff8c00',
+        'Snow Squall Warning' => '#c71585',
+        'Dust Storm Warning' => '#ffe4c4',
         'Hurricane Warning' => '#dc143c',
         'Tropical Storm Warning' => '#b22222',
         'Winter Storm Warning' => '#ff69b4',

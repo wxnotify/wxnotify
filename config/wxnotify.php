@@ -110,6 +110,7 @@ return [
     'map' => [
         'warning_radius_miles' => 150,
         'max_warnings' => 100,
+        'max_live_warnings' => 150,
         'simplify_degrees' => 0.01,
         'basemaps' => [
             ['key' => 'topo', 'label' => 'Topo', 'url' => 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', 'max_zoom' => 16],

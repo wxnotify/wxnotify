@@ -3,17 +3,14 @@
 namespace App\Actions\Map;
 
 use App\Models\ActiveWwa;
-use App\Support\WarningColors;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The warnings and watches drawn on the map: active events with an active, unexpired area within the
- * configured distance of any of the given points. Areas are read from active_wwa_areas (never the
- * event row's own ugc_codes/polygon): an area's geometry is its own polygon, else the boundary of the
- * zone it names, found by UGC code in the public zones, counties, fire zones and marine zones.
- * An event is returned once with its areas' simplified geometries as one GeoJSON GeometryCollection.
+ * The warnings and watches drawn on the app's map: active events with an active, unexpired area
+ * within the configured distance of any of the given points. Which areas are in effect and their
+ * geometry come from ActiveWarningAreas (shared with the Live map's GetLiveWarnings). An event is
+ * returned once with its areas' simplified geometries as one GeoJSON GeometryCollection.
  */
 class GetMapWarnings
 {
@@ -26,6 +23,8 @@ class GetMapWarnings
     private const MAX_ANCHORS = 50;
 
     private const FAMILY_RANK = ['warning' => 0, 'watch' => 1];
+
+    public function __construct(private ActiveWarningAreas $areas = new ActiveWarningAreas) {}
 
     /**
      * @param  list<array{lat: float, lng: float}>  $anchors
@@ -45,11 +44,7 @@ class GetMapWarnings
             return [];
         }
 
-        $events = ActiveWwa::query()
-            ->with(['product', 'latestIngestedProduct'])
-            ->whereIn('id', $rows->keys()->all())
-            ->get()
-            ->keyBy('id');
+        $events = $this->areas->events($rows->keys()->all());
 
         return $rows
             ->map(fn ($areaRows, $id): ?array => $this->entry($events->get($id), $areaRows))
@@ -66,11 +61,10 @@ class GetMapWarnings
     }
 
     /**
-     * One event's payload from its area rows, plus the private `_meters` (its nearest area's distance,
-     * used to sort and stripped before returning). Null when the event is gone or, authoritatively, is
-     * not a warning or watch (the SQL family filter is only a safe superset of this check). The end is
-     * the latest of its areas', or none when any area has none. Identical geometries are listed once: a
-     * storm-based warning's one polygon is stored on every zone row it covers.
+     * One event's payload (ActiveWarningAreas::payload()) from its area rows, plus the private
+     * `_meters` (its nearest area's distance, used to sort and stripped before returning). Null when
+     * the event is gone or, authoritatively, is not a warning or watch (the SQL family filter is only
+     * a safe superset of this check).
      *
      * @param  Collection<int, object>  $areaRows
      * @return ?array<string, mixed>
@@ -83,20 +77,8 @@ class GetMapWarnings
             return null;
         }
 
-        $expires = $areaRows->contains(fn ($row): bool => $row->expires === null) ? null : $areaRows->max('expires');
-
         return [
-            'id' => $wwa->id,
-            'event' => $wwa->eventName(),
-            'family' => $family,
-            'color' => WarningColors::for($wwa->eventName(), $family),
-            'headline' => $wwa->headline,
-            'expires' => $expires === null ? null : Carbon::parse($expires)->toIso8601String(),
-            'view_url' => $wwa->latestIngestedProduct?->viewUrl(),
-            'geometry' => [
-                'type' => 'GeometryCollection',
-                'geometries' => $areaRows->unique('geojson')->map(fn ($row): array => json_decode($row->geojson, true))->values()->all(),
-            ],
+            ...$this->areas->payload($wwa, $family, $areaRows),
             '_meters' => (float) $areaRows->min('meters'),
         ];
     }
@@ -117,7 +99,7 @@ class GetMapWarnings
     {
         $radiusMeters = (float) config('wxnotify.map.warning_radius_miles') * self::METERS_PER_MILE;
         $values = implode(', ', array_fill(0, count($anchors), '(?::float8, ?::float8, ?::float8, ?::float8, ?::float8, ?::float8)'));
-        $bindings = [now()->toDateTimeString()];
+        $bindings = [];
 
         foreach ($anchors as $anchor) {
             array_push($bindings, ...$this->searchBox($anchor, $radiusMeters));
@@ -126,42 +108,12 @@ class GetMapWarnings
         $bindings[] = $radiusMeters;
         $bindings[] = (float) config('wxnotify.map.simplify_degrees');
 
+        $areas = $this->areas->ctes(
+            "COALESCE(pr.family, CASE upper(w.vtec_significance) WHEN 'W' THEN 'warning' WHEN 'A' THEN 'watch' END) IN ('warning', 'watch')",
+        );
+
         return DB::select(<<<SQL
-            WITH candidate AS MATERIALIZED (
-                SELECT a.id AS area_id, a.active_wwa_id, a.ugc_code, a.expires, a.polygon
-                FROM active_wwa_areas a
-                JOIN active_wwas w ON w.id = a.active_wwa_id
-                LEFT JOIN products pr ON pr.id = w.product_id
-                WHERE a.status = 'Active'
-                  AND (a.expires IS NULL OR a.expires > ?)
-                  AND w.status = 'Active'
-                  AND w.is_test = false
-                  AND COALESCE(pr.family, CASE upper(w.vtec_significance) WHEN 'W' THEN 'warning' WHEN 'A' THEN 'watch' END) IN ('warning', 'watch')
-            ),
-            zone_boundary AS MATERIALIZED (
-                SELECT c.ugc_code, (
-                    SELECT b.boundary FROM (
-                        SELECT boundary FROM public_zones WHERE substr(c.ugc_code, 3, 1) = 'Z' AND state_zone = substr(c.ugc_code, 1, 2) || substr(c.ugc_code, 4)
-                        UNION ALL
-                        SELECT boundary FROM fire_zones WHERE substr(c.ugc_code, 3, 1) = 'Z' AND state_zone = substr(c.ugc_code, 1, 2) || substr(c.ugc_code, 4)
-                        UNION ALL
-                        SELECT boundary FROM counties WHERE substr(c.ugc_code, 3, 1) = 'C' AND state = substr(c.ugc_code, 1, 2) AND right(fips, 3) = substr(c.ugc_code, 4)
-                        UNION ALL
-                        SELECT boundary FROM marine_zones_coastal WHERE zone_id = c.ugc_code
-                        UNION ALL
-                        SELECT boundary FROM marine_zones_offshore WHERE zone_id = c.ugc_code
-                        UNION ALL
-                        SELECT boundary FROM marine_zones_high_seas WHERE zone_id = c.ugc_code
-                    ) b LIMIT 1
-                ) AS boundary
-                FROM (SELECT DISTINCT ugc_code FROM candidate WHERE polygon IS NULL) c
-            ),
-            resolved AS MATERIALIZED (
-                SELECT k.area_id, k.active_wwa_id, k.expires, COALESCE(k.polygon, z.boundary) AS geom
-                FROM candidate k
-                LEFT JOIN zone_boundary z ON k.polygon IS NULL AND z.ugc_code = k.ugc_code
-                WHERE COALESCE(k.polygon, z.boundary) IS NOT NULL
-            ),
+            WITH {$areas['sql']},
             anchor AS (
                 SELECT * FROM (VALUES {$values}) AS p(lng, lat, xmin, ymin, xmax, ymax)
             ),
@@ -180,7 +132,7 @@ class GetMapWarnings
                    ST_AsGeoJSON(ST_SimplifyPreserveTopology(r.geom, ?), 4, 0) AS geojson
             FROM near n
             JOIN resolved r ON r.area_id = n.area_id
-            SQL, $bindings);
+            SQL, [...$areas['bindings'], ...$bindings]);
     }
 
     /**

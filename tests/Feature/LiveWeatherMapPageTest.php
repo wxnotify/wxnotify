@@ -1,11 +1,15 @@
 <?php
 
 use App\Filament\Dashboard\Pages\LiveWeather\Map;
+use App\Models\ActiveWwa;
+use App\Models\ActiveWwaArea;
 use App\Models\Location;
 use App\Models\User;
+use App\Support\LiveWarningKinds;
 use App\Support\NexradSites;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Renderless;
 
@@ -211,4 +215,72 @@ test('rendering the page asks NOAA for nothing', function () {
     livewire(Map::class)->assertSeeHtml('data-radar-controls');
 
     Http::assertNothingSent();
+});
+
+function liveWeatherMapTornadoWarning(): ActiveWwa
+{
+    $wwa = ActiveWwa::factory()->create(['product_id' => null, 'vtec_phenomenon' => 'TO', 'vtec_significance' => 'W', 'status' => 'Active', 'is_test' => false]);
+    ActiveWwaArea::factory()->for($wwa)->withPolygon('POLYGON((-105.5 39.5, -105.5 40.5, -104.5 40.5, -104.5 39.5, -105.5 39.5))')->create(['expires' => now()->addHour()]);
+
+    return $wwa;
+}
+
+test('the live warnings method gives the warnings in the box', function () {
+    $wwa = liveWeatherMapTornadoWarning();
+    $this->actingAs(User::factory()->create());
+
+    $result = livewire(Map::class)->instance()->liveWarnings(['south' => 38, 'west' => -107, 'north' => 42, 'east' => -101], LiveWarningKinds::SHORT_FUSE);
+
+    expect($result['status'])->toBe('ok')
+        ->and($result['truncated'])->toBeFalse()
+        ->and(collect($result['events'])->pluck('id')->all())->toBe([$wwa->id]);
+});
+
+test('the live warnings method refuses an unknown kind or a malformed box without querying', function (array $bounds, string $kind) {
+    liveWeatherMapTornadoWarning();
+    $this->actingAs(User::factory()->create());
+    $component = livewire(Map::class)->instance();
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $result = $component->liveWarnings($bounds, $kind);
+
+    expect($result)->toBe(['status' => 'invalid', 'events' => [], 'truncated' => false])
+        ->and(collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'active_wwa'))->all())->toBe([]);
+})->with([
+    'unknown kind' => [['south' => 38, 'west' => -107, 'north' => 42, 'east' => -101], 'advisories'],
+    'missing edge' => [['south' => 38, 'west' => -107, 'north' => 42], LiveWarningKinds::SHORT_FUSE],
+    'text edge' => [['south' => 38, 'west' => 'x', 'north' => 42, 'east' => -101], LiveWarningKinds::SHORT_FUSE],
+    'extra key' => [['south' => 38, 'west' => -107, 'north' => 42, 'east' => -101, 'zoom' => 5], LiveWarningKinds::SHORT_FUSE],
+]);
+
+test('the live warnings method is reachable from the browser without re-rendering the page', function () {
+    expect((new ReflectionMethod(Map::class, 'liveWarnings'))->getAttributes(Renderless::class))->toHaveCount(1);
+});
+
+test('the warnings config carries the kind, its event names and the subscriber\'s timezone', function () {
+    $this->actingAs(User::factory()->create(['timezone' => 'America/Chicago']));
+
+    expect(livewire(Map::class)->instance()->getWarningsConfig())->toBe([
+        'kind' => 'short_fuse',
+        'events' => ['Tornado Warning', 'Severe Thunderstorm Warning', 'Flash Flood Warning', 'Special Marine Warning', 'Extreme Wind Warning', 'Snow Squall Warning', 'Dust Storm Warning'],
+        'timezone' => 'America/Chicago',
+    ]);
+});
+
+test('the page renders the warnings panel beside the map and reads no warnings while rendering', function () {
+    liveWeatherMapTornadoWarning();
+    $this->actingAs(User::factory()->create());
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    livewire(Map::class)
+        ->assertSeeHtmlInOrder(['data-live-weather-map', 'data-warnings-panel', 'data-radar-controls'])
+        ->assertSeeHtmlInOrder(['data-warnings-chip', 'value="Tornado Warning"', 'value="Dust Storm Warning"'])
+        ->assertSeeHtml('data-warnings-list')
+        ->assertSeeHtml('data-warnings-chips')
+        ->assertSeeHtml('data-warnings-notice')
+        ->assertSeeHtml('&quot;warnings&quot;:{&quot;kind&quot;:&quot;short_fuse&quot;');
+
+    expect(collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'active_wwa'))->all())->toBe([]);
 });
