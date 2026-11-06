@@ -447,3 +447,23 @@ test('the page renders the SPC layer control, all off, and asks SPC for nothing 
         ->and(collect($toggles[0])->filter(fn (string $toggle): bool => str_contains($toggle, 'checked'))->all())->toBe([]);
     Http::assertNothingSent();
 });
+
+test('the page controls have accessible names, grouped layer toggles and status regions', function () {
+    $this->actingAs(User::factory()->create());
+
+    $html = livewire(Map::class)->html();
+
+    expect($html)
+        ->toContain('aria-label="Previous frame"')
+        ->toContain('aria-label="Next frame"')
+        ->toContain('type="range"')
+        ->toContain('aria-label="Radar frame time"')
+        ->toContain('aria-label="Current warnings"')
+        ->toContain('aria-controls="live-map-warnings-body"')
+        ->toContain('aria-expanded="false"')
+        ->toContain('<legend class="mb-1 font-medium">SPC layers</legend>')
+        ->toContain('<legend class="sr-only">Show these warnings</legend>')
+        ->and(substr_count($html, '<fieldset'))->toBe(2)
+        ->and(substr_count($html, 'role="status"'))->toBeGreaterThanOrEqual(3)
+        ->and($html)->not->toContain('aria-live');
+});

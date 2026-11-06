@@ -9,9 +9,9 @@
     @include('filament.partials.map-tiles')
 
     {{-- The map and its layer controls; each layer module finds its controls inside this wrapper. --}}
-    <div data-live-weather-page>
+    <div data-live-weather-page class="pb-14 lg:pb-0">
         {{-- The map, with the warnings panel beside it (a drawer at the bottom on small screens). --}}
-        <div class="pb-14 lg:flex lg:items-start lg:gap-3 lg:pb-0">
+        <div class="lg:flex lg:items-start lg:gap-3">
             {{-- wire:ignore on the root: Leaflet owns the map div. --}}
             <div
                 wire:ignore

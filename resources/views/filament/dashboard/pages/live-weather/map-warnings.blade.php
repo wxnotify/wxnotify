@@ -13,17 +13,17 @@
     wire:ignore
     data-warnings-panel
     aria-label="Current warnings"
-    class="fixed inset-x-0 bottom-0 z-40 flex max-h-[65vh] flex-col rounded-t-xl border border-gray-200 bg-white shadow-lg dark:border-white/10 dark:bg-gray-900 lg:static lg:z-auto lg:max-h-[70vh] lg:w-80 lg:shrink-0 lg:rounded-xl lg:shadow-sm"
+    class="fixed inset-x-0 bottom-0 z-[25] flex max-h-[65vh] flex-col rounded-t-xl border border-gray-200 bg-white shadow-lg dark:border-white/10 dark:bg-gray-900 lg:static lg:z-auto lg:max-h-[70vh] lg:w-80 lg:shrink-0 lg:rounded-xl lg:shadow-sm"
 >
     <button
         type="button"
         data-warnings-toggle
         aria-expanded="false"
         aria-controls="live-map-warnings-body"
-        class="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold text-gray-950 dark:text-white"
+        class="flex min-h-11 w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold text-gray-950 dark:text-white"
     >
         <span>Warnings <span data-warnings-count class="font-normal text-gray-500 dark:text-gray-400"></span></span>
-        <span data-warnings-toggle-label class="text-xs font-normal text-gray-500 dark:text-gray-400">Show</span>
+        <span data-warnings-toggle-label aria-hidden="true" class="text-xs font-normal text-gray-500 dark:text-gray-400">Show</span>
     </button>
 
     <div id="live-map-warnings-body" data-warnings-body hidden class="min-h-0 flex-1 space-y-3 overflow-y-auto border-t border-gray-200 px-4 py-3 dark:border-white/10">
@@ -39,7 +39,7 @@
         <fieldset data-warnings-chips class="flex flex-wrap gap-2">
             <legend class="sr-only">Show these warnings</legend>
             @foreach ($warningEventNames as $warningEventName)
-                <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-gray-300 px-2.5 py-1 text-xs text-gray-700 has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50 dark:border-white/10 dark:text-gray-300 dark:has-[:checked]:bg-primary-500/10">
+                <label class="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-gray-300 px-2.5 py-1 text-xs text-gray-700 has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50 dark:border-white/10 dark:text-gray-300 dark:has-[:checked]:bg-primary-500/10">
                     <input type="checkbox" data-warnings-chip value="{{ $warningEventName }}" checked class="h-3.5 w-3.5 rounded border-gray-300 dark:border-white/20">
                     <span>{{ $warningEventName }}</span>
                 </label>
@@ -416,7 +416,7 @@
                     const ends = document.createElement('span');
 
                     button.type = 'button';
-                    button.className = 'flex w-full items-start gap-2 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/5';
+                    button.className = 'flex min-h-10 w-full items-start gap-2 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/5';
                     swatch.className = 'mt-1 inline-block h-3 w-3 shrink-0 rounded-sm';
                     swatch.style.backgroundColor = safeColor(entry.color);
                     swatch.setAttribute('aria-hidden', 'true');

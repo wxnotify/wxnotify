@@ -7,7 +7,7 @@
     viewer turns it on. Outside text (event names, headlines, areas) goes in with textContent only.
 --}}
 @php
-    $layerSelectClasses = 'block rounded-lg border-gray-300 bg-white py-1.5 text-sm text-gray-950 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white';
+    $layerSelectClasses = 'block min-h-10 rounded-lg border-gray-300 bg-white py-1.5 text-sm text-gray-950 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white';
     $layerToggleClasses = 'h-4 w-4 rounded border-gray-300 dark:border-white/20';
     $outlookDays = $this->getLayersConfig()['outlook_days'];
 @endphp
@@ -22,15 +22,15 @@
 
     <fieldset class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-700 dark:text-gray-300">
         <legend class="mb-1 font-medium">SPC layers</legend>
-        <label class="inline-flex cursor-pointer items-center gap-1.5">
+        <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
             <input type="checkbox" data-layer-toggle="watches" class="{{ $layerToggleClasses }}">
             <span>Tornado and severe thunderstorm watches</span>
         </label>
-        <label class="inline-flex cursor-pointer items-center gap-1.5">
+        <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
             <input type="checkbox" data-layer-toggle="outlook" class="{{ $layerToggleClasses }}">
             <span>Convective outlook</span>
         </label>
-        <label class="inline-flex cursor-pointer items-center gap-1.5">
+        <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
             <input type="checkbox" data-layer-toggle="discussions" class="{{ $layerToggleClasses }}">
             <span>Mesoscale Discussions</span>
         </label>

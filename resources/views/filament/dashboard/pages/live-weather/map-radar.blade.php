@@ -5,8 +5,8 @@
     straight from NOAA's WMS. Nothing here is asked for while the page renders.
 --}}
 @php
-    $selectClasses = 'block rounded-lg border-gray-300 bg-white py-1.5 text-sm text-gray-950 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white';
-    $buttonClasses = 'inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-950 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10';
+    $selectClasses = 'block min-h-10 rounded-lg border-gray-300 bg-white py-1.5 text-sm text-gray-950 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white';
+    $buttonClasses = 'inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-950 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10';
 @endphp
 
 <div wire:ignore data-radar-controls class="mt-3 space-y-3">
