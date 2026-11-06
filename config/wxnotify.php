@@ -118,6 +118,9 @@ return [
         'radar' => [
             'wms_url' => 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows',
             'layer' => 'conus_bref_qcd',
+            'site_wms_url' => 'https://opengeo.ncep.noaa.gov/geoserver/{site}/ows',
+            'site_reflectivity_layer' => '{site}_sr_bref',
+            'site_velocity_layer' => '{site}_sr_bvel',
         ],
         'attribution' => 'USGS The National Map · NOAA/NWS MRMS',
     ],
