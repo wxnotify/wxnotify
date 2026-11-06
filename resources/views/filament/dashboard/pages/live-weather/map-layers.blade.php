@@ -121,6 +121,10 @@
                 return 'The Day ' + day + ' convective outlook is unavailable right now.';
             }
 
+            function outlookLoading(day) {
+                return 'Loading the Day ' + day + ' outlook…';
+            }
+
             // A day with no areas is a genuine quiet day (only an available answer reaches here).
             function outlookStatus(formatter, day, issuedAt, count) {
                 if (count === 0) { return 'No thunderstorm areas in the Day ' + day + ' outlook.'; }
@@ -292,17 +296,19 @@
                 function drawEntries(kind, entries, style) {
                     const group = layers.groups[kind];
                     const next = new Map();
-
-                    group.clearLayers();
-
-                    entries.forEach((entry) => {
+                    // Built before the swap, like the outlook, so a refused geometry keeps the
+                    // last good drawing whole.
+                    const built = entries.map((entry) => {
                         const layer = L.geoJSON(entry.geometry, { pane: PANES[kind].name, style: style(entry) });
 
                         layer.on('click', (event) => openPopup(kind, entry.id, event.latlng));
-                        group.addLayer(layer);
                         next.set(entry.id, entry);
+
+                        return layer;
                     });
 
+                    group.clearLayers();
+                    built.forEach((layer) => group.addLayer(layer));
                     layers.entries[kind] = next;
 
                     // An open popup shows the latest text of its entry, or closes when it is gone.
@@ -315,20 +321,22 @@
                     }
                 }
 
+                // Every area is built before any is swapped in, so a geometry Leaflet refuses
+                // leaves the last good drawing whole rather than half replaced.
                 function drawOutlook(features) {
                     const group = layers.groups.outlook;
-
-                    group.clearLayers();
-
-                    features.forEach((feature) => {
+                    const built = features.map((feature) => {
                         const color = shared.safeColor(feature.color);
 
-                        group.addLayer(L.geoJSON(feature.geometry, {
+                        return L.geoJSON(feature.geometry, {
                             pane: PANES.outlook.name,
                             interactive: false,
                             style: { color: color, weight: 1, opacity: 0.8, fillColor: color, fillOpacity: 0.3 },
-                        }));
+                        });
                     });
+
+                    group.clearLayers();
+                    built.forEach((layer) => group.addLayer(layer));
                 }
 
                 function clearOutlook() {
@@ -478,6 +486,8 @@
                     layers.choices.day = day;
                     storeChoices(layers.choices);
                     setNotice('outlook', '');
+                    // The last day's issue time no longer describes what is asked for.
+                    ui.status.textContent = outlookLoading(day);
                     refreshOutlook();
                 });
 
@@ -528,7 +538,7 @@
                 destroy: destroy,
                 // Pure helpers, exposed for checks outside the page.
                 helpers: {
-                    startingChoices: startingChoices, outlookStatus: outlookStatus, outlookUnavailable: outlookUnavailable,
+                    startingChoices: startingChoices, outlookStatus: outlookStatus, outlookUnavailable: outlookUnavailable, outlookLoading: outlookLoading,
                     isOutlookFeature: isOutlookFeature, isDiscussion: isDiscussion, noticeText: noticeText, discussionContent: discussionContent,
                 },
             };

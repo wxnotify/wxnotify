@@ -349,13 +349,54 @@ test('an outlook day whose categorical file failed is unavailable, never a quiet
     'an HTML error page' => [['www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson' => '<html>busy</html>']],
 ]);
 
-test('an outlook day outside 1 to 3 is unavailable without asking SPC', function (int $day) {
+test('an outlook day outside 1 to 3, or not a whole number, is unavailable without asking SPC', function (mixed $day) {
     Http::fake(['www.spc.noaa.gov/*' => Http::response(liveWeatherMapOutlookFile(['TSTM']))]);
     $this->actingAs(User::factory()->create());
 
     expect(livewire(Map::class)->instance()->spcOutlook($day))->toBe(['available' => false, 'issued_at' => null, 'features' => []]);
     Http::assertNothingSent();
-})->with([0, 4, -1]);
+})->with([0, 4, -1, '1; drop', 'abc', 1.5, null, [[1]]]);
+
+test('an outlook day is asked of SPC once per cache period, available or not, and stays unavailable from the cache', function () {
+    Cache::flush();
+    Http::fake([
+        'www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson' => Http::response(liveWeatherMapOutlookFile(['SLGT'])),
+        'www.spc.noaa.gov/*' => Http::response('', 404),
+    ]);
+    $this->actingAs(User::factory()->create());
+    $page = livewire(Map::class)->instance();
+
+    $dayOne = [$page->spcOutlook(1), $page->spcOutlook(1)];
+    Http::assertSentCount(15);
+
+    $dayTwo = [$page->spcOutlook(2), $page->spcOutlook(2)];
+    Http::assertSentCount(30);
+
+    expect(array_column($dayOne, 'available'))->toBe([true, true])
+        ->and(array_column($dayOne[1]['features'], 'label'))->toBe(['SLGT'])
+        ->and($dayTwo[1])->toBe(['available' => false, 'issued_at' => null, 'features' => []]);
+});
+
+test('an unavailable outlook day is asked again after a minute, an available one after two', function () {
+    Cache::flush();
+    Http::fake([
+        'www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson' => Http::response(liveWeatherMapOutlookFile(['SLGT'])),
+        'www.spc.noaa.gov/*' => Http::response('', 404),
+    ]);
+    $this->actingAs(User::factory()->create());
+    $page = livewire(Map::class)->instance();
+    $page->spcOutlook(1);
+    $page->spcOutlook(2);
+
+    $this->travel(61)->seconds();
+    $page->spcOutlook(1);
+    $page->spcOutlook(2);
+    Http::assertSentCount(45);
+
+    $this->travel(60)->seconds();
+    $page->spcOutlook(1);
+    Http::assertSentCount(60);
+});
 
 test('the mesoscale discussions method gives the current discussions', function () {
     $this->travelTo('2026-08-20 23:58:00');

@@ -125,3 +125,42 @@ test('the newest discussion comes first', function () {
 
     expect(array_column((new GetActiveMesoscaleDiscussions)(), 'id'))->toBe([$newer->id, $older->id]);
 });
+
+/**
+ * The opening of real SPC Mesoscale Discussions (2441 and 2439, November 2026), trimmed after the
+ * Valid line, with SPC's own mixed case, wrapping and trailing spaces.
+ *
+ * @return array<string, string>
+ */
+function mesoscaleDiscussionRealTexts(): array
+{
+    return [
+        '2441' => "128\nACUS11 KWNS 031742\nSWOMCD\nSPC MCD 031741 \nLAZ000-ARZ000-TXZ000-031915-\n\n"
+            ."Mesoscale Discussion 2441\nNWS Storm Prediction Center Norman OK\n1141 AM CST Tue Nov 03 2026\n\n"
+            ."Areas affected...east Texas...northwest Louisiana...and far southern\nArkansas\n\n"
+            ."Concerning...Severe potential...Watch unlikely \n\nValid 031741Z - 031915Z\n\n"
+            ."Probability of Watch Issuance...20 percent\n",
+        '2439' => "750\nACUS11 KWNS 030321\nSWOMCD\nSPC MCD 030320 \nOKZ000-TXZ000-030445-\n\n"
+            ."Mesoscale Discussion 2439\nNWS Storm Prediction Center Norman OK\n0920 PM CST Mon Nov 02 2026\n\n"
+            ."Areas affected...Portions of central/eastern Oklahoma into far North\nTexas\n\n"
+            ."Concerning...Tornado Watch 701...702...703...\n\nValid 030320Z - 030445Z\n\n"
+            ."The severe weather threat for Tornado Watch 701, 702, 703 continues.\n",
+    ];
+}
+
+test('real mixed-case discussion text gives its number, its whole wrapped areas line and its true end', function (string $number, string $receivedAt, string $areas, string $expires) {
+    $this->travelTo($receivedAt);
+    mesoscaleDiscussionCreate(['received_at' => $receivedAt, 'text' => mesoscaleDiscussionRealTexts()[$number]]);
+
+    expect((new GetActiveMesoscaleDiscussions)()[0])->toMatchArray(['number' => $number, 'areas' => $areas, 'expires' => $expires]);
+})->with([
+    '2441' => ['2441', '2026-11-03 17:42:10', 'east Texas...northwest Louisiana...and far southern Arkansas', '2026-11-03T19:15:00+00:00'],
+    '2439' => ['2439', '2026-11-03 03:21:38', 'Portions of central/eastern Oklahoma into far North Texas', '2026-11-03T04:45:00+00:00'],
+]);
+
+test('a wrapped areas line is joined with single spaces before it is cut to 160 characters', function () {
+    $this->travelTo('2026-08-20 23:58:00');
+    mesoscaleDiscussionCreate(['text' => mesoscaleDiscussionText(areas: str_repeat('ABCDEFGHIJ', 10)."   \n   ".str_repeat('KLMNOPQRST', 10))]);
+
+    expect((new GetActiveMesoscaleDiscussions)()[0]['areas'])->toBe(substr(str_repeat('ABCDEFGHIJ', 10).' '.str_repeat('KLMNOPQRST', 10), 0, 160));
+});

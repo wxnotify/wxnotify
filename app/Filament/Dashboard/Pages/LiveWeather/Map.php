@@ -14,6 +14,7 @@ use App\Support\Timezones;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Renderless;
@@ -46,6 +47,12 @@ class Map extends Page
      * The convective outlook days the map offers (the ones with a categorical layer).
      */
     protected const OUTLOOK_DAYS = [1, 2, 3];
+
+    protected const OUTLOOK_CACHE_SECONDS = 120;
+
+    protected const UNAVAILABLE_OUTLOOK_CACHE_SECONDS = 60;
+
+    protected const UNAVAILABLE_OUTLOOK = ['available' => false, 'issued_at' => null, 'features' => []];
 
     protected string $view = 'filament.dashboard.pages.live-weather.map';
 
@@ -198,37 +205,40 @@ class Map extends Page
 
     /**
      * The categorical convective outlook of a day, each area with its fill colour. The day comes
-     * from the browser: one outside OUTLOOK_DAYS is unavailable without asking SPC. A day, or its
-     * categorical file, that SPC could not give is unavailable too, never a quiet day; an
-     * available day with no areas is one.
+     * from the browser: anything but a whole number in OUTLOOK_DAYS is unavailable without asking
+     * SPC. A day, or its categorical file, that SPC could not give is unavailable too, never a
+     * quiet day; an available day with no areas is one. Each day's answer is kept for a while
+     * (a shorter while when unavailable), so open maps do not refetch every SPC file while one of
+     * them is failing (FetchSpcOutlooks caches only a complete result).
      *
-     * @return array{available: bool, issued_at: ?string, features: list<array{label: string, color: string, geometry: array<string, mixed>}>}
+     * @return array{
+     *     available: bool,
+     *     issued_at: ?string,
+     *     features: list<array{label: string, color: string, geometry: array<string, mixed>}>,
+     * }
      */
     #[Renderless]
-    public function spcOutlook(int $day): array
+    public function spcOutlook(mixed $day): array
     {
-        $unavailable = ['available' => false, 'issued_at' => null, 'features' => []];
+        $validator = Validator::make(['day' => $day], [
+            'day' => ['required', 'integer', Rule::in(self::OUTLOOK_DAYS)],
+        ]);
 
-        if (! in_array($day, self::OUTLOOK_DAYS, true)) {
-            return $unavailable;
+        if ($validator->fails()) {
+            return self::UNAVAILABLE_OUTLOOK;
         }
 
-        $outlook = app(FetchSpcOutlooks::class)()["day_{$day}"] ?? null;
-        $areas = $outlook['layers']['cat'] ?? null;
+        $key = 'live-map-spc-outlook-day-'.(int) $day;
+        $cached = Cache::get($key);
 
-        if (! is_array($areas)) {
-            return $unavailable;
+        if (is_array($cached)) {
+            return $cached;
         }
 
-        return [
-            'available' => true,
-            'issued_at' => $outlook['issued_at'] ?? null,
-            'features' => array_map(fn (array $area): array => [
-                'label' => $area['label'],
-                'color' => SpcOutlookColors::for($area['label']),
-                'geometry' => $area['geometry'],
-            ], $areas),
-        ];
+        $outlook = $this->outlookDay((int) $day);
+        Cache::put($key, $outlook, $outlook['available'] ? self::OUTLOOK_CACHE_SECONDS : self::UNAVAILABLE_OUTLOOK_CACHE_SECONDS);
+
+        return $outlook;
     }
 
     /**
@@ -240,6 +250,29 @@ class Map extends Page
     public function mesoscaleDiscussions(): array
     {
         return ['status' => 'ok', 'discussions' => app(GetActiveMesoscaleDiscussions::class)()];
+    }
+
+    /**
+     * @return array{available: bool, issued_at: ?string, features: list<array{label: string, color: string, geometry: array<string, mixed>}>}
+     */
+    protected function outlookDay(int $day): array
+    {
+        $outlook = app(FetchSpcOutlooks::class)()["day_{$day}"] ?? null;
+        $areas = $outlook['layers']['cat'] ?? null;
+
+        if (! is_array($areas)) {
+            return self::UNAVAILABLE_OUTLOOK;
+        }
+
+        return [
+            'available' => true,
+            'issued_at' => $outlook['issued_at'] ?? null,
+            'features' => array_map(fn (array $area): array => [
+                'label' => $area['label'],
+                'color' => SpcOutlookColors::for($area['label']),
+                'geometry' => $area['geometry'],
+            ], $areas),
+        ];
     }
 
     /**

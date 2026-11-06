@@ -9,8 +9,10 @@ use Carbon\CarbonInterface;
 /**
  * The SPC Mesoscale Discussions in effect, for the Live map: live (not test, not a replay copy)
  * ingested products of the catalog product SPC.MD received in the last 12 hours that carry a
- * drawable polygon, newest first. Each discussion ends at the end of its "VALID ddhhmmZ - ddhhmmZ"
- * line, else three hours after it arrived; ended ones are left out. The text is outside input, so
+ * drawable polygon, newest first. Current SPC text is mixed case ("Mesoscale Discussion 2441",
+ * "Areas affected...", "Valid ...") and older or EMWIN text upper case, so every pattern ignores
+ * case. Each discussion ends at the end of its "Valid ddhhmmZ - ddhhmmZ" line, else three hours
+ * after it arrived; ended ones are left out. The text is outside input, so
  * a piece that cannot be read is null (or the default end), never an exception.
  */
 class GetActiveMesoscaleDiscussions
@@ -67,7 +69,7 @@ class GetActiveMesoscaleDiscussions
 
         return [
             'id' => $product->id,
-            'number' => preg_match('/^\s*MESOSCALE DISCUSSION\s+(\d{1,5})\b/m', $text, $match) === 1 ? $match[1] : null,
+            'number' => preg_match('/^\s*MESOSCALE DISCUSSION\s+(\d{1,5})\b/im', $text, $match) === 1 ? $match[1] : null,
             'areas' => $this->areas($text),
             'expires' => $expires->toIso8601String(),
             'view_url' => $product->viewUrl(),
@@ -75,13 +77,17 @@ class GetActiveMesoscaleDiscussions
         ];
     }
 
+    /**
+     * The "Areas affected..." text up to the next blank line (SPC wraps it), its whitespace
+     * collapsed to single spaces, cut to AREAS_MAX_LENGTH.
+     */
     private function areas(string $text): ?string
     {
-        if (preg_match('/^\s*AREAS AFFECTED\.\.\.(.*)$/m', $text, $match) !== 1) {
+        if (preg_match('/^\h*AREAS AFFECTED\.\.\.(.*?)(?:\R\h*\R|\z)/ims', $text, $match) !== 1) {
             return null;
         }
 
-        $areas = trim($match[1]);
+        $areas = trim((string) preg_replace('/\s+/', ' ', $match[1]));
 
         return $areas === '' ? null : mb_substr($areas, 0, self::AREAS_MAX_LENGTH);
     }
@@ -92,7 +98,7 @@ class GetActiveMesoscaleDiscussions
      */
     private function validEnd(string $text, CarbonImmutable $receivedAt): ?CarbonInterface
     {
-        if (preg_match('/^\s*VALID\s+\d{6}Z\s*-\s*(\d{2})(\d{2})(\d{2})Z/m', $text, $match) !== 1) {
+        if (preg_match('/^\s*VALID\s+\d{6}Z\s*-\s*(\d{2})(\d{2})(\d{2})Z/im', $text, $match) !== 1) {
             return null;
         }
 
@@ -121,7 +127,7 @@ class GetActiveMesoscaleDiscussions
 
     /**
      * The polygon's points as a closed GeoJSON ring (longitude, latitude), or null when a point is
-     * unreadable or there are fewer than three distinct corners.
+     * unreadable or the closed ring has fewer than four points (three corners and the closing one).
      *
      * @return list<array{0: float, 1: float}>|null
      */
