@@ -68,15 +68,33 @@ test('a row carries the name, office, headline, category and public page link', 
     ])->and($row['view_url'])->toStartWith('https://products.example.com/');
 });
 
-test('the View link shows only for an https public page', function () {
+test('the product name is the row link, only for an https public page', function () {
     config(['wxnotify.product_domain' => 'products.example.com']);
-    liveProductsMake(['cccc' => 'ktbw']);
+    $ingested = liveProductsMake(['cccc' => 'ktbw'], ProductFamily::Warning);
+    $name = $ingested->product->name;
+    $href = $ingested->fresh()->viewUrl();
 
-    livewire(Products::class)->assertSeeHtml('target="_blank"')->assertSeeHtml('rel="noopener"');
+    livewire(Products::class)
+        ->assertSeeHtml('<a href="'.e($href).'" target="_blank" rel="noopener"')
+        ->assertSeeHtmlInOrder(['data-row-link>', e($name), '</a>'])
+        ->assertDontSeeHtml('>View</a>');
 
     config(['wxnotify.product_domain' => null, 'app.url' => 'http://localhost']);
 
-    livewire(Products::class)->assertDontSeeHtml('target="_blank"');
+    livewire(Products::class)
+        ->assertDontSeeHtml('target="_blank"')
+        ->assertDontSeeHtml('data-row-link')
+        ->assertSee($name);
+});
+
+test('a product name is escaped inside the row link', function () {
+    config(['wxnotify.product_domain' => 'products.example.com']);
+    $ingested = liveProductsMake(['cccc' => 'ktbw'], ProductFamily::Warning);
+    $ingested->product->update(['name' => '<script>x</script>']);
+
+    livewire(Products::class)
+        ->assertSeeHtml('&lt;script&gt;x&lt;/script&gt;</a>')
+        ->assertDontSeeHtml('<script>x</script>');
 });
 
 test('onProductIngested puts a fresh product at the top and a repeat adds nothing', function () {

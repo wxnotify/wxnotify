@@ -61,11 +61,20 @@
         @else
             <ul class="divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-950/5 dark:divide-white/10 dark:bg-gray-900 dark:ring-white/10" data-product-list>
                 @foreach ($rows as $row)
-                    <li wire:key="product-{{ $row['id'] }}" class="relative isolate flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3" data-product-row>
+                    @php
+                        $linked = $row['view_url'] && str_starts_with($row['view_url'], 'https://');
+                    @endphp
+                    <li wire:key="product-{{ $row['id'] }}" @class(['relative isolate flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3', 'hover:bg-gray-50 dark:hover:bg-white/5' => $linked]) data-product-row>
                         <span aria-hidden="true" x-show="isFresh({{ (int) $row['id'] }})" x-cloak x-bind:class="fadeClass()" class="pointer-events-none absolute inset-0 -z-10 bg-primary-50 dark:bg-primary-500/10" data-fresh-tint></span>
                         <span x-show="isFresh({{ (int) $row['id'] }})" x-cloak class="pointer-events-none absolute bottom-0.5 right-2 rounded-full bg-primary-50 px-1.5 text-[10px] font-semibold leading-4 text-primary-700 ring-1 ring-inset ring-primary-600/30 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30" data-fresh-badge>New</span>
                         <div class="min-w-0 flex-1">
-                            <p class="text-sm font-medium text-gray-950 dark:text-white">{{ $row['name'] }}</p>
+                            <p class="text-sm font-medium text-gray-950 dark:text-white">
+                                @if ($linked)
+                                    <a href="{{ $row['view_url'] }}" target="_blank" rel="noopener" class="outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary-600 dark:focus-visible:after:ring-primary-400" data-row-link>{{ $row['name'] }}</a>
+                                @else
+                                    {{ $row['name'] }}
+                                @endif
+                            </p>
                             <p class="text-xs text-gray-500 dark:text-gray-400">
                                 {{ \Illuminate\Support\Carbon::parse($row['issued_at'])->setTimezone($timezone)->format('M j, g:i A T') }}
                                 @if ($row['office'])
@@ -77,9 +86,6 @@
                                 <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">{{ $row['headline'] }}</p>
                             @endif
                         </div>
-                        @if ($row['view_url'] && str_starts_with($row['view_url'], 'https://'))
-                            <a href="{{ $row['view_url'] }}" target="_blank" rel="noopener" class="text-sm font-medium text-primary-600 hover:underline dark:text-primary-400">View</a>
-                        @endif
                     </li>
                 @endforeach
             </ul>
