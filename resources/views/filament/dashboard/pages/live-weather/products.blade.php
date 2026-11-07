@@ -8,55 +8,57 @@
         x-effect="if (! scrolled && $wire.pending > 0) { $wire.pending = 0; }"
         x-data="wxLiveProducts"
     >
-        <div class="mb-3 flex flex-wrap items-center justify-end gap-2">
-            <span
-                role="status"
-                aria-live="polite"
-                data-connection-status
-                class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset"
-                x-bind:class="{
-                    'bg-green-50 text-green-800 ring-green-600/30 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-400/30': ! paused && status === 'live',
-                    'bg-amber-50 text-amber-800 ring-amber-600/30 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30': ! paused && status === 'connecting',
-                    'bg-gray-100 text-gray-700 ring-gray-500/30 dark:bg-white/10 dark:text-gray-300 dark:ring-white/20': paused || status === 'offline',
-                }"
-            >
-                <span aria-hidden="true" class="size-2 rounded-full bg-current"></span>
-                <span x-text="paused ? 'Paused' : label">Offline: refreshing every minute</span>
-                <span aria-hidden="true" data-paused-count x-show="paused && missed > 0" x-cloak x-text="'· ' + missed + ' new'"></span>
-            </span>
-            <button
-                type="button"
-                data-pause-toggle
-                aria-label="Pause live updates"
-                x-bind:aria-label="paused ? 'Resume live updates' : 'Pause live updates'"
-                x-on:click="paused ? resume() : pause()"
-                class="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:ring-white/20 dark:hover:bg-white/5"
-            >
-                <span aria-hidden="true" x-show="! paused"><x-filament::icon icon="heroicon-m-pause" class="size-4" /></span>
-                <span aria-hidden="true" x-show="paused" x-cloak><x-filament::icon icon="heroicon-m-play" class="size-4" /></span>
-                <span x-text="paused ? 'Resume' : 'Pause'">Pause</span>
-            </button>
-        </div>
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2" data-products-toolbar>
+            <div class="flex flex-wrap gap-2" data-category-chips>
+                @foreach ($this->getCategoryOptions() as $option)
+                    @php
+                        $active = in_array($option['value'], $categories, true);
+                        $next = $active
+                            ? array_values(array_diff($categories, [$option['value']]))
+                            : [...$categories, $option['value']];
+                    @endphp
+                    <button
+                        type="button"
+                        wire:click="setCategories(@js($next))"
+                        aria-pressed="{{ $active ? 'true' : 'false' }}"
+                        @class([
+                            'rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset',
+                            'bg-primary-600 text-white ring-primary-600' => $active,
+                            'bg-white text-gray-700 ring-gray-300 dark:bg-gray-900 dark:text-gray-300 dark:ring-white/20' => ! $active,
+                        ])
+                    >{{ $option['label'] }}</button>
+                @endforeach
+            </div>
 
-        <div class="mb-4 flex flex-wrap gap-2" data-category-chips>
-            @foreach ($this->getCategoryOptions() as $option)
-                @php
-                    $active = in_array($option['value'], $categories, true);
-                    $next = $active
-                        ? array_values(array_diff($categories, [$option['value']]))
-                        : [...$categories, $option['value']];
-                @endphp
+            <div class="ml-auto flex flex-wrap items-center justify-end gap-2" data-live-controls>
+                <span
+                    role="status"
+                    aria-live="polite"
+                    data-connection-status
+                    class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset"
+                    x-bind:class="{
+                        'bg-green-50 text-green-800 ring-green-600/30 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-400/30': ! paused && status === 'live',
+                        'bg-amber-50 text-amber-800 ring-amber-600/30 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30': ! paused && status === 'connecting',
+                        'bg-gray-100 text-gray-700 ring-gray-500/30 dark:bg-white/10 dark:text-gray-300 dark:ring-white/20': paused || status === 'offline',
+                    }"
+                >
+                    <span aria-hidden="true" class="size-2 rounded-full bg-current"></span>
+                    <span x-text="paused ? 'Paused' : label">Offline: refreshing every minute</span>
+                    <span aria-hidden="true" data-paused-count x-show="paused && missed > 0" x-cloak x-text="'· ' + missed + ' new'"></span>
+                </span>
                 <button
                     type="button"
-                    wire:click="setCategories(@js($next))"
-                    aria-pressed="{{ $active ? 'true' : 'false' }}"
-                    @class([
-                        'rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset',
-                        'bg-primary-600 text-white ring-primary-600' => $active,
-                        'bg-white text-gray-700 ring-gray-300 dark:bg-gray-900 dark:text-gray-300 dark:ring-white/20' => ! $active,
-                    ])
-                >{{ $option['label'] }}</button>
-            @endforeach
+                    data-pause-toggle
+                    aria-label="Pause live updates"
+                    x-bind:aria-label="paused ? 'Resume live updates' : 'Pause live updates'"
+                    x-on:click="paused ? resume() : pause()"
+                    class="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:ring-white/20 dark:hover:bg-white/5"
+                >
+                    <span aria-hidden="true" x-show="! paused"><x-filament::icon icon="heroicon-m-pause" class="size-4" /></span>
+                    <span aria-hidden="true" x-show="paused" x-cloak><x-filament::icon icon="heroicon-m-play" class="size-4" /></span>
+                    <span x-text="paused ? 'Resume' : 'Pause'">Pause</span>
+                </button>
+            </div>
         </div>
 
         <div

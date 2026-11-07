@@ -490,6 +490,22 @@ test('the page has an accessible pause and resume button beside the status chip 
         ->and(strpos($html, 'data-connection-status'))->toBeLessThan(strpos($html, 'data-pause-toggle'));
 });
 
+test('the category chips, the status chip and the pause button share one toolbar, chips first', function () {
+    $this->withoutVite();
+
+    $html = livewire(Products::class)->assertSuccessful()->html();
+    $toolbar = strpos($html, 'data-products-toolbar');
+    $toolbarEnd = strpos($html, 'x-show="scrolled && $wire.pending > 0"');
+
+    expect($toolbar)->not->toBeFalse()
+        ->and(strpos($html, 'data-category-chips'))->toBeGreaterThan($toolbar)
+        ->and(strpos($html, 'data-connection-status'))->toBeGreaterThan(strpos($html, 'data-category-chips'))
+        ->and(strpos($html, 'data-pause-toggle'))->toBeGreaterThan(strpos($html, 'data-connection-status'))
+        ->and(strpos($html, 'data-pause-toggle'))->toBeLessThan($toolbarEnd)
+        ->and($html)->toContain('flex-wrap items-center justify-between')
+        ->toContain('ml-auto flex flex-wrap items-center justify-end');
+});
+
 test('while paused no fetch is made and events are only counted, and resume makes the one catch-up', function () {
     $this->withoutVite();
 
