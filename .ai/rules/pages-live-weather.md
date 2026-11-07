@@ -2,6 +2,7 @@
 paths:
   - 'resources/views/filament/dashboard/pages/live-weather/**'
   - resources/views/filament/dashboard/pages/live-weather/products.blade.php
+  - resources/views/filament/dashboard/pages/live-weather/map-recenter.blade.php
 ---
 
 # Pages Live Weather
@@ -20,3 +21,6 @@ The dot (`data-live-dot`) pulses via `.wx-live-dot-pulse` only when `! paused &&
 
 ## Products status chip is teleported into the page title
 The status chip is not in the toolbar: it is teleported (x-teleport) from the Alpine root into `[data-page-title-slot]` beside the h1 (Products::getHeader() view), and that slot must keep wire:ignore or Livewire morphs the chip away. Inside the teleported chip use x-bind:hidden, not x-show/x-cloak. The Browser pane never fires requestAnimationFrame, so Alpine's x-show does not update there; do not conclude a bug from the pane alone.
+
+## Live map recenter button
+The button (window.wxLiveMapRecenter) returns to state.opening (the page's data-center/data-zoom), takes its name from config.recenter.label (decided server-side in Map::getRecenterConfig(): "Back to my location" for a saved place, "Reset the map view" for the default US view), uses setView animate:false under prefers-reduced-motion, and starts inside startModule's try/catch. Never ask for browser geolocation.
