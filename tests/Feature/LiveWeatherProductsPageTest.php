@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\User;
 use App\Support\LiveProductCategory;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 
 use function Pest\Livewire\livewire;
 
@@ -77,10 +79,10 @@ test('the View link shows only for an https public page', function () {
 });
 
 test('onProductIngested puts a fresh product at the top and a repeat adds nothing', function () {
+    $component = livewire(Products::class);
     liveProductsMake(['received_at' => now()->subHour()]);
     $fresh = liveProductsMake(['received_at' => now()]);
 
-    $component = livewire(Products::class)->set('rows', []);
     $component->call('onProductIngested', ['id' => $fresh->id])
         ->call('onProductIngested', ['id' => $fresh->id]);
 
@@ -88,11 +90,11 @@ test('onProductIngested puts a fresh product at the top and a repeat adds nothin
 });
 
 test('an out-of-order older product lands in order', function () {
+    $component = livewire(Products::class);
     $older = liveProductsMake(['received_at' => now()->subHours(2)]);
     $newest = liveProductsMake(['received_at' => now()]);
     $middle = liveProductsMake(['received_at' => now()->subHour()]);
 
-    $component = livewire(Products::class)->set('rows', []);
     $component->call('onProductIngested', ['id' => $newest->id])
         ->call('onProductIngested', ['id' => $older->id])
         ->call('onProductIngested', ['id' => $middle->id]);
@@ -101,7 +103,7 @@ test('an out-of-order older product lands in order', function () {
 });
 
 test('the list never exceeds 100 rows', function () {
-    $component = livewire(Products::class)->set('rows', []);
+    $component = livewire(Products::class);
 
     foreach (range(1, 101) as $minute) {
         $product = liveProductsMake(['received_at' => now()->subMinutes(200 - $minute)]);
@@ -113,10 +115,10 @@ test('the list never exceeds 100 rows', function () {
 });
 
 test('a payload for a test product, a replay, a missing id or garbage adds nothing', function () {
+    $component = livewire(Products::class);
     $test = liveProductsMake(['is_test' => true]);
     $replay = liveProductsMake(['replay_of_id' => liveProductsMake()->id]);
 
-    $component = livewire(Products::class)->set('rows', []);
     $component->call('onProductIngested', ['id' => $test->id])
         ->call('onProductIngested', ['id' => $replay->id])
         ->call('onProductIngested', ['id' => 999999])
@@ -189,4 +191,104 @@ test('product names and offices are escaped, never rendered as HTML', function (
     livewire(Products::class)
         ->assertSee('<script>x</script>', escape: true)
         ->assertDontSeeHtml('<script>x</script>');
+});
+
+test('the client resets pending whenever the viewer is not scrolled down', function () {
+    livewire(Products::class)
+        ->assertSeeHtml('x-effect="if (! scrolled && $wire.pending > 0) { $wire.pending = 0; }"')
+        ->assertSeeHtml('x-show="scrolled && $wire.pending > 0"');
+});
+
+test('pending counts only a product that made it into the capped list', function () {
+    $component = livewire(Products::class);
+    foreach (range(1, 100) as $minute) {
+        $product = liveProductsMake(['received_at' => now()->subMinutes(10 + $minute)]);
+        $component->call('onProductIngested', ['id' => $product->id]);
+    }
+    $oldest = liveProductsMake(['received_at' => now()->subYear()]);
+
+    $component->call('onProductIngested', ['id' => $oldest->id]);
+
+    expect($component->get('rows'))->toHaveCount(100)
+        ->and(array_column($component->get('rows'), 'id'))->not->toContain($oldest->id)
+        ->and($component->get('pending'))->toBe(100);
+});
+
+test('rows and categories cannot be written from the browser', function () {
+    expect(fn () => livewire(Products::class)->set('rows', []))->toThrow('Cannot update locked property')
+        ->and(fn () => livewire(Products::class)->set('categories', ['other']))->toThrow('Cannot update locked property');
+});
+
+test('garbage arguments never throw and change nothing', function () {
+    liveProductsMake();
+    $component = livewire(Products::class);
+    $before = $component->get('rows');
+
+    foreach (['abc', -5, null, ['x'], '9999999999999999999999', 1.5] as $garbage) {
+        $component->call('fetchSince', $garbage)->assertSuccessful();
+    }
+    $component->call('setCategories', 'other')->call('setCategories', [['x'], 5])->call('setCategories', [null]);
+
+    expect($component->get('rows'))->toBe($before)
+        ->and($component->get('categories'))->toHaveCount(3);
+});
+
+test('the query budget is 120 calls a minute per viewer, shared by fetchSince and setCategories, and does no query once spent', function () {
+    $product = liveProductsMake();
+    $component = livewire(Products::class);
+
+    foreach (range(1, 60) as $i) {
+        $component->call('fetchSince', $product->id)->call('setCategories', ['other', 'warnings_and_watches', 'outlooks_and_discussions']);
+    }
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+    $component->call('fetchSince', 0);
+    $limitedQueries = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'ingested_products'))->count();
+    DB::disableQueryLog();
+
+    expect($limitedQueries)->toBe(0)
+        ->and($component->get('rows'))->toHaveCount(1);
+
+    $component->call('setCategories', ['other']);
+    expect($component->get('categories'))->toHaveCount(3);
+
+    $this->travel(61)->seconds();
+    $component->call('setCategories', ['other']);
+    expect($component->get('categories'))->toBe(['other']);
+});
+
+test('another viewer has their own query budget', function () {
+    $product = liveProductsMake();
+    $first = User::factory()->create();
+    RateLimiter::hit('live-products-query:'.$first->id, 60);
+    foreach (range(1, 120) as $i) {
+        RateLimiter::hit('live-products-query:'.$first->id, 60);
+    }
+
+    $this->actingAs($first);
+    expect(livewire(Products::class)->call('fetchSince', 0)->get('rows'))->toHaveCount(1);
+
+    $other = User::factory()->create();
+    $this->actingAs($other);
+    $component = livewire(Products::class)->set('pending', 0);
+    $component->call('setCategories', ['other']);
+    expect($component->get('categories'))->toBe(['other']);
+});
+
+test('the live listener has its own larger budget that fetchSince exhaustion does not touch', function () {
+    $product = liveProductsMake();
+    $component = livewire(Products::class);
+    foreach (range(1, 121) as $i) {
+        RateLimiter::hit('live-products-query:'.auth()->id(), 60);
+    }
+
+    foreach (range(1, 130) as $i) {
+        $component->call('onProductIngested', ['id' => $product->id + 1000 + $i]);
+    }
+    $fresh = liveProductsMake();
+    $component->call('onProductIngested', ['id' => $fresh->id]);
+
+    expect(array_column($component->get('rows'), 'id'))->toContain($fresh->id)
+        ->and($component->call('fetchSince', 0)->get('rows'))->toHaveCount(2);
 });

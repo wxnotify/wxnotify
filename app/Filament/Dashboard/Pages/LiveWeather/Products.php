@@ -2,6 +2,7 @@
 
 namespace App\Filament\Dashboard\Pages\LiveWeather;
 
+use App\Filament\Dashboard\Pages\LiveWeather\Concerns\LimitsDataCalls;
 use App\Models\IngestedProduct;
 use App\Support\IssuingOffice;
 use App\Support\LiveProductCategory;
@@ -11,6 +12,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use UnitEnum;
 
 /**
@@ -23,9 +25,20 @@ use UnitEnum;
  */
 class Products extends Page
 {
+    use LimitsDataCalls;
+
     protected const INITIAL_ROWS = 50;
 
     protected const MAX_ROWS = 100;
+
+    /**
+     * Calls per viewer per minute: fetchSince() and setCategories() share one budget; the live
+     * listener has its own, larger one (it fires once per broadcast) so a busy feed never starves
+     * the others.
+     */
+    protected const QUERY_CALLS_PER_MINUTE = 120;
+
+    protected const LIVE_CALLS_PER_MINUTE = 600;
 
     protected string $view = 'filament.dashboard.pages.live-weather.products';
 
@@ -44,6 +57,7 @@ class Products extends Page
     /**
      * @var list<array<string, mixed>>
      */
+    #[Locked]
     public array $rows = [];
 
     /**
@@ -51,6 +65,7 @@ class Products extends Page
      *
      * @var list<string>
      */
+    #[Locked]
     public array $categories = [];
 
     /**
@@ -72,6 +87,10 @@ class Products extends Page
      */
     public function onProductIngested(array $payload): void
     {
+        if ($this->callLimited('live-products-live', self::LIVE_CALLS_PER_MINUTE)) {
+            return;
+        }
+
         $id = $payload['id'] ?? null;
 
         if (! is_int($id) && ! (is_string($id) && ctype_digit($id))) {
@@ -91,17 +110,27 @@ class Products extends Page
         }
 
         $this->mergeRows($this->buildRows(collect([$product])));
-        $this->pending++;
+
+        if ($this->hasRow($id)) {
+            $this->pending++;
+        }
     }
 
     /**
      * The gap fill: the listable products newer than the given id (newest first, at most 100),
-     * merged into the list and returned.
+     * merged into the list and returned. A non-numeric or negative id, or a call over the budget,
+     * returns nothing without a query.
      *
      * @return list<array<string, mixed>>
      */
-    public function fetchSince(int $lastId): array
+    public function fetchSince(mixed $lastId): array
     {
+        $lastId = is_int($lastId) ? $lastId : (is_string($lastId) && ctype_digit($lastId) && strlen($lastId) <= 18 ? (int) $lastId : -1);
+
+        if ($lastId < 0 || $this->callLimited('live-products-query', self::QUERY_CALLS_PER_MINUTE)) {
+            return [];
+        }
+
         $rows = $this->buildRows(
             $this->listable()->where('ingested_products.id', '>', $lastId)->limit(self::MAX_ROWS)->get()
         );
@@ -112,10 +141,15 @@ class Products extends Page
     }
 
     /**
-     * @param  array<mixed>  $categories
+     * A non-array argument, any non-string or unknown value, or a call over the budget changes
+     * nothing.
      */
-    public function setCategories(array $categories): void
+    public function setCategories(mixed $categories): void
     {
+        if (! is_array($categories) || $this->callLimited('live-products-query', self::QUERY_CALLS_PER_MINUTE)) {
+            return;
+        }
+
         $valid = [];
 
         foreach ($categories as $value) {

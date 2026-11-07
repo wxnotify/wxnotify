@@ -5,6 +5,7 @@
 <x-filament-panels::page>
     <div
         data-live-products
+        x-effect="if (! scrolled && $wire.pending > 0) { $wire.pending = 0; }"
         x-data="{
             scrolled: false,
             init() {

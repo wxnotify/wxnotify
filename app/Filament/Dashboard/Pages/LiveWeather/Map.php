@@ -6,6 +6,7 @@ use App\Actions\Map\GetActiveMesoscaleDiscussions;
 use App\Actions\Map\GetLiveWarnings;
 use App\Actions\Weather\FetchSpcOutlooks;
 use App\Actions\Weather\GetRadarFrames;
+use App\Filament\Dashboard\Pages\LiveWeather\Concerns\LimitsDataCalls;
 use App\Models\Location;
 use App\Support\LiveWarningKinds;
 use App\Support\NexradSites;
@@ -15,7 +16,6 @@ use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Renderless;
@@ -29,6 +29,8 @@ use UnitEnum;
  */
 class Map extends Page
 {
+    use LimitsDataCalls;
+
     protected const DEFAULT_CENTER = [39.83, -98.58];
 
     protected const DEFAULT_ZOOM = 4;
@@ -295,21 +297,13 @@ class Map extends Page
     }
 
     /**
-     * Counts one data call against the viewer's minute and says whether it is over the limit (keyed
-     * on the signed-in user, never the IP). A limited call must do no work; the page shows the
-     * same notice as for any unavailable answer and recovers on the next call that gets through.
+     * Counts one data call against the viewer's minute and says whether it is over the limit. A
+     * limited call must do no work; the page shows the same notice as for any unavailable answer
+     * and recovers on the next call that gets through.
      */
     protected function dataCallLimited(): bool
     {
-        $key = 'live-map-data:'.auth()->id();
-
-        if (RateLimiter::tooManyAttempts($key, self::DATA_CALLS_PER_MINUTE)) {
-            return true;
-        }
-
-        RateLimiter::hit($key, 60);
-
-        return false;
+        return $this->callLimited('live-map-data', self::DATA_CALLS_PER_MINUTE);
     }
 
     /**
