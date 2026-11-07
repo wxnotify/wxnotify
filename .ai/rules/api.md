@@ -1,8 +1,9 @@
 ---
 paths:
-  - 'routes/api.php'
+  - routes/api.php
   - 'app/Http/Controllers/Api/**'
   - 'app/Http/Resources/**'
+  - routes/channels.php
 ---
 
 # API
@@ -51,3 +52,6 @@ Sanctum treats `*` as granting every ability, and `createToken()` defaults to `[
 Mark-all takes a cutoff so it never reads an alert the phone had not loaded: every page of `GET /api/v1/alerts` carries `meta.as_of`, the server time taken BEFORE the request's queries, as ISO-8601 UTC with microseconds (`Y-m-d\TH:i:s.u\Z`); the app sends the one from its last first-page load back as `through` (`MarkAllAppAlertsReadRequest`: nullable string date, at most `MAX_CLOCK_SKEW_MINUTES` = 5 minutes ahead of the server clock, otherwise or malformed 422). With `through`, `MarkAppAlertsRead::all()` reads only the caller's unread successful push rows with `created_at` before it; without it (old app builds, or a new app that never saw an `as_of`) every unread row is read, as before. `delivery_logs.created_at` is `timestamp(0)` and Eloquent writes it truncated to the second, so the comparison is `created_at < through` truncated to its second: a row from the cutoff's own second stays unread (the safe direction; it reappears unread and is cleared by the next mark-all). The response is unchanged: `unread_count` after the write, which includes the newer rows left unread. Keep `as_of` on every page and keep the cutoff optional until no supported app build lacks it.
 
 A tapped push reads its alert by reference, because the push is sent before its delivery row (the id) exists: `POST /api/v1/alerts/read-ref` (`api.v1.alerts.read-ref`, same `ability:app` group and throttle) takes `ref` (`MarkAppAlertReadByRefRequest`: `App\Support\AlertRef::PATTERN`, at most `MAX_LENGTH`; anything else 422) and `MarkAppAlertsRead::byRef()` stamps `read_at` on the caller's unread successful push rows of that group through the shared scope `DeliveryLog::inAlertGroup()` (also used by `FindAppAlert` and `PushBadgeCount`; keep it in step with the mirrors above). A ref is `p.{rule id, 0 = none}.{product id}` or `b.{batch uuid, lowercase}`; a legacy row with neither has none. A ref that matches nothing (row not written yet, another user's group) is a no-op; the answer is always `200 {"data":{"unread_count":N}}`, counted after the write. `PUT /push-token` takes an optional boolean `tap_ref`: stored in the channel's encrypted `config` only when true, replaced on every registration (absent = false), and it decides whether pushes carry the ref (see delivery.md).
+
+## Channel auth mirrors panel access
+`live-products` admits a signed-in user who would pass the dashboard's `verified` middleware (MustVerifyEmail users need a verified email). `/broadcasting/auth` uses the `web` group with CSRF. Under the null broadcaster everyone is authorized, so channel tests must switch the default connection to reverb with dummy keys and re-require this file.
