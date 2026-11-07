@@ -53,7 +53,7 @@
 
         <ul data-warnings-list class="divide-y divide-gray-100 dark:divide-white/5"></ul>
     </div>
-    <details data-spc-section class="border-t border-gray-200 dark:border-white/10">
+    <details open data-spc-section class="border-t border-gray-200 dark:border-white/10">
         <summary class="flex min-h-11 cursor-pointer items-center px-4 py-3 text-sm font-semibold text-gray-950 dark:text-white">SPC</summary>
         <div class="max-h-[40vh] overflow-y-auto">
         <div data-layers-control class="space-y-3 px-4 pb-3">
