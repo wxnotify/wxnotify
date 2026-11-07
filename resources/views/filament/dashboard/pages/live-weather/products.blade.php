@@ -3,6 +3,23 @@
 @endphp
 
 <x-filament-panels::page>
+    <style>
+        @keyframes wx-live-dot-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.25; }
+        }
+
+        .wx-live-dot-pulse {
+            animation: wx-live-dot-pulse 1.8s ease-in-out infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .wx-live-dot-pulse {
+                animation: none;
+            }
+        }
+    </style>
+
     <div
         data-live-products
         x-effect="if (! scrolled && $wire.pending > 0) { $wire.pending = 0; }"
@@ -42,7 +59,7 @@
                         'bg-gray-100 text-gray-700 ring-gray-500/30 dark:bg-white/10 dark:text-gray-300 dark:ring-white/20': paused || status === 'offline',
                     }"
                 >
-                    <span aria-hidden="true" class="size-2 rounded-full bg-current"></span>
+                    <span aria-hidden="true" data-live-dot class="size-2 rounded-full bg-current" x-bind:class="{ 'wx-live-dot-pulse': ! paused && status === 'live' }"></span>
                     <span x-text="paused ? 'Paused' : label">Offline: refreshing every minute</span>
                     <span aria-hidden="true" data-paused-count x-show="paused && missed > 0" x-cloak x-text="'· ' + missed + ' new'"></span>
                 </span>

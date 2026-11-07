@@ -490,6 +490,18 @@ test('the page has an accessible pause and resume button beside the status chip 
         ->and(strpos($html, 'data-connection-status'))->toBeLessThan(strpos($html, 'data-pause-toggle'));
 });
 
+test('the status chip dot pulses only while the chip says Live and respects reduced motion', function () {
+    $this->withoutVite();
+
+    $html = livewire(Products::class)->assertSuccessful()->html();
+
+    expect($html)
+        ->toContain("x-bind:class=\"{ 'wx-live-dot-pulse': ! paused && status === 'live' }\"")
+        ->and(substr_count($html, 'wx-live-dot-pulse\''))->toBe(1)
+        ->and($html)->toContain('@keyframes wx-live-dot-pulse')
+        ->toMatch('/prefers-reduced-motion: reduce\)\s*\{\s*\.wx-live-dot-pulse\s*\{\s*animation: none;/');
+});
+
 test('the category chips, the status chip and the pause button share one toolbar, chips first', function () {
     $this->withoutVite();
 
