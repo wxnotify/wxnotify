@@ -46,7 +46,8 @@
 
             function storeChoices(choices) {
                 try {
-                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(choices));
+                    // Merged over what is stored: the My places layer keeps its own choice in the same object.
+                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.assign({}, readStoredChoices(), choices)));
                 } catch (error) {
                     // Blocked storage only means the choices are not remembered.
                 }

@@ -10,6 +10,7 @@
     $layerSelectClasses = 'block min-h-10 rounded-lg border-gray-300 bg-white py-1.5 text-sm text-gray-950 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white';
     $layerToggleClasses = 'h-4 w-4 rounded border-gray-300 dark:border-white/20';
     $outlookDays = $this->getLayersConfig()['outlook_days'];
+    $placesConfig = $this->getPlacesConfig();
 @endphp
 
 <aside
@@ -102,6 +103,20 @@
                 <span data-outlook-status class="text-xs text-gray-500 dark:text-gray-400"></span>
             </div>
         </div>
+        </div>
+    </details>
+    <details x-data x-init="$el.open = window.matchMedia('(min-width: 1024px)').matches" data-places-section class="border-t border-gray-200 dark:border-white/10">
+        <summary class="flex min-h-11 cursor-pointer items-center px-4 py-3 text-sm font-semibold text-gray-950 dark:text-white">My places</summary>
+        <div data-places-control class="space-y-2 px-4 pb-3 text-sm text-gray-700 dark:text-gray-300">
+            <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
+                <input type="checkbox" data-places-toggle @disabled($placesConfig['places'] === []) class="{{ $layerToggleClasses }} disabled:opacity-50">
+                <span>My locations</span>
+            </label>
+            @if ($placesConfig['places'] === [])
+                <p data-places-empty>No saved locations with a map position yet. <a href="{{ $placesConfig['locations_url'] }}" class="font-medium text-primary-600 underline dark:text-primary-400">My Locations</a></p>
+            @elseif ($placesConfig['truncated'])
+                <p data-places-truncated class="text-xs text-gray-500 dark:text-gray-400">Showing the first {{ count($placesConfig['places']) }} of {{ $placesConfig['total'] }} saved locations.</p>
+            @endif
         </div>
     </details>
 </aside>

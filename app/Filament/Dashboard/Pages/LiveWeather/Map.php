@@ -7,6 +7,7 @@ use App\Actions\Map\GetLiveWarnings;
 use App\Actions\Weather\FetchSpcOutlooks;
 use App\Actions\Weather\GetRadarFrames;
 use App\Filament\Dashboard\Pages\LiveWeather\Concerns\LimitsDataCalls;
+use App\Filament\Dashboard\Resources\Locations\LocationResource;
 use App\Models\Location;
 use App\Support\LiveWarningKinds;
 use App\Support\NexradSites;
@@ -36,6 +37,11 @@ class Map extends Page
     protected const DEFAULT_ZOOM = 4;
 
     protected const PLACE_ZOOM = 8;
+
+    /**
+     * The most saved places the My places layer draws; the rest are left off and the panel says so.
+     */
+    protected const MAX_PLACE_MARKERS = 100;
 
     /**
      * The radar layers the picker offers, in order, with their labels.
@@ -102,6 +108,44 @@ class Map extends Page
         $fromPlace = $this->firstLocatedPlace() !== null;
 
         return ['from_place' => $fromPlace, 'label' => $fromPlace ? 'Back to my location' : 'Reset the map view'];
+    }
+
+    /**
+     * The My places layer's part of the page config: the viewer's OWN saved places that have a valid
+     * position (never another subscriber's), at most MAX_PLACE_MARKERS of them in id order, each with
+     * only its name, its address and its type. Rows with no or impossible coordinates are skipped.
+     * Nothing else about a location (phone, channels, device) is sent.
+     *
+     * @return array{places: list<array{name: string, detail: string, lat: float, lng: float}>, total: int, truncated: bool, locations_url: string}
+     */
+    public function getPlacesConfig(): array
+    {
+        return once(function (): array {
+            $located = (auth()->user()?->locations() ?? Location::query()->whereRaw('1 = 0'))
+                ->whereNotNull('lat')
+                ->whereNotNull('lng')
+                ->orderBy('id')
+                ->get(['id', 'user_id', 'label', 'type', 'address', 'lat', 'lng'])
+                ->filter(fn (Location $location): bool => abs((float) $location->lat) <= 90 && abs((float) $location->lng) <= 180)
+                ->values();
+
+            $places = $located->take(self::MAX_PLACE_MARKERS)->map(fn (Location $location): array => [
+                'name' => trim((string) $location->label) !== '' ? (string) $location->label : 'Saved location',
+                'detail' => trim(implode(' · ', array_filter([
+                    trim((string) $location->address),
+                    ucfirst($location->type->value ?? ''),
+                ]))),
+                'lat' => (float) $location->lat,
+                'lng' => (float) $location->lng,
+            ])->all();
+
+            return [
+                'places' => $places,
+                'total' => $located->count(),
+                'truncated' => $located->count() > self::MAX_PLACE_MARKERS,
+                'locations_url' => LocationResource::getUrl('index'),
+            ];
+        });
     }
 
     /**

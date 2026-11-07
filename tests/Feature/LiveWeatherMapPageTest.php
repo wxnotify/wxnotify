@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Dashboard\Pages\LiveWeather\Map;
+use App\Filament\Dashboard\Resources\Locations\LocationResource;
 use App\Models\ActiveWwa;
 use App\Models\ActiveWwaArea;
 use App\Models\IngestedProduct;
@@ -105,6 +106,86 @@ test('the recenter button resets the view when the viewer has no located place',
     $component->assertSeeHtml('data-center="39.83,-98.58"')
         ->assertSeeHtml('data-zoom="4"')
         ->assertSee('&quot;recenter&quot;:{&quot;from_place&quot;:false,&quot;label&quot;:&quot;Reset the map view&quot;}', false);
+});
+
+test('the My places layer carries only the viewer\'s own located places', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+    Location::factory()->for($user)->create(['label' => 'Home', 'address' => '1 Main St', 'lat' => 35.5, 'lng' => -97.25]);
+    Location::factory()->for($user)->create(['label' => 'No fix', 'lat' => null, 'lng' => null]);
+    Location::factory()->for($user)->create(['label' => 'Off the globe', 'lat' => 95, 'lng' => 10]);
+    Location::factory()->for($other)->create(['label' => 'Someone else', 'lat' => 40, 'lng' => -100]);
+    $this->actingAs($user);
+
+    $component = livewire(Map::class);
+    $config = $component->instance()->getPlacesConfig();
+
+    expect($config['places'])->toBe([['name' => 'Home', 'detail' => '1 Main St · Stationary', 'lat' => 35.5, 'lng' => -97.25]])
+        ->and($config['total'])->toBe(1)
+        ->and($config['truncated'])->toBeFalse();
+
+    $component->assertSee('window.wxLiveMapPlaces', false)
+        ->assertDontSee('Someone else')
+        ->assertDontSee('No fix')
+        ->assertSeeHtml('data-places-toggle')
+        ->assertDontSeeHtml('data-places-empty');
+});
+
+test('the My places layer is capped and says so', function () {
+    $user = User::factory()->create();
+    Location::factory()->count(103)->for($user)->create();
+    $this->actingAs($user);
+
+    $component = livewire(Map::class);
+    $config = $component->instance()->getPlacesConfig();
+
+    expect($config['places'])->toHaveCount(100)
+        ->and($config['total'])->toBe(103)
+        ->and($config['truncated'])->toBeTrue();
+
+    $component->assertSee('Showing the first 100 of 103 saved locations.');
+});
+
+test('a place name is only JSON text in the config, never markup', function () {
+    $user = User::factory()->create();
+    Location::factory()->for($user)->create(['label' => '<script>x</script>', 'lat' => 35.5, 'lng' => -97.25]);
+    $this->actingAs($user);
+
+    $html = livewire(Map::class)->html();
+
+    expect($html)->toContain('&lt;script&gt;x&lt;\/script&gt;')
+        ->and($html)->not->toContain('<script>x</script>')
+        ->and($html)->toContain('popupContent')
+        ->and($html)->toContain('name.textContent = place.name');
+});
+
+test('with no located place the My places section is the disabled empty state with a link', function () {
+    $user = User::factory()->create();
+    Location::factory()->for($user)->create(['lat' => null, 'lng' => null]);
+    $this->actingAs($user);
+
+    $html = livewire(Map::class)->html();
+
+    expect($html)->toMatch('#<input type="checkbox" data-places-toggle\s+disabled#')
+        ->and($html)->toContain('No saved locations with a map position yet.')
+        ->and($html)->toContain('href="'.LocationResource::getUrl('index').'"')
+        ->and(livewire(Map::class)->instance()->getPlacesConfig()['places'])->toBe([]);
+});
+
+test('the My places section follows the SPC section, starts on by default and keeps an off choice', function () {
+    $this->actingAs(User::factory()->create());
+
+    $html = livewire(Map::class)->html();
+
+    expect(strpos($html, 'data-places-section'))->toBeGreaterThan(strpos($html, 'data-spc-section'))
+        ->and($html)->toMatch('#data-places-section.*?>\s*<summary[^>]*>My places</summary>#s')
+        ->and($html)->toContain('<span>My locations</span>')
+        ->and($html)->toContain('startModule(window.wxLiveMapPlaces)')
+        ->and($html)->toContain("const STORAGE_KEY = 'wxnotify.liveMap.layers'")
+        ->and($html)->toContain('return stored.places !== false;')
+        ->and($html)->toContain('Object.assign({}, readStored(), { places: isOn })')
+        ->and($html)->toContain('bubblingMouseEvents: false')
+        ->and($html)->toContain('zIndex: 420');
 });
 
 function liveWeatherMapCapabilities(string $layer): string
