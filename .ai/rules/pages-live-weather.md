@@ -17,3 +17,6 @@ The category chips ([data-category-chips]) and the status chip + Pause button ([
 
 ## Live chip dot pulses only while live
 The dot (`data-live-dot`) pulses via `.wx-live-dot-pulse` only when `! paused && status === 'live'`, so a pulse always means live. A reduced-motion rule turns the animation off, and the dot stays aria-hidden.
+
+## Products status chip is teleported into the page title
+The status chip is not in the toolbar: it is teleported (x-teleport) from the Alpine root into `[data-page-title-slot]` beside the h1 (Products::getHeader() view), and that slot must keep wire:ignore or Livewire morphs the chip away. Inside the teleported chip use x-bind:hidden, not x-show/x-cloak. The Browser pane never fires requestAnimationFrame, so Alpine's x-show does not update there; do not conclude a bug from the pane alone.
