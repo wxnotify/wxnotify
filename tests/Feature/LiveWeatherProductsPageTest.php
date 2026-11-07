@@ -420,6 +420,33 @@ test('the page has no new-row highlight or badge markup', function () {
         ->not->toContain('isFresh(');
 });
 
+test('the page has an accessible pause and resume button beside the status chip with a paused label and counter hook', function () {
+    $this->withoutVite();
+
+    $html = livewire(Products::class)->assertSuccessful()->html();
+
+    expect($html)
+        ->toContain('data-pause-toggle')
+        ->toContain('type="button"')
+        ->toContain('aria-label="Pause live updates"')
+        ->toContain("'Resume live updates'")
+        ->toContain("paused ? 'Paused' : label")
+        ->toContain('data-paused-count')
+        ->toContain("'· ' + missed + ' new'")
+        ->toContain('min-h-10')
+        ->and(strpos($html, 'data-connection-status'))->toBeLessThan(strpos($html, 'data-pause-toggle'));
+});
+
+test('while paused no fetch is made and events are only counted, and resume makes the one catch-up', function () {
+    $this->withoutVite();
+
+    expect(livewire(Products::class)->html())
+        ->toContain('if (this.paused) { this.missed++; return; }')
+        ->toContain('if (this.paused) { return Promise.resolve([]); }')
+        ->toContain('if (this.paused || this.pollTimer !== null) { return; }')
+        ->toContain('Promise.resolve(this.gapFill())');
+});
+
 test('a guest is redirected to the panel login', function () {
     auth()->logout();
 

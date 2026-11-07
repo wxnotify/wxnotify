@@ -8,21 +8,34 @@
         x-effect="if (! scrolled && $wire.pending > 0) { $wire.pending = 0; }"
         x-data="wxLiveProducts"
     >
-        <div class="mb-3 flex justify-end">
+        <div class="mb-3 flex flex-wrap items-center justify-end gap-2">
             <span
                 role="status"
                 aria-live="polite"
                 data-connection-status
                 class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset"
                 x-bind:class="{
-                    'bg-green-50 text-green-800 ring-green-600/30 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-400/30': status === 'live',
-                    'bg-amber-50 text-amber-800 ring-amber-600/30 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30': status === 'connecting',
-                    'bg-gray-100 text-gray-700 ring-gray-500/30 dark:bg-white/10 dark:text-gray-300 dark:ring-white/20': status === 'offline',
+                    'bg-green-50 text-green-800 ring-green-600/30 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-400/30': ! paused && status === 'live',
+                    'bg-amber-50 text-amber-800 ring-amber-600/30 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30': ! paused && status === 'connecting',
+                    'bg-gray-100 text-gray-700 ring-gray-500/30 dark:bg-white/10 dark:text-gray-300 dark:ring-white/20': paused || status === 'offline',
                 }"
             >
                 <span aria-hidden="true" class="size-2 rounded-full bg-current"></span>
-                <span x-text="label">Offline: refreshing every minute</span>
+                <span x-text="paused ? 'Paused' : label">Offline: refreshing every minute</span>
+                <span aria-hidden="true" data-paused-count x-show="paused && missed > 0" x-cloak x-text="'· ' + missed + ' new'"></span>
             </span>
+            <button
+                type="button"
+                data-pause-toggle
+                aria-label="Pause live updates"
+                x-bind:aria-label="paused ? 'Resume live updates' : 'Pause live updates'"
+                x-on:click="paused ? resume() : pause()"
+                class="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:ring-white/20 dark:hover:bg-white/5"
+            >
+                <span aria-hidden="true" x-show="! paused"><x-filament::icon icon="heroicon-m-pause" class="size-4" /></span>
+                <span aria-hidden="true" x-show="paused" x-cloak><x-filament::icon icon="heroicon-m-play" class="size-4" /></span>
+                <span x-text="paused ? 'Resume' : 'Pause'">Pause</span>
+            </button>
         </div>
 
         <div class="mb-4 flex flex-wrap gap-2" data-category-chips>
@@ -109,6 +122,8 @@
             const register = () => Alpine.data('wxLiveProducts', () => ({
                 scrolled: false,
                 status: 'offline',
+                paused: false,
+                missed: 0,
                 label: LABELS.offline,
                 pollTimer: null,
                 echoChannel: null,
@@ -148,6 +163,7 @@
                     this.stopPolling();
                     clearTimeout(this.eventTimer);
                     clearTimeout(this.retryTimer);
+                    this.paused = true;
                     this.unbindState();
                     try {
                         if (window.Echo) { window.Echo.leave('live-products'); }
@@ -166,7 +182,32 @@
                 newestId() {
                     return this.$wire.rows.reduce((max, row) => Math.max(max, Number(row.id) || 0), 0);
                 },
+                /*
+                 * Paused freezes the list: no fetch of any kind runs (gapFill, the debounce, the
+                 * retries and the poll all stand still) and events are only counted. Resume makes
+                 * one catch-up gapFill and hands the polling decision back to the status logic.
+                 */
+                pause() {
+                    if (this.paused) { return; }
+                    this.paused = true;
+                    this.missed = 0;
+                    this.latestEvent = 0;
+                    this.attempts = 0;
+                    clearTimeout(this.eventTimer);
+                    clearTimeout(this.retryTimer);
+                    this.eventTimer = null;
+                    this.retryTimer = null;
+                    this.stopPolling();
+                },
+                resume() {
+                    if (! this.paused) { return; }
+                    this.paused = false;
+                    this.missed = 0;
+                    Promise.resolve(this.gapFill()).catch(() => {});
+                    this.setStatus(this.status);
+                },
                 gapFill() {
+                    if (this.paused) { return Promise.resolve([]); }
                     return this.$wire.fetchSince(this.newestId());
                 },
                 /*
@@ -182,6 +223,7 @@
                 onEvent(event) {
                     const id = Number(event && event.id);
                     if (! Number.isInteger(id) || id <= 0) { return; }
+                    if (this.paused) { this.missed++; return; }
                     this.latestEvent = Math.max(this.latestEvent, id);
                     this.attempts = 0;
                     clearTimeout(this.retryTimer);
@@ -190,9 +232,11 @@
                 },
                 async resolveEvents() {
                     this.eventTimer = null;
+                    if (this.paused) { return; }
                     const target = this.latestEvent;
                     if (target === 0) { return; }
                     try { await this.gapFill(); } catch (error) {}
+                    if (this.paused) { return; }
                     if (this.latestEvent !== target) { return; }
                     this.attempts++;
                     if (this.newestId() >= target || this.attempts >= 3) { this.settle(); return; }
@@ -219,7 +263,7 @@
                     this.startPolling();
                 },
                 startPolling() {
-                    if (this.pollTimer !== null) { return; }
+                    if (this.paused || this.pollTimer !== null) { return; }
                     this.pollTimer = setInterval(() => (this.latestEvent > 0 ? this.resolveEvents() : this.gapFill()), 60000);
                 },
                 stopPolling() {
