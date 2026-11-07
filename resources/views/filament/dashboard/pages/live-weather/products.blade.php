@@ -62,7 +62,7 @@
             <ul class="divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-950/5 dark:divide-white/10 dark:bg-gray-900 dark:ring-white/10" data-product-list>
                 @foreach ($rows as $row)
                     @php
-                        $linked = $row['view_url'] && str_starts_with($row['view_url'], 'https://');
+                        $linked = $this->isLinkable($row['view_url']);
                     @endphp
                     <li wire:key="product-{{ $row['id'] }}" @class(['relative flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3', 'hover:bg-gray-50 dark:hover:bg-white/5' => $linked]) data-product-row>
                         <div class="min-w-0 flex-1">

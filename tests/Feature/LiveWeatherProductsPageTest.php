@@ -79,13 +79,44 @@ test('the product name is the row link, only for an https public page', function
         ->assertSeeHtmlInOrder(['data-row-link>', e($name), '</a>'])
         ->assertDontSeeHtml('>View</a>');
 
-    config(['wxnotify.product_domain' => null, 'app.url' => 'http://localhost']);
-
-    livewire(Products::class)
-        ->assertDontSeeHtml('target="_blank"')
-        ->assertDontSeeHtml('data-row-link')
-        ->assertSee($name);
 });
+
+function liveProductsInEnvironment(string $environment, Closure $callback): void
+{
+    app()->detectEnvironment(fn () => $environment);
+
+    try {
+        $callback();
+    } finally {
+        app()->detectEnvironment(fn () => 'testing');
+    }
+}
+
+test('a row links on https in every environment and on http only outside production', function (string $environment, string $appUrl, bool $linked) {
+    config(['wxnotify.product_domain' => null, 'app.url' => $appUrl]);
+    $ingested = liveProductsMake(['cccc' => 'ktbw'], ProductFamily::Warning);
+    $name = $ingested->product->name;
+
+    liveProductsInEnvironment($environment, function () use ($linked, $name) {
+        $page = livewire(Products::class)->assertSee($name);
+
+        if ($linked) {
+            $page->assertSeeHtml('target="_blank" rel="noopener"')->assertSeeHtml('data-row-link');
+        } else {
+            $page->assertDontSeeHtml('target="_blank"')->assertDontSeeHtml('data-row-link');
+        }
+    });
+})->with([
+    'https in production' => ['production', 'https://app.example.com', true],
+    'https outside production' => ['local', 'https://app.example.com', true],
+    'http outside production' => ['testing', 'http://127.0.0.1:8080', true],
+    'http in production' => ['production', 'http://127.0.0.1:8080', false],
+    'javascript in production' => ['production', 'javascript:alert(1)//', false],
+    'javascript outside production' => ['local', 'javascript:alert(1)//', false],
+    'data outside production' => ['local', 'data:text/html,x', false],
+    'relative outside production' => ['local', '/relative', false],
+    'empty outside production' => ['local', '', false],
+]);
 
 test('a product name is escaped inside the row link', function () {
     config(['wxnotify.product_domain' => 'products.example.com']);

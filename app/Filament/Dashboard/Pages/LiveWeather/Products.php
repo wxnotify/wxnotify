@@ -175,6 +175,20 @@ class Products extends Page
         $this->pending = 0;
     }
 
+    /**
+     * Whether a row's public page may be linked: always an https URL, and an http URL only
+     * outside production (a local APP_URL). Any other scheme, a relative URL or none is never linked.
+     */
+    public function isLinkable(?string $url): bool
+    {
+        if ($url === null) {
+            return false;
+        }
+
+        return str_starts_with($url, 'https://')
+            || (! app()->isProduction() && str_starts_with($url, 'http://'));
+    }
+
     public function getTimezone(): string
     {
         return Timezones::forUserOrDefault(auth()->user());
