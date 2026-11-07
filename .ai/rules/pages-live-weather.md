@@ -14,3 +14,6 @@ While `paused`, gapFill()/startPolling() are no-ops, the debounce and retry time
 
 ## Products toolbar: one row
 The category chips ([data-category-chips]) and the status chip + Pause button ([data-live-controls], ml-auto) share one flex-wrap row ([data-products-toolbar]) inside the x-data root; keep it inside the Alpine scope.
+
+## Live chip dot pulses only while live
+The dot (`data-live-dot`) pulses via `.wx-live-dot-pulse` only when `! paused && status === 'live'`, so a pulse always means live. A reduced-motion rule turns the animation off, and the dot stays aria-hidden.

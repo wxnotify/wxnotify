@@ -27,6 +27,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/filament/dashboard/pages/live-weather/**, resources/views/filament/dashboard/pages/live-weather/products.blade.php | .ai/rules/pages-live-weather.md |
 | app/Filament/Admin/Pages/** | .ai/rules/pages.md |
 | app/Actions/Pipeline/**, app/Actions/Weather/MatchWeatherAlertRules.php, app/Observers/IngestedProductObserver.php, app/Actions/Weather/**, app/Actions/Weather/GetPlaceWeather.php, app/Actions/Weather/GetUserWeatherPlaces.php, app/Actions/Weather/RenderAlertSubject.php | .ai/rules/pipeline.md |
+| app/Providers/Filament/DashboardPanelProvider.php | .ai/rules/providers-filament.md |
 | app/Actions/Storage/** | .ai/rules/storage.md |
 | app/Support/**, app/Support/Integrations.php, app/Support/PhoneNumber.php, app/Support/FormatPlaceWeather.php, app/Support/DeliveryFailureExplanation.php | .ai/rules/support.md |
 | app/Http/Controllers/Api/V1/WeatherController.php | .ai/rules/v1.md |
