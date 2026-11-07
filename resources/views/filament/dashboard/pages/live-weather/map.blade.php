@@ -1,6 +1,6 @@
 @php
     $opening = $this->getOpeningView();
-    $config = ['radar' => $this->getRadarConfig(), 'warnings' => $this->getWarningsConfig(), 'layers' => $this->getLayersConfig()];
+    $config = ['radar' => $this->getRadarConfig(), 'warnings' => $this->getWarningsConfig(), 'layers' => $this->getLayersConfig(), 'recenter' => $this->getRecenterConfig()];
 @endphp
 
 <x-filament-panels::page>
@@ -33,6 +33,7 @@
         {{-- The other layer partials, before the script. --}}
         @include('filament.dashboard.pages.live-weather.map-radar')
         @include('filament.dashboard.pages.live-weather.map-layers')
+        @include('filament.dashboard.pages.live-weather.map-recenter')
     </div>
 
     <script>
@@ -66,6 +67,7 @@
                 state.timers = [];
                 state.modules = [];
                 state.config = JSON.parse(root.dataset.config);
+                state.opening = { center: center, zoom: zoom };
 
                 const startModule = (module) => {
                     if (! module) { return; }
@@ -87,6 +89,7 @@
                     startModule(window.wxLiveMapRadar);
                     startModule(window.wxLiveMapWarnings);
                     startModule(window.wxLiveMapLayers);
+                    startModule(window.wxLiveMapRecenter);
                 }, () => {
                     if (! state.destroyed) { captionEl.textContent = "Couldn't load the map."; }
                 });

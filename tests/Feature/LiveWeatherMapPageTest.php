@@ -78,6 +78,35 @@ test('another subscriber\'s place never centres the map', function () {
     livewire(Map::class)->assertSeeHtml('data-center="39.83,-98.58"');
 });
 
+test('the recenter button returns to a saved place and says so', function () {
+    $user = User::factory()->create();
+    Location::factory()->for($user)->create(['lat' => 35.5, 'lng' => -97.25]);
+    $this->actingAs($user);
+
+    $component = livewire(Map::class);
+
+    expect($component->instance()->getRecenterConfig())->toBe(['from_place' => true, 'label' => 'Back to my location']);
+
+    $component->assertSeeHtml('data-center="35.5,-97.25"')
+        ->assertSeeHtml('data-zoom="8"')
+        ->assertSee('&quot;recenter&quot;:{&quot;from_place&quot;:true,&quot;label&quot;:&quot;Back to my location&quot;}', false)
+        ->assertSee('window.wxLiveMapRecenter', false);
+});
+
+test('the recenter button resets the view when the viewer has no located place', function () {
+    $user = User::factory()->create();
+    Location::factory()->for($user)->create(['lat' => null, 'lng' => null]);
+    $this->actingAs($user);
+
+    $component = livewire(Map::class);
+
+    expect($component->instance()->getRecenterConfig())->toBe(['from_place' => false, 'label' => 'Reset the map view']);
+
+    $component->assertSeeHtml('data-center="39.83,-98.58"')
+        ->assertSeeHtml('data-zoom="4"')
+        ->assertSee('&quot;recenter&quot;:{&quot;from_place&quot;:false,&quot;label&quot;:&quot;Reset the map view&quot;}', false);
+});
+
 function liveWeatherMapCapabilities(string $layer): string
 {
     return '<?xml version="1.0" encoding="UTF-8"?><WMS_Capabilities version="1.3.0" xmlns="http://www.opengis.net/wms"><Capability><Layer><Title>root</Title>'

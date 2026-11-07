@@ -92,6 +92,19 @@ class Map extends Page
     }
 
     /**
+     * The recenter button's part of the page config: it returns to the opening view, and its
+     * name says whether that view is the viewer's own saved place or the default whole-US view.
+     *
+     * @return array{from_place: bool, label: string}
+     */
+    public function getRecenterConfig(): array
+    {
+        $fromPlace = $this->firstLocatedPlace() !== null;
+
+        return ['from_place' => $fromPlace, 'label' => $fromPlace ? 'Back to my location' : 'Reset the map view'];
+    }
+
+    /**
      * The radar part of the page config. Nothing here asks NOAA: the browser asks for frames later.
      *
      * @return array{layers: list<string>, default_site: ?string, timezone: string}
