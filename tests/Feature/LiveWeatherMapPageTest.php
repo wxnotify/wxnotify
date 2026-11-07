@@ -434,7 +434,7 @@ test('the page renders the SPC layer control, all off, and asks SPC for nothing 
     $this->actingAs(User::factory()->create());
 
     $html = livewire(Map::class)
-        ->assertSeeHtmlInOrder(['data-live-weather-map', 'data-radar-controls', 'data-layers-control'])
+        ->assertSeeHtmlInOrder(['data-live-weather-map', 'data-warnings-panel', 'data-spc-section', 'data-layers-control', 'data-radar-controls'])
         ->assertSeeHtmlInOrder(['data-layer-toggle="watches"', 'data-layer-toggle="outlook"', 'data-layer-toggle="discussions"'])
         ->assertSeeHtmlInOrder(['data-outlook-day', '<option value="1">Day 1</option>', '<option value="2">Day 2</option>', '<option value="3">Day 3</option>'])
         ->assertSeeHtmlInOrder(['data-outlook-legend', '#c1e9c1', 'General thunder', '#ff7cff', 'High'])
@@ -462,7 +462,7 @@ test('the page controls have accessible names, grouped layer toggles and status 
         ->toContain('aria-label="Current warnings"')
         ->toContain('aria-controls="live-map-warnings-body"')
         ->toContain('aria-expanded="false"')
-        ->toContain('<legend class="mb-1 font-medium">SPC layers</legend>')
+        ->toContain('<legend class="sr-only">SPC layers</legend>')
         ->toContain('<legend class="sr-only">Show these warnings</legend>')
         ->and(substr_count($html, '<fieldset'))->toBe(2)
         ->and(substr_count($html, 'role="status"'))->toBeGreaterThanOrEqual(3)

@@ -7,6 +7,9 @@
 --}}
 @php
     $warningEventNames = $this->getWarningsConfig()['events'];
+    $layerSelectClasses = 'block min-h-10 rounded-lg border-gray-300 bg-white py-1.5 text-sm text-gray-950 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white';
+    $layerToggleClasses = 'h-4 w-4 rounded border-gray-300 dark:border-white/20';
+    $outlookDays = $this->getLayersConfig()['outlook_days'];
 @endphp
 
 <aside
@@ -50,6 +53,57 @@
 
         <ul data-warnings-list class="divide-y divide-gray-100 dark:divide-white/5"></ul>
     </div>
+    <details data-spc-section class="border-t border-gray-200 dark:border-white/10">
+        <summary class="flex min-h-11 cursor-pointer items-center px-4 py-3 text-sm font-semibold text-gray-950 dark:text-white">SPC</summary>
+        <div class="max-h-[40vh] overflow-y-auto">
+        <div data-layers-control class="space-y-3 px-4 pb-3">
+            <p
+                data-layers-notice
+                role="status"
+                hidden
+                class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"
+            ></p>
+
+            <fieldset class="flex flex-col gap-y-1 text-sm text-gray-700 dark:text-gray-300">
+                <legend class="sr-only">SPC layers</legend>
+                <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
+                    <input type="checkbox" data-layer-toggle="watches" class="{{ $layerToggleClasses }}">
+                    <span>Tornado and severe thunderstorm watches</span>
+                </label>
+                <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
+                    <input type="checkbox" data-layer-toggle="outlook" class="{{ $layerToggleClasses }}">
+                    <span>Convective outlook</span>
+                </label>
+                <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
+                    <input type="checkbox" data-layer-toggle="discussions" class="{{ $layerToggleClasses }}">
+                    <span>Mesoscale Discussions</span>
+                </label>
+            </fieldset>
+
+            <div data-outlook-options hidden class="flex flex-wrap items-center gap-3">
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <span class="font-medium">Outlook</span>
+                    <select data-outlook-day class="{{ $layerSelectClasses }}">
+                        @foreach ($outlookDays as $outlookDay)
+                            <option value="{{ $outlookDay }}">Day {{ $outlookDay }}</option>
+                        @endforeach
+                    </select>
+                </label>
+
+                <ul data-outlook-legend aria-label="Convective outlook categories" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-700 dark:text-gray-300">
+                    @foreach (\App\Support\SpcOutlookColors::legend() as $outlookCategory)
+                        <li class="inline-flex items-center gap-1">
+                            <span aria-hidden="true" class="inline-block h-3 w-3 rounded-sm border border-black/10" style="background-color: {{ $outlookCategory['color'] }}"></span>
+                            <span>{{ $outlookCategory['name'] }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+
+                <span data-outlook-status class="text-xs text-gray-500 dark:text-gray-400"></span>
+            </div>
+        </div>
+        </div>
+    </details>
 </aside>
 
 <script>

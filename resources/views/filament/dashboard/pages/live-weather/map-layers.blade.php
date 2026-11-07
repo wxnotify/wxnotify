@@ -1,64 +1,11 @@
 {{--
-    The SPC layers for the Live map: the layer control under the radar controls and
+    The SPC layers for the Live map: its controls are the SPC section of the warnings side panel (map-warnings.blade.php) and this is
     window.wxLiveMapLayers, which the page's initLiveWeatherMap starts once Leaflet is ready.
     Tornado and Severe Thunderstorm Watches come from the page's liveWarnings() (the watches kind),
     the convective outlook from spcOutlook(day) and the Mesoscale Discussions from
     mesoscaleDiscussions(); nothing is read while the page renders. Every layer is off until the
     viewer turns it on. Outside text (event names, headlines, areas) goes in with textContent only.
 --}}
-@php
-    $layerSelectClasses = 'block min-h-10 rounded-lg border-gray-300 bg-white py-1.5 text-sm text-gray-950 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white';
-    $layerToggleClasses = 'h-4 w-4 rounded border-gray-300 dark:border-white/20';
-    $outlookDays = $this->getLayersConfig()['outlook_days'];
-@endphp
-
-<div wire:ignore data-layers-control class="mt-3 space-y-3">
-    <p
-        data-layers-notice
-        role="status"
-        hidden
-        class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"
-    ></p>
-
-    <fieldset class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-700 dark:text-gray-300">
-        <legend class="mb-1 font-medium">SPC layers</legend>
-        <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
-            <input type="checkbox" data-layer-toggle="watches" class="{{ $layerToggleClasses }}">
-            <span>Tornado and severe thunderstorm watches</span>
-        </label>
-        <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
-            <input type="checkbox" data-layer-toggle="outlook" class="{{ $layerToggleClasses }}">
-            <span>Convective outlook</span>
-        </label>
-        <label class="inline-flex min-h-10 cursor-pointer items-center gap-1.5">
-            <input type="checkbox" data-layer-toggle="discussions" class="{{ $layerToggleClasses }}">
-            <span>Mesoscale Discussions</span>
-        </label>
-    </fieldset>
-
-    <div data-outlook-options hidden class="flex flex-wrap items-center gap-3">
-        <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <span class="font-medium">Outlook</span>
-            <select data-outlook-day class="{{ $layerSelectClasses }}">
-                @foreach ($outlookDays as $outlookDay)
-                    <option value="{{ $outlookDay }}">Day {{ $outlookDay }}</option>
-                @endforeach
-            </select>
-        </label>
-
-        <ul data-outlook-legend aria-label="Convective outlook categories" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-700 dark:text-gray-300">
-            @foreach (\App\Support\SpcOutlookColors::legend() as $outlookCategory)
-                <li class="inline-flex items-center gap-1">
-                    <span aria-hidden="true" class="inline-block h-3 w-3 rounded-sm border border-black/10" style="background-color: {{ $outlookCategory['color'] }}"></span>
-                    <span>{{ $outlookCategory['name'] }}</span>
-                </li>
-            @endforeach
-        </ul>
-
-        <span data-outlook-status class="text-xs text-gray-500 dark:text-gray-400"></span>
-    </div>
-</div>
-
 <script>
     // Defined once per page. Started by window.initLiveWeatherMap with { state, $wire, page };
     // window.destroyLiveWeatherMap calls destroy(state). It reuses the warnings module's helpers
