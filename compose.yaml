@@ -179,6 +179,37 @@ services:
         restart: unless-stopped
         profiles:
             - server-c
+    # The WebSocket server the live Products page streams over (Laravel
+    # Reverb). It listens on 8080 inside the container and is published on host
+    # port 8085 for local use only (8080 is the front-end's); in production the
+    # reverse proxy terminates TLS and forwards to it. Like `queue`, it keeps
+    # the code it booted with, so deploys restart it. server-a: it serves the
+    # dashboard's browsers; the events themselves are broadcast by the server-c
+    # workers through Reverb's HTTP API (REVERB_HOST/PORT, see .env.example).
+    reverb:
+        build:
+            context: './docker/8.4'
+            dockerfile: Dockerfile
+            target: worker-development
+            args:
+                USER_ID: '${USER_ID:-1000}'
+                GROUP_ID: '${GROUP_ID:-1000}'
+        image: 'wxnotify-php/worker:local'
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        ports:
+            - '${REVERB_FORWARD_PORT:-8085}:8080'
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - redis
+        command: 'php artisan reverb:start --host=0.0.0.0 --port=8080'
+        stop_signal: SIGTERM
+        restart: unless-stopped
+        profiles:
+            - server-a
     # Nothing else runs `artisan schedule:run`, so every schedule() entry in
     # bootstrap/app.php (alerts:dispatch-scheduled -- Daily Summary and
     # Threshold deliveries -- plus shapefile:scan, traccar:poll-positions,

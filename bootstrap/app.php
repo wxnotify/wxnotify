@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             require __DIR__.'/../routes/public.php';
         },
     )
+    ->withBroadcasting(__DIR__.'/../routes/channels.php', ['middleware' => ['web']])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'pipeline.webhook' => VerifyPipelineWebhookToken::class,
