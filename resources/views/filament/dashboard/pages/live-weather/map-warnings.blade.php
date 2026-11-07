@@ -29,7 +29,7 @@
         <span data-warnings-toggle-label aria-hidden="true" class="text-xs font-normal text-gray-500 dark:text-gray-400">Show</span>
     </button>
 
-    <div id="live-map-warnings-body" data-warnings-body hidden class="min-h-0 flex-1 space-y-3 overflow-y-auto border-t border-gray-200 px-4 py-3 dark:border-white/10">
+    <div id="live-map-warnings-body" data-warnings-body hidden class="min-h-0 flex-1 space-y-3 overflow-y-auto lg:min-h-[14rem] border-t border-gray-200 px-4 py-3 dark:border-white/10">
         <p
             data-warnings-notice
             role="status"
@@ -53,9 +53,9 @@
 
         <ul data-warnings-list class="divide-y divide-gray-100 dark:divide-white/5"></ul>
     </div>
-    <details open data-spc-section class="border-t border-gray-200 dark:border-white/10">
+    <details x-data x-init="$el.open = window.matchMedia('(min-width: 1024px)').matches" data-spc-section class="border-t border-gray-200 dark:border-white/10">
         <summary class="flex min-h-11 cursor-pointer items-center px-4 py-3 text-sm font-semibold text-gray-950 dark:text-white">SPC</summary>
-        <div class="max-h-[40vh] overflow-y-auto">
+        <div class="max-h-48 overflow-y-auto">
         <div data-layers-control class="space-y-3 px-4 pb-3">
             <p
                 data-layers-notice
