@@ -192,3 +192,13 @@ test('duplicate times are collapsed and order follows the clock', function () {
 
     expect((new GetRadarFrames)('composite')['times'])->toBe(['2026-11-06T00:05:00.000Z', '2026-11-06T00:10:00Z']);
 });
+
+test('a site layer whose configured url is on another host is unavailable and nothing is sent', function (string $layer) {
+    config(['wxnotify.map.radar_sites.site_wms_url' => 'https://evil.example.com/geoserver/{site}/ows']);
+    Http::fake();
+
+    $result = (new GetRadarFrames)($layer, 'KFWS');
+
+    expect($result)->toMatchArray(['status' => 'unavailable', 'wms_url' => null, 'wms_layer' => null, 'times' => []]);
+    Http::assertNothingSent();
+})->with(['site_reflectivity', 'site_velocity']);

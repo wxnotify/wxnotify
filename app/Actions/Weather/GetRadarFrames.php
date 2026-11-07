@@ -83,10 +83,10 @@ class GetRadarFrames
 
         $site = strtolower($site);
 
-        return [
-            'wms_url' => str_replace('{site}', $site, (string) config('wxnotify.map.radar_sites.site_wms_url')),
-            'wms_layer' => str_replace('{site}', $site, (string) config("wxnotify.map.radar_sites.{$layerKey}")),
-        ];
+        $url = str_replace('{site}', $site, (string) config('wxnotify.map.radar_sites.site_wms_url'));
+        $wmsLayer = str_replace('{site}', $site, (string) config("wxnotify.map.radar_sites.{$layerKey}"));
+
+        return str_starts_with($url, self::HOST_PREFIX) && $wmsLayer !== '' ? ['wms_url' => $url, 'wms_layer' => $wmsLayer] : null;
     }
 
     /**

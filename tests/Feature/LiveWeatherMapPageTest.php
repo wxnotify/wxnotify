@@ -13,6 +13,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Renderless;
 
 use function Pest\Livewire\livewire;
@@ -466,4 +467,82 @@ test('the page controls have accessible names, grouped layer toggles and status 
         ->and(substr_count($html, '<fieldset'))->toBe(2)
         ->and(substr_count($html, 'role="status"'))->toBeGreaterThanOrEqual(3)
         ->and($html)->not->toContain('aria-live');
+});
+
+function liveWeatherMapExhaust(User $user, int $calls = 120): void
+{
+    for ($i = 0; $i < $calls; $i++) {
+        RateLimiter::hit('live-map-data:'.$user->id, 60);
+    }
+}
+
+test('the data methods are refused without any work once a viewer has used 120 calls in a minute', function () {
+    liveWeatherMapTornadoWarning();
+    Http::fake();
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    $component = livewire(Map::class)->instance();
+    liveWeatherMapExhaust($user);
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $warnings = $component->liveWarnings(['south' => 38, 'west' => -107, 'north' => 42, 'east' => -101], LiveWarningKinds::SHORT_FUSE);
+    $frames = $component->radarFrames('composite');
+    $site = $component->nearestRadarSite(32.57, -97.30);
+
+    expect($warnings)->toBe(['status' => 'invalid', 'events' => [], 'truncated' => false])
+        ->and($frames)->toBe(['layer' => 'composite', 'status' => 'unavailable', 'wms_url' => null, 'wms_layer' => null, 'times' => []])
+        ->and($site)->toBeNull()
+        ->and(DB::getQueryLog())->toBe([]);
+    Http::assertNothingSent();
+});
+
+test('the limit is shared by the three methods, per user, and resets after a minute', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+    $this->actingAs($user);
+    $component = livewire(Map::class)->instance();
+
+    foreach (range(1, 40) as $i) {
+        $component->nearestRadarSite(32.57, -97.30);
+        $component->liveWarnings(['south' => 38, 'west' => -107, 'north' => 42, 'east' => -101], LiveWarningKinds::SHORT_FUSE);
+        $component->radarFrames('echo_tops');
+    }
+
+    expect($component->nearestRadarSite(32.57, -97.30))->toBeNull();
+
+    $this->actingAs($other);
+    expect(livewire(Map::class)->instance()->nearestRadarSite(32.57, -97.30))->toBe('kfws');
+
+    $this->actingAs($user);
+    $this->travel(61)->seconds();
+    expect($component->nearestRadarSite(32.57, -97.30))->toBe('kfws');
+});
+
+test('normal-rate calls are not limited', function () {
+    $this->actingAs(User::factory()->create());
+    $component = livewire(Map::class)->instance();
+
+    foreach (range(1, 120) as $i) {
+        $last = $component->nearestRadarSite(32.57, -97.30);
+    }
+
+    expect($last)->toBe('kfws');
+});
+
+test('the page controls have the accessible names the viewer hears', function () {
+    $this->actingAs(User::factory()->create());
+
+    $html = livewire(Map::class)->html();
+    $labelled = fn (string $marker, string $name): string => '#<label[^>]*>\s*<span[^>]*>'.$name.'</span>\s*<select '.$marker.'[ >]#';
+
+    expect($html)
+        ->toMatch($labelled('data-radar-layer', 'Radar'))
+        ->toMatch($labelled('data-radar-site', 'Radar site'))
+        ->toMatch($labelled('data-radar-frames', 'Frames'))
+        ->toMatch($labelled('data-radar-speed', 'Speed'))
+        ->toMatch($labelled('data-outlook-day', 'Outlook'))
+        ->toMatch('#<label[^>]*>\s*<input type="checkbox" data-layer-toggle="outlook"[^>]*>\s*<span>Convective outlook</span>#')
+        ->toMatch('#<button[^>]*data-radar-play[^>]*>Play</button>#')
+        ->toMatch('#<button[^>]*data-warnings-toggle[^>]*aria-expanded="false"[^>]*>#');
 });

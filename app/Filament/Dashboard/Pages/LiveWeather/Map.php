@@ -15,6 +15,7 @@ use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Renderless;
@@ -49,6 +50,12 @@ class Map extends Page
     protected const OUTLOOK_DAYS = [1, 2, 3];
 
     protected const OUTLOOK_CACHE_SECONDS = 120;
+
+    /**
+     * The most calls one viewer may make to liveWarnings(), radarFrames() and nearestRadarSite()
+     * together in a minute (the app's own map endpoint allows the same). Normal use is far below it.
+     */
+    protected const DATA_CALLS_PER_MINUTE = 120;
 
     protected const UNAVAILABLE_OUTLOOK_CACHE_SECONDS = 60;
 
@@ -116,12 +123,20 @@ class Map extends Page
     #[Renderless]
     public function radarFrames(string $layer, ?string $site = null): array
     {
+        if ($this->dataCallLimited()) {
+            return ['layer' => $layer, 'status' => 'unavailable', 'wms_url' => null, 'wms_layer' => null, 'times' => []];
+        }
+
         return app(GetRadarFrames::class)($layer, $site);
     }
 
     #[Renderless]
     public function nearestRadarSite(float $lat, float $lng): ?string
     {
+        if ($this->dataCallLimited()) {
+            return null;
+        }
+
         if (! is_finite($lat) || ! is_finite($lng) || abs($lat) > 90 || abs($lng) > 180) {
             return null;
         }
@@ -173,6 +188,10 @@ class Map extends Page
     #[Renderless]
     public function liveWarnings(array $bounds, string $kind): array
     {
+        if ($this->dataCallLimited()) {
+            return ['status' => 'invalid', 'events' => [], 'truncated' => false];
+        }
+
         $validator = Validator::make(['bounds' => $bounds, 'kind' => $kind], [
             'kind' => ['required', 'string', Rule::in(LiveWarningKinds::all())],
             'bounds' => ['required', 'array:south,west,north,east', 'size:4'],
@@ -273,6 +292,24 @@ class Map extends Page
                 'geometry' => $area['geometry'],
             ], $areas),
         ];
+    }
+
+    /**
+     * Counts one data call against the viewer's minute and says whether it is over the limit (keyed
+     * on the signed-in user, never the IP). A limited call must do no work; the page shows the
+     * same notice as for any unavailable answer and recovers on the next call that gets through.
+     */
+    protected function dataCallLimited(): bool
+    {
+        $key = 'live-map-data:'.auth()->id();
+
+        if (RateLimiter::tooManyAttempts($key, self::DATA_CALLS_PER_MINUTE)) {
+            return true;
+        }
+
+        RateLimiter::hit($key, 60);
+
+        return false;
     }
 
     /**

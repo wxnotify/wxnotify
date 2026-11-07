@@ -75,18 +75,31 @@
             }
 
             // The box to ask for: finite, within ±90/±180, south below north. A view wider than the
-            // world is the whole world. A view across the antimeridian keeps the side holding more
+            // world is cut to MAX_WIDTH x MAX_HEIGHT around the view's centre (a box at the world's
+            // middle holds no US warnings). A view across the antimeridian keeps the side holding more
             // of it (the west one on a tie) and is cut at ±180. `cut` says the viewer is not seeing
             // every warning in view: a side was dropped here, or the server will shrink the box
             // (wider than 120 or taller than 60 degrees).
-            function clampBounds(raw) {
+            function clampBounds(raw, centre) {
                 let west = clampNumber(raw && raw.west, -Infinity, Infinity, -180);
                 let east = clampNumber(raw && raw.east, -Infinity, Infinity, 180);
                 let clipped = false;
 
+                let cutToCentre = false;
+
                 if (east - west >= 360) {
-                    west = -180;
-                    east = 180;
+                    // Around the view's centre (its longitude wrapped to ±180), not the world's middle.
+                    const middle = clampNumber(centre && centre.lng, -Infinity, Infinity, 0);
+                    const wrapped = ((((middle + 180) % 360) + 360) % 360) - 180;
+                    const centreLat = clampNumber(centre && centre.lat, -90, 90, 0);
+
+                    west = Math.max(-180, wrapped - MAX_WIDTH / 2);
+                    east = Math.min(180, wrapped + MAX_WIDTH / 2);
+                    raw = Object.assign({}, raw, {
+                        south: Math.max(clampNumber(raw && raw.south, -90, 90, -90), centreLat - MAX_HEIGHT / 2),
+                        north: Math.min(clampNumber(raw && raw.north, -90, 90, 90), centreLat + MAX_HEIGHT / 2),
+                    });
+                    cutToCentre = true;
                 } else {
                     const shift = Math.floor((west + 180) / 360) * 360;
                     west -= shift;
@@ -112,7 +125,7 @@
 
                 return {
                     bounds: { south: south, west: west, north: north, east: east },
-                    cut: clipped || east - west > MAX_WIDTH || north - south > MAX_HEIGHT,
+                    cut: cutToCentre || clipped || east - west > MAX_WIDTH || north - south > MAX_HEIGHT,
                 };
             }
 
@@ -451,7 +464,7 @@
                     const view = map.getBounds();
                     const box = clampBounds({
                         south: view.getSouth(), west: view.getWest(), north: view.getNorth(), east: view.getEast(),
-                    });
+                    }, map.getCenter().wrap());
                     let result = null;
 
                     try {
