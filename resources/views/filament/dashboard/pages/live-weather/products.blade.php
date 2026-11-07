@@ -106,6 +106,9 @@
                 label: LABELS.offline,
                 pollTimer: null,
                 echoChannel: null,
+                channelFailed: false,
+                socketState: 'unavailable',
+                lastKick: 0,
                 init() {
                     this.onScroll = () => {
                         this.scrolled = window.scrollY > 160;
@@ -115,17 +118,37 @@
 
                     this.onEchoReady = () => this.connect();
                     window.addEventListener('wx-echo-ready', this.onEchoReady);
+                    this.onWake = () => {
+                        if (document.visibilityState === 'hidden') { return; }
+                        const now = Date.now();
+                        if (now - this.lastKick < 5000) { return; }
+                        this.lastKick = now;
+                        this.gapFill();
+                    };
+                    document.addEventListener('visibilitychange', this.onWake);
+                    window.addEventListener('online', this.onWake);
                     this.setStatus('offline');
                     this.connect();
                 },
                 destroy() {
                     window.removeEventListener('scroll', this.onScroll);
                     window.removeEventListener('wx-echo-ready', this.onEchoReady);
+                    document.removeEventListener('visibilitychange', this.onWake);
+                    window.removeEventListener('online', this.onWake);
                     this.stopPolling();
+                    this.unbindState();
                     try {
-                        if (this.pusher && this.onState) { this.pusher.connection.unbind('state_change', this.onState); }
                         if (window.Echo) { window.Echo.leave('live-products'); }
                     } catch (error) {}
+                },
+                unbindState() {
+                    try {
+                        if (this.pusher && this.onState) { this.pusher.connection.unbind('state_change', this.onState); }
+                    } catch (error) {}
+                    this.onState = null;
+                },
+                refreshStatus() {
+                    this.setStatus(this.channelFailed ? 'offline' : statusFor(this.socketState));
                 },
                 toTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); this.$wire.pending = 0; },
                 newestId() {
@@ -161,14 +184,18 @@
                         if (! window.Echo) { return; }
 
                         this.pusher = window.Echo.connector.pusher;
-                        this.onState = (states) => this.setStatus(statusFor(states.current));
+                        this.onState = (states) => { this.socketState = states.current; this.refreshStatus(); };
                         this.pusher.connection.bind('state_change', this.onState);
 
                         this.echoChannel = window.Echo.private('live-products')
-                            .listen('.ProductIngested', (event) => this.$wire.onProductIngested(event));
+                            .listen('.ProductIngested', (event) => this.$wire.onProductIngested(event))
+                            .subscribed(() => { this.channelFailed = false; this.refreshStatus(); })
+                            .error(() => { this.channelFailed = true; this.refreshStatus(); });
 
-                        this.setStatus(statusFor(this.pusher.connection.state));
+                        this.socketState = this.pusher.connection.state;
+                        this.refreshStatus();
                     } catch (error) {
+                        this.unbindState();
                         this.echoChannel = null;
                         this.setStatus('offline');
                     }

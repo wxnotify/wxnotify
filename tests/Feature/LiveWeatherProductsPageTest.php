@@ -10,6 +10,7 @@ use App\Support\LiveProductCategory;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Vite;
 
 use function Pest\Livewire\livewire;
 
@@ -293,26 +294,39 @@ test('the live listener has its own larger budget that fetchSince exhaustion doe
         ->and($component->call('fetchSince', 0)->get('rows'))->toHaveCount(2);
 });
 
-test('the page carries the Echo bootstrap, the channel, the event and the three status labels', function () {
+test('the page loads the Echo bundle and carries the channel, the event and the three status labels', function () {
+    $hotFile = tempnam(sys_get_temp_dir(), 'hot');
+    file_put_contents($hotFile, 'http://localhost:5173');
+    Vite::useHotFile($hotFile);
+
     livewire(Products::class)
-        ->assertSeeHtml('/build/assets/echo-')
+        ->assertSeeHtml('http://localhost:5173/resources/js/echo.js')
         ->assertSeeHtml("private('live-products')")
         ->assertSeeHtml("'.ProductIngested'")
+        ->assertSeeHtml('.error(')
+        ->assertSeeHtml('.subscribed(')
         ->assertSeeHtml('role="status"')
         ->assertSeeHtml('aria-live="polite"')
         ->assertSee('Live')
         ->assertSee('Reconnecting…')
         ->assertSee('Offline: refreshing every minute');
+
+    unlink($hotFile);
 });
 
-test('with no Reverb configuration the page still renders with the offline polling markup and no secret', function () {
-    config(['reverb.apps.apps.0.key' => null, 'reverb.apps.apps.0.secret' => null]);
+test('the first render is Offline and already polls with no Echo, and no Reverb secret is in the page', function () {
+    $this->withoutVite();
+    config(['reverb.apps.apps.0.secret' => 'sekret-value-for-test', 'broadcasting.connections.reverb.secret' => 'sekret-value-for-test']);
 
-    livewire(Products::class)
-        ->assertSuccessful()
-        ->assertSeeHtml('$wire.fetchSince(')
-        ->assertSeeHtml('60000')
-        ->assertDontSee(env('REVERB_APP_SECRET') ?: 'no-such-secret-value');
+    $html = livewire(Products::class)->assertSuccessful()->html();
+
+    expect($html)
+        ->toContain("status: 'offline'")
+        ->toContain('this.setStatus(\'offline\')')
+        ->toContain('60000')
+        ->toContain('this.$wire.fetchSince(')
+        ->toContain('Offline: refreshing every minute')
+        ->not->toContain('sekret-value-for-test');
 });
 
 test('the poll entry point uses the newest id the page holds and merges without duplicates', function () {
