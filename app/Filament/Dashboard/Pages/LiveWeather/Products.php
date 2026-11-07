@@ -50,7 +50,7 @@ class Products extends Page
 
     protected static ?int $navigationSort = 2;
 
-    protected static ?string $title = 'Live products';
+    protected static ?string $title = 'Product Feed';
 
     protected static ?string $slug = 'live-weather/products';
 

@@ -29,7 +29,7 @@ function liveProductsMake(array $attributes = [], ?ProductFamily $family = null)
 }
 
 test('the page sits in the Live Weather group as Products and any signed-in user can open it', function () {
-    livewire(Products::class)->assertSuccessful();
+    livewire(Products::class)->assertSuccessful()->assertSee('Product Feed')->assertDontSee('Live products');
 
     expect(Products::getSlug())->toBe('live-weather/products')
         ->and(Products::getNavigationLabel())->toBe('Products')
