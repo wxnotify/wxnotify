@@ -39,7 +39,7 @@
             >
                 <span aria-hidden="true" data-live-dot class="size-2 rounded-full bg-current" x-bind:class="{ 'wx-live-dot-pulse': ! paused && status === 'live' }"></span>
                 <span x-text="paused ? 'Paused' : label">Offline: refreshing every minute</span>
-                <span aria-hidden="true" data-paused-count x-show="paused && missed > 0" x-cloak x-text="'· ' + missed + ' new'"></span>
+                <span aria-hidden="true" data-paused-count hidden x-bind:hidden="! (paused && missed > 0)" x-text="'· ' + missed + ' new'"></span>
             </span>
         </template>
 

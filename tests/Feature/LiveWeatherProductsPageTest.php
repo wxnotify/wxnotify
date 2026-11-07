@@ -534,6 +534,19 @@ test('the status chip is teleported once into a slot beside the title, in the Al
     expect($this->get(Products::getUrl())->assertOk()->getContent())->toMatch('/<title[^>]*>\\s*Product Feed/');
 });
 
+test('nothing inside the teleported status chip is cloaked and the paused counter is shown by the hidden attribute', function () {
+    $this->withoutVite();
+
+    $html = livewire(Products::class)->assertSuccessful()->html();
+    $start = strpos($html, 'x-teleport="[data-page-title-slot]"');
+    $chip = substr($html, $start, strpos($html, '</template>', $start) - $start);
+
+    expect($chip)->toContain('data-paused-count')
+        ->not->toContain('x-cloak')
+        ->not->toContain('x-show')
+        ->toContain('x-bind:hidden="! (paused && missed > 0)"');
+});
+
 test('while paused no fetch is made and events are only counted, and resume makes the one catch-up', function () {
     $this->withoutVite();
 
