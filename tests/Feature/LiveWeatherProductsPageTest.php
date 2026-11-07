@@ -473,7 +473,7 @@ test('the page has no new-row highlight or badge markup', function () {
         ->not->toContain('isFresh(');
 });
 
-test('the page has an accessible pause and resume button beside the status chip with a paused label and counter hook', function () {
+test('the page has an accessible pause and resume button and a status chip with a paused label and counter hook', function () {
     $this->withoutVite();
 
     $html = livewire(Products::class)->assertSuccessful()->html();
@@ -486,8 +486,7 @@ test('the page has an accessible pause and resume button beside the status chip 
         ->toContain("paused ? 'Paused' : label")
         ->toContain('data-paused-count')
         ->toContain("'· ' + missed + ' new'")
-        ->toContain('min-h-10')
-        ->and(strpos($html, 'data-connection-status'))->toBeLessThan(strpos($html, 'data-pause-toggle'));
+        ->toContain('min-h-10');
 });
 
 test('the status chip dot pulses only while the chip says Live and respects reduced motion', function () {
@@ -502,20 +501,37 @@ test('the status chip dot pulses only while the chip says Live and respects redu
         ->toMatch('/prefers-reduced-motion: reduce\)\s*\{\s*\.wx-live-dot-pulse\s*\{\s*animation: none;/');
 });
 
-test('the category chips, the status chip and the pause button share one toolbar, chips first', function () {
+test('the toolbar holds the category chips then the pause button alone, with no status chip', function () {
     $this->withoutVite();
 
     $html = livewire(Products::class)->assertSuccessful()->html();
     $toolbar = strpos($html, 'data-products-toolbar');
     $toolbarEnd = strpos($html, 'x-show="scrolled && $wire.pending > 0"');
+    $toolbarHtml = substr($html, $toolbar, $toolbarEnd - $toolbar);
 
     expect($toolbar)->not->toBeFalse()
         ->and(strpos($html, 'data-category-chips'))->toBeGreaterThan($toolbar)
-        ->and(strpos($html, 'data-connection-status'))->toBeGreaterThan(strpos($html, 'data-category-chips'))
-        ->and(strpos($html, 'data-pause-toggle'))->toBeGreaterThan(strpos($html, 'data-connection-status'))
-        ->and(strpos($html, 'data-pause-toggle'))->toBeLessThan($toolbarEnd)
+        ->and(strpos($html, 'data-pause-toggle'))->toBeGreaterThan(strpos($html, 'data-category-chips'))
+        ->and($toolbarHtml)->not->toContain('data-connection-status')
         ->and($html)->toContain('flex-wrap items-center justify-between')
         ->toContain('ml-auto flex flex-wrap items-center justify-end');
+});
+
+test('the status chip is teleported once into a slot beside the title, in the Alpine scope, and the heading stays Product Feed', function () {
+    $this->withoutVite();
+
+    $html = livewire(Products::class)->assertSuccessful()->html();
+    $teleport = strpos($html, 'x-teleport="[data-page-title-slot]"');
+    $root = strpos($html, 'x-data="wxLiveProducts"');
+
+    expect(substr_count($html, 'data-connection-status'))->toBe(1)
+        ->and(substr_count($html, 'data-page-title-slot'))->toBe(2)
+        ->and($html)->toMatch('/<h1 class="fi-header-heading">\s*Product Feed\s*<\/h1>\s*<div data-page-title-slot wire:ignore><\/div>/')
+        ->and($teleport)->toBeGreaterThan($root)
+        ->and(strpos($html, 'data-connection-status'))->toBeGreaterThan($teleport)
+        ->and(strpos($html, 'data-connection-status'))->toBeLessThan(strpos($html, 'data-products-toolbar'));
+
+    expect($this->get(Products::getUrl())->assertOk()->getContent())->toMatch('/<title[^>]*>\\s*Product Feed/');
 });
 
 test('while paused no fetch is made and events are only counted, and resume makes the one catch-up', function () {

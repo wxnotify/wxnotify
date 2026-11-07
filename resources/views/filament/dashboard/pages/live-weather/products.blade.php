@@ -25,6 +25,24 @@
         x-effect="if (! scrolled && $wire.pending > 0) { $wire.pending = 0; }"
         x-data="wxLiveProducts"
     >
+        <template x-teleport="[data-page-title-slot]">
+            <span
+                role="status"
+                aria-live="polite"
+                data-connection-status
+                class="inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium ring-1 ring-inset"
+                x-bind:class="{
+                    'bg-green-50 text-green-800 ring-green-600/30 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-400/30': ! paused && status === 'live',
+                    'bg-amber-50 text-amber-800 ring-amber-600/30 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30': ! paused && status === 'connecting',
+                    'bg-gray-100 text-gray-700 ring-gray-500/30 dark:bg-white/10 dark:text-gray-300 dark:ring-white/20': paused || status === 'offline',
+                }"
+            >
+                <span aria-hidden="true" data-live-dot class="size-2 rounded-full bg-current" x-bind:class="{ 'wx-live-dot-pulse': ! paused && status === 'live' }"></span>
+                <span x-text="paused ? 'Paused' : label">Offline: refreshing every minute</span>
+                <span aria-hidden="true" data-paused-count x-show="paused && missed > 0" x-cloak x-text="'· ' + missed + ' new'"></span>
+            </span>
+        </template>
+
         <div class="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2" data-products-toolbar>
             <div class="flex flex-wrap gap-2" data-category-chips>
                 @foreach ($this->getCategoryOptions() as $option)
@@ -48,21 +66,6 @@
             </div>
 
             <div class="ml-auto flex flex-wrap items-center justify-end gap-2" data-live-controls>
-                <span
-                    role="status"
-                    aria-live="polite"
-                    data-connection-status
-                    class="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-xs font-medium ring-1 ring-inset"
-                    x-bind:class="{
-                        'bg-green-50 text-green-800 ring-green-600/30 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-400/30': ! paused && status === 'live',
-                        'bg-amber-50 text-amber-800 ring-amber-600/30 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30': ! paused && status === 'connecting',
-                        'bg-gray-100 text-gray-700 ring-gray-500/30 dark:bg-white/10 dark:text-gray-300 dark:ring-white/20': paused || status === 'offline',
-                    }"
-                >
-                    <span aria-hidden="true" data-live-dot class="size-2 rounded-full bg-current" x-bind:class="{ 'wx-live-dot-pulse': ! paused && status === 'live' }"></span>
-                    <span x-text="paused ? 'Paused' : label">Offline: refreshing every minute</span>
-                    <span aria-hidden="true" data-paused-count x-show="paused && missed > 0" x-cloak x-text="'· ' + missed + ' new'"></span>
-                </span>
                 <button
                     type="button"
                     data-pause-toggle

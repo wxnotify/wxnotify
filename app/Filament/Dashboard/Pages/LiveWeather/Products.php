@@ -10,6 +10,7 @@ use App\Support\Timezones;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -179,6 +180,18 @@ class Products extends Page
      * Whether a row's public page may be linked: always an https URL, and an http URL only
      * outside production (a local APP_URL). Any other scheme, a relative URL or none is never linked.
      */
+    /**
+     * The stock header with an empty slot beside the title: the page body teleports the live status
+     * chip into it, so the chip keeps the Alpine scope of the body while sitting next to the title.
+     */
+    public function getHeader(): ?View
+    {
+        return view('filament.dashboard.pages.live-weather.products-header', [
+            'heading' => $this->getHeading(),
+            'breadcrumbs' => filament()->hasBreadcrumbs() ? $this->getBreadcrumbs() : [],
+        ]);
+    }
+
     public function isLinkable(?string $url): bool
     {
         if ($url === null) {
