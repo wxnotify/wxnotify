@@ -190,6 +190,59 @@ test('fetchSince returns and merges only newer real products without duplicates'
     expect(array_column($component->get('rows'), 'id'))->toBe([$newer->id, $known->id]);
 });
 
+function liveProductsUntitled(array $attributes = []): IngestedProduct
+{
+    return liveProductsMake(['awipsid' => null, 'ttaaii' => null, ...$attributes]);
+}
+
+test('untitled products (no catalog name, AWIPS ID or WMO header) are hidden from the mount', function () {
+    liveProductsUntitled(['received_at' => now()]);
+    liveProductsMake(['awipsid' => '  ', 'ttaaii' => "\t", 'received_at' => now()]);
+    $emptyName = liveProductsMake(['awipsid' => null, 'ttaaii' => '', 'received_at' => now()]);
+    $emptyName->update(['product_id' => Product::factory()->create(['name' => ''])->id]);
+
+    expect(livewire(Products::class)->get('rows'))->toBe([]);
+});
+
+test('a product with only a catalog name, only an AWIPS ID or only a TTAAII is still listed', function () {
+    $named = liveProductsUntitled(['product_id' => Product::factory()->create()->id]);
+    $awips = liveProductsUntitled(['awipsid' => 'tornado']);
+    $ttaaii = liveProductsUntitled(['ttaaii' => 'wwus41']);
+    $padded = liveProductsMake(['awipsid' => ' ', 'ttaaii' => ' wwus41 ']);
+
+    expect(array_column(livewire(Products::class)->get('rows'), 'id'))
+        ->toEqualCanonicalizing([$named->id, $awips->id, $ttaaii->id, $padded->id]);
+});
+
+test('an untitled product is ignored by the live listener and the gap fill and never counts as pending', function () {
+    $known = liveProductsMake(['received_at' => now()->subHour()]);
+    $page = livewire(Products::class);
+    $untitled = liveProductsUntitled(['received_at' => now()]);
+    $titled = liveProductsMake(['received_at' => now()->subMinute()]);
+
+    $page->call('onProductIngested', ['id' => $untitled->id])
+        ->assertSet('pending', 0);
+    expect(array_column($page->get('rows'), 'id'))->toBe([$known->id]);
+
+    $page->call('fetchSince', $known->id)->assertSet('pending', 1);
+    expect(array_column($page->get('rows'), 'id'))->toBe([$titled->id, $known->id]);
+});
+
+test('an untitled product is hidden after a category change and the 50 row cap counts only visible rows', function () {
+    foreach (range(1, 5) as $minute) {
+        liveProductsUntitled(['received_at' => now()->subMinutes($minute)]);
+    }
+    foreach (range(1, 55) as $minute) {
+        liveProductsMake(['received_at' => now()->subHours(1)->subMinutes($minute)]);
+    }
+
+    $page = livewire(Products::class);
+    expect($page->get('rows'))->toHaveCount(50);
+
+    $page->call('setCategories', ['other']);
+    expect($page->get('rows'))->toHaveCount(50);
+});
+
 test('category filtering hides the other categories and rejects an unknown value', function () {
     $warning = liveProductsMake([], ProductFamily::Warning);
     $discussion = liveProductsMake([], ProductFamily::ForecastDiscussion);

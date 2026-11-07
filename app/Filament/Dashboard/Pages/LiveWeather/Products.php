@@ -18,7 +18,7 @@ use UnitEnum;
 /**
  * The Live Weather product feed: the latest processed products, newest first, kept current by the
  * ProductIngested broadcast. Public data only (names, offices, headlines; never the text); every
- * signed-in tier may open it. Test products and replays are never listed. The mount, the live
+ * signed-in tier may open it. Test products, replays and untitled products (no catalog name, AWIPS ID or WMO header) are never listed. The mount, the live
  * listener and the gap fill all build rows through buildRows(), so they cannot diverge.
  *
  * @phpstan-type Row array{id: int, name: string, office: ?string, headline: ?string, issued_at: string, category: string, view_url: ?string}
@@ -215,11 +215,34 @@ class Products extends Page
             ->where('ingested_products.is_test', false)
             ->whereNull('ingested_products.replay_of_id')
             ->where(function (Builder $query): void {
+                $this->whereTitled($query);
+            })
+            ->where(function (Builder $query): void {
                 $this->whereInSelectedCategories($query);
             })
             ->with(['product:id,name,family', 'segments:id,ingested_product_id,position,product_id,vtec_phenomenon,vtec_significance', 'segments.product:id,name'])
             ->orderByDesc('ingested_products.received_at')
             ->orderByDesc('ingested_products.id');
+    }
+
+    /**
+     * Hides the untitled products: those whose displayTitle() would fall through to the generic
+     * "Weather product" label. Titled means a catalog product with a non-empty name, or a
+     * non-blank awipsid, or a non-blank ttaaii (blank mirrors filled(): PHP trim() characters).
+     *
+     * @param  Builder<IngestedProduct>  $query
+     */
+    protected function whereTitled(Builder $query): void
+    {
+        $blank = "E' \\t\\n\\r\\x0B'";
+
+        $query->whereExists(fn ($product) => $product->selectRaw('1')
+            ->from('products')
+            ->whereColumn('products.id', 'ingested_products.product_id')
+            ->whereNotNull('products.name')
+            ->where('products.name', '<>', ''))
+            ->orWhereRaw("btrim(ingested_products.awipsid, {$blank}) <> ''")
+            ->orWhereRaw("btrim(ingested_products.ttaaii, {$blank}) <> ''");
     }
 
     /**
