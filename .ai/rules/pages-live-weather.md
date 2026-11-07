@@ -3,6 +3,8 @@ paths:
   - 'resources/views/filament/dashboard/pages/live-weather/**'
   - resources/views/filament/dashboard/pages/live-weather/products.blade.php
   - resources/views/filament/dashboard/pages/live-weather/map-recenter.blade.php
+  - resources/views/filament/dashboard/pages/live-weather/map-places.blade.php
+  - resources/views/filament/dashboard/pages/live-weather/map-layers.blade.php
 ---
 
 # Pages Live Weather
@@ -24,3 +26,9 @@ The status chip is not in the toolbar: it is teleported (x-teleport) from the Al
 
 ## Live map recenter button
 The button (window.wxLiveMapRecenter) returns to state.opening (the page's data-center/data-zoom), takes its name from config.recenter.label (decided server-side in Map::getRecenterConfig(): "Back to my location" for a saved place, "Reset the map view" for the default US view), uses setView animate:false under prefers-reduced-motion, and starts inside startModule's try/catch. Never ask for browser geolocation.
+
+## Live map "My places" layer
+window.wxLiveMapPlaces: config.places comes from Map::getPlacesConfig() (only the viewer's own located locations, max 100, name + "address · Type" + lat/lng only). Pins sit in a custom pane at zIndex 420 (above the 350-410 overlays, below markers 600 and popups 700) with bubblingMouseEvents:false; popups use textContent. Default ON; the choice is stored as `places` in `wxnotify.liveMap.layers`.
+
+## Merge, never overwrite, the stored layer choices
+Every module that writes `wxnotify.liveMap.layers` must merge over the stored object (Object.assign({}, readStored(), mine)); a plain overwrite erases the other modules' keys (SPC layers and `places`).

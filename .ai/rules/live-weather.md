@@ -2,6 +2,7 @@
 paths:
   - 'app/Filament/Dashboard/Pages/LiveWeather/**'
   - app/Filament/Dashboard/Pages/LiveWeather/Products.php
+  - app/Filament/Dashboard/Pages/LiveWeather/Map.php
 ---
 
 # Live Weather
@@ -20,3 +21,6 @@ The one check, called from the Blade (supersedes the "https only" wording): an h
 
 ## Products page lists only titled products
 listable() requires a catalog product with a non-empty name, or a non-blank awipsid, or a non-blank ttaaii (btrim with PHP trim chars), so the generic "Weather product" rows never appear, count as pending, or take cap slots. Keep the condition in listable() only; the broadcast event still announces them.
+
+## Per-viewer map data goes through data-config, scoped to the user
+Per-viewer data on the Live map (the My places pins) goes through the server-rendered data-config scoped to auth()->user(), never a $wire method, and never carries anything but name, address, type and position.
