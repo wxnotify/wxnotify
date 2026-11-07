@@ -60,6 +60,12 @@ class DashboardPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Blue,
             ])
+            ->navigationGroups([
+                'Live Weather',
+                'Alerting',
+                'Tools',
+                'Support',
+            ])
             ->databaseNotifications()
             ->login()
             ->registration(Register::class)
