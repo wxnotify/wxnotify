@@ -17,3 +17,6 @@ The owner removed the new-row tint and "New" badge (f14d364); ignore the earlier
 
 ## Products rows link only when Products::isLinkable() says so
 The one check, called from the Blade (supersedes the "https only" wording): an https:// URL always, an http:// URL only when `! app()->isProduction()`, never any other scheme, a relative URL or none. The anchor keeps target=_blank rel=noopener. Row links come from IngestedProduct::viewUrl(), which uses config('wxnotify.product_domain') else APP_URL, so a local APP_URL that differs from the serving host sends links to the wrong server.
+
+## Products page lists only titled products
+listable() requires a catalog product with a non-empty name, or a non-blank awipsid, or a non-blank ttaaii (btrim with PHP trim chars), so the generic "Weather product" rows never appear, count as pending, or take cap slots. Keep the condition in listable() only; the broadcast event still announces them.
