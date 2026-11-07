@@ -6,6 +6,7 @@ use App\Actions\Pipeline\BackfillOutlookRiskAreas;
 use App\Actions\Pipeline\BuildBulletinSegments;
 use App\Actions\Pipeline\SyncActiveWwa;
 use App\Actions\Weather\MatchWeatherAlertRules;
+use App\Events\ProductIngested;
 use App\Models\IngestedProduct;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -63,6 +64,7 @@ class ProcessIngestedProduct implements ShouldQueue
         }
 
         $this->buildSegments($product);
+        $this->announce($product);
 
         if ($product->replay_of_id !== null) {
             // A replay only exercises alert delivery, so it must not write active_wwas.
@@ -128,6 +130,27 @@ class ProcessIngestedProduct implements ShouldQueue
             logger()->error('ProcessIngestedProduct: failed to build the segments of a bulletin', [
                 'ingested_product_id' => $product->id,
                 'exception' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Announces a real product to the Live Weather Products page (queued broadcast). Test products
+     * and replays are never shown there. A failure is logged by exception class only and never
+     * thrown: ingestion must not suffer for a broadcast.
+     */
+    private function announce(IngestedProduct $product): void
+    {
+        if ($product->is_test || $product->replay_of_id !== null) {
+            return;
+        }
+
+        try {
+            event(new ProductIngested($product));
+        } catch (Throwable $e) {
+            logger()->error('ProcessIngestedProduct: failed to broadcast a product', [
+                'ingested_product_id' => $product->id,
+                'exception' => $e::class,
             ]);
         }
     }
