@@ -292,3 +292,41 @@ test('the live listener has its own larger budget that fetchSince exhaustion doe
     expect(array_column($component->get('rows'), 'id'))->toContain($fresh->id)
         ->and($component->call('fetchSince', 0)->get('rows'))->toHaveCount(2);
 });
+
+test('the page carries the Echo bootstrap, the channel, the event and the three status labels', function () {
+    livewire(Products::class)
+        ->assertSeeHtml('/build/assets/echo-')
+        ->assertSeeHtml("private('live-products')")
+        ->assertSeeHtml("'.ProductIngested'")
+        ->assertSeeHtml('role="status"')
+        ->assertSeeHtml('aria-live="polite"')
+        ->assertSee('Live')
+        ->assertSee('Reconnecting…')
+        ->assertSee('Offline: refreshing every minute');
+});
+
+test('with no Reverb configuration the page still renders with the offline polling markup and no secret', function () {
+    config(['reverb.apps.apps.0.key' => null, 'reverb.apps.apps.0.secret' => null]);
+
+    livewire(Products::class)
+        ->assertSuccessful()
+        ->assertSeeHtml('$wire.fetchSince(')
+        ->assertSeeHtml('60000')
+        ->assertDontSee(env('REVERB_APP_SECRET') ?: 'no-such-secret-value');
+});
+
+test('the poll entry point uses the newest id the page holds and merges without duplicates', function () {
+    $known = liveProductsMake(['received_at' => now()->subMinutes(5)]);
+    $page = livewire(Products::class);
+    $newer = liveProductsMake(['received_at' => now()]);
+
+    $page->call('fetchSince', $known->id)->call('fetchSince', $known->id);
+
+    expect(array_column($page->get('rows'), 'id'))->toBe([$newer->id, $known->id]);
+});
+
+test('a guest is redirected to the panel login', function () {
+    auth()->logout();
+
+    $this->get(Products::getUrl())->assertRedirect(Filament::getLoginUrl());
+});
