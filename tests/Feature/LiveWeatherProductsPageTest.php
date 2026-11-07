@@ -379,24 +379,14 @@ test('the poll entry point uses the newest id the page holds and merges without 
     expect(array_column($page->get('rows'), 'id'))->toBe([$newer->id, $known->id]);
 });
 
-test('each row carries a tint and a New badge bound to the fresh state, and the page defines the 8 s highlight and reduce-motion handling', function () {
+test('the page has no new-row highlight or badge markup', function () {
     $this->withoutVite();
-    $product = liveProductsMake(['received_at' => now()]);
+    liveProductsMake(['received_at' => now()]);
 
-    $html = livewire(Products::class)->assertSuccessful()->html();
-
-    expect($html)
-        ->toContain('data-fresh-badge')
-        ->toContain('>New</span>')
-        ->toContain('isFresh('.$product->id.')')
-        ->toContain('data-fresh-tint')
-        ->toContain('const FRESH_MS = 8000;')
-        ->toContain('animation: wx-fresh-fade 8s linear forwards')
-        ->toContain('prefers-reduced-motion: reduce')
-        ->toContain('wx-fresh-static')
-        ->toContain('bg-primary-50 dark:bg-primary-500/10')
-        ->toContain('this.$wire.$watch(\'rows\'')
-        ->not->toContain('aria-live="assertive"');
+    expect(livewire(Products::class)->assertSuccessful()->html())
+        ->not->toContain('data-fresh-badge')
+        ->not->toContain('data-fresh-tint')
+        ->not->toContain('isFresh(');
 });
 
 test('a guest is redirected to the panel login', function () {

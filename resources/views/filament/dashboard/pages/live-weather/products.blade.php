@@ -64,9 +64,7 @@
                     @php
                         $linked = $row['view_url'] && str_starts_with($row['view_url'], 'https://');
                     @endphp
-                    <li wire:key="product-{{ $row['id'] }}" @class(['relative isolate flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3', 'hover:bg-gray-50 dark:hover:bg-white/5' => $linked]) data-product-row>
-                        <span aria-hidden="true" x-show="isFresh({{ (int) $row['id'] }})" x-cloak x-bind:class="fadeClass()" class="pointer-events-none absolute inset-0 -z-10 bg-primary-50 dark:bg-primary-500/10" data-fresh-tint></span>
-                        <span x-show="isFresh({{ (int) $row['id'] }})" x-cloak class="pointer-events-none absolute bottom-0.5 right-2 rounded-full bg-primary-50 px-1.5 text-[10px] font-semibold leading-4 text-primary-700 ring-1 ring-inset ring-primary-600/30 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30" data-fresh-badge>New</span>
+                    <li wire:key="product-{{ $row['id'] }}" @class(['relative flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3', 'hover:bg-gray-50 dark:hover:bg-white/5' => $linked]) data-product-row>
                         <div class="min-w-0 flex-1">
                             <p class="text-sm font-medium text-gray-950 dark:text-white">
                                 @if ($linked)
@@ -93,18 +91,8 @@
     </div>
     @vite('resources/js/echo.js')
 
-    <style>
-        /* Duration matches FRESH_MS in the script below. */
-        @keyframes wx-fresh-fade { from { opacity: 1; } to { opacity: 0; } }
-        .wx-fresh-fade { animation: wx-fresh-fade 8s linear forwards; }
-        @media (prefers-reduced-motion: reduce) { .wx-fresh-fade { animation: none; } }
-    </style>
-
     <script>
         (function () {
-            /** How long a newly arrived row stays highlighted once the viewer can see it at the top. */
-            const FRESH_MS = 8000;
-
             const LABELS = {
                 live: 'Live',
                 connecting: 'Reconnecting…',
@@ -131,29 +119,10 @@
                 eventTimer: null,
                 retryTimer: null,
                 attempts: 0,
-                fresh: {},
-                waiting: [],
-                seen: {},
-                baseline: 0,
-                freshTimer: null,
-                reduceMotion: false,
                 init() {
-                    this.reduceMotion = !! (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-                    this.$wire.rows.forEach((row) => {
-                        const id = Number(row.id) || 0;
-                        this.seen[id] = true;
-                        this.baseline = Math.max(this.baseline, id);
-                    });
-                    this.$wire.$watch('rows', (rows) => this.track(rows));
-
                     this.onScroll = () => {
                         this.scrolled = window.scrollY > 160;
                         if (! this.scrolled && this.$wire.pending > 0) { this.$wire.pending = 0; }
-                        if (! this.scrolled && this.waiting.length > 0) {
-                            const ids = this.waiting;
-                            this.waiting = [];
-                            this.highlight(ids);
-                        }
                     };
                     window.addEventListener('scroll', this.onScroll, { passive: true });
 
@@ -179,7 +148,6 @@
                     this.stopPolling();
                     clearTimeout(this.eventTimer);
                     clearTimeout(this.retryTimer);
-                    clearTimeout(this.freshTimer);
                     this.unbindState();
                     try {
                         if (window.Echo) { window.Echo.leave('live-products'); }
@@ -194,48 +162,6 @@
                 refreshStatus() {
                     this.setStatus(this.channelFailed ? 'offline' : statusFor(this.socketState));
                 },
-                /*
-                 * Highlighting is client-side. Rows held at init are never fresh, and neither is a row
-                 * with an id at or below the newest id held at init (a category switch re-lists older
-                 * rows). A new row gets FRESH_MS of highlight starting when the viewer is at the top:
-                 * at once if they are, otherwise when they next return to the top (pill click or
-                 * manual scroll). One timer sweeps expired ids.
-                 */
-                track(rows) {
-                    const arrived = [];
-                    (rows || []).forEach((row) => {
-                        const id = Number(row.id) || 0;
-                        if (id <= 0 || this.seen[id]) { return; }
-                        this.seen[id] = true;
-                        if (id > this.baseline) { arrived.push(id); }
-                    });
-                    if (arrived.length === 0) { return; }
-                    if (this.scrolled) { this.waiting = this.waiting.concat(arrived); return; }
-                    this.highlight(arrived);
-                },
-                highlight(ids) {
-                    const expiry = Date.now() + FRESH_MS;
-                    const next = { ...this.fresh };
-                    ids.forEach((id) => { next[id] = expiry; });
-                    this.fresh = next;
-                    this.scheduleSweep();
-                },
-                scheduleSweep() {
-                    clearTimeout(this.freshTimer);
-                    this.freshTimer = null;
-                    const expiries = Object.values(this.fresh);
-                    if (expiries.length === 0) { return; }
-                    this.freshTimer = setTimeout(() => this.sweep(), Math.max(0, Math.min(...expiries) - Date.now()));
-                },
-                sweep() {
-                    const now = Date.now();
-                    const kept = {};
-                    Object.keys(this.fresh).forEach((id) => { if (this.fresh[id] > now) { kept[id] = this.fresh[id]; } });
-                    this.fresh = kept;
-                    this.scheduleSweep();
-                },
-                isFresh(id) { return (this.fresh[id] || 0) > 0; },
-                fadeClass() { return this.reduceMotion ? 'wx-fresh-static' : 'wx-fresh-fade'; },
                 toTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); this.$wire.pending = 0; },
                 newestId() {
                     return this.$wire.rows.reduce((max, row) => Math.max(max, Number(row.id) || 0), 0);
