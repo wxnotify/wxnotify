@@ -141,7 +141,7 @@ class ProcessIngestedProduct implements ShouldQueue
      */
     private function announce(IngestedProduct $product): void
     {
-        if ($product->is_test || $product->replay_of_id !== null) {
+        if ($product->is_test || $product->replay_of_id !== null || ProductIngested::broadcasterIsOff()) {
             return;
         }
 

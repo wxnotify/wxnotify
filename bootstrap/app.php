@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('storage:scan-products')->hourly()->withoutOverlapping(60);
         $schedule->command('sanctum:prune-expired --hours=24')->daily();
         $schedule->command('outlook:prune-maps')->daily();
+        $schedule->command('queue:prune-failed --hours=168')->daily();
         $schedule->job(new RecordQueueHeartbeat)->everyMinute();
     })
     ->withExceptions(function (Exceptions $exceptions): void {

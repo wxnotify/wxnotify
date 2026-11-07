@@ -118,7 +118,8 @@ class Products extends Page
 
     /**
      * The gap fill: the listable products newer than the given id (newest first, at most 100),
-     * merged into the list and returned. A non-numeric or negative id, or a call over the budget,
+     * merged into the list and returned; each row that actually entered the capped list counts into
+     * `pending` (the page zeroes it at the top). A non-numeric or negative id, or a call over the budget,
      * returns nothing without a query.
      *
      * @return list<array<string, mixed>>
@@ -135,7 +136,14 @@ class Products extends Page
             $this->listable()->where('ingested_products.id', '>', $lastId)->limit(self::MAX_ROWS)->get()
         );
 
+        $known = array_column($this->rows, 'id');
         $this->mergeRows($rows);
+
+        foreach ($rows as $row) {
+            if (! in_array($row['id'], $known, true) && $this->hasRow($row['id'])) {
+                $this->pending++;
+            }
+        }
 
         return $rows;
     }

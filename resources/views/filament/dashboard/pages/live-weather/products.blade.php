@@ -109,6 +109,10 @@
                 channelFailed: false,
                 socketState: 'unavailable',
                 lastKick: 0,
+                latestEvent: 0,
+                eventTimer: null,
+                retryTimer: null,
+                attempts: 0,
                 init() {
                     this.onScroll = () => {
                         this.scrolled = window.scrollY > 160;
@@ -136,6 +140,8 @@
                     document.removeEventListener('visibilitychange', this.onWake);
                     window.removeEventListener('online', this.onWake);
                     this.stopPolling();
+                    clearTimeout(this.eventTimer);
+                    clearTimeout(this.retryTimer);
                     this.unbindState();
                     try {
                         if (window.Echo) { window.Echo.leave('live-products'); }
@@ -157,13 +163,49 @@
                 gapFill() {
                     return this.$wire.fetchSince(this.newestId());
                 },
+                /*
+                 * A broadcast only says "something new exists". Instead of one server round trip
+                 * (and one full re-render) per event, events are collected and, once they stop for
+                 * 1 s, ONE fetchSince(newest id held) reads everything newer. That same call is
+                 * the recovery for a dropped event, and a rate-limited call (which answers []
+                 * without a query) is simply retried: the event stays unresolved until the page
+                 * holds a row at least as new as the event, a retry runs every 5 s (at most 3
+                 * tries, so an event for a product the category filter hides cannot loop), and the
+                 * minute poll keeps running meanwhile even when the chip says Live.
+                 */
+                onEvent(event) {
+                    const id = Number(event && event.id);
+                    if (! Number.isInteger(id) || id <= 0) { return; }
+                    this.latestEvent = Math.max(this.latestEvent, id);
+                    this.attempts = 0;
+                    clearTimeout(this.retryTimer);
+                    clearTimeout(this.eventTimer);
+                    this.eventTimer = setTimeout(() => this.resolveEvents(), 1000);
+                },
+                async resolveEvents() {
+                    this.eventTimer = null;
+                    const target = this.latestEvent;
+                    if (target === 0) { return; }
+                    try { await this.gapFill(); } catch (error) {}
+                    if (this.latestEvent !== target) { return; }
+                    this.attempts++;
+                    if (this.newestId() >= target || this.attempts >= 3) { this.settle(); return; }
+                    this.startPolling();
+                    this.retryTimer = setTimeout(() => this.resolveEvents(), 5000);
+                },
+                settle() {
+                    this.latestEvent = 0;
+                    this.attempts = 0;
+                    clearTimeout(this.retryTimer);
+                    if (this.status === 'live') { this.stopPolling(); }
+                },
                 setStatus(status) {
                     const wasLive = this.status === 'live';
                     this.status = status;
                     this.label = LABELS[status];
 
                     if (status === 'live') {
-                        this.stopPolling();
+                        if (this.latestEvent === 0) { this.stopPolling(); }
                         if (! wasLive) { this.gapFill(); }
                         return;
                     }
@@ -172,7 +214,7 @@
                 },
                 startPolling() {
                     if (this.pollTimer !== null) { return; }
-                    this.pollTimer = setInterval(() => this.gapFill(), 60000);
+                    this.pollTimer = setInterval(() => (this.latestEvent > 0 ? this.resolveEvents() : this.gapFill()), 60000);
                 },
                 stopPolling() {
                     if (this.pollTimer !== null) { clearInterval(this.pollTimer); this.pollTimer = null; }
@@ -188,7 +230,7 @@
                         this.pusher.connection.bind('state_change', this.onState);
 
                         this.echoChannel = window.Echo.private('live-products')
-                            .listen('.ProductIngested', (event) => this.$wire.onProductIngested(event))
+                            .listen('.ProductIngested', (event) => this.onEvent(event))
                             .subscribed(() => { this.channelFailed = false; this.refreshStatus(); })
                             .error(() => { this.channelFailed = true; this.refreshStatus(); });
 

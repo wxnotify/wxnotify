@@ -31,7 +31,7 @@ beforeEach(function (): void {
 /**
  * The queues the stack's worker reads, highest priority first (compose.yaml's `queue` service).
  */
-const CHAN_WORKER_QUEUES = 'deliveries,default';
+const CHAN_WORKER_QUEUES = 'deliveries,default,broadcasts';
 
 /**
  * The seconds in a compose duration such as `70s`.

@@ -16,7 +16,7 @@
 # queue:listen only has while a job runs, so this checks for the listener.
 services:
     queue:
-        command: 'php artisan queue:listen --queue=deliveries,default --tries=1 --sleep=1'
+        command: 'php artisan queue:listen --queue=deliveries,default,broadcasts --tries=1 --sleep=1'
         healthcheck:
             test:
                 - CMD

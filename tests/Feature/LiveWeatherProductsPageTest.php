@@ -329,6 +329,28 @@ test('the first render is Offline and already polls with no Echo, and no Reverb 
         ->not->toContain('sekret-value-for-test');
 });
 
+test('the Echo listener debounces events into one fetchSince and never calls onProductIngested', function () {
+    $this->withoutVite();
+
+    $html = livewire(Products::class)->assertSuccessful()->html();
+
+    expect($html)
+        ->toContain('this.onEvent(event)')
+        ->toContain('setTimeout(() => this.resolveEvents(), 1000)')
+        ->toContain('this.$wire.fetchSince(this.newestId())')
+        ->not->toContain('$wire.onProductIngested');
+});
+
+test('fetchSince counts only the rows that entered the list into pending', function () {
+    $known = liveProductsMake(['received_at' => now()->subMinutes(5)]);
+    $page = livewire(Products::class);
+    liveProductsMake(['received_at' => now()->subMinute()]);
+    liveProductsMake(['received_at' => now()]);
+
+    $page->call('fetchSince', $known->id)->assertSet('pending', 2)
+        ->call('fetchSince', $known->id)->assertSet('pending', 2);
+});
+
 test('the poll entry point uses the newest id the page holds and merges without duplicates', function () {
     $known = liveProductsMake(['received_at' => now()->subMinutes(5)]);
     $page = livewire(Products::class);

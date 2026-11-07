@@ -55,3 +55,14 @@ test('pruning expired tokens removes an expired app token and its device channel
         ->and(PersonalAccessToken::find($live->id))->not->toBeNull()
         ->and(NotificationChannel::find($liveChannel->id))->not->toBeNull();
 });
+
+test('failed jobs, including failed broadcasts, are pruned after a week', function () {
+    Artisan::call('schedule:list');
+
+    $event = collect(app(Schedule::class)->events())
+        ->first(fn (Event $event): bool => str_contains($event->command, 'queue:prune-failed'));
+
+    expect($event)->not->toBeNull()
+        ->and($event->command)->toContain('--hours=168')
+        ->and($event->expression)->toBe('0 0 * * *');
+});

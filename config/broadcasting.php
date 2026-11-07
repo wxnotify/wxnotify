@@ -43,6 +43,9 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                // Short, so a hanging Reverb frees the `broadcasts` worker slot quickly.
+                'connect_timeout' => 2,
+                'timeout' => 3,
             ],
         ],
 

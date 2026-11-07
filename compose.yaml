@@ -95,7 +95,9 @@ services:
     # A persistent worker: it boots the app once (queue:listen re-booted it for
     # every job, ~1.2 s each, capping a burst at ~1.5 jobs/s). It reads the
     # `deliveries` queue (DeliverWeatherAlert, DeliverScheduledAlert) before
-    # `default`, so an alert never waits behind products being processed.
+    # `default`, so an alert never waits behind products being processed. It
+    # reads `broadcasts` (the Live Weather Reverb push) last of all, so a slow
+    # or hanging Reverb can only ever delay other broadcasts.
     # --tries=1: a failed job is never re-run (a retry re-sends billed
     # messages). --timeout=60 stays below the database queue's retry_after
     # (90 s) and above the longest send budget (50 s), or a slow send would be
@@ -123,7 +125,7 @@ services:
         depends_on:
             - pgsql
             - redis
-        command: 'php artisan queue:work --queue=deliveries,default --tries=1 --sleep=1 --timeout=60 --memory=192 --max-time=3600'
+        command: 'php artisan queue:work --queue=deliveries,default,broadcasts --tries=1 --sleep=1 --timeout=60 --memory=192 --max-time=3600'
         stop_signal: SIGTERM
         # Room for the job in hand to finish (at most --timeout) after SIGTERM
         # before Docker kills it; Docker's default is 10 s.
