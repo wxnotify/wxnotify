@@ -14,3 +14,6 @@ Rows are built only by `buildRows()` and read through `listable()` (never `text`
 
 ## Products page: no new-row highlight, the whole row is the link (supersedes the "new highlight" sentence)
 The owner removed the new-row tint and "New" badge (f14d364); ignore the earlier "client-side highlight, 8 s" sentence in this file. Only the "N new products" pill (with `pending` and its x-effect reset) tells the viewer about new rows. Each row with an https public page is one stretched anchor (target=_blank, rel=noopener) named by the product; rows without a public page are plain and not clickable.
+
+## Products rows link only when Products::isLinkable() says so
+The one check, called from the Blade (supersedes the "https only" wording): an https:// URL always, an http:// URL only when `! app()->isProduction()`, never any other scheme, a relative URL or none. The anchor keeps target=_blank rel=noopener. Row links come from IngestedProduct::viewUrl(), which uses config('wxnotify.product_domain') else APP_URL, so a local APP_URL that differs from the serving host sends links to the wrong server.
