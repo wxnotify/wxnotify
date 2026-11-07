@@ -11,3 +11,6 @@ Methods the page JS calls through `$wire` are `#[Renderless]`, validate every ar
 
 ## Live products page trusts only the id
 Rows are built only by `buildRows()` and read through `listable()` (never `text`, never is_test or replays), so a forged payload adds nothing. `rows` and `categories` are #[Locked]. Data methods are budgeted per user via `Concerns/LimitsDataCalls` (fetchSince/setCategories 120/min, onProductIngested 600/min). The browser no longer calls onProductIngested: it debounces broadcasts (1 s) into one `fetchSince(newestId)` with an INTEGER id (anything else returns []). The "new" highlight is client-side only (8 s, starts when the viewer is at the top).
+
+## Products page: no new-row highlight, the whole row is the link (supersedes the "new highlight" sentence)
+The owner removed the new-row tint and "New" badge (f14d364); ignore the earlier "client-side highlight, 8 s" sentence in this file. Only the "N new products" pill (with `pending` and its x-effect reset) tells the viewer about new rows. Each row with an https public page is one stretched anchor (target=_blank, rel=noopener) named by the product; rows without a public page are plain and not clickable.
