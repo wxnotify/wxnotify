@@ -52,7 +52,7 @@
                     role="status"
                     aria-live="polite"
                     data-connection-status
-                    class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset"
+                    class="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-xs font-medium ring-1 ring-inset"
                     x-bind:class="{
                         'bg-green-50 text-green-800 ring-green-600/30 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-400/30': ! paused && status === 'live',
                         'bg-amber-50 text-amber-800 ring-amber-600/30 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30': ! paused && status === 'connecting',
