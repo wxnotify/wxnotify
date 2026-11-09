@@ -22,6 +22,10 @@
           email: @json(auth()->user()->email),
           name: @json(auth()->user()->name),
         });
+
+        window.$chatwoot.setCustomAttributes({
+          tier: @json(auth()->user()->tier()->value),
+        });
       });
     };
   })(document, 'script');

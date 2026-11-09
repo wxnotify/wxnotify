@@ -44,6 +44,7 @@ use Illuminate\Support\Str;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use JeffersonGoncalves\FilamentServiceDesk\ServiceDeskUserPlugin;
 use Laravel\Socialite\Contracts\User as SocialiteUserContract;
+use STS\FilamentImpersonate\ImpersonateManager;
 use Swis\Filament\Backgrounds\FilamentBackgroundsPlugin;
 use Swis\Filament\Backgrounds\ImageProviders\MyImages;
 use Wallacemartinss\FilamentOnboarding\FilamentOnboardingPlugin;
@@ -169,7 +170,7 @@ class DashboardPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn (): ?string => (auth()->check() && config('wxnotify.mode') === 'cloud')
+                fn (): ?string => $this->shouldShowSupportWidget()
                     ? Blade::render(
                         '@include(\'filament.dashboard.chatwoot-widget\')',
                         ['identityHash' => app(GenerateChatwootIdentityHash::class)(auth()->user())],
@@ -191,5 +192,19 @@ class DashboardPanelProvider extends PanelProvider
                 RedirectAdmins::class,
                 Authenticate::class,
             ]);
+    }
+
+    /**
+     * The support chat widget is for a signed-in subscriber in cloud mode with Chatwoot set up. It stays away while
+     * staff are impersonating: the widget would identify them as the subscriber, so a message would go to Slack under
+     * the subscriber's name and the subscriber's earlier conversation would be readable.
+     */
+    private function shouldShowSupportWidget(): bool
+    {
+        return auth()->check()
+            && config('wxnotify.mode') === 'cloud'
+            && filled(config('services.chatwoot.base_url'))
+            && filled(config('services.chatwoot.website_token'))
+            && ! app(ImpersonateManager::class)->isImpersonating();
     }
 }
