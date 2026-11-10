@@ -55,3 +55,6 @@ A tapped push reads its alert by reference, because the push is sent before its 
 
 ## Channel auth mirrors panel access
 `live-products` admits a signed-in user who would pass the dashboard's `verified` middleware (MustVerifyEmail users need a verified email). `/broadcasting/auth` uses the `web` group with CSRF. Under the null broadcaster everyone is authorized, so channel tests must switch the default connection to reverb with dummy keys and re-require this file.
+
+## GET /products/{slug} mirrors the public page
+`GET /api/v1/products/{slug}` (`ProductController::show`, `ProductResource`) mirrors ViewProductController's 404 rule: unknown slug, or an `is_test` product when `app()->isProduction()`. Its `details` come from `GetProductDetails`, the same action the public page uses, so the page and the app cannot drift. The slug route is constrained to `[a-z0-9-]+`.
