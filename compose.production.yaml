@@ -1,0 +1,89 @@
+# Overrides for running the stack split across four servers (see
+# docs/multi-server-deployment.md). Layer it on compose.yaml on EVERY server and
+# let the profile decide what runs there:
+#
+#   COMPOSE_FILE=compose.yaml:compose.production.yaml
+#   COMPOSE_PROFILES=server-a        # or server-b / server-c / server-d
+#
+# server-d does not exist in compose.yaml (single-host dev keeps those services in
+# server-c); this file moves the delivery workers, the scheduler and Apprise into it.
+# queue-long and docker-socket-proxy stay in server-c on purpose: queue-long reads
+# server-c's product volumes, and the Docker proxy must sit on the host that runs
+# the feed containers it controls.
+#
+# What it changes, and why compose.yaml alone cannot be split:
+#   - compose.yaml's depends_on entries cross profile boundaries (front-end needs
+#     pgsql and redis, the server-c workers need pgsql, and so on). Compose refuses
+#     to load a profile whose dependencies are in a profile that is not enabled
+#     ("depends on undefined service"), so they are reset here. The cross-server
+#     dependencies are network calls now, configured through .env.
+#   - Dev-only conveniences go: mailpit is parked behind a `dev` profile and the
+#     Vite dev-server port is no longer published.
+#   - Every port that carries no public traffic is bound to an address you choose
+#     (default: this host only) instead of every interface.
+#
+# Needs Docker Compose 2.24 or newer (the !reset and !override tags).
+services:
+    front-end:
+        depends_on: !reset []
+        # No Vite dev-server port.
+        ports: !override
+            - '${APP_PORT:-80}:8080'
+        # The product volumes belong to server-c; they are not shared across hosts.
+        volumes: !override
+            - '.:/var/www/html'
+    reverb:
+        depends_on: !reset []
+        # server-c's workers broadcast to this port over the private network, and the
+        # TLS reverse proxy forwards browser WebSockets here. Set REVERB_BIND_ADDRESS
+        # to this server's private address; never a public one.
+        ports: !override
+            - '${REVERB_BIND_ADDRESS:-127.0.0.1}:${REVERB_FORWARD_PORT:-8085}:8080'
+    pipeline-api:
+        depends_on: !reset []
+        ports: !override
+            - '127.0.0.1:${PIPELINE_API_PORT:-8027}:8080'
+    queue:
+        depends_on: !reset []
+        profiles: !override
+            - server-d
+    queue-long:
+        depends_on: !reset []
+    queue-heartbeat:
+        depends_on: !reset []
+        profiles: !override
+            - server-d
+    scheduler:
+        depends_on: !reset []
+        profiles: !override
+            - server-d
+    # Called by the server-d workers and by the dashboard on server-a (channel
+    # confirmation codes). It has no authentication: bind it to server-d's PRIVATE
+    # address (APPRISE_BIND_ADDRESS) and firewall it to servers A and D.
+    apprise:
+        profiles: !override
+            - server-d
+        ports: !override
+            - '${APPRISE_BIND_ADDRESS:-127.0.0.1}:${FORWARD_APPRISE_PORT:-8026}:8000'
+    emwin-byteblaster:
+        ports: !override
+            - '127.0.0.1:${EMWIN_WEB_PORT:-8016}:8016'
+    # server-a's admin tooling starts and stops the feed containers through this,
+    # so it runs on server-c, next to them. It has no authentication or TLS of its
+    # own: bind it to server-c's PRIVATE
+    # address (DOCKER_PROXY_BIND_ADDRESS) and firewall it to server-a alone.
+    docker-socket-proxy:
+        networks:
+            - sail
+        ports:
+            - '${DOCKER_PROXY_BIND_ADDRESS:-127.0.0.1}:2375:2375'
+    pgsql:
+        ports: !override
+            - '${DB_BIND_ADDRESS:-127.0.0.1}:${FORWARD_DB_PORT:-5432}:5432'
+    redis:
+        ports: !override
+            - '${REDIS_BIND_ADDRESS:-127.0.0.1}:${FORWARD_REDIS_PORT:-6379}:6379'
+    # Local mail catcher; production sends through a real SMTP relay.
+    mailpit:
+        profiles: !override
+            - dev
