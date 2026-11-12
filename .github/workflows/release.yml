@@ -1,0 +1,372 @@
+# Release pipeline for the WxNotify Docker images.
+#
+#   push of a tag vMAJOR.MINOR.PATCH  -> test, build, smoke-test, then publish
+#                                        five multi-arch images to Docker Hub
+#   pull_request / workflow_dispatch  -> test, build and smoke-test only. Nothing
+#                                        is pushed, no registry login happens and
+#                                        no secret is referenced by any job that
+#                                        runs here.
+#
+# Repository settings:
+#   variable DOCKERHUB_NAMESPACE  the Docker Hub namespace (user or organisation)
+#   secret   DOCKERHUB_USERNAME   Docker Hub user the token belongs to
+#   secret   DOCKERHUB_TOKEN      Docker Hub access token with write access
+#
+# Jobs: test -> build (verify, 5 images x 2 platforms) -> push (tags only, by
+# digest) -> merge (tags only, one manifest per image).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  test:
+    name: Test suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_USERNAME: wxnotify
+      DB_PASSWORD: secret
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # A service container cannot take server arguments, and a parallel run
+      # (one database per worker) needs max_locks_per_transaction above its
+      # default of 64. The init script creates the `testing` database that
+      # phpunit.xml points at.
+      - name: Start PostGIS
+        run: |
+          docker run -d --name pgsql -p 5432:5432 \
+            -e POSTGRES_DB=wxnotify \
+            -e POSTGRES_USER="$DB_USERNAME" \
+            -e POSTGRES_PASSWORD="$DB_PASSWORD" \
+            -v "$PWD/docker/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql:ro" \
+            imresamu/postgis:18-3.6 \
+            postgres -c max_locks_per_transaction=256
+          for _ in $(seq 1 30); do
+            if docker exec pgsql psql -U "$DB_USERNAME" -d testing -c 'select 1' >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs pgsql
+          echo '::error::PostGIS did not become ready'
+          exit 1
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.4'
+          extensions: bcmath, gd, imagick, intl, pdo_pgsql, pgsql, redis, soap, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      # filament/blueprint (a dev-only planning tool, not used by any test) comes
+      # from packages.filamentphp.com, which needs a licence key that public CI
+      # and contributors do not have. Dropping the repository and the package
+      # from this workspace leaves every other dependency anonymous. --no-scripts
+      # skips the post-update hook (boost:update), which cannot run mid-removal;
+      # the install that follows runs the scripts normally.
+      - name: Install Composer dependencies without the licensed repository
+        run: |
+          composer config --unset repositories.filament
+          composer remove --dev filament/blueprint --no-interaction --no-scripts
+          composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Build front-end assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare the environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+
+      - name: Run the test suite
+        run: php artisan test --parallel --compact
+
+      - name: Show PostGIS logs on failure
+        if: failure()
+        run: docker logs pgsql
+
+  build:
+    name: Build and smoke-test ${{ matrix.image.name }} (${{ matrix.platform.arch }})
+    needs: test
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: wxnotify
+            dockerfile: docker/8.4/Dockerfile
+            target: production
+            title: WxNotify
+            description: WxNotify web application and queue workers (PHP 8.4, ServerSideUp FPM-NGINX).
+          - name: nwws
+            dockerfile: docker/nwws/Dockerfile
+            target: ''
+            title: WxNotify NWWS-OI client
+            description: WxNotify client for the NWS NWWS-OI product feed.
+          - name: emwin-byteblaster
+            dockerfile: docker/emwin-byteblaster/Dockerfile
+            target: ''
+            title: WxNotify EMWIN ByteBlaster client
+            description: WxNotify EMWIN ByteBlaster receiver (npemwin built from source).
+          - name: emwin-http
+            dockerfile: docker/emwin-http/Dockerfile
+            target: ''
+            title: WxNotify EMWIN HTTP poller
+            description: WxNotify EMWIN product poller over HTTP.
+          - name: glm-decoder
+            dockerfile: docker/glm-decoder/Dockerfile
+            target: ''
+            title: WxNotify GLM decoder
+            description: WxNotify decoder for GOES Geostationary Lightning Mapper data.
+        platform:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ vars.DOCKERHUB_NAMESPACE || 'local' }}/${{ matrix.image.name }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image.title }}
+            org.opencontainers.image.description=${{ matrix.image.description }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=GPL-3.0-or-later
+
+      - name: Build and load the image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.image.dockerfile }}
+          target: ${{ matrix.image.target }}
+          platforms: linux/${{ matrix.platform.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: wxnotify-ci/${{ matrix.image.name }}:${{ matrix.platform.arch }}
+          load: true
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
+
+      - name: Check the image labels
+        env:
+          IMAGE: wxnotify-ci/${{ matrix.image.name }}:${{ matrix.platform.arch }}
+          EXPECTED_SOURCE: https://github.com/${{ github.repository }}
+        run: |
+          docker image inspect "$IMAGE" --format '{{json .Config.Labels}}' | jq .
+          test "$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.licenses"}}')" = 'GPL-3.0-or-later'
+          test "$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.source"}}')" = "$EXPECTED_SOURCE"
+          test "$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
+
+      - name: Smoke-test the PHP image
+        if: matrix.image.name == 'wxnotify'
+        run: docker/8.4/smoke-test.sh "wxnotify-ci/wxnotify:${{ matrix.platform.arch }}" "linux/${{ matrix.platform.arch }}"
+
+  push:
+    name: Push ${{ matrix.image.name }} (${{ matrix.platform.arch }})
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: wxnotify
+            dockerfile: docker/8.4/Dockerfile
+            target: production
+            title: WxNotify
+            description: WxNotify web application and queue workers (PHP 8.4, ServerSideUp FPM-NGINX).
+          - name: nwws
+            dockerfile: docker/nwws/Dockerfile
+            target: ''
+            title: WxNotify NWWS-OI client
+            description: WxNotify client for the NWS NWWS-OI product feed.
+          - name: emwin-byteblaster
+            dockerfile: docker/emwin-byteblaster/Dockerfile
+            target: ''
+            title: WxNotify EMWIN ByteBlaster client
+            description: WxNotify EMWIN ByteBlaster receiver (npemwin built from source).
+          - name: emwin-http
+            dockerfile: docker/emwin-http/Dockerfile
+            target: ''
+            title: WxNotify EMWIN HTTP poller
+            description: WxNotify EMWIN product poller over HTTP.
+          - name: glm-decoder
+            dockerfile: docker/glm-decoder/Dockerfile
+            target: ''
+            title: WxNotify GLM decoder
+            description: WxNotify decoder for GOES Geostationary Lightning Mapper data.
+        platform:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Require the Docker Hub namespace
+        env:
+          NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+        run: |
+          if [ -z "$NAMESPACE" ]; then
+            echo '::error::Set the repository variable DOCKERHUB_NAMESPACE before releasing'
+            exit 1
+          fi
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.image.name }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image.title }}
+            org.opencontainers.image.description=${{ matrix.image.description }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=GPL-3.0-or-later
+
+      # Same Dockerfile, platform, labels and cache scope as the build job, so
+      # the layers come from the cache the smoke-tested build just wrote.
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.image.dockerfile }}
+          target: ${{ matrix.image.target }}
+          platforms: linux/${{ matrix.platform.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.image.name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
+
+      - name: Export the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - name: Upload the digest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digests-${{ matrix.image.name }}-${{ matrix.platform.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Publish ${{ matrix.image }}
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: push
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - wxnotify
+          - nwws
+          - emwin-byteblaster
+          - emwin-http
+          - glm-decoder
+    steps:
+      - name: Download the digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: /tmp/digests
+          pattern: digests-${{ matrix.image }}-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # vMAJOR.MINOR.PATCH becomes MAJOR.MINOR.PATCH, MAJOR.MINOR, MAJOR and
+      # latest. A pre-release tag (v1.2.3-rc.1) gets only its full version.
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.image }}
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+
+      - name: Create the multi-arch manifest
+        working-directory: /tmp/digests
+        env:
+          REPOSITORY: ${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.image }}
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${REPOSITORY}@sha256:%s " *)
+
+      - name: Inspect the manifest
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          REPOSITORY: ${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.image }}
+        run: docker buildx imagetools inspect "${REPOSITORY}:${VERSION}"
