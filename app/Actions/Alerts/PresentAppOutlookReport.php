@@ -3,8 +3,8 @@
 namespace App\Actions\Alerts;
 
 use App\Models\OutlookReportRun;
+use App\Support\OutlookMapDisk;
 use App\Support\OutlookReportPresenter;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -40,7 +40,7 @@ class PresentAppOutlookReport
     {
         $map = $expired ? null : $run->mapPath($key);
 
-        if ($map === null || ! Storage::disk('local')->exists($map['path'])) {
+        if ($map === null || ! OutlookMapDisk::disk()->exists($map['path'])) {
             return null;
         }
 

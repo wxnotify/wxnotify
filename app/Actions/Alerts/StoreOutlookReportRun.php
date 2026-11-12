@@ -4,9 +4,9 @@ namespace App\Actions\Alerts;
 
 use App\Models\AlertRule;
 use App\Models\OutlookReportRun;
+use App\Support\OutlookMapDisk;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
@@ -46,7 +46,7 @@ class StoreOutlookReportRun
             $path = "outlook-maps/{$batchKey}/{$key}.{$extension}";
 
             try {
-                if (Storage::disk('local')->put($path, $graphic['bytes']) === false) {
+                if (OutlookMapDisk::disk()->put($path, $graphic['bytes']) === false) {
                     Log::warning('Outlook report map copy failed', ['reason' => 'write_returned_false']);
 
                     continue;

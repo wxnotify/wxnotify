@@ -2,6 +2,7 @@
 
 use App\Models\OutlookReportRun;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 
@@ -70,7 +71,7 @@ it('keeps maps recorded when a delete fails, so the run is retried, and still pr
     $failing = OutlookReportRun::factory()->withMaps()->old()->create();
     $other = OutlookReportRun::factory()->withMaps()->old()->create();
 
-    $disk = Mockery::mock();
+    $disk = Mockery::mock(Filesystem::class);
     $disk->shouldReceive('deleteDirectory')->with('outlook-maps/'.$failing->batch_key)->once()->andReturn(false);
     $disk->shouldReceive('deleteDirectory')->with('outlook-maps/'.$other->batch_key)->once()->andReturn(true);
     $disk->shouldReceive('directories')->with('outlook-maps')->andReturn([]);
@@ -162,4 +163,25 @@ it('is scheduled daily', function () {
 
     expect($event)->not->toBeNull()
         ->and($event->expression)->toBe('0 0 * * *');
+});
+
+it('prunes and sweeps on the configured disk', function () {
+    config(['filesystems.outlook_maps_disk' => 'maps']);
+    Storage::fake('maps');
+
+    $run = OutlookReportRun::factory()->withMaps()->old()->create();
+    foreach ($run->maps as $map) {
+        Storage::disk('maps')->put($map['path'], 'x');
+    }
+    Storage::disk('maps')->put('outlook-maps/orphan/day1.png', 'x');
+    touch(Storage::disk('maps')->path('outlook-maps/orphan/day1.png'), now()->subDays(31)->getTimestamp());
+
+    artisan('outlook:prune-maps')
+        ->expectsOutputToContain('Swept 1 orphaned map folders')
+        ->assertSuccessful();
+
+    Storage::disk('maps')->assertMissing('outlook-maps/'.$run->batch_key.'/day1.png');
+    Storage::disk('maps')->assertMissing('outlook-maps/orphan/day1.png');
+    expect(Storage::disk('maps')->directories('outlook-maps'))->toBe([])
+        ->and($run->refresh()->maps)->toBeNull();
 });

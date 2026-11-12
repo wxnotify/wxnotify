@@ -3,6 +3,7 @@
 use App\Actions\Alerts\StoreOutlookReportRun;
 use App\Models\AlertRule;
 use App\Models\OutlookReportRun;
+use App\Support\OutlookMapDisk;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -96,4 +97,23 @@ it('treats a write that returns false as no map and still stores the other maps'
 it('reports expiry from the map retention days', function () {
     expect(OutlookReportRun::factory()->create()->mapsExpired())->toBeFalse()
         ->and(OutlookReportRun::factory()->old()->create()->mapsExpired())->toBeTrue();
+});
+
+it('stores the maps on the configured disk and not on local', function () {
+    config(['filesystems.outlook_maps_disk' => 'maps']);
+    Storage::fake('maps');
+    Storage::fake('local');
+
+    app(StoreOutlookReportRun::class)(storeOutlookRule(), 'batch-disk', [], [
+        'day1' => ['bytes' => 'PNGDATA', 'mime' => 'image/png'],
+    ]);
+
+    Storage::disk('maps')->assertExists('outlook-maps/batch-disk/day1.png');
+    Storage::disk('local')->assertMissing('outlook-maps/batch-disk/day1.png');
+});
+
+it('an undefined outlook map disk fails with a message naming OUTLOOK_MAPS_DISK', function () {
+    config(['filesystems.outlook_maps_disk' => 'no-such-disk']);
+
+    expect(fn () => OutlookMapDisk::disk())->toThrow(InvalidArgumentException::class, 'OUTLOOK_MAPS_DISK');
 });

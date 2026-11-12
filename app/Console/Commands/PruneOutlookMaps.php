@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\OutlookReportRun;
+use App\Support\OutlookMapDisk;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class PruneOutlookMaps extends Command
@@ -28,7 +28,7 @@ class PruneOutlookMaps extends Command
                     }
 
                     try {
-                        if (! Storage::disk('local')->deleteDirectory('outlook-maps/'.$run->batch_key)) {
+                        if (! OutlookMapDisk::disk()->deleteDirectory('outlook-maps/'.$run->batch_key)) {
                             Log::warning('Outlook map prune could not delete a run directory.');
 
                             continue;
@@ -59,7 +59,7 @@ class PruneOutlookMaps extends Command
     private function sweepOrphanedDirectories(): int
     {
         $swept = 0;
-        $disk = Storage::disk('local');
+        $disk = OutlookMapDisk::disk();
 
         try {
             $directories = $disk->directories('outlook-maps');

@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Outlook Map Disk
+    |--------------------------------------------------------------------------
+    |
+    | The disk that holds the stored Outlook report map images. "local" suits
+    | a single server; a multi-server deployment needs an S3-compatible disk
+    | (for example "s3") so the delivery server and the API server share them.
+    |
+    */
+
+    'outlook_maps_disk' => env('OUTLOOK_MAPS_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

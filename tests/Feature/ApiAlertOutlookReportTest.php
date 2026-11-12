@@ -5,6 +5,7 @@ use App\Models\OutlookReportRun;
 use App\Models\User;
 use App\Support\OutlookReportPresenter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -161,4 +162,34 @@ test('the map route uses its own named limiter, keyed per client address and set
 
     expect($limit->maxAttempts)->toBe(60)
         ->and($limit->key)->toBe('app-outlook-map:203.0.113.9');
+});
+
+test('serves a stored map from the configured disk through the signed link', function () {
+    config(['filesystems.outlook_maps_disk' => 'maps']);
+    Storage::fake('maps');
+    [$run, $log] = outlookReportFixture($this->user, writeFiles: false);
+    Storage::disk('maps')->put($run->maps['day1']['path'], 'MAPDISKBYTES');
+
+    $report = $this->withToken($this->token)->getJson("/api/v1/alerts/{$log->id}")->assertOk()->json('data.outlook_report');
+
+    expect($report['days'][0]['map_url'])->not->toBeNull();
+    $this->get($report['days'][0]['map_url'])->assertOk()->assertHeader('Content-Type', 'image/png');
+    expect(Storage::disk('maps')->get($run->maps['day1']['path']))->toBe('MAPDISKBYTES');
+});
+
+test('an unreachable disk reads as no map, not an error', function () {
+    $root = storage_path('framework/testing/disks/unreachable-maps');
+    File::ensureDirectoryExists($root);
+    config([
+        'filesystems.disks.unreachable' => ['driver' => 'local', 'root' => $root, 'throw' => false],
+        'filesystems.outlook_maps_disk' => 'unreachable',
+    ]);
+    [$run, $log] = outlookReportFixture($this->user);
+
+    $report = $this->withToken($this->token)->getJson("/api/v1/alerts/{$log->id}")->assertOk()->json('data.outlook_report');
+
+    expect($report['days'][0]['map_url'])->toBeNull();
+
+    $link = URL::temporarySignedRoute('api.v1.outlook-maps.show', now()->addHour(), ['batchKey' => $run->batch_key, 'key' => 'day1']);
+    $this->get($link)->assertNotFound();
 });
