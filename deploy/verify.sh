@@ -33,7 +33,8 @@ SECRETS="APP_KEY DB_PASSWORD REVERB_APP_KEY REVERB_APP_SECRET PIPELINE_WEBHOOK_T
 # self-hoster would after generating them.
 prepare() { # prepare <single-server|multi-server>
     mkdir -p "$TMP/$1"
-    cp "$HERE/$1/.env.example" "$TMP/$1/.env"
+    # WXNOTIFY_VERSION ships blank (the owner pins it); fill it in the temporary copy.
+    sed 's/^WXNOTIFY_VERSION=.*/WXNOTIFY_VERSION=1.0.0/' "$HERE/$1/.env.example" >"$TMP/$1/.env"
     cp "$HERE/$1/compose.yaml" "$TMP/$1/compose.yaml"
     local secret
     for secret in $SECRETS; do
@@ -67,6 +68,13 @@ for dir in single-server multi-server; do
             pass "$dir: .env.example leaves $secret blank"
         else
             fail "$dir: .env.example must leave $secret blank"
+        fi
+    done
+    for var in WXNOTIFY_VERSION TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY; do
+        if grep -q "^${var}=$" "$HERE/$dir/.env.example"; then
+            pass "$dir: .env.example leaves $var blank"
+        else
+            fail "$dir: .env.example must leave $var blank"
         fi
     done
     if grep -Eiq 'change-?me|changeit|password123|secret123' "$HERE/$dir/.env.example"; then
@@ -275,7 +283,7 @@ else
         fail "deploy/README.md: variables not in any .env.example:$unknown"
     fi
 
-    for term in WXNOTIFY_VERSION OUTLOOK_MAPS_DISK REVERB_PUBLIC_SCHEME REVERB_PUBLIC_PORT app:grant-owner Setup queue:restart reverb:restart; do
+    for term in WXNOTIFY_VERSION OUTLOOK_MAPS_DISK REVERB_PUBLIC_SCHEME REVERB_PUBLIC_PORT app:grant-owner Setup queue:restart reverb:restart Turnstile verification; do
         if grep -Fq -- "$term" "$README"; then
             pass "deploy/README.md mentions $term"
         else

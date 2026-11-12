@@ -38,7 +38,7 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
    cp .env.example .env
    ```
 
-2. Open `.env` and set `WXNOTIFY_VERSION` to the release you want to run (the file ships with `latest`, but pinning a version is better; see [Upgrading](#upgrading)). Find the current release on the repository's releases page, then write it as `WXNOTIFY_VERSION=<version>`, for example `1.0.0` once that exists.
+2. Open `.env` and set `WXNOTIFY_VERSION` to an exact release. It is left blank on purpose and Compose will not start without it. Find the current release on the repository's releases page and write it as `WXNOTIFY_VERSION=<version>` (for example `1.2.3`, once that exists). Pinning means upgrades happen when you change it; `latest` and the shorter `MAJOR.MINOR` and `MAJOR` tags exist for people who choose to follow along (see [Version tags](#version-tags)).
 
 3. Fill in every blank secret. Each one has a generating command in a comment above it:
 
@@ -53,7 +53,22 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
    docker run --rm wxnotify/wxnotify:<version> php artisan key:generate --show | tail -n 1
    ```
 
-   Generate `APP_KEY` once and never change it: channel credentials are encrypted with it. Also set `APP_URL` to the address people will use, and the `MAIL_*` settings if you want sign-up and password-reset emails. `NWWS_USERNAME` and `NWWS_PASSWORD` are optional; leave them empty to run without the NWWS feed.
+   Two more settings must work before anyone can sign up, so set them now:
+
+   - **Mail.** Signing up sends a verification email, and a new subscriber cannot use the dashboard until they follow its link. Set the `MAIL_*` values to your SMTP provider, for example:
+
+     ```ini
+     MAIL_MAILER=smtp
+     MAIL_HOST=smtp.example.com
+     MAIL_PORT=587
+     MAIL_USERNAME=your-smtp-user
+     MAIL_PASSWORD=your-smtp-password
+     MAIL_FROM_ADDRESS="alerts@example.com"
+     ```
+
+   - **Cloudflare Turnstile.** The sign-up form includes a Turnstile check and cannot be submitted while `TURNSTILE_SECRET_KEY` is blank. Create a free Cloudflare account, open Turnstile, add a site for your hostname, and put its keys in `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. For a private trial only, Cloudflare documents [test keys that always pass](https://developers.cloudflare.com/turnstile/troubleshooting/testing/): site key `1x00000000000000000000AA` and secret key `1x0000000000000000000000000000000AA`. They turn the bot protection off, so never use them on a site anyone else can reach.
+
+   Generate `APP_KEY` once and never change it: channel credentials are encrypted with it. Also set `APP_URL` to the address people will use. `NWWS_USERNAME` and `NWWS_PASSWORD` are optional; leave them empty to run without the NWWS feed.
 
 4. Start it:
 
@@ -69,16 +84,18 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
 
 ### Create the first owner
 
-1. Register an account on the dashboard sign-up page, `/dashboard/register`.
+1. Register an account on the dashboard sign-up page, `/dashboard/register` (this needs the Turnstile keys above, and the verification email must be deliverable if you want to use that account in the dashboard).
 2. Promote it to owner:
 
    ```bash
    docker compose exec front-end php artisan app:grant-owner you@example.com
    ```
 
-3. Sign in to the admin panel at `/admin` and open **Setup** (in the **System** group). A fresh install is not complete until you do this. The page lists the reference data sets with their counts and whether each is installed: the product catalog (categories and descriptions), the "Did you know" tips and the tracked shapefile layers. Press **Install reference data** and confirm. It only adds what is missing and changes nothing that already exists. Read the confirmation text: when the product catalog is not yet installed, the install also removes a few legacy products that have no counterpart in the catalog.
+3. Sign in to the admin panel at `/admin`. Owners are also staff, and as far as the code shows the admin panel does not require email verification (only the dashboard does), so you can go straight there even before mail works; the dashboard itself waits for the account to be verified. There is no command that creates a user: registration is the only way to make the first one.
 
-Do not run `db:seed`; the seeder is for development only and refuses to run in production.
+   In the admin panel, open **Setup** (in the **System** group). A fresh install is not complete until you do this. The page lists the reference data sets with their counts and whether each is installed: the product catalog (categories and descriptions), the "Did you know" tips and the tracked shapefile layers. Press **Install reference data** and confirm. It only adds what is missing and changes nothing that already exists. Read the confirmation text: when the product catalog is not yet installed, the install also removes a few legacy products that have no counterpart in the catalog.
+
+Do not run `db:seed`; the seeder creates a test user (`test@example.com`) and is for development only.
 
 ## Putting it behind HTTPS
 
@@ -185,7 +202,7 @@ Read [the multi-server guide](../docs/multi-server-deployment.md) for the networ
 
 What is different with images:
 
-- **Setup.** On every server download `deploy/multi-server/compose.yaml` and `.env.example`, copy the example to `.env`, set `COMPOSE_PROFILES` and the per-server values the example marks. Use the same `WXNOTIFY_VERSION` everywhere. Generate `APP_KEY` once and copy it to A, C and D.
+- **Setup.** On every server download `deploy/multi-server/compose.yaml` and `.env.example`, copy the example to `.env`, set `COMPOSE_PROFILES` and the per-server values the example marks. Use the same `WXNOTIFY_VERSION` everywhere. Set the `MAIL_*` values (A and D) and the Turnstile keys (A) before anyone signs up, as in the single-server steps. Generate `APP_KEY` once and copy it to A, C and D.
 - **Secrets that must match across servers:** `APP_KEY` (A, C, D), `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` (A, C, D, plus B which creates the database), `REVERB_APP_ID`, `REVERB_APP_KEY` and `REVERB_APP_SECRET` (A and D), and `PIPELINE_WEBHOOK_TOKEN` (A and C). The guide's table explains why.
 - **Order for a first start:** B, then A, D, C. On A, run the migrations yourself, because no startup automation runs them here:
 
