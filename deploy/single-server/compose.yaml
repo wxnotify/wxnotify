@@ -22,6 +22,12 @@ x-php-environment: &php-environment
     REVERB_SCHEME: http
     APPRISE_API_URL: 'http://apprise:8000'
     DOCKER_PROXY_URL: 'http://docker-socket-proxy:2375'
+    # Secrets with no default: a blank value stops `docker compose` with a clear message.
+    APP_KEY: '${APP_KEY:?set APP_KEY in .env}'
+    DB_PASSWORD: '${DB_PASSWORD:?set DB_PASSWORD in .env}'
+    REVERB_APP_KEY: '${REVERB_APP_KEY:?set REVERB_APP_KEY in .env}'
+    REVERB_APP_SECRET: '${REVERB_APP_SECRET:?set REVERB_APP_SECRET in .env}'
+    PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN:?set PIPELINE_WEBHOOK_TOKEN in .env}'
 
 x-php-service: &php-service
     image: '${WXNOTIFY_REGISTRY:-wxnotify}/wxnotify:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
@@ -34,10 +40,10 @@ services:
     pgsql:
         image: 'imresamu/postgis:18-3.6'
         environment:
-            PGPASSWORD: '${DB_PASSWORD}'
+            PGPASSWORD: '${DB_PASSWORD:?set DB_PASSWORD in .env}'
             POSTGRES_DB: '${DB_DATABASE}'
             POSTGRES_USER: '${DB_USERNAME}'
-            POSTGRES_PASSWORD: '${DB_PASSWORD}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD:?set DB_PASSWORD in .env}'
         volumes:
             - 'pgsql-data:/var/lib/postgresql'
         networks:
@@ -54,9 +60,14 @@ services:
             retries: 3
             timeout: 5s
         restart: unless-stopped
-    # The dashboard and the subscriber API. The image's own healthcheck (/up) applies.
+    # The dashboard and the subscriber API. The image's own healthcheck test (/up) applies;
+    # only the timing is overridden, so a slow first-run or upgrade migration (which runs
+    # before the server starts) has up to 5 minutes before failed checks count, instead of
+    # the image's 60 s.
     front-end:
         <<: *php-service
+        healthcheck:
+            start_period: 300s
         environment:
             <<: *php-environment
             AUTORUN_ENABLED: 'true'
@@ -223,7 +234,7 @@ services:
             NWWS_RETRY: 'true'
             NWWS_RETENTION_DAYS: '${NWWS_RETENTION_DAYS:-7}'
             NWWS_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/nwws-products'
-            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN:?set PIPELINE_WEBHOOK_TOKEN in .env}'
         volumes:
             - 'nwws-products:/products'
         restart: unless-stopped
@@ -235,7 +246,7 @@ services:
         container_name: wxnotify-glm-decoder
         environment:
             GLM_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/glm-flashes'
-            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN:?set PIPELINE_WEBHOOK_TOKEN in .env}'
         volumes:
             - 'glm-state:/state'
         restart: unless-stopped
@@ -246,7 +257,7 @@ services:
         image: '${WXNOTIFY_REGISTRY:-wxnotify}/emwin-byteblaster:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
         container_name: wxnotify-emwin-byteblaster
         environment:
-            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN:?set PIPELINE_WEBHOOK_TOKEN in .env}'
             EMWIN_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/emwin-products'
             EMWIN_SERVERS_REFRESH_HOURS: '${EMWIN_SERVERS_REFRESH_HOURS:-6}'
             EMWIN_MAX_UNZIP_BYTES: '${EMWIN_MAX_UNZIP_BYTES:-5242880}'
@@ -261,7 +272,7 @@ services:
         image: '${WXNOTIFY_REGISTRY:-wxnotify}/emwin-http:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
         container_name: wxnotify-emwin-http
         environment:
-            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN:?set PIPELINE_WEBHOOK_TOKEN in .env}'
             EMWIN_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/emwin-products'
             EMWIN_HTTP_STATE_DIR: /state
             EMWIN_RETENTION_DAYS: '${EMWIN_RETENTION_DAYS:-7}'

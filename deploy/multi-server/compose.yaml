@@ -16,6 +16,10 @@
 # Migrations do NOT run on start here (no startup automation). Run them on server A:
 #   docker compose exec front-end php artisan migrate --force
 #
+# Only DB_PASSWORD (every server has it) is enforced by the compose file. APP_KEY,
+# REVERB_APP_KEY/SECRET and PIPELINE_WEBHOOK_TOKEN are not set on every server, so the
+# example leaves them blank and says which servers must fill them in.
+#
 # Needs Docker Compose 2.24 or newer.
 
 x-php-service: &php-service
@@ -52,10 +56,10 @@ services:
     pgsql:
         image: 'imresamu/postgis:18-3.6'
         environment:
-            PGPASSWORD: '${DB_PASSWORD}'
+            PGPASSWORD: '${DB_PASSWORD:?set DB_PASSWORD in .env}'
             POSTGRES_DB: '${DB_DATABASE}'
             POSTGRES_USER: '${DB_USERNAME}'
-            POSTGRES_PASSWORD: '${DB_PASSWORD}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD:?set DB_PASSWORD in .env}'
         ports:
             - '${DB_BIND_ADDRESS:-127.0.0.1}:5432:5432'
         volumes:

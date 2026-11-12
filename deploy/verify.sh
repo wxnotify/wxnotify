@@ -27,11 +27,19 @@ for tool in docker jq; do
     command -v "$tool" >/dev/null 2>&1 || { echo "FAIL  $tool is required"; exit 1; }
 done
 
-# The temporary .env is the example, untouched, exactly as a self-hoster copies it.
+SECRETS="APP_KEY DB_PASSWORD REVERB_APP_KEY REVERB_APP_SECRET PIPELINE_WEBHOOK_TOKEN"
+
+# The temporary .env is the example with the (deliberately blank) secrets filled in, as a
+# self-hoster would after generating them.
 prepare() { # prepare <single-server|multi-server>
     mkdir -p "$TMP/$1"
     cp "$HERE/$1/.env.example" "$TMP/$1/.env"
     cp "$HERE/$1/compose.yaml" "$TMP/$1/compose.yaml"
+    local secret
+    for secret in $SECRETS; do
+        sed "s/^${secret}=.*/${secret}=verify-${secret}/" "$TMP/$1/.env" >"$TMP/$1/.env.tmp"
+        mv "$TMP/$1/.env.tmp" "$TMP/$1/.env"
+    done
 }
 
 dc() { # dc <dir> <compose args...>
@@ -52,6 +60,39 @@ for dir in single-server multi-server; do
     prepare "$dir"
 
     check "$dir: docker compose config -q succeeds (all profiles)" dc "$dir" --profile '*' config -q
+
+    # The example ships no secret values and no guessable placeholders.
+    for secret in $SECRETS; do
+        if grep -q "^${secret}=$" "$HERE/$dir/.env.example"; then
+            pass "$dir: .env.example leaves $secret blank"
+        else
+            fail "$dir: .env.example must leave $secret blank"
+        fi
+    done
+    if grep -Eiq 'change-?me|changeit|password123|secret123' "$HERE/$dir/.env.example"; then
+        fail "$dir: .env.example contains a placeholder-style value"
+    else
+        pass "$dir: .env.example contains no placeholder-style values"
+    fi
+    if [ "$dir" = single-server ]; then
+        # Every secret is required: leaving it blank stops compose, naming the variable.
+        for secret in $SECRETS; do
+            sed "s/^${secret}=.*/${secret}=/" "$TMP/$dir/.env" >"$TMP/$dir/.env.blank"
+            blank_out="$(COMPOSE_PROFILES= docker compose --project-directory "$TMP/$dir" --file "$TMP/$dir/compose.yaml" --env-file "$TMP/$dir/.env.blank" --profile '*' config -q 2>&1 || true)"
+            if grep -q "set ${secret} in .env" <<<"$blank_out"; then
+                pass "$dir: a blank $secret fails with a message naming it"
+            else
+                fail "$dir: a blank $secret must fail with a message naming it"
+            fi
+        done
+    else
+        blank_out="$(sed 's/^DB_PASSWORD=.*/DB_PASSWORD=/' "$TMP/$dir/.env" >"$TMP/$dir/.env.blank"; COMPOSE_PROFILES= docker compose --project-directory "$TMP/$dir" --file "$TMP/$dir/compose.yaml" --env-file "$TMP/$dir/.env.blank" --profile '*' config -q 2>&1 || true)"
+        if grep -q 'set DB_PASSWORD in .env' <<<"$blank_out"; then
+            pass "$dir: a blank DB_PASSWORD fails with a message naming it"
+        else
+            fail "$dir: a blank DB_PASSWORD must fail with a message naming it"
+        fi
+    fi
 
     # Every WxNotify image line is tagged with the version.
     bad_images="$(grep -E '^[[:space:]]*image:.*WXNOTIFY_REGISTRY' "$HERE/$dir/compose.yaml" | grep -vc 'WXNOTIFY_VERSION' || true)"
@@ -157,6 +198,13 @@ if [ -f "$HERE/single-server/compose.yaml" ]; then
             fail "single-server: $worker must wait for front-end (condition: service_healthy), got $cond"
         fi
     done
+    start="$(jq -r '.services["front-end"].healthcheck.start_period // "none"' <<<"$json" 2>/dev/null || echo none)"
+    seconds="$(awk -v d="$start" 'BEGIN{t=0; while (match(d, /^[0-9.]+[hms]/)) {n=substr(d,1,RLENGTH-1)+0; u=substr(d,RLENGTH,1); t+= (u=="h"?n*3600:(u=="m"?n*60:n)); d=substr(d,RLENGTH+1)} print t}')"
+    if [ "${seconds:-0}" -ge 300 ]; then
+        pass "single-server: front-end start_period is $start (>= 300s)"
+    else
+        fail "single-server: front-end start_period must be >= 300s (got $start)"
+    fi
     cond="$(jq -r '.services["front-end"].depends_on.pgsql.condition // "none"' <<<"$json" 2>/dev/null || echo none)"
     if [ "$cond" = service_healthy ]; then
         pass "single-server: front-end waits for pgsql (service_healthy)"
