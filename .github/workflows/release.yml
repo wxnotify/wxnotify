@@ -12,8 +12,9 @@
 #   secret   DOCKERHUB_USERNAME   Docker Hub user the token belongs to
 #   secret   DOCKERHUB_TOKEN      Docker Hub access token with write access
 #
-# Jobs: test -> build (verify, 5 images x 2 platforms) -> push (tags only, by
-# digest) -> merge (tags only, one manifest per image).
+# Jobs: test -> build (5 images x 2 platforms: ONE build per image and platform,
+# loaded for the smoke test and, on a tag, pushed by digest in the same build)
+# -> merge (tags only, one manifest per image).
 name: Release
 
 on:
@@ -42,6 +43,21 @@ jobs:
       DB_USERNAME: wxnotify
       DB_PASSWORD: secret
     steps:
+      - name: Check the release tag and namespace
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ -z "$NAMESPACE" ]; then
+            echo '::error::Set the repository variable DOCKERHUB_NAMESPACE before releasing'
+            exit 1
+          fi
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo '::error::The tag must look like vMAJOR.MINOR.PATCH (optionally with a -pre-release suffix)'
+            exit 1
+          fi
+
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -152,6 +168,9 @@ jobs:
             runner: ubuntu-24.04
           - arch: arm64
             runner: ubuntu-24.04-arm
+    env:
+      IS_RELEASE: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+      LOCAL_IMAGE: wxnotify-ci/${{ matrix.image.name }}:${{ matrix.platform.arch }}
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -160,6 +179,15 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Tag pushes only: the one place a pull request can never reach, because
+      # the condition is false for every other event and a fork gets no secrets.
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Image metadata
         id: meta
@@ -174,114 +202,12 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=GPL-3.0-or-later
 
-      - name: Build and load the image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: ${{ matrix.image.dockerfile }}
-          target: ${{ matrix.image.target }}
-          platforms: linux/${{ matrix.platform.arch }}
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: wxnotify-ci/${{ matrix.image.name }}:${{ matrix.platform.arch }}
-          load: true
-          push: false
-          cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
-
-      - name: Check the image labels
-        env:
-          IMAGE: wxnotify-ci/${{ matrix.image.name }}:${{ matrix.platform.arch }}
-          EXPECTED_SOURCE: https://github.com/${{ github.repository }}
-        run: |
-          docker image inspect "$IMAGE" --format '{{json .Config.Labels}}' | jq .
-          test "$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.licenses"}}')" = 'GPL-3.0-or-later'
-          test "$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.source"}}')" = "$EXPECTED_SOURCE"
-          test "$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
-
-      - name: Smoke-test the PHP image
-        if: matrix.image.name == 'wxnotify'
-        run: docker/8.4/smoke-test.sh "wxnotify-ci/wxnotify:${{ matrix.platform.arch }}" "linux/${{ matrix.platform.arch }}"
-
-  push:
-    name: Push ${{ matrix.image.name }} (${{ matrix.platform.arch }})
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: build
-    runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        image:
-          - name: wxnotify
-            dockerfile: docker/8.4/Dockerfile
-            target: production
-            title: WxNotify
-            description: WxNotify web application and queue workers (PHP 8.4, ServerSideUp FPM-NGINX).
-          - name: nwws
-            dockerfile: docker/nwws/Dockerfile
-            target: ''
-            title: WxNotify NWWS-OI client
-            description: WxNotify client for the NWS NWWS-OI product feed.
-          - name: emwin-byteblaster
-            dockerfile: docker/emwin-byteblaster/Dockerfile
-            target: ''
-            title: WxNotify EMWIN ByteBlaster client
-            description: WxNotify EMWIN ByteBlaster receiver (npemwin built from source).
-          - name: emwin-http
-            dockerfile: docker/emwin-http/Dockerfile
-            target: ''
-            title: WxNotify EMWIN HTTP poller
-            description: WxNotify EMWIN product poller over HTTP.
-          - name: glm-decoder
-            dockerfile: docker/glm-decoder/Dockerfile
-            target: ''
-            title: WxNotify GLM decoder
-            description: WxNotify decoder for GOES Geostationary Lightning Mapper data.
-        platform:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-    steps:
-      - name: Require the Docker Hub namespace
-        env:
-          NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
-        run: |
-          if [ -z "$NAMESPACE" ]; then
-            echo '::error::Set the repository variable DOCKERHUB_NAMESPACE before releasing'
-            exit 1
-          fi
-
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Image metadata
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.image.name }}
-          labels: |
-            org.opencontainers.image.title=${{ matrix.image.title }}
-            org.opencontainers.image.description=${{ matrix.image.description }}
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.url=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.licenses=GPL-3.0-or-later
-
-      # Same Dockerfile, platform, labels and cache scope as the build job, so
-      # the layers come from the cache the smoke-tested build just wrote.
-      - name: Build and push by digest
+      # ONE build per image and platform. BuildKit writes two exporters from the
+      # same result: the image loaded into the local Docker (smoke-tested below)
+      # and, on a tag push only, the same image pushed to Docker Hub by digest.
+      # An untagged digest pushed before the smoke test is harmless: the merge
+      # job needs every build leg, so no tag points at it unless all pass.
+      - name: Build, load and (on a tag) push by digest
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -290,17 +216,50 @@ jobs:
           target: ${{ matrix.image.target }}
           platforms: linux/${{ matrix.platform.arch }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.image.name }},push-by-digest=true,name-canonical=true,push=true
+          tags: ${{ env.LOCAL_IMAGE }}
+          outputs: |
+            type=docker
+            ${{ env.IS_RELEASE == 'true' && format('type=image,name={0}/{1},push-by-digest=true,name-canonical=true,push=true', vars.DOCKERHUB_NAMESPACE, matrix.image.name) || '' }}
           cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
 
-      - name: Export the digest
+      - name: Check the image platform and labels
+        env:
+          PLATFORM_ARCH: ${{ matrix.platform.arch }}
+          EXPECTED_SOURCE: https://github.com/${{ github.repository }}
+        run: |
+          docker image inspect "$LOCAL_IMAGE" --format '{{json .Config.Labels}}' | jq .
+          test "$(docker image inspect "$LOCAL_IMAGE" --format '{{.Architecture}}')" = "$PLATFORM_ARCH"
+          test "$(docker image inspect "$LOCAL_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.licenses"}}')" = 'GPL-3.0-or-later'
+          test "$(docker image inspect "$LOCAL_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.source"}}')" = "$EXPECTED_SOURCE"
+          test "$(docker image inspect "$LOCAL_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
+
+      # The other four images have no check that is meaningful without a feed or
+      # a broker to talk to; the PHP image gets the full smoke test.
+      - name: Smoke-test the PHP image
+        if: matrix.image.name == 'wxnotify'
+        run: docker/8.4/smoke-test.sh "$LOCAL_IMAGE" "linux/${{ matrix.platform.arch }}"
+
+      # The loaded image's config digest must be the config digest inside the
+      # manifest that was pushed: both come from the same build.
+      - name: Prove the pushed image is the tested image
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          REPOSITORY: ${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.image.name }}
         run: |
+          pushed_config="$(docker buildx imagetools inspect "${REPOSITORY}@${DIGEST}" --raw | jq -r '.config.digest')"
+          loaded_id="$(docker image inspect "$LOCAL_IMAGE" --format '{{.Id}}')"
+          echo "pushed manifest: ${DIGEST}; pushed config: ${pushed_config}; loaded image id: ${loaded_id}"
+          if [ "$loaded_id" != "$pushed_config" ] && [ "$loaded_id" != "$DIGEST" ]; then
+            echo '::error::The loaded image does not match the pushed digest'
+            exit 1
+          fi
           mkdir -p /tmp/digests
           touch "/tmp/digests/${DIGEST#sha256:}"
 
       - name: Upload the digest
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: digests-${{ matrix.image.name }}-${{ matrix.platform.arch }}
@@ -311,7 +270,7 @@ jobs:
   merge:
     name: Publish ${{ matrix.image }}
     if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: push
+    needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -351,8 +310,8 @@ jobs:
             latest=false
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
+            type=semver,pattern={{major}},enable=${{ !contains(github.ref_name, '-') }}
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
 
       - name: Create the multi-arch manifest
