@@ -17,18 +17,19 @@ class PruneOutlookMaps extends Command
     public function handle(): int
     {
         $pruned = 0;
+        $disk = OutlookMapDisk::disk();
 
         OutlookReportRun::query()
             ->whereNotNull('maps')
             ->where('created_at', '<=', now()->subDays(OutlookReportRun::MAP_DAYS))
-            ->chunkById(100, function ($runs) use (&$pruned): void {
+            ->chunkById(100, function ($runs) use (&$pruned, $disk): void {
                 foreach ($runs as $run) {
                     if (blank($run->batch_key)) {
                         continue;
                     }
 
                     try {
-                        if (! OutlookMapDisk::disk()->deleteDirectory('outlook-maps/'.$run->batch_key)) {
+                        if (! $disk->deleteDirectory('outlook-maps/'.$run->batch_key)) {
                             Log::warning('Outlook map prune could not delete a run directory.');
 
                             continue;

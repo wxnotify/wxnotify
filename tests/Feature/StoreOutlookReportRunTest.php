@@ -117,3 +117,11 @@ it('an undefined outlook map disk fails with a message naming OUTLOOK_MAPS_DISK'
 
     expect(fn () => OutlookMapDisk::disk())->toThrow(InvalidArgumentException::class, 'OUTLOOK_MAPS_DISK');
 });
+
+it('fails loudly instead of logging when storing graphics on an undefined disk', function () {
+    config(['filesystems.outlook_maps_disk' => 'no-such-disk']);
+
+    expect(fn () => app(StoreOutlookReportRun::class)(storeOutlookRule(), 'batch-bad-disk', [], [
+        'day1' => ['bytes' => 'PNGDATA', 'mime' => 'image/png'],
+    ]))->toThrow(InvalidArgumentException::class, 'OUTLOOK_MAPS_DISK');
+});

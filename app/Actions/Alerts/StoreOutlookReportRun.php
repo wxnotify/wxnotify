@@ -36,6 +36,8 @@ class StoreOutlookReportRun
             return $run;
         }
 
+        $disk = $graphics === [] ? null : OutlookMapDisk::disk();
+
         $maps = [];
         foreach ($graphics as $key => $graphic) {
             $extension = is_array($graphic) ? (self::EXTENSIONS[$graphic['mime'] ?? ''] ?? null) : null;
@@ -46,7 +48,7 @@ class StoreOutlookReportRun
             $path = "outlook-maps/{$batchKey}/{$key}.{$extension}";
 
             try {
-                if (OutlookMapDisk::disk()->put($path, $graphic['bytes']) === false) {
+                if ($disk->put($path, $graphic['bytes']) === false) {
                     Log::warning('Outlook report map copy failed', ['reason' => 'write_returned_false']);
 
                     continue;

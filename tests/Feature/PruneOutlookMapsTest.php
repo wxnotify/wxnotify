@@ -185,3 +185,12 @@ it('prunes and sweeps on the configured disk', function () {
     expect(Storage::disk('maps')->directories('outlook-maps'))->toBe([])
         ->and($run->refresh()->maps)->toBeNull();
 });
+
+it('fails loudly on an undefined disk and leaves the recorded maps alone', function () {
+    config(['filesystems.outlook_maps_disk' => 'no-such-disk']);
+    $run = OutlookReportRun::factory()->withMaps()->old()->create();
+
+    expect(fn () => Artisan::call('outlook:prune-maps'))
+        ->toThrow(InvalidArgumentException::class, 'OUTLOOK_MAPS_DISK');
+    expect($run->refresh()->maps)->not->toBeNull();
+});
