@@ -222,6 +222,10 @@ jobs:
             ${{ env.IS_RELEASE == 'true' && format('type=image,name={0}/{1},push-by-digest=true,name-canonical=true,push=true', vars.DOCKERHUB_NAMESPACE, matrix.image.name) || '' }}
           cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
+          # No attestations: with them the pushed artifact becomes an index, and the
+          # config-digest check below would fail the first tag release.
+          provenance: false
+          sbom: false
 
       - name: Check the image platform and labels
         env:
