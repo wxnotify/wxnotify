@@ -204,11 +204,12 @@ What is different with images:
 
 - **Setup.** On every server download `deploy/multi-server/compose.yaml` and `.env.example`, copy the example to `.env`, set `COMPOSE_PROFILES` and the per-server values the example marks. Use the same `WXNOTIFY_VERSION` everywhere. Set the `MAIL_*` values (A and D) and the Turnstile keys (A) before anyone signs up, as in the single-server steps. Generate `APP_KEY` once and copy it to A, C and D.
 - **Secrets that must match across servers:** `APP_KEY` (A, C, D), `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` (A, C, D, plus B which creates the database), `REVERB_APP_ID`, `REVERB_APP_KEY` and `REVERB_APP_SECRET` (A and D), and `PIPELINE_WEBHOOK_TOKEN` (A and C). The guide's table explains why.
-- **Order for a first start:** B, then A, D, C. On A, run the migrations yourself, because no startup automation runs them here:
+- **Order for a first start:** B, then A, D, C. On A, run the migrations yourself, because no startup automation runs them here. Start `front-end` alone first and `reverb` only after migrating: a Reverb started against an empty database cannot read its restart signal, and would then ignore every later `reverb:restart`.
 
   ```bash
-  docker compose up -d
+  docker compose up -d front-end
   docker compose exec front-end php artisan migrate --force
+  docker compose up -d
   ```
 
   Then create the first owner and run **Setup** exactly as in the single-server steps above, from A.

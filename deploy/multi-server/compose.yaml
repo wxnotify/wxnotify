@@ -13,8 +13,12 @@
 # bound to the address you choose (default: this host only). Never use a public address
 # for them, and firewall them as described in the multi-server guide.
 #
-# Migrations do NOT run on start here (no startup automation). Run them on server A:
+# Migrations do NOT run on start here (no startup automation). Run them on server A; on
+# the first start, before reverb exists (it cannot read its restart signal from an empty
+# database):
+#   docker compose up -d front-end
 #   docker compose exec front-end php artisan migrate --force
+#   docker compose up -d
 #
 # Only DB_PASSWORD (every server has it) is enforced by the compose file. APP_KEY,
 # REVERB_APP_KEY/SECRET and PIPELINE_WEBHOOK_TOKEN are not set on every server, so the
