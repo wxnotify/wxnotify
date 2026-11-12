@@ -11,6 +11,14 @@ test('the reverb connection is configured from the environment with the keys the
         ->and($connection['options'])->toHaveKeys(['host', 'port', 'scheme']);
 });
 
+test('the public reverb settings default to the published port over plain ws and use the app key', function () {
+    $public = config('reverb.public');
+
+    expect($public['key'])->toBe(config('reverb.apps.apps.0.key'))
+        ->and($public['port'])->toBeInt()
+        ->and($public['scheme'])->toBeIn(['http', 'https']);
+});
+
 test('the default broadcast connection under test is not reverb', function () {
     expect(config('broadcasting.default'))->not->toBe('reverb');
 });

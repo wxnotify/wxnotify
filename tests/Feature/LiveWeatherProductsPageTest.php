@@ -431,6 +431,31 @@ test('the first render is Offline and already polls with no Echo, and no Reverb 
         ->not->toContain('sekret-value-for-test');
 });
 
+test('the page carries the Reverb settings for the browser and no secret', function () {
+    $this->withoutVite();
+    config([
+        'reverb.public' => ['key' => 'pub-key', 'host' => 'wx.example.com', 'port' => 443, 'scheme' => 'https'],
+        'reverb.apps.apps.0.secret' => 'sekret-value-for-test',
+    ]);
+
+    $html = livewire(Products::class)->assertSuccessful()->html();
+
+    expect($html)
+        ->toContain('wxReverbConfig')
+        ->toContain('"key":"pub-key"')
+        ->toContain('"host":"wx.example.com"')
+        ->toContain('"port":443')
+        ->toContain('"scheme":"https"')
+        ->not->toContain('sekret-value-for-test');
+});
+
+test('an unset public host is rendered as null so the browser uses its own host', function () {
+    $this->withoutVite();
+    config(['reverb.public' => ['key' => 'pub-key', 'host' => null, 'port' => 8085, 'scheme' => 'http']]);
+
+    expect(livewire(Products::class)->assertSuccessful()->html())->toContain('"host":null');
+});
+
 test('the Echo listener debounces events into one fetchSince and never calls onProductIngested', function () {
     $this->withoutVite();
 

@@ -104,4 +104,23 @@ return [
 
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Public (Browser) Connection
+    |--------------------------------------------------------------------------
+    |
+    | Where the browser connects, handed to the Products page at request time
+    | so a prebuilt image needs no build-time VITE_REVERB_* values. The host is
+    | optional: unset, the browser uses the host it loaded the page from. Never
+    | put the app secret here; this block is written into the page.
+    |
+    */
+
+    'public' => [
+        'key' => env('REVERB_APP_KEY'),
+        'host' => env('REVERB_PUBLIC_HOST'),
+        'port' => (int) env('REVERB_PUBLIC_PORT', 8085),
+        'scheme' => env('REVERB_PUBLIC_SCHEME', 'http') === 'https' ? 'https' : 'http',
+    ],
+
 ];

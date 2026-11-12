@@ -124,6 +124,7 @@
             </ul>
         @endif
     </div>
+    <script>window.wxReverbConfig = {!! \Illuminate\Support\Js::encode(config('reverb.public')) !!};</script>
     @vite('resources/js/echo.js')
 
     <script>
