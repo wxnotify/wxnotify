@@ -1,5 +1,7 @@
 # Running WxNotify across four servers
 
+> **Two routes.** This guide describes running from a git checkout with `compose.production.yaml` (clone, `composer install`, `npm run build`). To run from the published Docker images instead, with one Compose file and no checkout, follow [deploy/README.md](../deploy/README.md) and [deploy/multi-server](../deploy/multi-server). The network layout, firewall rules, sizing, what must be identical across servers, per-server settings and the operating notes below carry over to both routes; the git, Composer, npm and `compose.production.yaml` steps do not apply to the image route.
+
 `docker compose up -d` runs everything on one machine. This guide splits the same stack across four servers using the `server-a`, `server-b`, `server-c` and `server-d` Compose profiles. It is written for our own test and production environments and for anyone self-hosting WxNotify.
 
 > **Status.** The compose layering in this guide was checked with `docker compose config` (each profile resolves on its own and starts exactly the services listed below). A full four-host deployment has not been run end to end yet, so treat the first rollout as a shakedown and see [Known limits](#known-limits).

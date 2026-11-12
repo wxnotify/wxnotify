@@ -1,58 +1,49 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# WxNotify
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+WxNotify turns weather feeds into alerts that reach people. It ingests National Weather Service text products (NWWS-OI), EMWIN and GOES lightning (GLM) data, matches them against the alert rules and places each subscriber has set up, and delivers the result through the channels they chose.
 
-## About Laravel
+## What is in it
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Feeds.** Separate containers for NWWS-OI, EMWIN (ByteBlaster and HTTP) and GLM post products to an ingestion API, which stores them and queues the matching work.
+- **Alert rules and places.** Subscribers choose products, areas and places; matching and delivery run on database-backed queue workers.
+- **Channels.** Email, SMS and voice (Twilio, BulkVS, HTTP SMS), web push and mobile push, Slack, Discord, Microsoft Teams, Telegram, Matrix, Mattermost, Rocket.Chat, Google Chat, Bluesky, ntfy, Pushover, PagerDuty, IFTTT and webhooks. See `app/Support/ChannelTypes` for the full list and what each needs configured.
+- **Dashboard and admin.** Filament panels for subscribers (`/dashboard`) and owners (`/admin`), including a live products page streamed over WebSockets (Laravel Reverb), a map, and pipeline and storage tools.
+- **API.** A versioned JSON API under `/api/v1` for the mobile app.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+The stack is Laravel and Filament on PHP 8.4, PostgreSQL with PostGIS, Laravel Reverb, and Python feed clients, all run with Docker Compose.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Run it yourself
 
-## Learning Laravel
+Published Docker images and ready-made Compose files mean you do not need to clone this repository. Start with [deploy/README.md](deploy/README.md): a single-server quick start, HTTPS, upgrades, and the four-server layout. [deploy/single-server](deploy/single-server) and [deploy/multi-server](deploy/multi-server) hold the Compose files and `.env.example` templates.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Develop locally
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+The development stack is the `compose.yaml` in this folder. It bind-mounts the checkout into the containers, so there is nothing to build for the PHP code itself.
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+cp .env.example .env
+docker compose up -d
+docker compose exec front-end composer install
+docker compose exec front-end php artisan key:generate
+docker compose exec front-end php artisan migrate --seed
+docker compose exec front-end npm install
+docker compose exec front-end npm run dev
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Composer and npm are always run inside the `front-end` container. Run the tests with:
 
-## Contributing
+```bash
+docker compose exec front-end php artisan test --compact
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+The test suite uses Pest. `CLAUDE.md` and the rules under `.ai/rules` describe the coding conventions this project follows.
 
-## Code of Conduct
+## Documentation
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- [deploy/README.md](deploy/README.md): self-hosting from the published images.
+- [docs/multi-server-deployment.md](docs/multi-server-deployment.md): the four-server layout, firewall, sizing and operations.
+- [docs/superpowers/specs](docs/superpowers/specs) and [docs/superpowers/plans](docs/superpowers/plans): design specifications and implementation plans.
 
-## Security Vulnerabilities
+## Licence
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+WxNotify is free software, licensed under the GNU General Public License, version 3 or (at your option) any later version (GPL-3.0-or-later). See [LICENSE](LICENSE).

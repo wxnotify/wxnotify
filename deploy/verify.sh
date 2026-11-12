@@ -248,6 +248,64 @@ for profile in server-a server-b server-c server-d; do
     fi
 done
 
+echo "== documentation"
+README="$HERE/README.md"
+ROOT_README="$HERE/../README.md"
+if [ ! -f "$README" ]; then
+    fail "deploy/README.md exists"
+else
+    pass "deploy/README.md exists"
+
+    # Every variable named inside a fenced block (NAME= or $NAME / ${NAME}) belongs to an
+    # .env.example, unless it is a shell or Compose name on the allow-list.
+    # POSTGRES_USER / POSTGRES_DB are read inside the pgsql container, not from .env.
+    ALLOW=" PATH HOME PWD USER POSTGRES_USER POSTGRES_DB "
+    fenced="$(awk '/^```/ { infence = !infence; next } infence { print }' "$README")"
+    used="$( { grep -Eo '(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]{3,}=' <<<"$fenced" || true; grep -Eo '\$\{?[A-Z][A-Z0-9_]{3,}' <<<"$fenced" || true; } | sed -E 's/^[^A-Z]*//; s/^\$\{?//; s/=$//' | sort -u)"
+    unknown=""
+    for var in $used; do
+        case "$ALLOW" in *" $var "*) continue ;; esac
+        if ! grep -Eqh "^#? ?${var}=" "$HERE/single-server/.env.example" "$HERE/multi-server/.env.example"; then
+            unknown="$unknown $var"
+        fi
+    done
+    if [ -z "$unknown" ]; then
+        pass "deploy/README.md: every variable in a command block is in an .env.example"
+    else
+        fail "deploy/README.md: variables not in any .env.example:$unknown"
+    fi
+
+    for term in WXNOTIFY_VERSION OUTLOOK_MAPS_DISK REVERB_PUBLIC_SCHEME REVERB_PUBLIC_PORT app:grant-owner Setup queue:restart reverb:restart; do
+        if grep -Fq -- "$term" "$README"; then
+            pass "deploy/README.md mentions $term"
+        else
+            fail "deploy/README.md must mention $term"
+        fi
+    done
+fi
+
+# Every relative link points at a file that exists.
+for doc in "$README" "$ROOT_README"; do
+    if [ "$doc" = "$README" ]; then label="deploy/README.md"; else label="README.md"; fi
+    if [ ! -f "$doc" ]; then
+        fail "$label exists"
+        continue
+    fi
+    broken=""
+    while read -r target; do
+        target="${target%%#*}"
+        [ -z "$target" ] && continue
+        if [ ! -e "$(dirname "$doc")/$target" ]; then
+            broken="$broken $target"
+        fi
+    done < <(grep -Eo '\]\([^)]+\)' "$doc" | sed -E 's/^\]\(//; s/\)$//' | grep -Ev '^(https?:|mailto:|#|<)' || true)
+    if [ -z "$broken" ]; then
+        pass "$label: every relative link points at an existing file"
+    else
+        fail "$label: broken relative links:$broken"
+    fi
+done
+
 if [ "$FAILED" -ne 0 ]; then
     echo "verify.sh: FAILED"
     exit 1
