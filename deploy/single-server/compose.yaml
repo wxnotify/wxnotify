@@ -64,6 +64,10 @@ services:
     # only the timing is overridden, so a slow first-run or upgrade migration (which runs
     # before the server starts) has up to 5 minutes before failed checks count, instead of
     # the image's 60 s.
+    # Migrations run without --isolated (AUTORUN_LARAVEL_MIGRATION_ISOLATION stays unset):
+    # its lock lives in the database cache's cache_locks table, which a fresh database does
+    # not have yet, so an isolated first migration can never start. Only this one service
+    # migrates, so there is nothing to isolate from.
     front-end:
         <<: *php-service
         healthcheck:
@@ -71,7 +75,6 @@ services:
         environment:
             <<: *php-environment
             AUTORUN_ENABLED: 'true'
-            AUTORUN_LARAVEL_MIGRATION_ISOLATION: 'true'
         ports:
             - '${APP_PORT:-8080}:8080'
         volumes:

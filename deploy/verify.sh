@@ -135,11 +135,13 @@ for dir in single-server multi-server; do
         else
             fail "$dir: only front-end may set AUTORUN_ENABLED (got: ${autorun:-none})"
         fi
+        # Isolation must stay off: `migrate --isolated` takes its lock in the database
+        # cache's cache_locks table, which does not exist before the first migration.
         isolation="$(dc "$dir" config --format json | jq -r '.services["front-end"].environment | "\(.AUTORUN_ENABLED) \(.AUTORUN_LARAVEL_MIGRATION_ISOLATION)"')"
-        if [ "$isolation" = "true true" ]; then
-            pass "$dir: front-end sets AUTORUN_ENABLED and AUTORUN_LARAVEL_MIGRATION_ISOLATION to true"
+        if [ "$isolation" = "true null" ]; then
+            pass "$dir: front-end sets AUTORUN_ENABLED to true and leaves AUTORUN_LARAVEL_MIGRATION_ISOLATION unset"
         else
-            fail "$dir: front-end must set both AUTORUN variables to true (got: $isolation)"
+            fail "$dir: front-end must set AUTORUN_ENABLED=true and leave AUTORUN_LARAVEL_MIGRATION_ISOLATION unset (got: $isolation)"
         fi
     else
         if grep -q 'AUTORUN' "$HERE/$dir/compose.yaml" "$HERE/$dir/.env.example"; then
