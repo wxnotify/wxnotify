@@ -1,0 +1,288 @@
+# WxNotify across four servers, from the published images (no repository checkout).
+# The same file goes on EVERY server; COMPOSE_PROFILES in that server's .env decides what
+# runs there:
+#
+#   server-a  front-end, reverb                  the dashboard, API and WebSockets
+#   server-b  pgsql, redis                       data (redis only if you use it)
+#   server-c  pipeline-api, nwws, emwin-byteblaster, emwin-http, glm-decoder,
+#             queue-long, docker-socket-proxy    ingestion
+#   server-d  queue, queue-heartbeat, scheduler, apprise    processing and delivery
+#
+# Nothing here depends on a service in another profile, so each profile loads alone. Calls
+# between servers are network calls whose addresses you set in .env. Cross-server ports are
+# bound to the address you choose (default: this host only). Never use a public address
+# for them, and firewall them as described in the multi-server guide.
+#
+# Migrations do NOT run on start here (no startup automation). Run them on server A:
+#   docker compose exec front-end php artisan migrate --force
+#
+# Needs Docker Compose 2.24 or newer.
+
+x-php-service: &php-service
+    image: '${WXNOTIFY_REGISTRY:-wxnotify}/wxnotify:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+    env_file: .env
+    restart: unless-stopped
+
+services:
+    # Server A. The image's own healthcheck (/up) applies.
+    front-end:
+        <<: *php-service
+        ports:
+            - '${APP_PORT:-8080}:8080'
+        profiles:
+            - server-a
+    # Server A. Server D's workers broadcast to this port over the private network, and
+    # the TLS reverse proxy forwards browser WebSockets here. Set REVERB_BIND_ADDRESS to
+    # this server's private address.
+    reverb:
+        <<: *php-service
+        command: 'php artisan reverb:start --host=0.0.0.0 --port=8080'
+        stop_signal: SIGTERM
+        healthcheck:
+            test: ['CMD', 'healthcheck-reverb']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        ports:
+            - '${REVERB_BIND_ADDRESS:-127.0.0.1}:${REVERB_PUBLISHED_PORT:-8085}:8080'
+        profiles:
+            - server-a
+    # Server B.
+    pgsql:
+        image: 'imresamu/postgis:18-3.6'
+        environment:
+            PGPASSWORD: '${DB_PASSWORD}'
+            POSTGRES_DB: '${DB_DATABASE}'
+            POSTGRES_USER: '${DB_USERNAME}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD}'
+        ports:
+            - '${DB_BIND_ADDRESS:-127.0.0.1}:5432:5432'
+        volumes:
+            - 'pgsql-data:/var/lib/postgresql'
+        healthcheck:
+            test:
+                - CMD
+                - pg_isready
+                - '-q'
+                - '-d'
+                - '${DB_DATABASE}'
+                - '-U'
+                - '${DB_USERNAME}'
+            retries: 3
+            timeout: 5s
+        restart: unless-stopped
+        profiles:
+            - server-b
+    # Server B. Not used by the default configuration; start it only if you switch
+    # sessions, cache or the queue to redis, or turn on REVERB_SCALING_ENABLED. It has no
+    # password: keep it on the private address and firewalled.
+    redis:
+        image: 'redis:alpine'
+        ports:
+            - '${REDIS_BIND_ADDRESS:-127.0.0.1}:6379:6379'
+        volumes:
+            - 'redis-data:/data'
+        healthcheck:
+            test:
+                - CMD
+                - redis-cli
+                - ping
+            retries: 3
+            timeout: 5s
+        restart: unless-stopped
+        profiles:
+            - server-b
+    # Server C. The feed clients post products here over this host's network.
+    pipeline-api:
+        <<: *php-service
+        container_name: wxnotify-pipeline-api
+        ports:
+            - '127.0.0.1:${PIPELINE_API_PORT:-8027}:8080'
+        volumes:
+            - 'nwws-products:/products'
+            - 'emwin-products:/emwin-products:ro'
+        profiles:
+            - server-c
+    # Server C, because it reads the product volumes that live here. It runs the long
+    # jobs: shapefile scans and the hourly product storage scan.
+    queue-long:
+        <<: *php-service
+        command: 'php artisan queue:work database_long --queue=long --tries=1 --sleep=3 --timeout=900 --memory=192 --max-time=3600'
+        stop_signal: SIGTERM
+        stop_grace_period: 930s
+        healthcheck:
+            test: ['CMD', 'healthcheck-queue']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        volumes:
+            - 'nwws-products:/products:ro'
+            - 'emwin-products:/emwin-products:ro'
+        profiles:
+            - server-c
+    nwws:
+        image: '${WXNOTIFY_REGISTRY:-wxnotify}/nwws:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+        container_name: wxnotify-nwws
+        environment:
+            NWWS_USERNAME: '${NWWS_USERNAME:-}'
+            NWWS_PASSWORD: '${NWWS_PASSWORD:-}'
+            NWWS_ARCHIVEDIR: /products
+            NWWS_PAN_RUN: /pan-notify.sh
+            NWWS_RETRY: 'true'
+            NWWS_RETENTION_DAYS: '${NWWS_RETENTION_DAYS:-7}'
+            NWWS_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/nwws-products'
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+        volumes:
+            - 'nwws-products:/products'
+        restart: unless-stopped
+        depends_on:
+            pipeline-api:
+                condition: service_healthy
+        profiles:
+            - server-c
+    glm-decoder:
+        image: '${WXNOTIFY_REGISTRY:-wxnotify}/glm-decoder:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+        container_name: wxnotify-glm-decoder
+        environment:
+            GLM_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/glm-flashes'
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+        volumes:
+            - 'glm-state:/state'
+        restart: unless-stopped
+        depends_on:
+            pipeline-api:
+                condition: service_healthy
+        profiles:
+            - server-c
+    emwin-byteblaster:
+        image: '${WXNOTIFY_REGISTRY:-wxnotify}/emwin-byteblaster:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+        container_name: wxnotify-emwin-byteblaster
+        environment:
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+            EMWIN_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/emwin-products'
+            EMWIN_SERVERS_REFRESH_HOURS: '${EMWIN_SERVERS_REFRESH_HOURS:-6}'
+            EMWIN_MAX_UNZIP_BYTES: '${EMWIN_MAX_UNZIP_BYTES:-5242880}'
+            EMWIN_RETENTION_DAYS: '${EMWIN_RETENTION_DAYS:-7}'
+        ports:
+            - '127.0.0.1:${EMWIN_WEB_PORT:-8016}:8016'
+        volumes:
+            - 'emwin-products:/var/npemwin/files'
+        restart: unless-stopped
+        depends_on:
+            pipeline-api:
+                condition: service_healthy
+        profiles:
+            - server-c
+    emwin-http:
+        image: '${WXNOTIFY_REGISTRY:-wxnotify}/emwin-http:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+        container_name: wxnotify-emwin-http
+        environment:
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+            EMWIN_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/emwin-products'
+            EMWIN_HTTP_STATE_DIR: /state
+            EMWIN_RETENTION_DAYS: '${EMWIN_RETENTION_DAYS:-7}'
+        volumes:
+            - 'emwin-products:/emwin-products'
+            - 'emwin-http-state:/state'
+        restart: unless-stopped
+        depends_on:
+            pipeline-api:
+                condition: service_healthy
+        profiles:
+            - server-c
+    # Server C, next to the feed containers it controls. Server A's admin tools call it.
+    # It has no authentication or TLS: bind it to C's PRIVATE address
+    # (DOCKER_PROXY_BIND_ADDRESS) and firewall it to server A alone.
+    docker-socket-proxy:
+        image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
+        container_name: wxnotify-docker-socket-proxy
+        environment:
+            CONTAINERS: 1
+            ALLOW_START: 1
+            ALLOW_STOP: 1
+            ALLOW_RESTARTS: 1
+            POST: 1
+            AUTH: 0
+            BUILD: 0
+            COMMIT: 0
+            CONFIGS: 0
+            DISTRIBUTION: 0
+            EXEC: 0
+            IMAGES: 0
+            NETWORKS: 0
+            NODES: 0
+            PLUGINS: 0
+            SECRETS: 0
+            SERVICES: 0
+            SESSION: 0
+            SWARM: 0
+            SYSTEM: 0
+            TASKS: 0
+            VOLUMES: 0
+        ports:
+            - '${DOCKER_PROXY_BIND_ADDRESS:-127.0.0.1}:2375:2375'
+        volumes:
+            - '/var/run/docker.sock:/var/run/docker.sock:ro'
+        restart: unless-stopped
+        profiles:
+            - server-c
+    # Server D. Delivers alerts. --timeout=60 stays below the database queue's
+    # retry_after (90 s) and above the longest send budget (50 s).
+    queue:
+        <<: *php-service
+        command: 'php artisan queue:work --queue=deliveries,default,broadcasts --tries=1 --sleep=1 --timeout=60 --memory=192 --max-time=3600'
+        stop_signal: SIGTERM
+        stop_grace_period: 70s
+        healthcheck:
+            test: ['CMD', 'healthcheck-queue']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        profiles:
+            - server-d
+    queue-heartbeat:
+        <<: *php-service
+        container_name: wxnotify-queue-heartbeat
+        command: 'php artisan queue:work --queue=heartbeat --tries=1'
+        stop_signal: SIGTERM
+        healthcheck:
+            test: ['CMD', 'healthcheck-queue']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        profiles:
+            - server-d
+    scheduler:
+        <<: *php-service
+        container_name: wxnotify-scheduler
+        command: 'php artisan schedule:work'
+        stop_signal: SIGTERM
+        healthcheck:
+            test: ['CMD', 'healthcheck-schedule']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        profiles:
+            - server-d
+    # Server D. Called by the workers here and by the dashboard on server A (channel
+    # confirmation codes). No authentication: bind it to D's PRIVATE address
+    # (APPRISE_BIND_ADDRESS) and firewall it to servers A and D.
+    apprise:
+        image: 'caronc/apprise:2.0.0'
+        ports:
+            - '${APPRISE_BIND_ADDRESS:-127.0.0.1}:8026:8000'
+        restart: unless-stopped
+        profiles:
+            - server-d
+volumes:
+    pgsql-data:
+    redis-data:
+    nwws-products:
+    emwin-products:
+    glm-state:
+    emwin-http-state:

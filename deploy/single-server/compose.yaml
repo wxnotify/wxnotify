@@ -1,0 +1,287 @@
+# WxNotify on one server, from the published images (no repository checkout needed).
+#
+#   cp .env.example .env      # then fill it in
+#   docker compose up -d
+#
+# Upgrade: change WXNOTIFY_VERSION in .env, then `docker compose pull && docker compose up -d`.
+# Back up PostgreSQL first: migrations only go forward.
+#
+# `front-end` runs the database migrations when it starts (AUTORUN_*) and is the only
+# service that does. Every other PHP service waits for it to be healthy, so a first
+# install never starts workers against an unmigrated database. If a migration fails,
+# `front-end` stops before serving, never becomes healthy, and nothing else starts:
+# read `docker compose logs front-end`.
+#
+# Needs Docker Compose 2.24 or newer.
+
+x-php-environment: &php-environment
+    # Service-to-service addresses; they override .env, so you never edit them.
+    DB_HOST: pgsql
+    REVERB_HOST: reverb
+    REVERB_PORT: '8080'
+    REVERB_SCHEME: http
+    APPRISE_API_URL: 'http://apprise:8000'
+    DOCKER_PROXY_URL: 'http://docker-socket-proxy:2375'
+
+x-php-service: &php-service
+    image: '${WXNOTIFY_REGISTRY:-wxnotify}/wxnotify:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+    env_file: .env
+    environment:
+        <<: *php-environment
+    restart: unless-stopped
+
+services:
+    pgsql:
+        image: 'imresamu/postgis:18-3.6'
+        environment:
+            PGPASSWORD: '${DB_PASSWORD}'
+            POSTGRES_DB: '${DB_DATABASE}'
+            POSTGRES_USER: '${DB_USERNAME}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD}'
+        volumes:
+            - 'pgsql-data:/var/lib/postgresql'
+        networks:
+            - default
+        healthcheck:
+            test:
+                - CMD
+                - pg_isready
+                - '-q'
+                - '-d'
+                - '${DB_DATABASE}'
+                - '-U'
+                - '${DB_USERNAME}'
+            retries: 3
+            timeout: 5s
+        restart: unless-stopped
+    # The dashboard and the subscriber API. The image's own healthcheck (/up) applies.
+    front-end:
+        <<: *php-service
+        environment:
+            <<: *php-environment
+            AUTORUN_ENABLED: 'true'
+            AUTORUN_LARAVEL_MIGRATION_ISOLATION: 'true'
+        ports:
+            - '${APP_PORT:-8080}:8080'
+        volumes:
+            - 'app-storage:/var/www/html/storage'
+            - 'nwws-products:/products'
+            - 'emwin-products:/emwin-products:ro'
+        networks:
+            - default
+            - docker-proxy
+        depends_on:
+            pgsql:
+                condition: service_healthy
+    # The ingestion entry point: the feed clients post products here. Same image and
+    # default (web) command, no published port, no automation.
+    pipeline-api:
+        <<: *php-service
+        container_name: wxnotify-pipeline-api
+        volumes:
+            - 'nwws-products:/products'
+            - 'emwin-products:/emwin-products:ro'
+        depends_on:
+            front-end:
+                condition: service_healthy
+    # Delivers alerts. It keeps running the code it booted with; `queue:restart`
+    # (run on every upgrade, `docker compose up -d` does it by recreating) replaces it.
+    # --timeout=60 stays below the database queue's retry_after (90 s) and above the
+    # longest send budget (50 s); --tries=1 because a retry would re-send billed messages.
+    queue:
+        <<: *php-service
+        command: 'php artisan queue:work --queue=deliveries,default,broadcasts --tries=1 --sleep=1 --timeout=60 --memory=192 --max-time=3600'
+        stop_signal: SIGTERM
+        stop_grace_period: 70s
+        healthcheck:
+            test: ['CMD', 'healthcheck-queue']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        volumes:
+            - 'app-storage:/var/www/html/storage'
+        depends_on:
+            front-end:
+                condition: service_healthy
+    # Long jobs: shapefile scans and the hourly product storage scan (reads the
+    # product volumes, read-only). retry_after for this connection is 960 s,
+    # above --timeout=900.
+    queue-long:
+        <<: *php-service
+        command: 'php artisan queue:work database_long --queue=long --tries=1 --sleep=3 --timeout=900 --memory=192 --max-time=3600'
+        stop_signal: SIGTERM
+        stop_grace_period: 930s
+        healthcheck:
+            test: ['CMD', 'healthcheck-queue']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        volumes:
+            - 'nwws-products:/products:ro'
+            - 'emwin-products:/emwin-products:ro'
+        depends_on:
+            front-end:
+                condition: service_healthy
+    queue-heartbeat:
+        <<: *php-service
+        container_name: wxnotify-queue-heartbeat
+        command: 'php artisan queue:work --queue=heartbeat --tries=1'
+        stop_signal: SIGTERM
+        healthcheck:
+            test: ['CMD', 'healthcheck-queue']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        depends_on:
+            front-end:
+                condition: service_healthy
+    # Runs the schedule (scheduled alerts, pruning, polling); without it none of that fires.
+    scheduler:
+        <<: *php-service
+        container_name: wxnotify-scheduler
+        command: 'php artisan schedule:work'
+        stop_signal: SIGTERM
+        healthcheck:
+            test: ['CMD', 'healthcheck-schedule']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        volumes:
+            - 'app-storage:/var/www/html/storage'
+        depends_on:
+            front-end:
+                condition: service_healthy
+    # The WebSocket server for the live Products page. It listens on 8080 inside the
+    # container and is published on REVERB_PUBLISHED_PORT; your reverse proxy forwards
+    # /app and /apps to it when you serve the dashboard over HTTPS.
+    reverb:
+        <<: *php-service
+        command: 'php artisan reverb:start --host=0.0.0.0 --port=8080'
+        stop_signal: SIGTERM
+        healthcheck:
+            test: ['CMD', 'healthcheck-reverb']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        ports:
+            - '${REVERB_PUBLISHED_PORT:-8085}:8080'
+        depends_on:
+            front-end:
+                condition: service_healthy
+    # Sends alerts and channel confirmation codes. Unauthenticated: not published.
+    apprise:
+        image: 'caronc/apprise:2.0.0'
+        networks:
+            - default
+        restart: unless-stopped
+    # Lets the dashboard start and stop the feed containers. Unauthenticated: it sits on
+    # an internal network that only front-end joins, and is not published.
+    docker-socket-proxy:
+        image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
+        container_name: wxnotify-docker-socket-proxy
+        environment:
+            CONTAINERS: 1
+            ALLOW_START: 1
+            ALLOW_STOP: 1
+            ALLOW_RESTARTS: 1
+            POST: 1
+            AUTH: 0
+            BUILD: 0
+            COMMIT: 0
+            CONFIGS: 0
+            DISTRIBUTION: 0
+            EXEC: 0
+            IMAGES: 0
+            NETWORKS: 0
+            NODES: 0
+            PLUGINS: 0
+            SECRETS: 0
+            SERVICES: 0
+            SESSION: 0
+            SWARM: 0
+            SYSTEM: 0
+            TASKS: 0
+            VOLUMES: 0
+        volumes:
+            - '/var/run/docker.sock:/var/run/docker.sock:ro'
+        networks:
+            - docker-proxy
+        restart: unless-stopped
+    nwws:
+        image: '${WXNOTIFY_REGISTRY:-wxnotify}/nwws:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+        container_name: wxnotify-nwws
+        environment:
+            NWWS_USERNAME: '${NWWS_USERNAME:-}'
+            NWWS_PASSWORD: '${NWWS_PASSWORD:-}'
+            NWWS_ARCHIVEDIR: /products
+            NWWS_PAN_RUN: /pan-notify.sh
+            NWWS_RETRY: 'true'
+            NWWS_RETENTION_DAYS: '${NWWS_RETENTION_DAYS:-7}'
+            NWWS_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/nwws-products'
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+        volumes:
+            - 'nwws-products:/products'
+        restart: unless-stopped
+        depends_on:
+            pipeline-api:
+                condition: service_healthy
+    glm-decoder:
+        image: '${WXNOTIFY_REGISTRY:-wxnotify}/glm-decoder:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+        container_name: wxnotify-glm-decoder
+        environment:
+            GLM_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/glm-flashes'
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+        volumes:
+            - 'glm-state:/state'
+        restart: unless-stopped
+        depends_on:
+            pipeline-api:
+                condition: service_healthy
+    emwin-byteblaster:
+        image: '${WXNOTIFY_REGISTRY:-wxnotify}/emwin-byteblaster:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+        container_name: wxnotify-emwin-byteblaster
+        environment:
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+            EMWIN_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/emwin-products'
+            EMWIN_SERVERS_REFRESH_HOURS: '${EMWIN_SERVERS_REFRESH_HOURS:-6}'
+            EMWIN_MAX_UNZIP_BYTES: '${EMWIN_MAX_UNZIP_BYTES:-5242880}'
+            EMWIN_RETENTION_DAYS: '${EMWIN_RETENTION_DAYS:-7}'
+        volumes:
+            - 'emwin-products:/var/npemwin/files'
+        restart: unless-stopped
+        depends_on:
+            pipeline-api:
+                condition: service_healthy
+    emwin-http:
+        image: '${WXNOTIFY_REGISTRY:-wxnotify}/emwin-http:${WXNOTIFY_VERSION:?set WXNOTIFY_VERSION in .env}'
+        container_name: wxnotify-emwin-http
+        environment:
+            PIPELINE_WEBHOOK_TOKEN: '${PIPELINE_WEBHOOK_TOKEN}'
+            EMWIN_WEBHOOK_URL: 'http://pipeline-api:8080/api/pipeline/emwin-products'
+            EMWIN_HTTP_STATE_DIR: /state
+            EMWIN_RETENTION_DAYS: '${EMWIN_RETENTION_DAYS:-7}'
+        volumes:
+            - 'emwin-products:/emwin-products'
+            - 'emwin-http-state:/state'
+        restart: unless-stopped
+        depends_on:
+            pipeline-api:
+                condition: service_healthy
+networks:
+    default:
+        driver: bridge
+    docker-proxy:
+        driver: bridge
+        internal: true
+volumes:
+    pgsql-data:
+    app-storage:
+    nwws-products:
+    emwin-products:
+    glm-state:
+    emwin-http-state:
