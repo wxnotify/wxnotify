@@ -195,11 +195,12 @@ docker compose run --rm --no-deps front-end php artisan key:generate --show
 `key:generate --show` only prints a key. Paste it into `APP_KEY` in `.env` on **A, C and D**. Generate it once and never change it. Then:
 
 ```bash
-docker compose up -d
+docker compose up -d front-end
 docker compose exec front-end php artisan migrate --force
+docker compose up -d
 ```
 
-`docker compose up -d` starts only `front-end` and `reverb` here, because `COMPOSE_PROFILES=server-a`.
+Start `front-end` alone and migrate before `reverb` starts: a Reverb started against an empty database cannot read its restart signal and then ignores every later `reverb:restart` (seen on the image route, where the same order is now used). The final `docker compose up -d` starts only `reverb` in addition, because `COMPOSE_PROFILES=server-a`.
 
 ### 3. Server A: build the front end
 
@@ -250,19 +251,21 @@ wxnotify.example.com {
 }
 ```
 
-If the proxy sits in front of the application, set `WXNOTIFY_TRUSTED_PROXIES` (and `WXNOTIFY_CLIENT_IP_HEADER` for Cloudflare) as described in `.env.example`. Without that, every request looks like it came from the proxy.
+Behind the proxy, set `APP_URL` to the public `https://` address (the application then generates every URL as https; with an `http://` value the browser blocks the dashboard's assets as mixed content), `SESSION_SECURE_COOKIE=true`, and `WXNOTIFY_TRUSTED_PROXIES` (and `WXNOTIFY_CLIENT_IP_HEADER` for Cloudflare). Trusting the proxy is required, not optional: without it every request looks like it came from the proxy (one shared sign-in rate limit, wrong addresses in logs and activity alerts), and signed links such as email verification are checked against `http://` and refused. `*` is safe only while the application port is reachable from nothing but the proxy (bound to `127.0.0.1` with the proxy on A); otherwise list the proxy's address. [deploy/README.md](../deploy/README.md#putting-it-behind-https) explains each setting.
 
 ## The Docker socket proxy
 
 Admin tooling on A starts, stops and restarts the feed containers by calling `DOCKER_PROXY_URL`, which points at C.
 
-`tecnativa/docker-socket-proxy` restricts the Docker API to container start, stop, restart and inspection. **It does not authenticate callers and does not speak TLS.** On a plain port 2375, anyone who can reach it can restart any container on C, and the traffic is unencrypted. So:
+`tecnativa/docker-socket-proxy` (v0.5.0) filters the Docker API by path, and the settings the dashboard needs open far more than start, stop and restart. With `CONTAINERS=1` and `POST=1`, its rule for `/containers` is matched before any narrower rule, so every container call is allowed, including `POST /containers/create` and then `start`. A caller can therefore create a privileged container with the host's filesystem mounted and start it: **anyone who can reach port 2375 on C is root on C.** (`EXEC=0` still blocks `/exec`, and the non-container APIs such as images, networks and volumes stay blocked; `POST=0` is not an option, because the POST deny rule comes before the allow rules and would also block start and stop.) **It does not authenticate callers and does not speak TLS**, and the traffic is unencrypted. So:
 
 - Bind it to C's private address only (`DOCKER_PROXY_BIND_ADDRESS`).
 - Firewall it to A's address alone.
 - Keep the private network itself trusted (or carry it over WireGuard).
 
-The architecture plan called for TLS client-certificate authentication here; that has not been built. If the private network is not one you trust, front the proxy with something that provides it (an mTLS-terminating nginx or Caddy on C) and point `DOCKER_PROXY_URL` at the `https://` address.
+The architecture plan called for TLS client-certificate authentication here; that has not been built. If the private network is not one you trust, front the proxy with something that provides it (an mTLS-terminating nginx or Caddy on C) and point `DOCKER_PROXY_URL` at the `https://` address. A narrower proxy that allows only inspecting and starting, stopping and restarting the three feed containers would remove the root exposure; that hardening is not built yet.
+
+On one server the same proxy sits on an internal network that only `front-end` joins and is not published, so the exposure there is a compromise of the application itself.
 
 Apprise on D is similarly unauthenticated and is protected the same way: a private bind address and a firewall rule for A.
 
@@ -307,7 +310,7 @@ Run `migrate` before restarting the workers so they never run new code against a
 
 ## Operating notes
 
-- **Backups.** Everything that matters is in PostgreSQL on B. Schedule `pg_dump` to somewhere off B (`docker compose exec -T pgsql pg_dump -U "$DB_USERNAME" "$DB_DATABASE" | gzip > ...`) and test a restore. The product files on C can be rebuilt from the feeds and are not backed up.
+- **Backups.** Almost everything that matters is in PostgreSQL on B. The exception is uploaded files (service-desk attachments, bug-report screenshots, onboarding files) under `storage/` on A: in this route that is the checkout's `storage/` directory, on the image route the `app-storage` volume ([deploy/README.md](../deploy/README.md#backups-and-day-to-day-operation)); back it up as well. Schedule `pg_dump` to somewhere off B (`docker compose exec -T pgsql pg_dump -U "$DB_USERNAME" "$DB_DATABASE" | gzip > ...`) and test a restore. The product files on C can be rebuilt from the feeds and are not backed up.
 - **If A is down:** C and D keep ingesting, matching and delivering, because delivery needs only the database and the outbound providers. Live pushes to browsers and Docker control are unavailable, and broadcasts queue up on D until A is back.
 - **If B is down:** nothing works. Workers fail and keep restarting, which is expected; they recover on their own when B returns.
 - **If C is down:** the dashboard keeps working but no new products arrive, so no new alerts are produced. Alerts already queued still deliver.
@@ -316,9 +319,9 @@ Run `migrate` before restarting the workers so they never run new code against a
 
 ## Known limits
 
-- **No production images.** Each server runs a checkout in development-style images (see [Before you start](#before-you-start)). Expect this guide to get simpler once the `*-production` Docker targets copy the application in.
+- **This route builds from a checkout.** Each server here runs a checkout in development-style images (see [Before you start](#before-you-start)). Ready-made production images exist: the [image route](../deploy/README.md#running-on-four-servers) needs no checkout, Composer or npm.
 - **Product storage gauges on A.** The product volumes (`nwws-products`, `emwin-products`) live on C. `compose.production.yaml` removes them from the `front-end` mount, so the disk gauges on the Product Storage page read an empty path and show as unavailable on A. The scan results come from the database and are unaffected. The disk gauge needs a different source if you want it back.
 - **Outlook map images need shared storage.** The delivery job on D writes them and the dashboard and mobile API on A read them, and they are separate hosts, so the default `local` disk would leave A with outlook maps returning 404. On both A and D set `OUTLOOK_MAPS_DISK=s3` and the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `AWS_BUCKET`, `AWS_ENDPOINT` and `AWS_USE_PATH_STYLE_ENDPOINT` values for the same S3-compatible bucket (see `.env.example` for a Backblaze B2 example). If the disk is unreachable the app treats the map as missing rather than failing. Nothing else crosses servers on disk (shapefile imports download and clean up within one job; the dashboard wallpapers are repository files).
-- **Docker control and Apprise are unauthenticated.** See [the Docker socket proxy](#the-docker-socket-proxy).
+- **Docker control and Apprise are unauthenticated, and Docker control is root on C.** Anyone who can reach C's port 2375 can create and start a privileged container there. See [the Docker socket proxy](#the-docker-socket-proxy).
 - **One server per role.** Splitting by profile does not make any role redundant. Running more than one `reverb` needs `REVERB_SCALING_ENABLED=true` and Redis, and is outside this guide.
 - **Single-server use is unchanged.** Without `COMPOSE_FILE` pointing at `compose.production.yaml`, `docker compose up -d` behaves as it always has, including the Mailpit catcher, the Vite port and the original `server-c` grouping.
