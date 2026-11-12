@@ -64,7 +64,7 @@ Built `FROM serversideup/php:8.4-fpm-nginx-bookworm-<pinned version>` (the repo 
 
 **Application state.** `storage/` and the product volumes are volumes, never image layers. Which parts of `storage/` must be shared between roles is an open item below.
 
-**Startup automation (to confirm against ServerSideUp's docs):** the single-server `front-end` container enables the Laravel automations (migrations with the isolation option, and whichever of config caching and storage linking suit a container whose settings come from environment variables). Everything else leaves automations off. The multi-server set turns them all off.
+**Startup automation (to confirm against ServerSideUp's docs):** the single-server `front-end` container enables the Laravel automations (migrations, and whichever of config caching and storage linking suit a container whose settings come from environment variables). Everything else leaves automations off. The multi-server set turns them all off. **Correction after the end-to-end run (2026-11-11):** the migration isolation option (`AUTORUN_LARAVEL_MIGRATION_ISOLATION`) is NOT used. `migrate --isolated` takes a cache lock through the database cache store, whose `cache_locks` table only a migration creates, so a fresh install could not start; only one container migrates in the single-server file, so isolation adds nothing there.
 
 ## The feed images
 
