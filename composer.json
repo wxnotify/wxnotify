@@ -28,6 +28,7 @@
         "laravel/reverb": "^1.12",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "marcelodelgado/filament-announcements": "^1.0",
         "owenvoke/blade-fontawesome": "^3.3",
         "phpmyadmin/shapefile": "^4.0",
