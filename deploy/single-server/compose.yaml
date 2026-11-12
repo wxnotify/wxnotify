@@ -4,7 +4,10 @@
 #   docker compose up -d
 #
 # Upgrade: change WXNOTIFY_VERSION in .env, then `docker compose pull && docker compose up -d`.
-# Back up PostgreSQL first: migrations only go forward.
+# Back up PostgreSQL and the app-storage volume first: migrations only go forward. An
+# upgrade is a maintenance window: every service is recreated and the workers and feeds
+# stay stopped until front-end has migrated. If a migration fails, set the previous
+# WXNOTIFY_VERSION and run `docker compose up -d` again (see the README).
 #
 # `front-end` runs the database migrations when it starts (AUTORUN_*) and is the only
 # service that does. Every other PHP service waits for it to be healthy, so a first
@@ -75,8 +78,11 @@ services:
         environment:
             <<: *php-environment
             AUTORUN_ENABLED: 'true'
+        # Published on every interface by default (a plain-HTTP trial). Behind a reverse
+        # proxy on this host set APP_BIND_ADDRESS=127.0.0.1: Docker's published ports
+        # bypass ufw/firewalld, and a reachable 8080 would let anyone skip the proxy.
         ports:
-            - '${APP_PORT:-8080}:8080'
+            - '${APP_BIND_ADDRESS:-0.0.0.0}:${APP_PORT:-8080}:8080'
         volumes:
             - 'app-storage:/var/www/html/storage'
             - 'nwws-products:/products'
@@ -171,7 +177,8 @@ services:
                 condition: service_healthy
     # The WebSocket server for the live Products page. It listens on 8080 inside the
     # container and is published on REVERB_PUBLISHED_PORT; your reverse proxy forwards
-    # /app and /apps to it when you serve the dashboard over HTTPS.
+    # /app and /apps to it when you serve the dashboard over HTTPS. Behind a proxy on
+    # this host set REVERB_BIND_ADDRESS=127.0.0.1, as for front-end.
     reverb:
         <<: *php-service
         command: 'php artisan reverb:start --host=0.0.0.0 --port=8080'
@@ -183,7 +190,7 @@ services:
             retries: 3
             start_period: 10s
         ports:
-            - '${REVERB_PUBLISHED_PORT:-8085}:8080'
+            - '${REVERB_BIND_ADDRESS:-0.0.0.0}:${REVERB_PUBLISHED_PORT:-8085}:8080'
         depends_on:
             front-end:
                 condition: service_healthy
@@ -195,6 +202,10 @@ services:
         restart: unless-stopped
     # Lets the dashboard start and stop the feed containers. Unauthenticated: it sits on
     # an internal network that only front-end joins, and is not published.
+    # It grants far more than start/stop: with CONTAINERS=1 and POST=1 its rules allow
+    # every /containers call, including creating a container (privileged, with the host
+    # filesystem mounted) and starting it. That is root on this host for anyone who can
+    # reach it, which here means code running in front-end. EXEC=0 still blocks /exec.
     docker-socket-proxy:
         image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
         container_name: wxnotify-docker-socket-proxy

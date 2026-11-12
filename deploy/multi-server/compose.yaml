@@ -32,11 +32,17 @@ x-php-service: &php-service
     restart: unless-stopped
 
 services:
-    # Server A. The image's own healthcheck (/up) applies.
+    # Server A. The image's own healthcheck (/up) applies. Uploads (service-desk
+    # attachments, bug-report screenshots, onboarding files) live in storage/, so it is a
+    # named volume: recreating the container on an upgrade must not delete them. Only A
+    # needs it; Outlook maps go to the shared S3 disk, and the workers on C and D keep no
+    # files A must read. Set APP_BIND_ADDRESS=127.0.0.1 when the TLS proxy runs on A.
     front-end:
         <<: *php-service
         ports:
-            - '${APP_PORT:-8080}:8080'
+            - '${APP_BIND_ADDRESS:-0.0.0.0}:${APP_PORT:-8080}:8080'
+        volumes:
+            - 'app-storage:/var/www/html/storage'
         profiles:
             - server-a
     # Server A. Server D's workers broadcast to this port over the private network, and
@@ -65,7 +71,7 @@ services:
             POSTGRES_USER: '${DB_USERNAME}'
             POSTGRES_PASSWORD: '${DB_PASSWORD:?set DB_PASSWORD in .env}'
         ports:
-            - '${DB_BIND_ADDRESS:-127.0.0.1}:5432:5432'
+            - '${DB_BIND_ADDRESS:-127.0.0.1}:${FORWARD_DB_PORT:-5432}:5432'
         volumes:
             - 'pgsql-data:/var/lib/postgresql'
         healthcheck:
@@ -88,7 +94,7 @@ services:
     redis:
         image: 'redis:alpine'
         ports:
-            - '${REDIS_BIND_ADDRESS:-127.0.0.1}:6379:6379'
+            - '${REDIS_BIND_ADDRESS:-127.0.0.1}:${FORWARD_REDIS_PORT:-6379}:6379'
         volumes:
             - 'redis-data:/data'
         healthcheck:
@@ -203,6 +209,10 @@ services:
     # Server C, next to the feed containers it controls. Server A's admin tools call it.
     # It has no authentication or TLS: bind it to C's PRIVATE address
     # (DOCKER_PROXY_BIND_ADDRESS) and firewall it to server A alone.
+    # It grants far more than start/stop: with CONTAINERS=1 and POST=1 its rules allow
+    # every /containers call, including creating a container (privileged, with the host
+    # filesystem mounted) and starting it. Anyone who can reach C:2375 is therefore root
+    # on C. EXEC=0 still blocks /exec. See the multi-server guide.
     docker-socket-proxy:
         image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
         container_name: wxnotify-docker-socket-proxy
@@ -288,6 +298,7 @@ services:
         profiles:
             - server-d
 volumes:
+    app-storage:
     pgsql-data:
     redis-data:
     nwws-products:

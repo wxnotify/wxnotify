@@ -68,7 +68,7 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
 
    - **Cloudflare Turnstile.** The sign-up form includes a Turnstile check and cannot be submitted while `TURNSTILE_SECRET_KEY` is blank. Create a free Cloudflare account, open Turnstile, add a site for your hostname, and put its keys in `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. For a private trial only, Cloudflare documents [test keys that always pass](https://developers.cloudflare.com/turnstile/troubleshooting/testing/): site key `1x00000000000000000000AA` and secret key `1x0000000000000000000000000000000AA`. They turn the bot protection off, so never use them on a site anyone else can reach.
 
-   Generate `APP_KEY` once and never change it: channel credentials are encrypted with it. Also set `APP_URL` to the address people will use. `NWWS_USERNAME` and `NWWS_PASSWORD` are optional; leave them empty to run without the NWWS feed.
+   Generate `APP_KEY` once and never change it: channel credentials are encrypted with it. Also set `APP_URL` to the address people will use. `NWWS_USERNAME` and `NWWS_PASSWORD` are optional; leave them empty to run without the NWWS feed. Leave `WXNOTIFY_MODE=selfhost` as the example sets it (see [Self-hosted mode and tiers](#self-hosted-mode-and-tiers)).
 
 4. Start it:
 
@@ -80,7 +80,7 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
 
    The `front-end` service runs the database migrations when it starts, and every other WxNotify service waits for it to become healthy, so a first start never runs workers against an empty database. The first start takes a minute or two. Watch it with `docker compose ps`; if anything stays unhealthy, read `docker compose logs front-end`.
 
-5. Open the dashboard at `APP_URL` plus `/dashboard` (by default <http://localhost:8080/dashboard>).
+5. Check that the sign-in page loads at `APP_URL` plus `/dashboard/login` (by default <http://localhost:8080/dashboard/login>). Then create the first owner, below; the owner works in the admin panel at `/admin`.
 
 ### Create the first owner
 
@@ -91,7 +91,9 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
    docker compose exec front-end php artisan app:grant-owner you@example.com
    ```
 
-3. Sign in to the admin panel at `/admin`. Owners are also staff, and as far as the code shows the admin panel does not require email verification (only the dashboard does), so you can go straight there even before mail works; the dashboard itself waits for the account to be verified. There is no command that creates a user: registration is the only way to make the first one.
+3. Sign in to the admin panel at `/admin`. Owners are also staff, and the admin panel does not require email verification (only the dashboard does), so you can go straight there even before mail works. There is no command that creates a user: registration is the only way to make the first one.
+
+   Staff and owners **cannot use the subscriber dashboard**: every `/dashboard` page redirects them to `/admin`, by design. To see what subscribers see, use a second account that is not staff. The simplest way is **Admin > Users > Create**: an account made there is already verified (no Turnstile check and no verification email), and you either set its password there or have a reset link emailed. Signing up a second account at `/dashboard/register` works too.
 
    In the admin panel, open **Setup** (in the **System** group). A fresh install is not complete until you do this. The page lists the reference data sets with their counts and whether each is installed: the product catalog (categories and descriptions), the "Did you know" tips and the tracked shapefile layers. Press **Install reference data** and confirm. It only adds what is missing and changes nothing that already exists. Read the confirmation text: when the product catalog is not yet installed, the install also removes a few legacy products that have no counterpart in the catalog.
 
@@ -101,24 +103,33 @@ Do not run `db:seed`; the seeder creates a test user (`test@example.com`) and is
 
 TLS is your job: the stack does not include a certificate or a proxy. Without it the stack still works over plain HTTP, and the browser connects to the live WebSocket server on the page's own host at port 8085.
 
-For real use, put a reverse proxy in front that does two things:
+For real use, run a reverse proxy on the same host (the examples below) that does two things:
 
-1. Proxies the application to the `front-end` port (`APP_PORT`, default 8080).
-2. Forwards the WebSocket paths `/app` and `/apps` to Reverb on its published port (`REVERB_PUBLISHED_PORT`, default 8085).
+1. Proxies the application to the `front-end` port (`APP_PORT`, default 8080) at `127.0.0.1`.
+2. Forwards the WebSocket paths `/app` and `/apps` to Reverb on its published port (`REVERB_PUBLISHED_PORT`, default 8085) at `127.0.0.1`.
 
-Then tell the application where browsers will connect, in `.env`:
+Then set **all** of these in `.env` (each one is there, commented, in `.env.example`):
 
 ```ini
 APP_URL=https://wxnotify.example.com
 REVERB_PUBLIC_SCHEME=https
 REVERB_PUBLIC_PORT=443
+APP_BIND_ADDRESS=127.0.0.1
+REVERB_BIND_ADDRESS=127.0.0.1
+SESSION_SECURE_COOKIE=true
+WXNOTIFY_TRUSTED_PROXIES=*
 ```
+
+What each one does, and why none is optional:
+
+- `APP_URL` must be the public `https://` address. When it starts with `https://`, the application generates every link, stylesheet, script and Livewire URL as https, even though the proxy talks to it over plain HTTP. With an `http://` value behind an HTTPS proxy, browsers block those URLs as mixed content and the dashboard loads unstyled and does not respond.
+- `APP_BIND_ADDRESS` and `REVERB_BIND_ADDRESS` publish 8080 and 8085 on the loopback address only. By default they are published on every interface, and Docker's published ports bypass host firewalls such as ufw and firewalld, so plain HTTP would stay reachable from the internet around your proxy.
+- `SESSION_SECURE_COOKIE=true` sends the session cookie over HTTPS only.
+- `WXNOTIFY_TRUSTED_PROXIES` tells the application to believe the proxy's `X-Forwarded-For` and `X-Forwarded-Proto` headers. Without it, every request seems to come from one address (with the proxy on the host, that is the Docker network's gateway, such as `172.18.0.1`), so all visitors share one sign-in rate limit and logs and activity alerts show that address; and signed links, such as the email verification link, are checked against `http://` and are refused. `*` trusts whatever connects, which is safe **only** while both ports are bound to `127.0.0.1`: then the only thing that can connect is a process on this host, your proxy. If you publish the ports on another address, do not use `*`; list the address the proxy's connections arrive from instead (for a proxy on the host, the gateway of the stack's network, shown by `docker network inspect <folder>_default --format '{{(index .IPAM.Config 0).Gateway}}'`; for a proxy container on that network, its container address). Set `WXNOTIFY_CLIENT_IP_HEADER` to `CF-Connecting-IP` as well if you are behind Cloudflare.
 
 Recreate the containers with `docker compose up -d` after changing them. If you skip the proxy part for WebSockets (or get it wrong), the live Products page still works: it falls back to polling, which refreshes about once a minute, instead of streaming new products as they arrive.
 
 `REVERB_ALLOWED_ORIGINS` lists the hostnames (no scheme or port) that may open a WebSocket. It defaults to the host in `APP_URL`, so you only set it if people reach the site under other names.
-
-Behind a proxy the application sees the proxy's address for every request unless you tell it whom to trust. Set `WXNOTIFY_TRUSTED_PROXIES` to `*` or a comma list of proxy addresses, and `WXNOTIFY_CLIENT_IP_HEADER` to `CF-Connecting-IP` if you are behind Cloudflare.
 
 **Caddy** (certificates are automatic):
 
@@ -164,7 +175,9 @@ server {
 
 ## Upgrading
 
-1. Back up PostgreSQL. Migrations only go forward, so you cannot step back to an older version without restoring a backup:
+**An upgrade is a maintenance window.** `docker compose up -d` stops and recreates every WxNotify service at once. The workers, the pipeline API and the feed clients are then held back until the new `front-end` has migrated the database and turned healthy. While migrations run, nothing ingests products or delivers alerts, and the dashboard is down. Pick a quiet time.
+
+1. Back up PostgreSQL and the `app-storage` volume (see [Backups](#backups-and-day-to-day-operation)). Migrations only go forward, so you cannot step back to an older version without restoring a backup:
 
    ```bash
    docker compose exec -T pgsql sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > wxnotify-$(date +%F).sql.gz
@@ -179,9 +192,13 @@ server {
 
 `front-end` migrates the database first and the workers start after it is healthy; recreating the containers also replaces the old workers, so there is nothing else to restart.
 
-`front-end` gets five minutes (`start_period: 300s` on its `healthcheck` in `compose.yaml`) to finish starting before failed health checks count. If an upgrade has an unusually long migration, raise that value. A migration that fails keeps `front-end` from ever becoming healthy and nothing else starts; `docker compose logs front-end` shows why.
+`front-end` gets five minutes (`start_period: 300s` on its `healthcheck` in `compose.yaml`) to finish starting before failed health checks count. If an upgrade has an unusually long migration, raise that value. Never run a second `front-end`, or a manual `migrate`, while one is starting: only one container may migrate at a time.
 
-Restoring a backup: stop the stack with `docker compose down`, remove the `pgsql-data` volume (`docker volume ls` shows its full name, which starts with your folder name), start only the database with `docker compose up -d pgsql`, load the dump with `gunzip -c wxnotify-<date>.sql.gz | docker compose exec -T pgsql sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'`, then set `WXNOTIFY_VERSION` back to the version the dump came from and run `docker compose up -d`.
+**If a migration fails**, `front-end` keeps restarting and never becomes healthy, `up -d` exits with `dependency failed to start`, and the other services stay stopped (the old version is not running either): a full outage until you act. `docker compose logs front-end` shows the failing migration. To go back, set `WXNOTIFY_VERSION` to the version you were running and run `docker compose up -d` again. On PostgreSQL a failed migration is rolled back, so the previous version starts against the schema it knows. Then report the failure before trying the upgrade again.
+
+A gentler variant, not tested by us: run `docker compose up -d front-end` first, wait until `docker compose ps` shows it healthy, then run `docker compose up -d`. The old workers keep running while the migrations run (briefly against the new schema), and if the migration fails they are still up; go back as above.
+
+Restoring a backup: stop the stack with `docker compose down`, remove the `pgsql-data` volume (`docker volume ls` shows its full name, which starts with your folder name), start only the database with `docker compose up -d pgsql`, load the dump with `gunzip -c wxnotify-<date>.sql.gz | docker compose exec -T pgsql sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'`, restore `app-storage` from its archive if you need its files back (below), then set `WXNOTIFY_VERSION` back to the version the dump came from and run `docker compose up -d`.
 
 ### Version tags
 
@@ -213,15 +230,17 @@ What is different with images:
   ```
 
   Then create the first owner and run **Setup** exactly as in the single-server steps above, from A.
-- **Ports and bind addresses.** Cross-server ports (`REVERB_BIND_ADDRESS` with `REVERB_PUBLISHED_PORT`, `DB_BIND_ADDRESS`, `DOCKER_PROXY_BIND_ADDRESS`, `APPRISE_BIND_ADDRESS`) default to `127.0.0.1`. Set each to that server's private address where the example says so, never to a public address, and firewall them as the guide describes. The Docker control and Apprise services have no authentication, so keep them on the private network.
+- **HTTPS on A.** The example is already set for a TLS proxy on A itself: `APP_URL` is `https://`, `APP_BIND_ADDRESS=127.0.0.1`, `SESSION_SECURE_COOKIE=true` and `WXNOTIFY_TRUSTED_PROXIES=*`. The reasons are in [Putting it behind HTTPS](#putting-it-behind-https). If the proxy is another machine, bind `APP_BIND_ADDRESS` to A's private address and list the proxy's address in `WXNOTIFY_TRUSTED_PROXIES` instead of `*`.
+- **Ports and bind addresses.** Cross-server ports (`REVERB_BIND_ADDRESS` with `REVERB_PUBLISHED_PORT`, `DB_BIND_ADDRESS`, `DOCKER_PROXY_BIND_ADDRESS`, `APPRISE_BIND_ADDRESS`) default to `127.0.0.1`. Set each to that server's private address where the example says so, never to a public address, and firewall them as the guide describes. B's host ports are `5432` and `6379` unless you set `FORWARD_DB_PORT` and `FORWARD_REDIS_PORT`. The Docker control and Apprise services have no authentication, so keep them on the private network. The Docker socket proxy on C is effectively root on C for anyone who can reach port 2375 (see below).
 - **Outlook map images.** Server D writes them and server A serves them, so they need shared storage. On A and D set `OUTLOOK_MAPS_DISK=s3` and the `AWS_*` values for the same bucket; any S3-compatible storage works (the example uses Backblaze B2). Without that, outlook maps return 404 on A.
-- **Upgrading.** Set the new `WXNOTIFY_VERSION` on every server, then:
+- **Upgrading.** This is a maintenance window, as on one server. Back up PostgreSQL on B and `app-storage` on A first. Set the new `WXNOTIFY_VERSION` on every server, then:
 
   ```bash
-  # on A
+  # on A: the same order as a first start, so reverb boots after the migration
   docker compose pull
-  docker compose up -d
+  docker compose up -d front-end
   docker compose exec front-end php artisan migrate --force
+  docker compose up -d
 
   # on D and C
   docker compose pull
@@ -232,14 +251,42 @@ What is different with images:
   docker compose exec front-end php artisan reverb:restart
   ```
 
-  Migrate before the workers on C and D restart. `queue:restart` and `reverb:restart` signal through the shared database cache, so running them on A reaches the workers on C and D. Back up PostgreSQL on B first, using the `pg_dump` command above on that server.
+  Migrate before the workers on C and D restart. `queue:restart` and `reverb:restart` signal through the shared database cache, so running them on A reaches the workers on C and D. Use the `pg_dump` command above on B. This upgrade order follows the first-start order that we ran; a full multi-server upgrade has not been run end to end yet. If the migration fails, set the previous `WXNOTIFY_VERSION` on A and run `docker compose up -d` there, and do not upgrade C and D.
+
+## Self-hosted mode and tiers
+
+`WXNOTIFY_MODE=selfhost` (set in both examples) marks the instance as self-hosted. Compared with `cloud`, the value used by the hosted service, it:
+
+- hides the subscriber **Billing** page, which needs Stripe settings to work;
+- hides the billing and support-chat steps of the owner's setup checklist (the Chatwoot support widget is cloud-only as well);
+- lets a Traccar server on your own network be used (in cloud mode private addresses are refused);
+- allows the opt-in `WXNOTIFY_WEBHOOKS_ALLOW_PRIVATE=true`, which lets webhook and chat-server channels deliver to private-network addresses.
+
+It does not change sign-up: Turnstile and email verification apply in both modes.
+
+**Tiers.** Every account is on the **Free** tier, with its limits (for example, the Severe Weather Outlook report is for paid tiers), unless an owner or staff member gives it another one: **Admin > Users**, edit the user, choose **Tier override** (Plus or Pro) and write a **Reason** (required). Clearing the override puts the account back on Free. There is no other way to change a tier on a self-hosted instance.
 
 ## Backups and day-to-day operation
 
-- **What to back up:** PostgreSQL (Compose volume `pgsql-data`). It holds accounts, alert rules, channels, the queue and delivery history. Product files on the `nwws-products` and `emwin-products` volumes are rebuilt from the feeds, and the Product Storage page shows their size. Keep your `.env` somewhere safe too: without `APP_KEY` the encrypted channel credentials cannot be read.
+- **What to back up:**
+  - PostgreSQL (Compose volume `pgsql-data`). It holds accounts, alert rules, channels, the queue and delivery history. Use the `pg_dump` command in [Upgrading](#upgrading).
+  - The `app-storage` volume (on server A in the four-server layout). It holds uploaded files: service-desk ticket attachments, bug-report screenshots, onboarding files, and on one server the Outlook map images. Compose prefixes volume names with the project name, which is the folder name unless you set one, so a stack in `~/wxnotify` has `wxnotify_app-storage`; `docker volume ls --filter name=app-storage` shows yours. To archive it into the current folder:
+
+    ```bash
+    docker run --rm -v wxnotify_app-storage:/data:ro -v "$PWD":/backup alpine tar czf /backup/app-storage-$(date +%F).tar.gz -C /data .
+    ```
+
+    To restore it, stop the stack (`docker compose down`), then unpack the archive into the volume (it keeps the files' owner, `www-data`, uid 33) and start again:
+
+    ```bash
+    docker run --rm -v wxnotify_app-storage:/data -v "$PWD":/backup alpine tar xzf /backup/app-storage-<date>.tar.gz -C /data
+    docker compose up -d
+    ```
+
+  Product files on the `nwws-products` and `emwin-products` volumes are rebuilt from the feeds, and the Product Storage page shows their size. Keep your `.env` somewhere safe too: without `APP_KEY` the encrypted channel credentials cannot be read.
 - **Logs:** `docker compose logs -f <service>` (for example `front-end`, `queue`, `nwws`).
 - **Health:** `docker compose ps` shows each service's health. The queue workers, scheduler and Reverb have their own health checks.
-- **Docker control:** the dashboard's pipeline page starts and stops the feed containers by name through the Docker socket proxy.
+- **Docker control:** the dashboard's pipeline page starts and stops the feed containers by name through the Docker socket proxy. The proxy allows far more than that: with the settings the dashboard needs (`CONTAINERS=1`, `POST=1`) it lets a caller create and start any container, including a privileged one with the host's filesystem mounted, which is root on the host. Only `exec` and the non-container APIs are blocked. On one server it is reachable only from `front-end` (an internal network, not published), so the exposure is a compromise of the application itself. In the four-server layout anyone who can reach C's port 2375 has root on C: bind it to the private address and firewall it to A alone, as the guide says.
 
 ## Problems and licence
 

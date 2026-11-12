@@ -182,6 +182,26 @@ for dir in single-server multi-server; do
         fi
     done
 
+    # front-end keeps uploads (service-desk attachments, bug screenshots, onboarding files)
+    # on a named volume, so recreating the container on an upgrade does not delete them.
+    if jq -e '[.services["front-end"].volumes[]? | select(.type == "volume" and .target == "/var/www/html/storage")] | length == 1' <<<"$json" >/dev/null 2>&1; then
+        pass "$dir: front-end mounts a named volume at /var/www/html/storage"
+    else
+        fail "$dir: front-end must mount a named volume at /var/www/html/storage"
+    fi
+
+    # Self-hosters run in selfhost mode; HTTPS deployments need the secure-cookie setting.
+    if grep -q '^WXNOTIFY_MODE=selfhost$' "$HERE/$dir/.env.example"; then
+        pass "$dir: .env.example sets WXNOTIFY_MODE=selfhost"
+    else
+        fail "$dir: .env.example must set WXNOTIFY_MODE=selfhost"
+    fi
+    if grep -Eq '^#? ?SESSION_SECURE_COOKIE=' "$HERE/$dir/.env.example"; then
+        pass "$dir: .env.example lists SESSION_SECURE_COOKIE"
+    else
+        fail "$dir: .env.example must list SESSION_SECURE_COOKIE"
+    fi
+
     # Every ${VAR} the compose file references is listed in its .env.example
     # (commented-out optional settings count).
     missing=""
@@ -235,6 +255,52 @@ else
     fail "single-server: compose.yaml missing"
 fi
 
+echo "== single-server: published ports"
+if [ -f "$HERE/single-server/compose.yaml" ]; then
+    # host_ip of the port that maps to container port 8080: <service> [env-file]
+    host_ip() {
+        local args=(--profile '*' config --format json)
+        if [ -n "${2:-}" ]; then args=(--env-file "$2" "${args[@]}"); fi
+        dc single-server "${args[@]}" 2>/dev/null | jq -r --arg s "$1" '.services[$s].ports[] | select(.target == 8080) | "\(.host_ip // "")|\(.published)"'
+    }
+    for pair in front-end:8080 reverb:8085; do
+        svc="${pair%%:*}"
+        port="${pair##*:}"
+        got="$(host_ip "$svc" || true)"
+        case "$got" in
+            "|$port" | "0.0.0.0|$port") pass "single-server: $svc publishes $port on every interface by default" ;;
+            *) fail "single-server: $svc should publish $port on every interface by default (got: ${got:-nothing})" ;;
+        esac
+    done
+    { cat "$TMP/single-server/.env"; echo 'APP_BIND_ADDRESS=127.0.0.1'; echo 'REVERB_BIND_ADDRESS=127.0.0.1'; } >"$TMP/single-server/.env.loopback"
+    for pair in front-end:8080 reverb:8085; do
+        svc="${pair%%:*}"
+        port="${pair##*:}"
+        got="$(host_ip "$svc" "$TMP/single-server/.env.loopback" || true)"
+        if [ "$got" = "127.0.0.1|$port" ]; then
+            pass "single-server: $svc publishes on 127.0.0.1 when its bind address is set"
+        else
+            fail "single-server: $svc should publish on 127.0.0.1:$port when its bind address is set (got: ${got:-nothing})"
+        fi
+    done
+fi
+
+echo "== multi-server: database and redis host ports"
+if [ -f "$HERE/multi-server/compose.yaml" ]; then
+    { cat "$TMP/multi-server/.env"; echo 'FORWARD_DB_PORT=15432'; echo 'FORWARD_REDIS_PORT=16379'; } >"$TMP/multi-server/.env.ports"
+    for spec in "pgsql:5432:5432:" "redis:6379:6379:" "pgsql:5432:15432:$TMP/multi-server/.env.ports" "redis:6379:16379:$TMP/multi-server/.env.ports"; do
+        IFS=: read -r svc target want envfile <<<"$spec"
+        args=(--profile server-b config --format json)
+        if [ -n "$envfile" ]; then args=(--env-file "$envfile" "${args[@]}"); fi
+        got="$(dc multi-server "${args[@]}" 2>/dev/null | jq -r --arg s "$svc" --argjson t "$target" '.services[$s].ports[] | select(.target == $t) | .published' || true)"
+        if [ "$got" = "$want" ]; then
+            pass "multi-server: $svc host port is $want${envfile:+ when FORWARD_* is set}"
+        else
+            fail "multi-server: $svc host port should be $want${envfile:+ when FORWARD_* is set} (got: ${got:-nothing})"
+        fi
+    done
+fi
+
 echo "== multi-server: profiles"
 expected_for() {
     case "$1" in
@@ -285,7 +351,7 @@ else
         fail "deploy/README.md: variables not in any .env.example:$unknown"
     fi
 
-    for term in WXNOTIFY_VERSION OUTLOOK_MAPS_DISK REVERB_PUBLIC_SCHEME REVERB_PUBLIC_PORT app:grant-owner Setup queue:restart reverb:restart Turnstile verification; do
+    for term in WXNOTIFY_VERSION OUTLOOK_MAPS_DISK REVERB_PUBLIC_SCHEME REVERB_PUBLIC_PORT app:grant-owner Setup queue:restart reverb:restart Turnstile verification WXNOTIFY_TRUSTED_PROXIES SESSION_SECURE_COOKIE APP_BIND_ADDRESS REVERB_BIND_ADDRESS WXNOTIFY_MODE "Tier override" app-storage; do
         if grep -Fq -- "$term" "$README"; then
             pass "deploy/README.md mentions $term"
         else
