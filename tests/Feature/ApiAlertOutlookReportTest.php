@@ -4,6 +4,7 @@ use App\Models\DeliveryLog;
 use App\Models\OutlookReportRun;
 use App\Models\User;
 use App\Support\OutlookReportPresenter;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\RateLimiter;
@@ -192,4 +193,55 @@ test('an unreachable disk reads as no map, not an error', function () {
 
     $link = URL::temporarySignedRoute('api.v1.outlook-maps.show', now()->addHour(), ['batchKey' => $run->batch_key, 'key' => 'day1']);
     $this->get($link)->assertNotFound();
+});
+
+function throwingOutlookMapDisk(callable $configure): void
+{
+    $disk = Mockery::mock(Filesystem::class);
+    $configure($disk);
+    Storage::set('throwing-maps', $disk);
+    config(['filesystems.outlook_maps_disk' => 'throwing-maps']);
+}
+
+test('a disk whose exists check throws gives null map urls in the detail, not a 500', function () {
+    [, $log] = outlookReportFixture($this->user);
+    throwingOutlookMapDisk(fn ($disk) => $disk->shouldReceive('exists')->andThrow(new RuntimeException('S3 unreachable')));
+
+    $report = $this->withToken($this->token)->getJson("/api/v1/alerts/{$log->id}")->assertOk()->json('data.outlook_report');
+
+    expect($report['days'][0]['map_url'])->toBeNull()
+        ->and($report['extended_map_url'])->toBeNull()
+        ->and($report['maps_expired'])->toBeFalse();
+});
+
+test('the map route is 404 when the disk throws on exists or get, or get returns nothing', function (string $failure) {
+    [$run] = outlookReportFixture($this->user);
+    throwingOutlookMapDisk(function ($disk) use ($failure) {
+        if ($failure === 'exists throws') {
+            $disk->shouldReceive('exists')->andThrow(new RuntimeException('S3 unreachable'));
+
+            return;
+        }
+
+        $disk->shouldReceive('exists')->andReturn(true);
+
+        match ($failure) {
+            'get throws' => $disk->shouldReceive('get')->andThrow(new RuntimeException('S3 unreachable')),
+            'get returns null' => $disk->shouldReceive('get')->andReturn(null),
+            'get returns false' => $disk->shouldReceive('get')->andReturn(false),
+        };
+    });
+    $link = URL::temporarySignedRoute('api.v1.outlook-maps.show', now()->addHour(), ['batchKey' => $run->batch_key, 'key' => 'day1']);
+
+    $this->get($link)->assertNotFound();
+})->with(['exists throws', 'get throws', 'get returns null', 'get returns false']);
+
+test('a misnamed map disk still fails loudly on the map route, naming OUTLOOK_MAPS_DISK', function () {
+    [$run] = outlookReportFixture($this->user);
+    config(['filesystems.outlook_maps_disk' => 'no-such-disk']);
+    $link = URL::temporarySignedRoute('api.v1.outlook-maps.show', now()->addHour(), ['batchKey' => $run->batch_key, 'key' => 'day1']);
+
+    $this->withoutExceptionHandling();
+
+    expect(fn () => $this->get($link))->toThrow(InvalidArgumentException::class, 'OUTLOOK_MAPS_DISK');
 });

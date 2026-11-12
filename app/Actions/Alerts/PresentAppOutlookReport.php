@@ -6,11 +6,14 @@ use App\Models\OutlookReportRun;
 use App\Support\OutlookMapDisk;
 use App\Support\OutlookReportPresenter;
 use Illuminate\Support\Facades\URL;
+use Throwable;
 
 /**
  * The Severe Weather Outlook report as the mobile app's alert detail carries it: the presenter's view
  * plus signed, one-hour links to the stored map copies. A link exists only while the maps are within
  * their retention, the key was stored and the file is still on the disk. Never exposes a storage path.
+ * A disk that cannot be reached (an S3 outage or auth failure throws from exists()) reads as no map;
+ * a misnamed disk still throws, because the disk is resolved outside the guard.
  */
 class PresentAppOutlookReport
 {
@@ -40,7 +43,17 @@ class PresentAppOutlookReport
     {
         $map = $expired ? null : $run->mapPath($key);
 
-        if ($map === null || ! OutlookMapDisk::disk()->exists($map['path'])) {
+        if ($map === null) {
+            return null;
+        }
+
+        $disk = OutlookMapDisk::disk();
+
+        try {
+            if (! $disk->exists($map['path'])) {
+                return null;
+            }
+        } catch (Throwable) {
             return null;
         }
 

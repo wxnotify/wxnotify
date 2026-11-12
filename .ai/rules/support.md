@@ -5,6 +5,7 @@ paths:
   - app/Support/PhoneNumber.php
   - app/Support/FormatPlaceWeather.php
   - app/Support/DeliveryFailureExplanation.php
+  - app/Support/ForceHttpsFromAppUrl.php
 ---
 
 # Support
@@ -59,3 +60,6 @@ The /api/v1/weather card carries current.gust/pressure/pressure_trend/visibility
 
 ## Subscribers see failure reasons only through DeliveryFailureExplanation, never error_detail
 The Recent Alerts status badge (failure, suppressed, skipped) opens a modal, and Needs attention shows the same reason, both from `App\Support\DeliveryFailureExplanation::for($status, $errorDetail)`: a fixed list of OUR OWN sentences (reason + suggested fix, `ours` for a problem only we can fix, `channels` for a link to the channels page). The stored `delivery_logs.error_detail` is only matched against it (anchored/exact patterns; BYO types' `failureMessage()` split into reason and fix), never passed through: an unrecognised text gets the generic sentence, so a provider message, URL or header can never reach the dashboard. Every new failure sentence (a `DeliveryResult::failed(...)` or `FcmResult::failed/unregistered(...)` literal, a guard or refusal constant, a transport `describe()` text) needs a rule entry and a place in the explicit-sentence list in `DeliveryFailureExplanationTest`; the literal-scan test fails until it has one. Never add a rule with a pass-through reason. A column action's trigger stays a button for every row unless `->disabledClick()` says otherwise, so keep it tied to `for() === null`.
+
+## https URLs are forced from APP_URL; signed links still need the proxy trusted
+AppServiceProvider calls App\Support\ForceHttpsFromAppUrl at boot: when config('app.url') starts with https://, URL::forceScheme('https'), so url()/asset()/route()/Livewire/Filament URLs stay https behind a TLS proxy that the app sees as http. An http APP_URL leaves the scheme to the request. This does NOT fix signed-URL checks (hasValidSignature compares against the request's own scheme): behind a proxy, WXNOTIFY_TRUSTED_PROXIES must still be set so X-Forwarded-Proto is believed. Pinned by tests/Feature/HttpsSchemeFromAppUrlTest.php.

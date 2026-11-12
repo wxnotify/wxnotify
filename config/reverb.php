@@ -119,7 +119,8 @@ return [
     'public' => [
         'key' => env('REVERB_APP_KEY'),
         'host' => env('REVERB_PUBLIC_HOST'),
-        'port' => (int) env('REVERB_PUBLIC_PORT', 8085),
+        // A blank, non-numeric or non-positive value would cast to 0 or less: use the default.
+        'port' => max(0, (int) env('REVERB_PUBLIC_PORT', 8085)) ?: 8085,
         'scheme' => env('REVERB_PUBLIC_SCHEME', 'http') === 'https' ? 'https' : 'http',
     ],
 

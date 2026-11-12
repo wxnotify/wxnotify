@@ -17,6 +17,7 @@ use App\Support\ApplyEmailSettings;
 use App\Support\ApplyMapTileSettings;
 use App\Support\ClientIp;
 use App\Support\Filament\AdminLogoutResponse;
+use App\Support\ForceHttpsFromAppUrl;
 use App\Support\Pipeline\UnmanagedPipelineStack;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Filament\Auth\Notifications\ResetPassword;
@@ -68,6 +69,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->make(ApplyMapTileSettings::class)();
 
         ClientIp::configureProxies();
+        $this->app->make(ForceHttpsFromAppUrl::class)();
 
         RateLimiter::for('app-api', fn (Request $request) => Limit::perMinute(120)
             ->by('app-api:'.($request->user()?->currentAccessToken()?->id ?? $request->ip())));

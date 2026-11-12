@@ -65,3 +65,37 @@ test('reverb allowed origins default to the app host and never to a wildcard', f
 
     expect(config('reverb.apps.apps.0.allowed_origins'))->not->toContain('*');
 });
+
+test('the public reverb block holds exactly the four browser settings, never the secret', function () {
+    expect(array_keys(config('reverb.public')))->toEqualCanonicalizing(['key', 'host', 'port', 'scheme']);
+});
+
+test('a blank or non-numeric public reverb port falls back to 8085', function () {
+    $saved = [$_SERVER['REVERB_PUBLIC_PORT'] ?? null, $_ENV['REVERB_PUBLIC_PORT'] ?? null];
+    $publicPort = function (?string $port): int {
+        unset($_SERVER['REVERB_PUBLIC_PORT'], $_ENV['REVERB_PUBLIC_PORT']);
+
+        if ($port !== null) {
+            $_SERVER['REVERB_PUBLIC_PORT'] = $_ENV['REVERB_PUBLIC_PORT'] = $port;
+        }
+
+        return (require config_path('reverb.php'))['public']['port'];
+    };
+
+    try {
+        expect($publicPort(''))->toBe(8085)
+            ->and($publicPort('abc'))->toBe(8085)
+            ->and($publicPort(null))->toBe(8085)
+            ->and($publicPort('18085'))->toBe(18085);
+    } finally {
+        unset($_SERVER['REVERB_PUBLIC_PORT'], $_ENV['REVERB_PUBLIC_PORT']);
+
+        if ($saved[0] !== null) {
+            $_SERVER['REVERB_PUBLIC_PORT'] = $saved[0];
+        }
+
+        if ($saved[1] !== null) {
+            $_ENV['REVERB_PUBLIC_PORT'] = $saved[1];
+        }
+    }
+});
