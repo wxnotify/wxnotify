@@ -647,7 +647,7 @@ EOF
 - [ ] **Step 1: Check for an existing controller test**
 
 ```bash
-ls /Users/jimmy/Documents/WxNotify/wxnotify-dashboard/tests/Feature/IngestNwwsProductControllerTest.php 2>&1
+ls <dashboard repo root>/tests/Feature/IngestNwwsProductControllerTest.php 2>&1
 ```
 If it exists, read it first and add the two tests below into it, matching its existing setup (fixture directory, `config(['services.pipeline.products_path' => ...])`, etc.) instead of duplicating that setup. If it doesn't exist, create it fresh per Step 2 below (which includes a minimal self-contained setup).
 

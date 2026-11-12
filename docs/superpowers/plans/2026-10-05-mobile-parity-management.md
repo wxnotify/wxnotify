@@ -7643,7 +7643,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ### Task 13: Device check (controller task, needs the owner)
 
-Not a subagent task. The owner rebuilds and reinstalls on an Android emulator (Google Play image, LAN access to the dev server) with `cd /Users/jimmy/Documents/WxNotify/wxnotify-nextgen/mobile && php artisan native:run android`; the dev database needs no new migration for this slice. The controller never runs `native:run`. After the owner says the app is installed, check on the emulator (screenshots and `adb` where useful; app logs via `adb shell run-as com.wxnotify.dev.app tail app_storage/persisted_data/storage/logs/edge-nav.log`), and report each line as verified, failed or not verifiable:
+Not a subagent task. The owner rebuilds and reinstalls on an Android emulator (Google Play image, LAN access to the dev server) with `cd <project root>/mobile && php artisan native:run android`; the dev database needs no new migration for this slice. The controller never runs `native:run`. After the owner says the app is installed, check on the emulator (screenshots and `adb` where useful; app logs via `adb shell run-as com.wxnotify.dev.app tail app_storage/persisted_data/storage/logs/edge-nav.log`), and report each line as verified, failed or not verifiable:
 
 - [ ] The four tabs show and switch; the Rules and Locations lists load and show the dashboard's data.
 - [ ] Create, edit, switch off and delete a rule of each category: threshold, daily summary, lightning, weather alerts (by location, by office, by county/zone, nationwide) and SPC & WPC (risk area). Each saved rule opens on the dashboard with the same fields; a rule made on the dashboard opens in the app and saves unchanged.

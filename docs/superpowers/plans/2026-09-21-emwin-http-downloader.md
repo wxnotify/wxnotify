@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go standard library only: no third-party Go modules (`go.mod` has no `require`).
-- Run the Go tests on the host: `cd /Users/jimmy/Documents/WxNotify/wxnotify-nextgen/docker/emwin-http && go test ./...` (Go 1.27 is installed). No test may touch the network; use `net/http/httptest` and temp dirs.
+- Run the Go tests on the host: `cd <project root>/docker/emwin-http && go test ./...` (Go 1.27 is installed). No test may touch the network; use `net/http/httptest` and temp dirs.
 - Laravel tests run only inside Sail: `docker exec wxnotify-nextgen-laravel.test-1 bash -lc "cd /var/www/html && vendor/bin/pest <path> --compact"` (the full suite takes about two minutes and is moved to the background; wait for it). Run `vendor/bin/pint --dirty --format agent` on the host before each commit that touches PHP.
 - Leave `CLAUDE.md` unchanged (`git checkout CLAUDE.md` if a hook modified it). No new Composer dependencies. NEVER run `migrate:fresh`, `migrate:refresh`, `migrate:reset` or `db:seed`; do not run `php artisan migrate` on the dev database. Do NOT start the new container against the real NOAA server.
 - Commit messages end with `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`. Do not push.

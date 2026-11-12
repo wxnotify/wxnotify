@@ -1732,7 +1732,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ### Task 5: Device check and notes (owner-assisted)
 
 **Files:**
-- Create: `/Users/jimmy/.claude/projects/-Users-jimmy-Documents-WxNotify-wxnotify-nextgen/memory/mobile-products-state.md` and its line in `MEMORY.md`.
+- Create: `<Claude project memory>/mobile-products-state.md` and its line in `MEMORY.md`.
 
 - [ ] **Step 1:** Run the full backend suite in parallel in the app container (`docker exec wxnotify-nextgen-front-end-1 bash -c 'cd /var/www/html && DB_HOST=pgsql php -d memory_limit=-1 vendor/bin/pest --parallel --processes=6'`) and the full app suite; both must be green.
 

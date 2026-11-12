@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Tasks 1 and 2 are in `/Users/jimmy/Documents/WxNotify/wxnotify-nextgen`; Tasks 3 to 6 are in `/Users/jimmy/Documents/WxNotify/wxnotify-mobile`. Commit in the repo each task touches, directly on `main`. Do not push.
+- Tasks 1 and 2 are in `<project root>`; Tasks 3 to 6 are in `<mobile repo root>`. Commit in the repo each task touches, directly on `main`. Do not push.
 - Backend first, then the app. The endpoint is additive: an old app build keeps using the browser. No fallback to the browser from the new screen: a 404 shows "no longer available".
 - A product is opened only when its address passes `ProductLinkTarget` (https, this server's site or a subdomain of its two-label domain, path `/view-product/{slug}` with `[a-z0-9-]+`, no query, credentials or port). Anything else opens nothing in the browser.
 - The endpoint returns public fields only, answers 404 for an unknown slug, and 404 for `is_test` products when `app()->isProduction()` (no role exemption).

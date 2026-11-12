@@ -207,7 +207,7 @@ Worker services (same PHP image, `command:` overrides; `restart: unless-stopped`
 
 **Files:** whatever the sweep finds.
 
-- [ ] **Step 1: Remove local paths.** `git grep -n "/Users/jimmy"` and change each to a neutral form.
+- [ ] **Step 1: Remove local paths.** `git grep` for local home-directory paths and change each to a neutral form.
 - [ ] **Step 2: Run a second secret scanner** over the history and the working tree: `docker run --rm -v "$PWD":/repo zricethezav/gitleaks:latest detect --source /repo --redact`. Triage every finding; test fixtures and documentation placeholders are expected.
 - [ ] **Step 3: Skim `docs/superpowers/` and `.ai/rules/`** for anything private (server names, personal details, credentials) and report, do not delete, what you find.
 - [ ] **Step 4: Report the optional history purge.** The vendored `npemwin` `.deb` files remain in history; report the one-line `git filter-repo --path docker/emwin-byteblaster/packages --invert-paths` option for the owner to run just before publishing. Do not run it.

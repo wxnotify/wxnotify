@@ -12,8 +12,8 @@
 
 ## Two repos
 
-- Tasks 1-5 are the BACKEND, in `/Users/jimmy/Documents/WxNotify/wxnotify-nextgen`. Run tests in the container: `docker exec wxnotify-nextgen-front-end-1 bash -c 'cd /var/www/html && php artisan test --compact <file>'`; Pint: `vendor/bin/pint --dirty --format agent` there too.
-- Tasks 6-8 are the APP, in `/Users/jimmy/Documents/WxNotify/wxnotify-mobile` (its own git repo, no Docker). Run tests: `cd /Users/jimmy/Documents/WxNotify/wxnotify-mobile && vendor/bin/pest --compact <file>`; also `php artisan native:validate`; Pint there as well.
+- Tasks 1-5 are the BACKEND, in `<project root>`. Run tests in the container: `docker exec wxnotify-nextgen-front-end-1 bash -c 'cd /var/www/html && php artisan test --compact <file>'`; Pint: `vendor/bin/pint --dirty --format agent` there too.
+- Tasks 6-8 are the APP, in `<mobile repo root>` (its own git repo, no Docker). Run tests: `cd <mobile repo root> && vendor/bin/pest --compact <file>`; also `php artisan native:validate`; Pint there as well.
 - Backend first, then the app. Each repo gets its own commits; neither is pushed.
 
 ## Global Constraints

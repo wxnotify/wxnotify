@@ -3708,7 +3708,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-10-10-mobile-channels-design.md` only if a decision changed during the build (record it under a "Clarifications settled while building" heading).
-- Create: `/Users/jimmy/.claude/projects/-Users-jimmy-Documents-WxNotify-wxnotify-nextgen/memory/mobile-channels-state.md` and one line in `MEMORY.md`.
+- Create: `<Claude project memory>/mobile-channels-state.md` and one line in `MEMORY.md`.
 
 - [ ] **Step 1: Run the full backend suite in parallel**
 
