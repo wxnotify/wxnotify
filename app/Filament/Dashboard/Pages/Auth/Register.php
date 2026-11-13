@@ -27,16 +27,17 @@ class Register extends BaseRegister
     }
 
     /**
-     * The sign-up captcha. A self-hosted install that has no Cloudflare Turnstile keys signs people up
-     * without one. It is skipped only when BOTH keys are blank: with either key set the check applies, so a
-     * half-configured install fails loudly instead of silently running without bot protection.
+     * The sign-up captcha. A self-hosted install (WXNOTIFY_MODE=selfhost) that has no Cloudflare Turnstile
+     * keys signs people up without one. The skip needs BOTH keys blank: with either key set the check
+     * applies, so a half-configured install fails loudly. The hosted cloud service never skips it, so a
+     * missing key there is an error, not silently disabled bot protection.
      *
      * @return array<int, Turnstile>
      */
     private function captchaComponents(): array
     {
-        $configured = filled(config('turnstile.turnstile_site_key')) || filled(config('turnstile.turnstile_secret_key'));
+        $keysBlank = blank(config('turnstile.turnstile_site_key')) && blank(config('turnstile.turnstile_secret_key'));
 
-        return $configured ? [Turnstile::make('turnstile_token')] : [];
+        return config('wxnotify.mode') === 'selfhost' && $keysBlank ? [] : [Turnstile::make('turnstile_token')];
     }
 }
