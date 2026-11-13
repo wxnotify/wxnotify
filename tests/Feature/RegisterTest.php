@@ -144,3 +144,42 @@ test('an unverified registrant cannot reach dashboard resources', function () {
         ->get('/dashboard')
         ->assertRedirect(route('filament.dashboard.auth.email-verification.prompt'));
 });
+
+test('sign-up works without a captcha when both turnstile keys are blank', function () {
+    config(['turnstile.turnstile_site_key' => null, 'turnstile.turnstile_secret_key' => null]);
+    Http::fake();
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Subscriber',
+            'email' => 'jane@example.com',
+            'password' => 'Sup3r$ecret!',
+            'passwordConfirmation' => 'Sup3r$ecret!',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(User::where('email', 'jane@example.com')->exists())->toBeTrue();
+    Http::assertNothingSent();
+});
+
+test('the captcha still applies when only one turnstile key is set, so a half-configured install fails loudly', function (string $configured) {
+    config([
+        'turnstile.turnstile_site_key' => $configured === 'site' ? 'site-key' : null,
+        'turnstile.turnstile_secret_key' => $configured === 'secret' ? 'secret-key' : null,
+    ]);
+    Http::fake();
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Subscriber',
+            'email' => 'jane@example.com',
+            'password' => 'Sup3r$ecret!',
+            'passwordConfirmation' => 'Sup3r$ecret!',
+            'turnstile_token' => '',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['turnstile_token' => 'required']);
+
+    expect(User::where('email', 'jane@example.com')->exists())->toBeFalse();
+})->with(['only the site key' => ['site'], 'only the secret key' => ['secret']]);

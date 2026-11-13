@@ -53,7 +53,7 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
    docker run --rm wxnotify/wxnotify:<version> php artisan key:generate --show | tail -n 1
    ```
 
-   Two more settings must work before anyone can sign up, so set them now:
+   Set up mail before anyone signs up, and decide about the sign-up captcha:
 
    - **Mail.** Signing up sends a verification email, and a new subscriber cannot use the dashboard until they follow its link. Set the `MAIL_*` values to your SMTP provider, for example:
 
@@ -66,7 +66,7 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
      MAIL_FROM_ADDRESS="alerts@example.com"
      ```
 
-   - **Cloudflare Turnstile.** The sign-up form includes a Turnstile check and cannot be submitted while `TURNSTILE_SECRET_KEY` is blank. Create a free Cloudflare account, open Turnstile, add a site for your hostname, and put its keys in `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. For a private trial only, Cloudflare documents [test keys that always pass](https://developers.cloudflare.com/turnstile/troubleshooting/testing/): site key `1x00000000000000000000AA` and secret key `1x0000000000000000000000000000000AA`. They turn the bot protection off, so never use them on a site anyone else can reach.
+   - **Cloudflare Turnstile (optional, recommended for a public site).** If both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are blank, sign-up works without a captcha. To protect a site anyone can reach from automated sign-ups, create a free Cloudflare account, open Turnstile, add a site for your hostname, and put its keys in those two variables. Set both or neither: with only one of them set the captcha still applies and sign-up fails until the other is filled in, so a half-configured install is noticed instead of silently running unprotected.
 
    Generate `APP_KEY` once and never change it: channel credentials are encrypted with it. Also set `APP_URL` to the address people will use. `NWWS_USERNAME` and `NWWS_PASSWORD` are optional; leave them empty to run without the NWWS feed. Leave `WXNOTIFY_MODE=selfhost` as the example sets it (see [Self-hosted mode and tiers](#self-hosted-mode-and-tiers)).
 
@@ -84,7 +84,7 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
 
 ### Create the first owner
 
-1. Register an account on the dashboard sign-up page, `/dashboard/register` (this needs the Turnstile keys above, and the verification email must be deliverable if you want to use that account in the dashboard).
+1. Register an account on the dashboard sign-up page, `/dashboard/register` (the verification email must be deliverable if you want to use that account in the dashboard; the Turnstile captcha appears only if you set its keys).
 2. Promote it to owner:
 
    ```bash
@@ -219,7 +219,7 @@ Read [the multi-server guide](../docs/multi-server-deployment.md) for the networ
 
 What is different with images:
 
-- **Setup.** On every server download `deploy/multi-server/compose.yaml` and `.env.example`, copy the example to `.env`, set `COMPOSE_PROFILES` and the per-server values the example marks. Use the same `WXNOTIFY_VERSION` everywhere. Set the `MAIL_*` values (A and D) and the Turnstile keys (A) before anyone signs up, as in the single-server steps. Generate `APP_KEY` once and copy it to A, C and D.
+- **Setup.** On every server download `deploy/multi-server/compose.yaml` and `.env.example`, copy the example to `.env`, set `COMPOSE_PROFILES` and the per-server values the example marks. Use the same `WXNOTIFY_VERSION` everywhere. Set the `MAIL_*` values (A and D) and, if you want the sign-up captcha, the Turnstile keys (A) before anyone signs up, as in the single-server steps. Generate `APP_KEY` once and copy it to A, C and D.
 - **Secrets that must match across servers:** `APP_KEY` (A, C, D), `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` (A, C, D, plus B which creates the database), `REVERB_APP_ID`, `REVERB_APP_KEY` and `REVERB_APP_SECRET` (A and D), and `PIPELINE_WEBHOOK_TOKEN` (A and C). The guide's table explains why.
 - **Order for a first start:** B, then A, D, C. On A, run the migrations yourself, because no startup automation runs them here. Start `front-end` alone first and `reverb` only after migrating: a Reverb started against an empty database cannot read its restart signal, and would then ignore every later `reverb:restart`.
 
@@ -263,7 +263,7 @@ What is different with images:
 - lets a Traccar server on your own network be used (in cloud mode private addresses are refused);
 - allows the opt-in `WXNOTIFY_WEBHOOKS_ALLOW_PRIVATE=true`, which lets webhook and chat-server channels deliver to private-network addresses.
 
-It does not change sign-up: Turnstile and email verification apply in both modes.
+It does not change sign-up: email verification applies in both modes, and the Turnstile captcha is used in both whenever its keys are set.
 
 **Tiers.** Every account is on the **Free** tier, with its limits (for example, the Severe Weather Outlook report is for paid tiers), unless an owner or staff member gives it another one: **Admin > Users**, edit the user, choose **Tier override** (Plus or Pro) and write a **Reason** (required). Clearing the override puts the account back on Free. There is no other way to change a tier on a self-hosted instance.
 

@@ -22,7 +22,21 @@ class Register extends BaseRegister
                     ->extraInputAttributes(['data-password-input' => true]),
                 View::make('filament.dashboard.password-requirements'),
                 $this->getPasswordConfirmationFormComponent(),
-                Turnstile::make('turnstile_token'),
+                ...$this->captchaComponents(),
             ]);
+    }
+
+    /**
+     * The sign-up captcha. A self-hosted install that has no Cloudflare Turnstile keys signs people up
+     * without one. It is skipped only when BOTH keys are blank: with either key set the check applies, so a
+     * half-configured install fails loudly instead of silently running without bot protection.
+     *
+     * @return array<int, Turnstile>
+     */
+    private function captchaComponents(): array
+    {
+        $configured = filled(config('turnstile.turnstile_site_key')) || filled(config('turnstile.turnstile_secret_key'));
+
+        return $configured ? [Turnstile::make('turnstile_token')] : [];
     }
 }

@@ -9,6 +9,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Alerts/**, app/Actions/Alerts/GetActiveAlertsForUser.php, app/Actions/Alerts/SaveAlertRule.php, app/Actions/Alerts/FindAppAlert.php | .ai/rules/alerts.md |
 | routes/api.php, app/Http/Controllers/Api/**, app/Http/Resources/**, routes/channels.php | .ai/rules/api.md |
 | app/Jobs/DeliverWeatherAlert.php, app/Jobs/**, app/Jobs/DeliverScheduledAlert.php | .ai/rules/app-jobs.md |
+| app/Filament/Dashboard/Pages/Auth/** | .ai/rules/auth.md |
 | app/Support/ChannelTypes/** | .ai/rules/channel-types.md |
 | app/Console/Commands/** | .ai/rules/commands.md |
 | app/Support/Delivery/** | .ai/rules/delivery.md |
