@@ -351,7 +351,7 @@ else
         fail "deploy/README.md: variables not in any .env.example:$unknown"
     fi
 
-    for term in WXNOTIFY_VERSION OUTLOOK_MAPS_DISK REVERB_PUBLIC_SCHEME REVERB_PUBLIC_PORT app:grant-owner Setup queue:restart reverb:restart Turnstile verification WXNOTIFY_TRUSTED_PROXIES SESSION_SECURE_COOKIE APP_BIND_ADDRESS REVERB_BIND_ADDRESS WXNOTIFY_MODE "Tier override" app-storage; do
+    for term in WXNOTIFY_VERSION OUTLOOK_MAPS_DISK REVERB_PUBLIC_SCHEME REVERB_PUBLIC_PORT app:grant-owner Setup queue:restart reverb:restart Turnstile verification WXNOTIFY_TRUSTED_PROXIES SESSION_SECURE_COOKIE APP_BIND_ADDRESS REVERB_BIND_ADDRESS WXNOTIFY_MODE "Tier override" app-storage view:clear; do
         if grep -Fq -- "$term" "$README"; then
             pass "deploy/README.md mentions $term"
         else

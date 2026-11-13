@@ -20,6 +20,13 @@
 #   docker compose exec front-end php artisan migrate --force
 #   docker compose up -d
 #
+# On every later version change (upgrade or rollback) also run, on A, right after
+# `docker compose up -d front-end`:
+#   docker compose exec front-end php artisan view:clear
+# front-end keeps storage/ (including compiled Blade views) in the app-storage volume and
+# has no startup automation, so it would otherwise keep serving views compiled by the
+# other version.
+#
 # Only DB_PASSWORD (every server has it) is enforced by the compose file. APP_KEY,
 # REVERB_APP_KEY/SECRET and PIPELINE_WEBHOOK_TOKEN are not set on every server, so the
 # example leaves them blank and says which servers must fill them in.

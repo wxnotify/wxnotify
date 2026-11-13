@@ -239,6 +239,7 @@ What is different with images:
   # on A: the same order as a first start, so reverb boots after the migration
   docker compose pull
   docker compose up -d front-end
+  docker compose exec front-end php artisan view:clear
   docker compose exec front-end php artisan migrate --force
   docker compose up -d
 
@@ -251,7 +252,7 @@ What is different with images:
   docker compose exec front-end php artisan reverb:restart
   ```
 
-  Migrate before the workers on C and D restart. `queue:restart` and `reverb:restart` signal through the shared database cache, so running them on A reaches the workers on C and D. Use the `pg_dump` command above on B. This upgrade order follows the first-start order that we ran; a full multi-server upgrade has not been run end to end yet. If the migration fails, set the previous `WXNOTIFY_VERSION` on A and run `docker compose up -d` there, and do not upgrade C and D.
+  Clear the compiled views on A after every version change, upgrade or rollback: A keeps `storage/` (including the compiled Blade views) in the `app-storage` volume and has no startup automation, so without `view:clear` it can keep serving views compiled by the other version. Migrate before the workers on C and D restart. `queue:restart` and `reverb:restart` signal through the shared database cache, so running them on A reaches the workers on C and D. Use the `pg_dump` command above on B. This upgrade order follows the first-start order that we ran; a full multi-server upgrade has not been run end to end yet. If the migration fails, set the previous `WXNOTIFY_VERSION` on A, run `docker compose up -d` there and then `docker compose exec front-end php artisan view:clear`, and do not upgrade C and D.
 
 ## Self-hosted mode and tiers
 
