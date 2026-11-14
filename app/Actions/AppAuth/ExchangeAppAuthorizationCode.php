@@ -36,7 +36,7 @@ class ExchangeAppAuthorizationCode
 
             $user = User::find($grant['user_id']);
 
-            if ($user === null || ! $user->hasVerifiedEmail()) {
+            if ($user === null || ! $user->hasVerifiedEmail() || $user->isPendingDeletion()) {
                 return null;
             }
 
