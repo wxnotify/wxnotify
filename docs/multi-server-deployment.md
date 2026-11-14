@@ -46,7 +46,7 @@ Ingestion hands work to D through the database: `pipeline-api` stores the produc
 - **Four Linux hosts on a private network** (Hetzner Cloud private network, WireGuard, or a VLAN). Everything between servers below travels over it.
 - **Docker Engine and Docker Compose 2.24 or newer** on each. `compose.production.yaml` uses the `!reset` and `!override` tags, which older Compose versions reject.
 - **A way to terminate TLS for server A** (Caddy, nginx, a load balancer or a Cloudflare tunnel). Compose does not include one. See [TLS and the reverse proxy](#tls-and-the-reverse-proxy).
-- **There is no production image yet.** `docker/8.4/Dockerfile` defines `web-production` and `worker-production` targets, but they are empty aliases and contain no application code. Every server therefore runs the repository checked out on disk and bind-mounted into the containers, as in development. Each application server (A, C, D) needs its own clone and its own `composer install`. B only needs the compose files.
+- **This route runs from a git checkout, not the published images.** `compose.yaml` builds the development-style `web-development` and `worker-development` targets of `docker/8.4/Dockerfile`, and the repository on disk is bind-mounted into the containers. Each application server (A, C, D) therefore needs its own clone and its own `composer install` and `npm run build`; B only needs the compose files. If you would rather not keep a checkout on every server, use the published production images instead: see the [image route](../deploy/README.md#running-on-four-servers).
 
 ### Addresses used below
 
