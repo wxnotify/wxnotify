@@ -218,9 +218,10 @@ jobs:
           target: ${{ matrix.image.target }}
           platforms: linux/${{ matrix.platform.arch }}
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ env.LOCAL_IMAGE }}
+          # The local name goes on the docker exporter itself, not in `tags:`: buildx applies `tags:` to every
+          # image exporter too, so the push-by-digest output tried to push the local CI tag.
           outputs: |
-            type=docker
+            type=docker,name=${{ env.LOCAL_IMAGE }}
             ${{ env.IS_RELEASE == 'true' && format('type=image,name={0}/{1},push-by-digest=true,name-canonical=true,push=true', vars.DOCKERHUB_NAMESPACE, matrix.image.name) || '' }}
           cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.platform.arch }}
