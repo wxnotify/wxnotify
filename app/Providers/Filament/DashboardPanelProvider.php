@@ -11,6 +11,8 @@ use App\Filament\Dashboard\Widgets\AnnouncementsWidget;
 use App\Filament\Dashboard\Widgets\RecentAlertsWidget;
 use App\Http\Middleware\RedirectAdmins;
 use App\Models\User;
+use App\Support\Filament\RecoverableAppAuthentication;
+use App\Support\Filament\RecoverablePasskeyAuthentication;
 use App\Support\MaintenanceModeGuard;
 use Awcodes\Gravatar\GravatarPlugin;
 use CerealKiller97\FilamentBugReports\BugReportsPlugin;
@@ -18,7 +20,6 @@ use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
 use EightCedars\FilamentInactivityGuard\FilamentInactivityGuardPlugin;
-use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -75,7 +76,8 @@ class DashboardPanelProvider extends PanelProvider
             ->profile(EditProfile::class)
             ->brandName(generateBrandName())
             ->multiFactorAuthentication([
-                AppAuthentication::make(),
+                RecoverableAppAuthentication::make()->recoverable(),
+                RecoverablePasskeyAuthentication::make(),
             ])
             ->discoverResources(in: app_path('Filament/Dashboard/Resources'), for: 'App\Filament\Dashboard\Resources')
             ->discoverPages(in: app_path('Filament/Dashboard/Pages'), for: 'App\Filament\Dashboard\Pages')

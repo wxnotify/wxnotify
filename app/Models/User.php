@@ -9,9 +9,13 @@ use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use Database\Factories\UserFactory;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
+use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Happenv\FilamentPasskeys\Concerns\InteractsWithPasskeysAuthentication;
+use Happenv\FilamentPasskeys\Contracts\HasPasskeysAuthentication;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -26,10 +30,10 @@ use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable(['name', 'email', 'password', 'is_test_account', 'unit_system', 'timezone'])]
 #[Hidden(['password', 'remember_token', 'app_authentication_secret'])]
-class User extends Authenticatable implements FilamentUser, HasAppAuthentication, MustVerifyEmail
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasPasskeysAuthentication, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasAnnouncements, HasApiTokens, HasFactory, InteractsWithAppAuthentication, LogsActivity, Notifiable;
+    use HasAnnouncements, HasApiTokens, HasFactory, InteractsWithAppAuthentication, InteractsWithAppAuthenticationRecovery, InteractsWithPasskeysAuthentication, LogsActivity, Notifiable;
 
     public function getActivitylogOptions(): LogOptions
     {
