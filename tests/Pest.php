@@ -12,8 +12,7 @@ use App\Support\Delivery\HeartbeatUrlGuard;
 use App\Support\Delivery\Pauser;
 use App\Support\TraccarUrlGuard;
 use Carbon\Carbon;
-use Filament\Notifications\Livewire\Notifications;
-use Filament\Notifications\Notification;
+use Filament\Notifications\NotificationMailbox;
 use Filament\Schemas\Components\Wizard;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
@@ -587,16 +586,27 @@ function presenterReport(array $overrides = []): array
 }
 
 /**
+ * The notifications Filament has queued for the current user, as the arrays Notification::fromArray() takes.
+ * Reading them consumes them, so call it once and don't combine it with assertNotified().
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function sentNotifications(): array
+{
+    $mailbox = app(NotificationMailbox::class);
+    $mailbox->flush();
+
+    return $mailbox->pull();
+}
+
+/**
  * The bodies of the notifications Filament has queued for the current user, as one string.
  * Reading them consumes them, so call it once and don't combine it with assertNotified().
  */
 function sentNotificationBodies(): string
 {
-    $notifications = new Notifications;
-    $notifications->mount();
-
-    return $notifications->notifications
-        ->map(fn (Notification $notification): string => (string) $notification->getBody())
+    return collect(sentNotifications())
+        ->map(fn (array $notification): string => (string) ($notification['body'] ?? ''))
         ->implode(' ');
 }
 

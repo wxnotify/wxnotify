@@ -189,7 +189,7 @@ test('resend in the table is throttled with the same notice', function () {
     }
 
     chanMsgConnResend($channel);
-    $sent = collect(session('filament.claimed_notifications'))->last();
+    $sent = collect(sentNotifications())->last();
 
     expect($sent['title'])->toBe('Too many confirmation codes')
         ->and($sent['body'])->toMatch('/^We\'ve sent several codes recently\. Try again in \d+ minutes?\.$/')
