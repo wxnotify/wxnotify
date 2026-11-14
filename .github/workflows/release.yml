@@ -90,7 +90,9 @@ jobs:
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.4'
-          extensions: bcmath, gd, imagick, intl, pdo_pgsql, pgsql, redis, soap, zip
+          # dbase: phpmyadmin/shapefile writes and reads .dbf files only when it is loaded (the shapefile
+          # import tests build their fixtures with it, and the production image installs it too).
+          extensions: bcmath, dbase, gd, imagick, intl, pdo_pgsql, pgsql, redis, soap, zip
           coverage: none
           tools: composer:v2
 
