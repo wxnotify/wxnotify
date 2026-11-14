@@ -32,3 +32,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Storage/** | .ai/rules/storage.md |
 | app/Support/**, app/Support/Integrations.php, app/Support/PhoneNumber.php, app/Support/FormatPlaceWeather.php, app/Support/DeliveryFailureExplanation.php, app/Support/ForceHttpsFromAppUrl.php | .ai/rules/support.md |
 | app/Http/Controllers/Api/V1/WeatherController.php | .ai/rules/v1.md |
+| app/Filament/Dashboard/Widgets/BrowserSessionsTable.php | .ai/rules/widgets.md |

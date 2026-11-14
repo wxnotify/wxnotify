@@ -2,6 +2,7 @@
 
 namespace App\Filament\Dashboard\Pages;
 
+use App\Filament\Dashboard\Widgets\BrowserSessionsTable;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -17,7 +18,7 @@ use STS\FilamentImpersonate\ImpersonateManager;
 use UnitEnum;
 
 /**
- * The phones signed in to the WxNotify app, with a way to sign one out remotely (a lost
+ * "Where you're signed in": the web browsers (BrowserSessionsTable, above) and the phones signed in to the WxNotify app, with a way to sign one out remotely (a lost
  * phone). The query is scoped to the signed-in subscriber itself: this panel's access gate
  * allows everyone, so scoping is the protection. App tokens are exactly the ones whose
  * abilities are ["app"]; Public API keys never appear here.
@@ -34,11 +35,25 @@ class SignedInDevices extends Page implements HasTable
 
     protected static ?int $navigationSort = 4;
 
-    protected static ?string $title = 'Signed-in devices';
+    protected static ?string $title = 'Where you\'re signed in';
+
+    protected static ?string $navigationLabel = 'Where you\'re signed in';
+
+    /** @return array<class-string> */
+    protected function getHeaderWidgets(): array
+    {
+        return [BrowserSessionsTable::class];
+    }
+
+    public function getHeaderWidgetsColumns(): int|array
+    {
+        return 1;
+    }
 
     public function table(Table $table): Table
     {
         return $table
+            ->heading('WxNotify app')
             ->query(fn () => auth()->user()->tokens()->getQuery()->where('abilities', json_encode(['app'])))
             ->defaultSort('last_used_at', 'desc')
             ->columns([
