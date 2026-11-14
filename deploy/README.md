@@ -25,6 +25,21 @@ The Compose files read the registry from `WXNOTIFY_REGISTRY`, which defaults to 
 
 You need Docker Engine with Docker Compose **2.24 or newer**.
 
+## What hardware you need
+
+Both `linux/amd64` and `linux/arm64` machines work. The figures below are starting points, not guarantees: they come from the memory the stack used while idle on a development install (every container started, no alert traffic), plus headroom. Feeds, alert fan-out and PostgreSQL's cache all grow under load, so watch your own server for the first week (`docker stats`, and the Product Storage page in the admin panel) and adjust.
+
+| | CPU | Memory | Disk (SSD) |
+| --- | --- | --- | --- |
+| **One server, minimum** | 2 vCPU | 4 GB | 40 GB |
+| **One server, comfortable** | 4 vCPU | 8 GB | 80 GB |
+
+- **Memory is the limit that matters.** The whole stack idles at roughly 2 to 2.5 GB (PostgreSQL, Apprise, the feed clients, the queue workers and the web processes), and the operating system needs several hundred megabytes more. 4 GB runs it with some room; 8 GB leaves space for PostgreSQL to cache and for bursts of products or a large alert fan-out.
+- **CPU is mostly idle** and spikes when a batch of products arrives or many alerts are sent at once. Two cores are enough for a small install; add cores before adding memory if deliveries lag during storms.
+- **Add swap** (2 GB is a sensible size) so a memory spike does not go straight to the out-of-memory killer. Swap is a safety net, not a substitute for enough RAM.
+- **Disk grows in two places.** Received weather products are kept for `NWWS_RETENTION_DAYS` and `EMWIN_RETENTION_DAYS` (7 days by default, which caps them), and the PostgreSQL database grows with the delivery history. Use SSD or NVMe storage. After the first week, check the Product Storage page and your volume sizes, then size the disk with room to grow.
+- **Four servers:** each machine of two vCPU and 2 GB can host its role, with swap on every one. The ingestion server (C) is the tightest, since it runs the feed clients and starts about half full. The per-server figures are in [Running on four servers](#running-on-four-servers) and in the [multi-server guide's sizing table](../docs/multi-server-deployment.md#sizing-2-vcpu--2-gb-hetzner-cpx11).
+
 ## Quick start: one server
 
 1. Make a folder and download the two files into it. The files live in [`deploy/single-server`](single-server) in the repository:
