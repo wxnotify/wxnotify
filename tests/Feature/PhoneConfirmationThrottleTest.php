@@ -127,7 +127,7 @@ test('resend says why it could not send', function (Closure $setUp, string $body
     $channel = $setUp($this->user);
 
     chanThrottleResend($channel);
-    $sent = collect(session('filament.claimed_notifications'))->last();
+    $sent = collect(sentNotifications())->last();
 
     expect($sent['title'])->toBe('Couldn\'t resend the confirmation code')
         ->and($sent['body'])->toContain($body)
@@ -166,7 +166,7 @@ test('send test on a downgraded phone channel names the plan, not reachability',
     $channel = NotificationChannel::factory()->for($this->user)->httpSms(CHAN_THROTTLE_NUMBER)->create();
 
     livewire(ListNotificationChannels::class)->callAction(TestAction::make('sendTest')->table($channel));
-    $sent = collect(session('filament.claimed_notifications'))->last();
+    $sent = collect(sentNotifications())->last();
 
     expect($sent['title'])->toBe('Couldn\'t send the test notification')
         ->and($sent['body'])->toBe('This channel needs the Plus plan or higher.');

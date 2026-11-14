@@ -9,8 +9,6 @@ use App\Models\ShapefileLayer;
 use App\Models\ShapefileLayerVersion;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Filament\Notifications\Livewire\Notifications;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Queue;
 
 use function Pest\Livewire\livewire;
@@ -80,14 +78,12 @@ test('the header action queues the job for the current user and says a queue wor
 
     Queue::assertPushed(ScanShapefileLayersJob::class, fn (ScanShapefileLayersJob $job) => $job->userId === $user->id);
 
-    $notifications = new Notifications;
-    $notifications->mount();
-    $sent = $notifications->notifications->first(fn (Notification $notification) => $notification->getTitle() === 'Scan started');
+    $sent = collect(sentNotifications())->first(fn (array $notification): bool => ($notification['title'] ?? null) === 'Scan started');
 
     expect($sent)->not->toBeNull()
-        ->and($sent->getBody())->toContain('queue worker')
-        ->and($sent->getBody())->toContain('its own queue worker (queue-long)')
-        ->and($sent->getBody())->toContain('Alerts keep being delivered while it runs');
+        ->and($sent['body'])->toContain('queue worker')
+        ->and($sent['body'])->toContain('its own queue worker (queue-long)')
+        ->and($sent['body'])->toContain('Alerts keep being delivered while it runs');
 });
 
 test('a scan job that fails tells the user the scan did not finish, and has room to run a full scan once', function () {

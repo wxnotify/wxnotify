@@ -73,12 +73,13 @@ test('the Traccar Servers list page shows the map, with servers and with none', 
     livewire(ListTraccarServers::class)->assertSeeLivewire(TraccarDevicesMapWidget::class);
 });
 
-test('a Free-tier subscriber is forbidden from the widget data method', function () {
+test('a Free-tier subscriber cannot reach the widget data method', function () {
+    config(['app.debug' => false]);
     $this->actingAs(User::factory()->create(['tier_override' => Tier::Free]));
     TraccarServer::factory()->for(auth()->user())->create(['base_url' => 'https://mine.example.com']);
     Http::fake();
 
-    livewire(TraccarDevicesMapWidget::class)->call('devices')->assertForbidden();
+    livewire(TraccarDevicesMapWidget::class)->call('devices')->assertNotFound();
 
     Http::assertNothingSent();
 });

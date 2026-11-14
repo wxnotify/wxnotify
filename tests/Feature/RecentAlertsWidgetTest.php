@@ -143,9 +143,11 @@ test('only a badge that can be explained is a control, and another subscriber\'s
     $component = livewire(RecentAlertsWidget::class);
     $html = $component->html();
 
-    expect($html)->toContain("mountTableAction(&#039;explainDelivery&#039;, &#039;{$failed->id}&#039;)")
-        ->not->toContain("mountTableAction(&#039;explainDelivery&#039;, &#039;{$sent->id}&#039;)")
-        ->not->toContain("mountTableAction(&#039;explainDelivery&#039;, &#039;{$others->id}&#039;)");
+    $isExplainable = fn (int $id): bool => str_contains($html, 'recordKey\u0022:\u0022'.$id.'\u0022') && (bool) preg_match('/explainDelivery.{0,200}'.preg_quote('recordKey\u0022:\u0022'.$id.'\u0022', '/').'/s', $html);
+
+    expect($isExplainable($failed->id))->toBeTrue()
+        ->and($isExplainable($sent->id))->toBeFalse()
+        ->and($isExplainable($others->id))->toBeFalse();
 
     $component->mountTableAction('explainDelivery', $others)->assertNotSet('mountedActions', [['name' => 'explainDelivery', 'arguments' => [], 'context' => ['table' => true, 'recordKey' => (string) $others->id]]]);
 });
