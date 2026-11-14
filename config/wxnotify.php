@@ -15,6 +15,10 @@ return [
 
     'mode' => env('WXNOTIFY_MODE', 'cloud'),
 
+    // Days between a subscriber asking to delete their account and the daily purge removing it. They can
+    // cancel by signing in during this window.
+    'account_deletion_days' => (int) env('WXNOTIFY_ACCOUNT_DELETION_DAYS', 7),
+
     // Optional dedicated host for the public View Product pages (e.g. a
     // subdomain behind Cloudflare caching). Unset serves them from the main
     // domain, which is what local development and self-hosting use.

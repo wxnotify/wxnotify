@@ -56,6 +56,13 @@ class AppAuthorizationController extends Controller
             ], 403));
         }
 
+        if ($request->user()->isPendingDeletion()) {
+            return self::unframed(response()->view('app-auth.page', [
+                'title' => 'Sign-in is unavailable',
+                'message' => 'This account is scheduled for deletion. Sign in on the WxNotify website to cancel the deletion first.',
+            ], 403));
+        }
+
         if (! $request->user()->hasVerifiedEmail()) {
             return redirect()->route('filament.dashboard.auth.email-verification.prompt');
         }

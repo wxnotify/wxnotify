@@ -104,6 +104,11 @@ class DashboardPanelProvider extends PanelProvider
                 fn (): View => view('filament.dashboard.did-you-know'),
             )
             ->renderHook(
+                // Shown on every dashboard page while the signed-in subscriber's account is scheduled for deletion.
+                PanelsRenderHook::PAGE_START,
+                fn (): string => auth()->user()?->isPendingDeletion() ? view('filament.dashboard.account-deletion-banner')->render() : '',
+            )
+            ->renderHook(
                 // The key-free map tile fallback (and provider logo), in <head> so it is installed before any
                 // map, the Pinpoint location picker included, creates its tile layer. Signed-in pages only:
                 // the sign-in pages have no map. The tile URL with the key is printed only by map pages.

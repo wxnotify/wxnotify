@@ -33,6 +33,8 @@ class ChannelDispatcher
     /**
      * The same refusal for a phone type, whose destination is a number.
      */
+    public const PENDING_DELETION_REFUSAL = 'This account is scheduled for deletion.';
+
     public const UNCONFIRMED_NUMBER_REFUSAL = 'This number has not been confirmed yet.';
 
     public function __construct(private readonly ChannelTypeRegistry $registry) {}
@@ -69,6 +71,10 @@ class ChannelDispatcher
      */
     private function refusal(NotificationChannel $channel, ChannelType $type, array $meta): ?string
     {
+        if ($channel->user?->isPendingDeletion()) {
+            return self::PENDING_DELETION_REFUSAL;
+        }
+
         if ($channel->user !== null && ! $channel->user->meetsChannelTier($type->slug())) {
             return self::TIER_REFUSAL;
         }

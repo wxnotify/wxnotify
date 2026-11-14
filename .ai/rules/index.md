@@ -4,6 +4,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| app/Actions/Account/** | .ai/rules/account.md |
 | app/Actions/** | .ai/rules/actions.md |
 | resources/views/filament/dashboard/alert-rules/** | .ai/rules/alert-rules.md |
 | app/Actions/Alerts/**, app/Actions/Alerts/GetActiveAlertsForUser.php, app/Actions/Alerts/SaveAlertRule.php, app/Actions/Alerts/FindAppAlert.php | .ai/rules/alerts.md |

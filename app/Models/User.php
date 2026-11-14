@@ -7,6 +7,7 @@ use App\Enums\UnitSystem;
 use App\Models\ChannelType as ChannelTypeModel;
 use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
+use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
@@ -50,6 +51,27 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
                 $user->is_staff = true;
             }
         });
+    }
+
+    public function isPendingDeletion(): bool
+    {
+        return $this->deletion_requested_at !== null;
+    }
+
+    /**
+     * When the daily purge will remove this account, or null when no deletion is pending.
+     */
+    public function deletionDate(): ?CarbonImmutable
+    {
+        return $this->deletion_requested_at?->toImmutable()->addDays(config('wxnotify.account_deletion_days'));
+    }
+
+    /**
+     * Staff and owners are demoted first, so nobody deletes their way out of /admin by accident.
+     */
+    public function canRequestDeletion(): bool
+    {
+        return ! $this->is_staff && ! $this->is_owner;
     }
 
     public function canAccessPanel(Panel $panel): bool
@@ -229,6 +251,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'password' => 'hashed',
             'is_staff' => 'boolean',
             'is_owner' => 'boolean',
+            'deletion_requested_at' => 'datetime',
             'is_test_account' => 'boolean',
             'tier_override' => Tier::class,
             'unit_system' => UnitSystem::class,
