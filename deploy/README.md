@@ -1,5 +1,3 @@
-<!-- Maintainer: confirm the Docker Hub namespace (the images are written as wxnotify/...) and fill in <repository-url> before publishing this page. -->
-
 # WxNotify: run it from Docker images
 
 WxNotify is a self-hosted weather alert service. It receives National Weather Service text products (NWWS-OI), EMWIN and GOES lightning (GLM) data, matches them against the alert rules people set up, and delivers alerts through channels such as email, SMS, push, chat services and webhooks. It has a dashboard for subscribers and owners, a live products page, and an API for the mobile app.
@@ -33,8 +31,8 @@ You need Docker Engine with Docker Compose **2.24 or newer**.
 
    ```bash
    mkdir wxnotify && cd wxnotify
-   curl -fsSLO <repository-url>/raw/main/deploy/single-server/compose.yaml
-   curl -fsSLO <repository-url>/raw/main/deploy/single-server/.env.example
+   curl -fsSLO https://github.com/wxnotify/wxnotify/raw/main/deploy/single-server/compose.yaml
+   curl -fsSLO https://github.com/wxnotify/wxnotify/raw/main/deploy/single-server/.env.example
    cp .env.example .env
    ```
 
@@ -292,4 +290,4 @@ It does not change sign-up: email verification applies in both modes, and the Tu
 
 ## Problems and licence
 
-Report issues at `<repository-url>/issues`. WxNotify is free software, licensed GPL-3.0-or-later; see [LICENSE](../LICENSE).
+Report issues at `https://github.com/wxnotify/wxnotify/issues`. WxNotify is free software, licensed GPL-3.0-or-later; see [LICENSE](../LICENSE).
