@@ -6,7 +6,7 @@ This image is one feed of the WxNotify stack. On its own it only receives and st
 
 ## You need your own NWWS-OI account
 
-NWWS-OI access is free but requires registering with the National Weather Service. Without credentials, leave the username and password empty and the stack simply runs without this feed.
+NWWS-OI access is free but requires registering with the National Weather Service: [request NWWS-OI credentials](https://www.weather.gov/nwws/nwws_oi_request). Without credentials, leave the username and password empty and the stack simply runs without this feed.
 
 ## Quick start
 
