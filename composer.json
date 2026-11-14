@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "wxnotify/wxnotify",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "WxNotify: National Weather Service alerts delivered to the places and channels you choose.",
+    "keywords": ["weather", "alerts", "notifications", "laravel", "filament"],
     "license": "GPL-3.0-or-later",
     "require": {
         "php": "^8.3",
