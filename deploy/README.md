@@ -81,7 +81,7 @@ Both `linux/amd64` and `linux/arm64` machines work. The figures below are starti
 
    - **Cloudflare Turnstile (optional, recommended for a public site).** If both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are blank, sign-up works without a captcha, because the example sets `WXNOTIFY_MODE=selfhost` (in `cloud` mode the captcha is always required). To protect a site anyone can reach from automated sign-ups, create a free Cloudflare account, open Turnstile, add a site for your hostname, and put its keys in those two variables. Set both or neither: with only one of them set the captcha still applies and sign-up fails until the other is filled in, so a half-configured install is noticed instead of silently running unprotected.
 
-   Generate `APP_KEY` once and never change it: channel credentials are encrypted with it. Also set `APP_URL` to the address people will use. `NWWS_USERNAME` and `NWWS_PASSWORD` are optional; leave them empty to run without the NWWS feed. Leave `WXNOTIFY_MODE=selfhost` as the example sets it (see [Self-hosted mode and tiers](#self-hosted-mode-and-tiers)).
+   Generate `APP_KEY` once and never change it: channel credentials are encrypted with it. Also set `APP_URL` to the address people will use. `NWWS_USERNAME` and `NWWS_PASSWORD` are optional; leave them empty to run without the NWWS feed (the `nwws` container then stays up, logs a notice and does nothing). Leave `WXNOTIFY_MODE=selfhost` as the example sets it (see [Self-hosted mode and tiers](#self-hosted-mode-and-tiers)).
 
 4. Start it:
 
