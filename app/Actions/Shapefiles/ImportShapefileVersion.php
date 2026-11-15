@@ -8,13 +8,12 @@ use App\Notifications\ShapefileLayerUpdateAvailableNotification;
 use App\Support\Shapefiles\ShapefileLayerDefinition;
 use App\Support\Shapefiles\ShapefileLayerDefinitions;
 use App\Support\Shapefiles\ShapefilePolygonAssembler;
+use App\Support\Shapefiles\ShapefilePolygonReader;
 use App\Support\Shapefiles\ZoneCountyCorrelationParser;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use PhpMyAdmin\ShapeFile\ShapeFile;
-use PhpMyAdmin\ShapeFile\ShapeRecord;
-use PhpMyAdmin\ShapeFile\ShapeType;
+use RuntimeException;
 use ZipArchive;
 
 class ImportShapefileVersion
@@ -54,15 +53,36 @@ class ImportShapefileVersion
 
             $shpFiles = File::glob($tempDir.'/*.shp') ?: File::glob($tempDir.'/*.SHP');
             $basePath = substr($shpFiles[0], 0, -4);
+            $dbfPath = (File::glob($basePath.'.dbf') ?: File::glob($basePath.'.DBF'))[0] ?? throw new RuntimeException('The shapefile has no .dbf attribute table.');
 
-            $shp = new ShapeFile(ShapeType::Polygon);
-            $shp->loadFromFile($basePath.'.*');
+            ['keys' => $keys, 'counts' => $counts, 'attributes' => $attributes] = $this->readAttributeKeys($dbfPath, $definition);
 
-            DB::transaction(function () use ($shp, $definition): void {
+            DB::transaction(function () use ($basePath, $definition, $keys, $counts, $attributes): void {
                 DB::table($definition->stagingTable)->delete();
 
-                foreach ($this->groupRecordsByNaturalKey($shp->records, $definition) as $group) {
-                    $this->insertShapefileRecordGroup($group, $definition);
+                $splitRings = [];
+                $reader = ShapefilePolygonReader::open($basePath.'.shp');
+
+                try {
+                    foreach ($reader->records() as $recordNumber => $rings) {
+                        $key = $keys[$recordNumber] ?? throw new RuntimeException("Shapefile record {$recordNumber} has no row in the attribute table.");
+
+                        if ($counts[$key] === 1) {
+                            $this->insertShapefileRow($attributes[$key], $rings, $definition);
+
+                            continue;
+                        }
+
+                        foreach ($rings as $ring) {
+                            $splitRings[$key][] = $ring;
+                        }
+                    }
+                } finally {
+                    $reader->close();
+                }
+
+                foreach ($splitRings as $key => $rings) {
+                    $this->insertShapefileRow($attributes[$key], $rings, $definition);
                 }
             });
         } finally {
@@ -71,48 +91,62 @@ class ImportShapefileVersion
     }
 
     /**
-     * NOAA sometimes splits one logical zone/entity across multiple physical shapefile
-     * records that share the same natural key and attributes but hold different,
-     * disjoint geometry (verified against a real download: 77 of Public Zones' 4,157
-     * records are such splits, e.g. Calvert County, MD's zone is two separate records
-     * for its two water-separated land areas). Group them here so each natural key
-     * becomes exactly one row with a combined MultiPolygon, matching this table's
-     * unique constraint on the natural key — inserting them separately would violate
-     * that constraint (or, without it, silently produce duplicate rows for one zone).
+     * Reads the attribute table alone (no geometry) to learn each record's natural key. NOAA sometimes
+     * splits one logical zone/entity across multiple physical shapefile records that share the same
+     * natural key and attributes but hold different, disjoint geometry (verified against a real
+     * download: 77 of Public Zones' 4,157 records are such splits, e.g. Calvert County, MD's zone is
+     * two separate records for its two water-separated land areas). Each natural key must become
+     * exactly one row with a combined MultiPolygon, matching this table's unique constraint on the
+     * natural key, so the import needs to know up front which keys are split: it inserts every other
+     * record the moment it is read and keeps the rings of only the split ones until the end. A split
+     * key takes the attributes of its first record.
      *
-     * @param  array<int, ShapeRecord>  $records
-     * @return array<string, array<int, ShapeRecord>>
+     * @return array{keys: array<int, string>, counts: array<string, int>, attributes: array<string, array<string, string>>}
      */
-    private function groupRecordsByNaturalKey(array $records, ShapefileLayerDefinition $definition): array
+    private function readAttributeKeys(string $dbfPath, ShapefileLayerDefinition $definition): array
     {
-        $groups = [];
-
-        foreach ($records as $record) {
-            $key = $definition->serializeNaturalKey($this->mapAttributes($record, $definition));
-            $groups[$key][] = $record;
+        if (! extension_loaded('dbase')) {
+            throw new RuntimeException('The dbase PHP extension is required to read shapefile attributes.');
         }
 
-        return $groups;
+        $db = dbase_open($dbfPath, 0);
+
+        if ($db === false) {
+            throw new RuntimeException('Cannot open the shapefile attribute table.');
+        }
+
+        $keys = [];
+        $counts = [];
+        $attributes = [];
+
+        try {
+            for ($recordNumber = 1, $total = dbase_numrecords($db); $recordNumber <= $total; $recordNumber++) {
+                $row = @dbase_get_record_with_names($db, $recordNumber);
+                unset($row['deleted']);
+
+                $mapped = $this->mapAttributes($row, $definition);
+                $key = $definition->serializeNaturalKey($mapped);
+
+                $keys[$recordNumber] = $key;
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+                $attributes[$key] ??= $mapped;
+            }
+        } finally {
+            dbase_close($db);
+        }
+
+        return ['keys' => $keys, 'counts' => $counts, 'attributes' => $attributes];
     }
 
     /**
-     * @param  array<int, ShapeRecord>  $group
+     * @param  array<string, string>  $attributes
+     * @param  array<int, array{wkt: string, clockwise: bool}>  $rings
      */
-    private function insertShapefileRecordGroup(array $group, ShapefileLayerDefinition $definition): void
+    private function insertShapefileRow(array $attributes, array $rings, ShapefileLayerDefinition $definition): void
     {
-        $attributes = $this->mapAttributes($group[0], $definition);
-
         if ($definition->zoneType !== null) {
             $attributes['zone_type'] = $definition->zoneType;
         }
-
-        $allParts = [];
-
-        foreach ($group as $record) {
-            array_push($allParts, ...($record->shpData['parts'] ?? []));
-        }
-
-        $wkt = ShapefilePolygonAssembler::toMultiPolygonWkt($allParts);
 
         $columns = array_keys($attributes);
         $sql = sprintf(
@@ -122,18 +156,19 @@ class ImportShapefileVersion
             implode(', ', array_fill(0, count($columns), '?')),
         );
 
-        DB::insert($sql, [...array_values($attributes), $wkt]);
+        DB::insert($sql, [...array_values($attributes), ShapefilePolygonAssembler::toMultiPolygonWktFromRings($rings)]);
     }
 
     /**
+     * @param  array<string, mixed>  $dbfData
      * @return array<string, string>
      */
-    private function mapAttributes(ShapeRecord $record, ShapefileLayerDefinition $definition): array
+    private function mapAttributes(array $dbfData, ShapefileLayerDefinition $definition): array
     {
         $attributes = [];
 
         foreach ($definition->attributeMap as $sourceField => $column) {
-            $attributes[$column] = trim((string) ($record->dbfData[$sourceField] ?? ''));
+            $attributes[$column] = trim((string) ($dbfData[$sourceField] ?? ''));
         }
 
         return $attributes;

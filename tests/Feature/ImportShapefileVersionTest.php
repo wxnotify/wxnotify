@@ -240,3 +240,88 @@ test('it notifies every staff user, and no one else, once the diff is computed',
     Notification::assertSentTo($staff, ShapefileLayerUpdateAvailableNotification::class);
     Notification::assertNotSentTo($subscriber, ShapefileLayerUpdateAvailableNotification::class);
 });
+
+/**
+ * A polygon shapefile written straight to disk, record by record (the library would hold every point in
+ * memory to write it): $records zones of $points points each, with a dbf holding the public zone columns.
+ */
+function buildLargeFixtureZip(string $basename, int $records, int $points): string
+{
+    $dir = storage_path('app/test-fixtures/'.$basename);
+    File::ensureDirectoryExists($dir);
+    $base = $dir.'/'.$basename;
+
+    $body = fopen($base.'.shp', 'wb');
+    fwrite($body, str_repeat("\0", 100));
+    $shx = fopen($base.'.shx', 'wb');
+    fwrite($shx, str_repeat("\0", 100));
+
+    $offsetWords = 50;
+    for ($record = 1; $record <= $records; $record++) {
+        $ring = '';
+        for ($i = 0; $i < $points; $i++) {
+            $angle = -2 * M_PI * $i / ($points - 1);
+            $ring .= pack('dd', 100 + $record + cos($angle), 30 + sin($angle));
+        }
+        $content = pack('V', 5).pack('dddd', 99, 29, 200, 31).pack('VV', 1, $points).pack('V', 0).$ring;
+        $contentWords = intdiv(strlen($content), 2);
+        fwrite($body, pack('NN', $record, $contentWords).$content);
+        fwrite($shx, pack('NN', $offsetWords, $contentWords));
+        $offsetWords += 4 + $contentWords;
+    }
+
+    $header = fn (int $lengthWords): string => pack('N', 9994).str_repeat("\0", 20).pack('N', $lengthWords).pack('V', 1000).pack('V', 5).pack('dddd', 99, 29, 200, 31).str_repeat("\0", 32);
+    fseek($body, 0);
+    fwrite($body, $header($offsetWords));
+    fseek($shx, 0);
+    fwrite($shx, $header(50 + 4 * $records));
+    fclose($body);
+    fclose($shx);
+
+    $db = dbase_create($base.'.dbf', [
+        ['STATE', 'C', 2], ['CWA', 'C', 9], ['TIME_ZONE', 'C', 2], ['FE_AREA', 'C', 2], ['ZONE', 'C', 3],
+        ['NAME', 'C', 40], ['STATE_ZONE', 'C', 5], ['LON', 'N', 12, 7], ['LAT', 'N', 12, 7], ['SHORTNAME', 'C', 32],
+    ]);
+    for ($record = 1; $record <= $records; $record++) {
+        $zone = str_pad((string) $record, 3, '0', STR_PAD_LEFT);
+        dbase_add_record($db, ['NM', 'ABQ', 'M', 'nw', $zone, 'Zone '.$record, 'NM'.$zone, -100.5, 30.5, 'Z'.$record]);
+    }
+    dbase_close($db);
+
+    $zipPath = $dir.'/'.$basename.'.zip';
+    $zip = new ZipArchive;
+    $zip->open($zipPath, ZipArchive::CREATE);
+    foreach (['shp', 'shx', 'dbf'] as $ext) {
+        $zip->addFile($base.'.'.$ext, $basename.'.'.$ext);
+    }
+    $zip->close();
+
+    return $zipPath;
+}
+
+test('importing a large layer holds only one record\'s geometry at a time', function () {
+    // 150 zones x 4,000 points: loading all of it as PHP arrays takes several hundred MB
+    // (the 256 MB limit the published containers run with kills it); one record at a time is a few MB.
+    $zipPath = buildLargeFixtureZip('z_large01', 150, 4000);
+    Http::fake(['weather.gov/large.zip' => Http::response(file_get_contents($zipPath))]);
+
+    $layer = ShapefileLayer::factory()->create(['key' => 'public_zones']);
+    $version = ShapefileLayerVersion::factory()->create([
+        'shapefile_layer_id' => $layer->id,
+        'source_url' => 'https://www.weather.gov/large.zip',
+        'status' => ShapefileVersionStatus::Staged,
+    ]);
+
+    gc_collect_cycles();
+    memory_reset_peak_usage();
+    $before = memory_get_usage();
+
+    (new ImportShapefileVersion)($version);
+
+    $growthMb = (memory_get_peak_usage() - $before) / 1048576;
+
+    File::deleteDirectory(storage_path('app/test-fixtures/z_large01'));
+
+    expect(DB::table('public_zones_staging')->count())->toBe(150)
+        ->and($growthMb)->toBeLessThan(60);
+});
