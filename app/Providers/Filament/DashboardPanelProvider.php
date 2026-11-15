@@ -163,11 +163,11 @@ class DashboardPanelProvider extends PanelProvider
                     ->windowPosition('bottom-right')    // or ->fullPage() for a full-page 500
                     ->email('support@wxnotify.com'),    // "Contact support" mailto:
                 FilamentInactivityGuardPlugin::make(),
-                ServiceDeskUserPlugin::make()
-                    ->knowledgeBase(false)
-                    ->serviceCatalog(false),
-                BugReportsPlugin::make()
-                    ->authorizeManagementUsing(fn (User $user): bool => (bool) $user->is_staff),
+                // ServiceDeskUserPlugin::make()
+                //     ->knowledgeBase(false)
+                //     ->serviceCatalog(false),
+                // BugReportsPlugin::make()
+                //     ->authorizeManagementUsing(fn (User $user): bool => (bool) $user->is_staff),
                 FilamentOnboardingPlugin::make()
                     ->launcher()                        // floating checklist, on every page
                     ->tours()                           // guided tours
