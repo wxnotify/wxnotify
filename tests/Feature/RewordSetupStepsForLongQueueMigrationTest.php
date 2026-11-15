@@ -30,6 +30,8 @@ test('it leaves owner-edited steps alone', function () {
 test('down restores the shipped wording', function () {
     $migration = rewordSetupStepsForLongQueueMigration();
 
+    // A rollback undoes the later boundaries rewording first.
+    (require database_path('migrations/2026_11_15_110001_add_shapefile_scan_command_to_boundaries_step.php'))->down();
     $migration->down();
 
     expect(OnboardingStep::query()->where('key', 'boundaries')->sole()->description['en'])
