@@ -12,7 +12,7 @@ test('it names the shapefile:scan command in the boundaries step', function () {
 
     expect(OnboardingStep::query()->where('key', 'boundaries')->sole()->description['en'])
         ->toContain('php artisan shapefile:scan')
-        ->toContain('press Activate');
+        ->toContain('Activate all imported layers');
 });
 
 test('it leaves an owner-edited boundaries step alone', function () {
