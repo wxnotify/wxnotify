@@ -610,6 +610,10 @@ test('a PUT with a stray matching field but no products is not the keep path', f
 });
 
 test('reading rules does not query per product', function () {
+    // Sanctum writes the token's last_used_at only when the clock second changed, so an unfrozen
+    // clock adds a query to whichever read crosses a second boundary.
+    $this->freezeTime();
+
     ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->assertCreated();
     ruleCall($this, 'POST', '/api/v1/alert-rules', perProductRuleBody($this))->assertCreated();
 
