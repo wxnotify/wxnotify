@@ -66,9 +66,9 @@ Both `linux/amd64` and `linux/arm64` machines work. The figures below are starti
    docker run --rm wxnotify/wxnotify:<version> php artisan key:generate --show | tail -n 1
    ```
 
-   Set up mail before anyone signs up, and decide about the sign-up captcha:
+   Decide about mail before real subscribers sign up, and about the sign-up captcha:
 
-   - **Mail.** Signing up sends a verification email, and a new subscriber cannot use the dashboard until they follow its link. Set the `MAIL_*` values to your SMTP provider, for example:
+   - **Mail.** Signing up sends a verification email, and a new subscriber cannot use the dashboard until they follow its link. The example starts with `MAIL_MAILER=mailpit`: the stack includes a [Mailpit](https://mailpit.axllent.org) container that catches every message instead of delivering it, so you can sign up and follow verification links before any real mail service exists. Read the caught messages at <http://localhost:8025>. That page has no password and shows every email in full (password-reset links too), so it listens on the server's loopback address only; from another machine, tunnel to it with `ssh -L 8025:localhost:8025 you@your-server`. Messages are kept in memory and disappear when the container is recreated. Mailpit delivers nothing to real inboxes, so switch to real mail before anyone else signs up: set `MAIL_MAILER=smtp` and the `MAIL_*` values for your SMTP provider (uncomment the host, port and login lines in the example), then run `docker compose up -d` again. For example:
 
      ```ini
      MAIL_MAILER=smtp
@@ -97,7 +97,7 @@ Both `linux/amd64` and `linux/arm64` machines work. The figures below are starti
 
 ### Create the first owner
 
-1. Register an account on the dashboard sign-up page, `/dashboard/register` (the verification email must be deliverable if you want to use that account in the dashboard; the Turnstile captcha appears only if you set its keys).
+1. Register an account on the dashboard sign-up page, `/dashboard/register` (with the default Mailpit mailer, the verification email is in Mailpit at <http://localhost:8025>; the Turnstile captcha appears only if you set its keys).
 2. Promote it to owner:
 
    ```bash
@@ -109,6 +109,8 @@ Both `linux/amd64` and `linux/arm64` machines work. The figures below are starti
    Staff and owners **cannot use the subscriber dashboard**: every `/dashboard` page redirects them to `/admin`, by design. To see what subscribers see, use a second account that is not staff. The simplest way is **Admin > Users > Create**: an account made there is already verified (no Turnstile check and no verification email), and you either set its password there or have a reset link emailed. Signing up a second account at `/dashboard/register` works too.
 
    In the admin panel, open **Setup** (in the **System** group). A fresh install is not complete until you do this. The page lists the reference data sets with their counts and whether each is installed: the product catalog (categories and descriptions), the "Did you know" tips and the tracked shapefile layers. Press **Install reference data** and confirm. It only adds what is missing and changes nothing that already exists. Read the confirmation text: when the product catalog is not yet installed, the install also removes a few legacy products that have no counterpart in the catalog.
+
+   The **Setup checklist** page (same group) lists what else a server needs. Its "Set up outgoing email" step stays open while the mailer is `mailpit`, and ticks once you switch to a real one.
 
 Do not run `db:seed`; the seeder creates a test user (`test@example.com`) and is for development only.
 

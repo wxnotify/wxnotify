@@ -246,10 +246,26 @@ if [ -f "$HERE/single-server/compose.yaml" ]; then
     else
         fail "single-server: redis must be omitted"
     fi
-    if jq -e '.services | has("mailpit") | not' <<<"$json" >/dev/null 2>&1; then
-        pass "single-server: no mailpit service"
+    if jq -e '.services | has("mailpit")' <<<"$json" >/dev/null 2>&1; then
+        pass "single-server: mailpit service is present"
     else
-        fail "single-server: mailpit must be omitted"
+        fail "single-server: mailpit service must be present (the default mailer)"
+    fi
+    if jq -e '[.services.mailpit.ports[]? | select(.target == 1025)] | length == 0' <<<"$json" >/dev/null 2>&1; then
+        pass "single-server: mailpit does not publish SMTP (1025)"
+    else
+        fail "single-server: mailpit must not publish SMTP (1025)"
+    fi
+    got="$(jq -r '.services.mailpit.ports[] | select(.target == 8025) | "\(.host_ip // "")|\(.published)"' <<<"$json" 2>/dev/null || true)"
+    if [ "$got" = "127.0.0.1|8025" ]; then
+        pass "single-server: mailpit page publishes on 127.0.0.1 only by default"
+    else
+        fail "single-server: mailpit page must publish on 127.0.0.1:8025 by default (got: ${got:-nothing})"
+    fi
+    if grep -q '^MAIL_MAILER=mailpit$' "$HERE/single-server/.env.example"; then
+        pass "single-server: .env.example defaults MAIL_MAILER to mailpit"
+    else
+        fail "single-server: .env.example must default MAIL_MAILER to mailpit"
     fi
 else
     fail "single-server: compose.yaml missing"

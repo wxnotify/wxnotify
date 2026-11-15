@@ -200,6 +200,28 @@ services:
         networks:
             - default
         restart: unless-stopped
+    # Catches every message the app sends and shows it at http://localhost:8025 (MAILPIT_PORT),
+    # so sign-up and password resets work before real mail is set up (MAIL_MAILER=mailpit in
+    # .env). Its page shows every email in full, verification and password-reset links
+    # included, and has no login, so it is published on this host's loopback only: reach it
+    # from elsewhere with an SSH tunnel, or set MAILPIT_BIND_ADDRESS knowing anyone who can
+    # reach the port can read all mail and take over accounts. SMTP (1025) is not published.
+    # Mail is kept in memory and is gone when the container is recreated.
+    mailpit:
+        image: 'axllent/mailpit:v1.31.0'
+        ports:
+            - '${MAILPIT_BIND_ADDRESS:-127.0.0.1}:${MAILPIT_PORT:-8025}:8025'
+        networks:
+            - default
+        healthcheck:
+            test:
+                - CMD
+                - /mailpit
+                - readyz
+            interval: 10s
+            timeout: 5s
+            retries: 3
+        restart: unless-stopped
     # Lets the dashboard start and stop the feed containers. Unauthenticated: it sits on
     # an internal network that only front-end joins, and is not published.
     # It grants far more than start/stop: with CONTAINERS=1 and POST=1 its rules allow

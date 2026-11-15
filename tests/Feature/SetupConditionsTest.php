@@ -233,6 +233,29 @@ it('does not count the array mailer as mail configured', function () {
     expect(setupConditionPasses('mail_configured'))->toBeFalse();
 });
 
+it('does not count the bundled mailpit mailer as mail configured', function () {
+    config(['mail.default' => 'mailpit']);
+
+    expect(setupConditionPasses('mail_configured'))->toBeFalse();
+});
+
+it('keeps the mailpit SMTP port apart from the compose variable that sets its web page port', function () {
+    // MAILPIT_PORT is the host port of the Mailpit page and reaches the app through env_file.
+    putenv('MAILPIT_PORT=18025');
+    $_ENV['MAILPIT_PORT'] = '18025';
+
+    try {
+        expect((require config_path('mail.php'))['mailers']['mailpit']['port'])->toBe(1025);
+    } finally {
+        putenv('MAILPIT_PORT');
+        unset($_ENV['MAILPIT_PORT']);
+    }
+});
+
+it('defines the mailpit mailer as plain SMTP to the bundled mailpit container', function () {
+    expect(config('mail.mailers.mailpit'))->toMatchArray(['transport' => 'smtp', 'host' => 'mailpit', 'port' => 1025]);
+});
+
 it('accepts a paddle key as billing configured', function () {
     config(['services.stripe.secret' => null, 'services.paddle.api_key' => 'pdl_x']);
 

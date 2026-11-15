@@ -14,6 +14,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Support/ChannelTypes/** | .ai/rules/channel-types.md |
 | app/Console/Commands/** | .ai/rules/commands.md |
 | app/Support/Delivery/** | .ai/rules/delivery.md |
+| deploy/** | .ai/rules/deploy.md |
 | docker/emwin-byteblaster/** | .ai/rules/emwin-byteblaster.md |
 | docker/emwin-http/** | .ai/rules/emwin-http.md |
 | app/Events/** | .ai/rules/events.md |

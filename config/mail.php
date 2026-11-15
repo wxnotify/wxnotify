@@ -37,6 +37,18 @@ return [
 
     'mailers' => [
 
+        // The Mailpit container that ships in the self-hosted compose file: it catches every
+        // message and shows it in its own web page, so sign-up works before real mail is set up.
+        // Deliberately separate from `smtp`, so the setup checklist can tell it from a real mailer. The
+        // variable names avoid MAILPIT_PORT, which the compose file uses for the web page's host port.
+        'mailpit' => [
+            'transport' => 'smtp',
+            'host' => env('MAILPIT_SMTP_HOST', 'mailpit'),
+            'port' => (int) env('MAILPIT_SMTP_PORT', 1025),
+            'timeout' => (int) env('MAIL_TIMEOUT', 10),
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),
