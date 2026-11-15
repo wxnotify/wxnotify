@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Admin\Widgets\AdminStatsOverview;
 use App\Filament\Admin\Widgets\AlertRulesByCategoryChart;
+use App\Filament\Admin\Widgets\DeliveriesPerDayChart;
 use App\Models\User;
 use Bityukov\CommandCenter\Filament\CommandCenterPlugin;
 use CerealKiller97\FilamentBugReports\BugReportsPlugin;
@@ -52,6 +53,7 @@ class AdminPanelProvider extends PanelProvider
                 // AccountWidget::class,
                 AdminStatsOverview::class,
                 AlertRulesByCategoryChart::class,
+                DeliveriesPerDayChart::class,
             ])
             ->renderHook(
                 // The key-free map tile fallback (and provider logo), in <head> so it is installed before any
