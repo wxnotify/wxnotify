@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Admin\Widgets\AlertRulesByCategoryChart;
 use App\Filament\Admin\Widgets\DeliveriesPerDayChart;
 use App\Models\DeliveryLog;
 use App\Models\User;
@@ -88,4 +89,10 @@ test('the range filter offers 7, 14 and 30 days and falls back to 14', function 
     expect(deliveriesChartData(livewire(DeliveriesPerDayChart::class)->set('filter', '7'))['labels'])->toHaveCount(7)
         ->and(deliveriesChartData(livewire(DeliveriesPerDayChart::class)->set('filter', '30'))['labels'])->toHaveCount(30)
         ->and(deliveriesChartData(livewire(DeliveriesPerDayChart::class)->set('filter', 'x'))['labels'])->toHaveCount(14);
+});
+
+test('it is sized like the alert rules chart beside it, so the two cards are the same height', function () {
+    $maxHeight = fn (string $widget) => (fn () => $this->getMaxHeight())->call(app($widget));
+
+    expect($maxHeight(DeliveriesPerDayChart::class))->toBe($maxHeight(AlertRulesByCategoryChart::class));
 });

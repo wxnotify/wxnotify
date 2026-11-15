@@ -17,8 +17,6 @@ class DeliveriesPerDayChart extends ChartWidget
 
     protected ?string $pollingInterval = null;
 
-    protected ?string $maxHeight = '260px';
-
     public ?string $filter = '14';
 
     /**
