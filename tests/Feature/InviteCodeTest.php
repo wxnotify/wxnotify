@@ -7,7 +7,9 @@ use Illuminate\Database\UniqueConstraintViolationException;
 
 it('normalises a code to upper case without spaces or dashes', function () {
     expect(InviteCode::normalise(' ab-cd 12 '))->toBe('ABCD12')
-        ->and(InviteCode::normalise(null))->toBe('');
+        ->and(InviteCode::normalise(null))->toBe('')
+        ->and(InviteCode::normalise('ab_c.d/12'))->toBe('ABCD12')
+        ->and(InviteCode::normalise("ab\u{2013}cd\u{00E9}12\u{201D}"))->toBe('ABCD12');
 });
 
 it('generates eight characters without look-alike characters', function () {

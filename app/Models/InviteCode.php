@@ -26,11 +26,11 @@ class InviteCode extends Model
     use HasFactory, LogsActivity;
 
     /**
-     * Upper-case a typed code and drop spaces and dashes, so " ab-cd 12 " matches ABCD12.
+     * Upper-case a typed code and drop everything outside A-Z and 0-9, so " ab-cd 12 " matches ABCD12.
      */
     public static function normalise(?string $code): string
     {
-        return Str::upper(preg_replace('/[\s-]+/', '', (string) $code));
+        return preg_replace('/[^A-Z0-9]/', '', Str::upper((string) $code));
     }
 
     public static function generateCode(): string
