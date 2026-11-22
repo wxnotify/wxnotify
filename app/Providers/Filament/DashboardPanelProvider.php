@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Actions\Account\SignUpGate;
 use App\Actions\Support\GenerateChatwootIdentityHash;
 use App\Filament\Dashboard\Pages\Auth\EditProfile;
 use App\Filament\Dashboard\Pages\Auth\Login;
@@ -132,17 +133,26 @@ class DashboardPanelProvider extends PanelProvider
                             ->outlined(false)
                             ->stateless(false),
                     ])
-                    ->registration()
+                    ->registration(fn (string $provider, SocialiteUserContract $oauthUser, ?Authenticatable $user): bool => $user !== null
+                        || app(SignUpGate::class)->check(app(SignUpGate::class)->rememberedCode(), $oauthUser->getEmail())->allowed)
                     ->createUserUsing(function (string $provider, SocialiteUserContract $oauthUser, FilamentSocialitePlugin $plugin): Authenticatable {
-                        $user = User::create([
-                            'name' => $oauthUser->getName() ?? $oauthUser->getNickname() ?? $oauthUser->getEmail(),
-                            'email' => $oauthUser->getEmail(),
-                            'password' => Str::password(40),
-                        ]);
+                        $gate = app(SignUpGate::class);
 
-                        // Google (and Apple, once added) already verify the email address
-                        // on their end — no reason to make the subscriber verify it again.
-                        $user->markEmailAsVerified();
+                        $user = $gate->admit($gate->rememberedCode(), (string) $oauthUser->getEmail(), function () use ($oauthUser): User {
+                            $user = User::create([
+                                'name' => $oauthUser->getName() ?? $oauthUser->getNickname() ?? $oauthUser->getEmail(),
+                                'email' => $oauthUser->getEmail(),
+                                'password' => Str::password(40),
+                            ]);
+
+                            // Google (and Apple, once added) already verify the email address
+                            // on their end — no reason to make the subscriber verify it again.
+                            $user->markEmailAsVerified();
+
+                            return $user;
+                        });
+
+                        $gate->forgetCode();
 
                         return $user;
                     }),

@@ -7,5 +7,5 @@ return [
 
     'user-not-allowed' => 'Your email is not part of a domain that is allowed.',
 
-    'registration-not-enabled' => 'Registration of a new user is not allowed.',
+    'registration-not-enabled' => 'Sign-ups are closed or need an invite code. Ask the administrator.',
 ];
