@@ -1,10 +1,10 @@
 # Running WxNotify across four servers
 
-> **Two routes.** This guide describes running from a git checkout with `compose.production.yaml` (clone, `composer install`, `npm run build`). To run from the published Docker images instead, with one Compose file and no checkout, follow [deploy/README.md](../deploy/README.md) and [deploy/multi-server](../deploy/multi-server). The network layout, firewall rules, sizing, what must be identical across servers, per-server settings and the operating notes below carry over to both routes; the git, Composer, npm and `compose.production.yaml` steps do not apply to the image route.
+> **Published images, no checkout.** This guide runs WxNotify from the published Docker images with one Compose file, [`deploy/multi-server/compose.yaml`](../deploy/multi-server/compose.yaml), and one `.env` per server. You do not clone the repository, and there is no Composer, npm or build step: Compose pulls the images, exactly as in [Quick start: one server](../deploy/README.md#quick-start-one-server). Running from a git checkout instead (development-style images, with the repository bind-mounted) is described in the [appendix](#appendix-running-from-a-git-checkout), for people working on WxNotify itself.
 
 `docker compose up -d` runs everything on one machine. This guide splits the same stack across four servers using the `server-a`, `server-b`, `server-c` and `server-d` Compose profiles. It is written for our own test and production environments and for anyone self-hosting WxNotify.
 
-> **Status.** The compose layering in this guide was checked with `docker compose config` (each profile resolves on its own and starts exactly the services listed below). A full four-host deployment has not been run end to end yet, so treat the first rollout as a shakedown and see [Known limits](#known-limits).
+> **Status.** Each profile of the multi-server Compose file resolves on its own and starts exactly the services listed below (`deploy/verify.sh` checks this). A full four-host deployment has not been run end to end yet, so treat the first rollout as a shakedown and see [Known limits](#known-limits).
 
 ## The four servers
 
@@ -14,9 +14,8 @@
 | **B** | `server-b` | `pgsql`, `redis` | Data. PostgreSQL holds the database, the queue, the cache and sessions. |
 | **C** | `server-c` | `pipeline-api`, `nwws`, `emwin-byteblaster`, `emwin-http`, `glm-decoder`, `queue-long`, `docker-socket-proxy` | Ingestion. Receives the weather feeds and stores products. |
 | **D** | `server-d` | `queue`, `queue-heartbeat`, `scheduler`, `apprise` | Processing and delivery. Matches products to alert rules and sends the alerts. |
-| (optional) | `support` | `healthchecks` | Monitoring. Run it anywhere, or use a hosted Healthchecks account instead. |
 
-`server-d` is defined by `compose.production.yaml`; plain `compose.yaml` keeps those four services in `server-c` for single-host development.
+The profile for each server is in [`deploy/multi-server/compose.yaml`](../deploy/multi-server/compose.yaml); `COMPOSE_PROFILES` in a server's `.env` selects it.
 
 Two services sit on C rather than D, because on D they would not work:
 
@@ -44,9 +43,9 @@ Ingestion hands work to D through the database: `pipeline-api` stores the produc
 ## Before you start
 
 - **Four Linux hosts on a private network** (Hetzner Cloud private network, WireGuard, or a VLAN). Everything between servers below travels over it.
-- **Docker Engine and Docker Compose 2.24 or newer** on each. `compose.production.yaml` uses the `!reset` and `!override` tags, which older Compose versions reject.
+- **Docker Engine and Docker Compose 2.24 or newer** on each, as on one server.
 - **A way to terminate TLS for server A** (Caddy, nginx, a load balancer or a Cloudflare tunnel). Compose does not include one. See [TLS and the reverse proxy](#tls-and-the-reverse-proxy).
-- **This route runs from a git checkout, not the published images.** `compose.yaml` builds the development-style `web-development` and `worker-development` targets of `docker/8.4/Dockerfile`, and the repository on disk is bind-mounted into the containers. Each application server (A, C, D) therefore needs its own clone and its own `composer install` and `npm run build`; B only needs the compose files. If you would rather not keep a checkout on every server, use the published production images instead: see the [image route](../deploy/README.md#running-on-four-servers).
+- **Nothing else.** No git checkout, Composer or npm. Each server needs only the Compose file and its own `.env`; Compose pulls the images from Docker Hub.
 
 ### Addresses used below
 
@@ -107,18 +106,16 @@ Mail settings (`MAIL_*`) belong on A and D, which both send email. NWWS credenti
 
 ## Per-server `.env`
 
-Start every server from `.env.example`, then set the values below. Only what differs per server is listed. Anything not listed keeps the `.env.example` value or your normal production value (`APP_URL`, Stripe, and so on).
+Every server starts from the same file, [`deploy/multi-server/.env.example`](../deploy/multi-server/.env.example), whose comments say which servers each setting is for. Set the values below. Only what differs per server is listed. Anything not listed keeps the `.env.example` value or your normal production value (mail, Turnstile and so on).
 
 **On every server:**
 
 ```ini
-COMPOSE_FILE=compose.yaml:compose.production.yaml
-USER_ID=1000      # the uid/gid of the account that owns the checkout:
-GROUP_ID=1000     #   `id -u` and `id -g`. These are baked in at build time.
-APP_ENV=production
-APP_DEBUG=false
+WXNOTIFY_VERSION=1.2.3     # the exact release, the same on every server
 APP_URL=https://wxnotify.example.com
 ```
+
+`APP_ENV=production` and `APP_DEBUG=false` are already set in the example.
 
 | Setting | A | B | C | D |
 | --- | --- | --- | --- | --- |
@@ -139,36 +136,39 @@ APP_URL=https://wxnotify.example.com
 
 Notes on the table:
 
-- **`REVERB_HOST`/`REVERB_PORT` are where the application's own servers send broadcasts**, not where browsers connect. On A that is the `reverb` container on the same host. On D it is A's private address and the published port 8085. C never broadcasts: the live-product event is queued and sent by the workers on D.
-- **`VITE_REVERB_*` is where the browser connects** and is set on A only: the public hostname, port 443 and `https` (see below).
+- **`REVERB_HOST`/`REVERB_PORT` are where the application's own servers send broadcasts**, not where browsers connect. On A that is the `reverb` container on the same host. On D it is A's private address and the published port 8085 (`REVERB_PUBLISHED_PORT`). C never broadcasts: the live-product event is queued and sent by the workers on D.
+- **`REVERB_PUBLIC_*` is where the browser connects** and is set on A only: the public hostname, port 443 and `https` (see below).
 - **`APPRISE_API_URL` differs by server.** On D the workers reach Apprise on their own host. On A the dashboard reaches it across the network.
 - The `*_BIND_ADDRESS` variables decide which interface each published port listens on. They default to `127.0.0.1`, which is safe but unreachable from other servers, so set them to the server's private address where the table says to. Never use `0.0.0.0` or a public address.
-- Every other published port in `compose.production.yaml` (`pipeline-api`, `emwin-byteblaster`) is pinned to `127.0.0.1`, because nothing outside its own host needs it.
+- Every other published port in the Compose file (`pipeline-api`, `emwin-byteblaster`) is pinned to `127.0.0.1`, because nothing outside its own host needs it.
 
 Browser-facing Reverb settings, on A:
 
 ```ini
-VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
-VITE_REVERB_HOST=wxnotify.example.com
-VITE_REVERB_PORT=443
-VITE_REVERB_SCHEME=https
+REVERB_PUBLIC_HOST=wxnotify.example.com
+REVERB_PUBLIC_PORT=443
+REVERB_PUBLIC_SCHEME=https
 REVERB_ALLOWED_ORIGINS=wxnotify.example.com
 ```
 
-`VITE_*` values are compiled into the JavaScript, so run `npm run build` after changing them (step 3 below).
+The application reads these when it starts, so after changing one run `docker compose up -d` on A to recreate the containers. There is nothing to build.
+
+Also set, before anyone signs up: the `MAIL_*` values on A and D (sign-up sends a verification email), the Turnstile keys on A if you want the sign-up captcha, and on A and D the `OUTLOOK_MAPS_DISK` and `AWS_*` values for the shared bucket (see [Known limits](#known-limits)). [deploy/README.md](../deploy/README.md#quick-start-one-server) explains the mail and Turnstile choices.
 
 ## Set up, in this order
 
 Bring the servers up B, A, D, then C. The database must exist before anything else, and the workers on D should be running before the feeds on C start delivering products.
 
-### 0. Servers A, C and D: get the code
+### 0. Every server: the Compose file and a `.env`
 
 ```bash
-git clone <your-repository-url> wxnotify && cd wxnotify
+mkdir wxnotify && cd wxnotify
+curl -fsSLO https://github.com/wxnotify/wxnotify/raw/main/deploy/multi-server/compose.yaml
+curl -fsSLO https://github.com/wxnotify/wxnotify/raw/main/deploy/multi-server/.env.example
 cp .env.example .env     # then edit it as described above
 ```
 
-Copy `auth.json` (it is git-ignored) if Composer needs credentials for a private package. Server B needs only `compose.yaml`, `compose.production.yaml`, `docker/pgsql/` and a `.env`, so a clone is the easiest way to get them.
+Set `COMPOSE_PROFILES` for that server and `WXNOTIFY_VERSION` to an exact release (the same everywhere; see [Version tags](../deploy/README.md#version-tags)). Generate each secret **once**, on any machine, with the commands in the comments of `.env.example`, and copy it to every server in the table above: `APP_KEY` (A, C, D), `DB_PASSWORD` (A, B, C, D), `REVERB_APP_KEY` and `REVERB_APP_SECRET` (A, D), `PIPELINE_WEBHOOK_TOKEN` (A, C). Never change `APP_KEY` afterwards: channel credentials are encrypted with it. Server B needs only the Compose file and a `.env`.
 
 ### 1. Server B: the database
 
@@ -186,58 +186,42 @@ nc -vz 10.0.0.2 5432
 
 ### 2. Server A: the dashboard
 
-```bash
-docker compose build front-end
-docker compose run --rm --no-deps front-end composer install --no-dev --optimize-autoloader
-docker compose run --rm --no-deps front-end php artisan key:generate --show
-```
-
-`key:generate --show` only prints a key. Paste it into `APP_KEY` in `.env` on **A, C and D**. Generate it once and never change it. Then:
+No startup automation runs the migrations here, so run them yourself, and before `reverb` starts: a Reverb started against an empty database cannot read its restart signal and then ignores every later `reverb:restart`.
 
 ```bash
 docker compose up -d front-end
+docker compose ps                  # wait until front-end is healthy
 docker compose exec front-end php artisan migrate --force
 docker compose up -d
 ```
 
-Start `front-end` alone and migrate before `reverb` starts: a Reverb started against an empty database cannot read its restart signal and then ignores every later `reverb:restart` (seen on the image route, where the same order is now used). The final `docker compose up -d` starts only `reverb` in addition, because `COMPOSE_PROFILES=server-a`.
+The final `docker compose up -d` starts only `reverb` in addition, because `COMPOSE_PROFILES=server-a`.
 
-### 3. Server A: build the front end
-
-```bash
-docker compose exec front-end npm ci
-docker compose exec front-end npm run build
-```
-
-Only the web image has Node. Do this on A after every change to a `VITE_*` value or to the JavaScript and CSS.
-
-### 4. Server D: processing and delivery
+### 3. Server D: processing and delivery
 
 ```bash
-docker compose build
-docker compose run --rm --no-deps queue composer install --no-dev --optimize-autoloader
 docker compose up -d
 docker compose ps
 ```
 
-### 5. Server C: ingestion
+### 4. Server C: ingestion
 
 ```bash
-docker compose build
-docker compose run --rm --no-deps queue-long composer install --no-dev --optimize-autoloader
 docker compose up -d
 docker compose ps
 ```
 
 If B were unreachable, the workers would fail and restart under `restart: unless-stopped`, which is why B goes first.
 
-### 6. Create the first owner
+### 5. Create the first owner and run Setup
 
 Register an account through the dashboard's sign-up page, then promote it from A:
 
 ```bash
 docker compose exec front-end php artisan app:grant-owner you@example.com
 ```
+
+Then do what a fresh install needs, exactly as on one server: [Create the first owner](../deploy/README.md#create-the-first-owner) covers the admin **Setup** page (install the reference data) and importing the boundaries. In this layout the boundary scan runs on the long-queue worker, which is on C, so C must be up before you press **Check for shapefile updates**; or run `docker compose exec front-end php artisan shapefile:scan -v` on A, which imports in that process and needs no worker.
 
 ## TLS and the reverse proxy
 
@@ -247,7 +231,7 @@ Put a reverse proxy in front of A. It terminates TLS and forwards two things: th
 wxnotify.example.com {
     @reverb path /app/* /apps/*
     reverse_proxy @reverb 10.0.0.1:8085
-    reverse_proxy 127.0.0.1:80
+    reverse_proxy 127.0.0.1:8080
 }
 ```
 
@@ -280,6 +264,114 @@ Apprise on D is similarly unauthenticated and is protected the same way: a priva
 
 ## Deploying an update
 
+An update is a maintenance window, as on one server. Back up PostgreSQL on B (see [Operating notes](#operating-notes)) and the `app-storage` volume on A first. Migrations only go forward, so you cannot step back to an older version without restoring a backup.
+
+Set the new `WXNOTIFY_VERSION` in `.env` on **every** server, then:
+
+On A, in the same order as a first start, so `reverb` boots after the migration:
+
+```bash
+docker compose pull
+docker compose up -d front-end
+docker compose exec front-end php artisan view:clear
+docker compose exec front-end php artisan migrate --force
+docker compose up -d
+```
+
+Then on D and on C:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Finally, from A:
+
+```bash
+docker compose exec front-end php artisan queue:restart
+docker compose exec front-end php artisan reverb:restart
+```
+
+Run `view:clear` after every version change, upgrade or rollback: A keeps `storage/` (including the compiled Blade views) in the `app-storage` volume and has no startup automation, so without it A can keep serving views compiled by the other version. Migrate before the workers on C and D restart. `queue:restart` and `reverb:restart` signal through the shared cache (the database, in the default configuration), so running them once on A reaches the workers on C and D as well. Docker's restart policy brings them back.
+
+If the migration fails, set the previous `WXNOTIFY_VERSION` on A, run `docker compose up -d` there and then `docker compose exec front-end php artisan view:clear`, and do not update C and D. For a change that is not backward compatible, stop `queue` on D first. This order follows the first-start order that we ran; a full multi-server update has not been run end to end yet.
+
+## Operating notes
+
+- **Backups.** Almost everything that matters is in PostgreSQL on B. The exception is uploaded files (service-desk attachments, bug-report screenshots, onboarding files) in the `app-storage` volume on A ([deploy/README.md](../deploy/README.md#backups-and-day-to-day-operation) has the archive and restore commands); back it up as well. Schedule `pg_dump` to somewhere off B (`docker compose exec -T pgsql sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > ...`) and test a restore. The product files on C can be rebuilt from the feeds and are not backed up. Keep each server's `.env` somewhere safe: without `APP_KEY` the encrypted channel credentials cannot be read.
+- **If A is down:** C and D keep ingesting, matching and delivering, because delivery needs only the database and the outbound providers. Live pushes to browsers and Docker control are unavailable, and broadcasts queue up on D until A is back.
+- **If B is down:** nothing works. Workers fail and keep restarting, which is expected; they recover on their own when B returns.
+- **If C is down:** the dashboard keeps working but no new products arrive, so no new alerts are produced. Alerts already queued still deliver.
+- **If D is down:** products still arrive and are stored, but nothing is matched or delivered. The jobs wait in the database queue and are processed when D returns, so alerts can arrive late. D is the server to monitor most closely: point Healthchecks at `queue-heartbeat` (see the heartbeat settings in the dashboard), and watch C's feed health separately.
+- **Logs:** `docker compose logs -f <service>` on the server that runs the service.
+
+## Known limits
+
+- **Product storage gauges on A.** The product volumes (`nwws-products`, `emwin-products`) live on C and are not mounted on A, so the disk gauges on the Product Storage page read an empty path and show as unavailable on A. The scan results come from the database and are unaffected. The disk gauge needs a different source if you want it back.
+- **Outlook map images need shared storage.** The delivery job on D writes them and the dashboard and mobile API on A read them, and they are separate hosts, so the default `local` disk would leave A with outlook maps returning 404. On both A and D set `OUTLOOK_MAPS_DISK=s3` and the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `AWS_BUCKET`, `AWS_ENDPOINT` and `AWS_USE_PATH_STYLE_ENDPOINT` values for the same S3-compatible bucket (see `.env.example` for a Backblaze B2 example). If the disk is unreachable the app treats the map as missing rather than failing. Nothing else crosses servers on disk (shapefile imports download and clean up within one job; the dashboard wallpapers are repository files).
+- **Docker control and Apprise are unauthenticated, and Docker control is root on C.** Anyone who can reach C's port 2375 can create and start a privileged container there. See [the Docker socket proxy](#the-docker-socket-proxy).
+- **One server per role.** Splitting by profile does not make any role redundant. Running more than one `reverb` needs `REVERB_SCALING_ENABLED=true` and Redis, and is outside this guide.
+
+## Appendix: running from a git checkout
+
+This is the route for people working on WxNotify, and the one our own test servers started on. `compose.yaml` builds the development-style `web-development` and `worker-development` targets of `docker/8.4/Dockerfile`, and the repository on disk is bind-mounted into the containers, so each application server (A, C, D) needs its own clone and its own `composer install` and `npm run build`; B only needs the compose files. For production use the published images above instead. Everything in this guide except the steps below (the network layout, firewall, sizing, shared secrets, TLS, the Docker socket proxy, the checks and the operating notes) applies to both routes.
+
+What differs in the checkout route:
+
+- **Compose layering.** Every server sets `COMPOSE_FILE=compose.yaml:compose.production.yaml`, which uses the `!reset` and `!override` tags, so it needs Docker Compose 2.24 or newer. `server-d` is defined by `compose.production.yaml`; plain `compose.yaml` keeps those four services in `server-c` for single-host development, and without `COMPOSE_FILE` pointing at `compose.production.yaml`, `docker compose up -d` behaves as it always has, including the Mailpit catcher, the Vite port and that original `server-c` grouping.
+- **Monitoring.** `compose.yaml` also has a `support` profile with a `healthchecks` service. Run it anywhere, or use a hosted Healthchecks account instead.
+- **Build user.** Set `USER_ID` and `GROUP_ID` to the uid and gid of the account that owns the checkout (`id -u`, `id -g`); they are baked in at build time.
+- **Browser WebSocket settings** are compiled into the JavaScript as `VITE_REVERB_*` on A (`VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"`, `VITE_REVERB_HOST`, `VITE_REVERB_PORT=443`, `VITE_REVERB_SCHEME=https`) plus `REVERB_ALLOWED_ORIGINS`, so run `npm run build` after changing them.
+- **Reverse proxy.** The application listens on port 80 on A, so the Caddyfile's last line is `reverse_proxy 127.0.0.1:80`.
+- **Product storage gauges.** `compose.production.yaml` removes the product volumes from the `front-end` mount.
+- **Per-server `.env`** otherwise follows the table above, with `COMPOSE_FILE`, `USER_ID` and `GROUP_ID` added on every server.
+
+### Setting up from a checkout
+
+Bring the servers up in the same order: B, A, D, then C.
+
+On A, C and D, get the code (B needs only `compose.yaml`, `compose.production.yaml`, `docker/pgsql/` and a `.env`, so a clone is the easiest way to get them):
+
+```bash
+git clone <your-repository-url> wxnotify && cd wxnotify
+cp .env.example .env     # then edit it
+```
+
+Copy `auth.json` (it is git-ignored) if Composer needs credentials for a private package. Then start B as in step 1 above, and:
+
+On A:
+
+```bash
+docker compose build front-end
+docker compose run --rm --no-deps front-end composer install --no-dev --optimize-autoloader
+docker compose run --rm --no-deps front-end php artisan key:generate --show
+```
+
+`key:generate --show` only prints a key. Paste it into `APP_KEY` in `.env` on **A, C and D**. Generate it once and never change it. Then:
+
+```bash
+docker compose up -d front-end
+docker compose exec front-end php artisan migrate --force
+docker compose up -d
+docker compose exec front-end npm ci
+docker compose exec front-end npm run build
+```
+
+Only the web image has Node. Run the two `npm` commands on A after every change to a `VITE_*` value or to the JavaScript and CSS.
+
+On D, then on C (use `queue-long` instead of `queue` on C):
+
+```bash
+docker compose build
+docker compose run --rm --no-deps queue composer install --no-dev --optimize-autoloader
+docker compose up -d
+docker compose ps
+```
+
+Create the first owner as in step 5 above.
+
+### Updating from a checkout
+
 Run `git pull` on A, C and D (and on B if the compose files changed). Then, in this order:
 
 On A:
@@ -297,31 +389,4 @@ docker compose run --rm --no-deps queue composer install --no-dev --optimize-aut
 docker compose up -d --build
 ```
 
-Finally, from A:
-
-```bash
-docker compose exec front-end php artisan queue:restart
-docker compose exec front-end php artisan reverb:restart
-```
-
-`queue:restart` and `reverb:restart` signal through the shared cache (the database, in the default configuration), so running them once on A restarts the workers on C and D as well. The workers keep running the code they booted with until that signal arrives, so never skip it. Docker's restart policy brings them back.
-
-Run `migrate` before restarting the workers so they never run new code against an old schema. For a change that is not backward compatible, stop `queue` on D first.
-
-## Operating notes
-
-- **Backups.** Almost everything that matters is in PostgreSQL on B. The exception is uploaded files (service-desk attachments, bug-report screenshots, onboarding files) under `storage/` on A: in this route that is the checkout's `storage/` directory, on the image route the `app-storage` volume ([deploy/README.md](../deploy/README.md#backups-and-day-to-day-operation)); back it up as well. Schedule `pg_dump` to somewhere off B (`docker compose exec -T pgsql pg_dump -U "$DB_USERNAME" "$DB_DATABASE" | gzip > ...`) and test a restore. The product files on C can be rebuilt from the feeds and are not backed up.
-- **If A is down:** C and D keep ingesting, matching and delivering, because delivery needs only the database and the outbound providers. Live pushes to browsers and Docker control are unavailable, and broadcasts queue up on D until A is back.
-- **If B is down:** nothing works. Workers fail and keep restarting, which is expected; they recover on their own when B returns.
-- **If C is down:** the dashboard keeps working but no new products arrive, so no new alerts are produced. Alerts already queued still deliver.
-- **If D is down:** products still arrive and are stored, but nothing is matched or delivered. The jobs wait in the database queue and are processed when D returns, so alerts can arrive late. D is the server to monitor most closely: point Healthchecks at `queue-heartbeat` (see the heartbeat settings in the dashboard), and watch C's feed health separately.
-- **Logs:** `docker compose logs -f <service>` on the server that runs the service.
-
-## Known limits
-
-- **This route builds from a checkout.** Each server here runs a checkout in development-style images (see [Before you start](#before-you-start)). Ready-made production images exist: the [image route](../deploy/README.md#running-on-four-servers) needs no checkout, Composer or npm.
-- **Product storage gauges on A.** The product volumes (`nwws-products`, `emwin-products`) live on C. `compose.production.yaml` removes them from the `front-end` mount, so the disk gauges on the Product Storage page read an empty path and show as unavailable on A. The scan results come from the database and are unaffected. The disk gauge needs a different source if you want it back.
-- **Outlook map images need shared storage.** The delivery job on D writes them and the dashboard and mobile API on A read them, and they are separate hosts, so the default `local` disk would leave A with outlook maps returning 404. On both A and D set `OUTLOOK_MAPS_DISK=s3` and the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `AWS_BUCKET`, `AWS_ENDPOINT` and `AWS_USE_PATH_STYLE_ENDPOINT` values for the same S3-compatible bucket (see `.env.example` for a Backblaze B2 example). If the disk is unreachable the app treats the map as missing rather than failing. Nothing else crosses servers on disk (shapefile imports download and clean up within one job; the dashboard wallpapers are repository files).
-- **Docker control and Apprise are unauthenticated, and Docker control is root on C.** Anyone who can reach C's port 2375 can create and start a privileged container there. See [the Docker socket proxy](#the-docker-socket-proxy).
-- **One server per role.** Splitting by profile does not make any role redundant. Running more than one `reverb` needs `REVERB_SCALING_ENABLED=true` and Redis, and is outside this guide.
-- **Single-server use is unchanged.** Without `COMPOSE_FILE` pointing at `compose.production.yaml`, `docker compose up -d` behaves as it always has, including the Mailpit catcher, the Vite port and the original `server-c` grouping.
+Finally, from A, run `queue:restart` and `reverb:restart` as in [Deploying an update](#deploying-an-update). Run `migrate` before restarting the workers so they never run new code against an old schema.

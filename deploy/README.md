@@ -233,7 +233,7 @@ Pin an exact version (`1.2.3`) so upgrades happen when you decide. If you would 
 | C | `server-c` | feed clients, `pipeline-api`, `queue-long`, `docker-socket-proxy` (ingestion) |
 | D | `server-d` | `queue`, `queue-heartbeat`, `scheduler`, `apprise` (processing and delivery) |
 
-Read [the multi-server guide](../docs/multi-server-deployment.md) for the network layout, firewall rules, sizing and operations; it applies to this route. What does **not** apply to the image route: cloning the repository, `composer install`, `npm ci` and `npm run build`, and `compose.production.yaml`. You need only the compose file and a `.env` on each server, and Compose pulls the images.
+Read [the multi-server guide](../docs/multi-server-deployment.md) for the network layout, firewall rules, sizing, the ordered setup steps and operations; it describes this route. You do not clone the repository, and there is no `composer install`, `npm ci`, `npm run build` or `compose.production.yaml` (those belong to the guide's checkout appendix). You need only the compose file and a `.env` on each server, and Compose pulls the images.
 
 What is different with images:
 
