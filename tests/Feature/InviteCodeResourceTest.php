@@ -6,6 +6,7 @@ use App\Models\InviteCode;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Js;
 
 use function Pest\Livewire\livewire;
 
@@ -114,4 +115,36 @@ test('a non-staff user cannot reach the page', function () {
     $this->actingAs(User::factory()->create(['is_staff' => false]));
 
     $this->get('/admin/invite-codes')->assertForbidden();
+});
+
+test('delete is refused server-side for a used code even when called directly', function () {
+    $used = InviteCode::factory()->usedUp()->create();
+
+    livewire(ListInviteCodes::class)
+        ->call('mountAction', 'delete', [], ['table' => true, 'recordKey' => (string) $used->getKey()])
+        ->call('callMountedAction');
+
+    expect(InviteCode::find($used->id))->not->toBeNull();
+});
+
+test('delete is refused when the code is spent after the table loaded', function () {
+    $code = InviteCode::factory()->create();
+
+    $component = livewire(ListInviteCodes::class)
+        ->assertCanSeeTableRecords([$code])
+        ->call('mountAction', 'delete', [], ['table' => true, 'recordKey' => (string) $code->getKey()]);
+
+    $code->forceFill(['used_count' => 1])->save();
+
+    $component->call('callMountedAction');
+
+    expect(InviteCode::find($code->id))->not->toBeNull();
+});
+
+test('the copy link action hands the clipboard the invite url', function () {
+    $code = InviteCode::factory()->create(['code' => 'ABCDEFGH']);
+
+    $html = html_entity_decode(livewire(ListInviteCodes::class)->html(), ENT_QUOTES);
+
+    expect($html)->toContain('window.navigator.clipboard.writeText('.Js::from($code->inviteUrl()).')');
 });

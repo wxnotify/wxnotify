@@ -6,6 +6,7 @@ use App\Enums\InviteCodeStatus;
 use App\Models\InviteCode;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -97,7 +98,19 @@ class InviteCodesTable
                     ->visible(fn (InviteCode $record): bool => $record->revoked_at !== null)
                     ->action(fn (InviteCode $record) => $record->forceFill(['revoked_at' => null])->save()),
                 DeleteAction::make()
-                    ->visible(fn (InviteCode $record): bool => $record->used_count === 0),
+                    ->visible(fn (InviteCode $record): bool => $record->used_count === 0)
+                    ->before(function (InviteCode $record, DeleteAction $action): void {
+                        // Re-check on a fresh row: the code may have been spent since the table loaded.
+                        if (InviteCode::query()->whereKey($record->getKey())->where('used_count', '>', 0)->exists()) {
+                            Notification::make()
+                                ->title('This code has been used, so it cannot be deleted')
+                                ->body('Revoke it instead.')
+                                ->danger()
+                                ->send();
+
+                            $action->cancel();
+                        }
+                    }),
             ])
             ->emptyStateHeading('No invite codes yet')
             ->emptyStateDescription('Generate invites to let people sign up while registration is invite only.')
