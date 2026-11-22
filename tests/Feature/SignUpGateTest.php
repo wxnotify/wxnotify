@@ -151,13 +151,32 @@ it('stops a shared code at its limit and never stops an unlimited one', function
         ->and(User::count())->toBe(8);
 });
 
-it('spends nothing and creates no user when creating the user fails', function () {
+it('rolls back the created user when the closure fails after creating it', function () {
     setSignUpPolicy('invite_only');
     $invite = InviteCode::factory()->create(['code' => 'ABCDEFGH']);
 
     expect(fn () => app(SignUpGate::class)->admit('ABCDEFGH', 'a@b.test', function (): User {
+        User::factory()->create(['email' => 'a@b.test']);
+
         throw new LogicException('boom');
     }))->toThrow(LogicException::class, 'boom');
+
+    expect($invite->fresh()->used_count)->toBe(0)
+        ->and(User::count())->toBe(0);
+});
+
+it('rolls back the created user when recording the invite on it fails', function () {
+    setSignUpPolicy('invite_only');
+    $invite = InviteCode::factory()->create(['code' => 'ABCDEFGH']);
+
+    User::saving(function (User $user): void {
+        if ($user->invite_code_id !== null) {
+            throw new LogicException('boom');
+        }
+    });
+
+    expect(fn () => app(SignUpGate::class)->admit('ABCDEFGH', 'a@b.test', createUserFor('a@b.test')))
+        ->toThrow(LogicException::class, 'boom');
 
     expect($invite->fresh()->used_count)->toBe(0)
         ->and(User::count())->toBe(0);
