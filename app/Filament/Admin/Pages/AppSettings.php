@@ -5,10 +5,12 @@ namespace App\Filament\Admin\Pages;
 use App\Actions\Pipeline\SendTestHeartbeatPing;
 use App\Enums\MapTileProvider;
 use App\Enums\Secret;
+use App\Enums\SignUpPolicy;
 use App\Settings\FeatureFlagsSettings;
 use App\Settings\GeneralSettings;
 use App\Settings\IntegrationSettings;
 use App\Settings\SecretSettings;
+use App\Settings\SignUpSettings;
 use App\Settings\TierThresholdSettings;
 use App\Support\ApplyEmailSettings;
 use App\Support\Secrets;
@@ -89,6 +91,7 @@ class AppSettings extends Page implements HasForms
             ...app(TierThresholdSettings::class)->toArray(),
             ...app(FeatureFlagsSettings::class)->toArray(),
             ...app(IntegrationSettings::class)->toArray(),
+            ...app(SignUpSettings::class)->toArray(),
         ]);
     }
 
@@ -156,6 +159,25 @@ class AppSettings extends Page implements HasForms
                                     Toggle::make('heads_up_enabled')->label('Heads Up enabled'),
                                 ]),
                         ]),
+                        Tab::make('Sign-ups')->schema([
+                            Section::make('Sign-up policy')
+                                ->description('Who can create a subscriber account.')
+                                ->schema([
+                                    Select::make('policy')
+                                        ->label('Policy')
+                                        ->native()
+                                        ->options(collect(SignUpPolicy::cases())->mapWithKeys(fn (SignUpPolicy $policy): array => [$policy->value => $policy->label()])->all())
+                                        ->in(array_column(SignUpPolicy::cases(), 'value'))
+                                        ->required()
+                                        ->live()
+                                        ->helperText(fn (Get $get): ?string => match ($get('policy')) {
+                                            SignUpPolicy::Open->value => 'Anyone can create an account.',
+                                            SignUpPolicy::InviteOnly->value => 'Sign-up needs a valid invite code, managed under Subscribers > Invite codes.',
+                                            SignUpPolicy::Closed->value => 'Only staff can create accounts, under Users.',
+                                            default => null,
+                                        }),
+                                ]),
+                        ]),
                         $this->integrationsTab(),
                         $this->secretsTab(),
                     ]),
@@ -174,9 +196,10 @@ class AppSettings extends Page implements HasForms
             }
 
             $emailSettingsBefore = $this->emailSettings();
+            $policyBefore = app(SignUpSettings::class)->policy;
 
             DB::transaction(function () use ($data): void {
-                foreach ([GeneralSettings::class, TierThresholdSettings::class, FeatureFlagsSettings::class, IntegrationSettings::class] as $class) {
+                foreach ([GeneralSettings::class, TierThresholdSettings::class, FeatureFlagsSettings::class, IntegrationSettings::class, SignUpSettings::class] as $class) {
                     $settings = app($class);
                     $settings->fill(Arr::only($data, array_keys($settings->toArray())));
                     $settings->save();
@@ -185,6 +208,15 @@ class AppSettings extends Page implements HasForms
                 $this->saveSecrets($data);
                 $this->saveMapTilesKey($data);
             });
+
+            $policyAfter = app(SignUpSettings::class)->policy;
+
+            if ($policyAfter !== $policyBefore) {
+                activity('settings')
+                    ->causedBy(auth()->user())
+                    ->withProperties(['from' => $policyBefore, 'to' => $policyAfter])
+                    ->log('Sign-up policy changed');
+            }
 
             if ($this->emailSettings() !== $emailSettingsBefore) {
                 $this->restartQueueWorkers();

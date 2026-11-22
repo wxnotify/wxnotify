@@ -3,8 +3,10 @@
 use App\Filament\Admin\Pages\AppSettings;
 use App\Models\User;
 use App\Settings\GeneralSettings;
+use App\Settings\SignUpSettings;
 use App\Settings\TierThresholdSettings;
 use Filament\Facades\Filament;
+use Spatie\Activitylog\Models\Activity;
 
 use function Pest\Livewire\livewire;
 
@@ -151,4 +153,35 @@ test('only staff can open the page', function () {
     expect(AppSettings::canAccess())->toBeFalse();
 
     livewire(AppSettings::class)->assertForbidden();
+});
+
+test('the sign-up policy defaults to open', function () {
+    livewire(AppSettings::class)->assertFormSet(['policy' => 'open']);
+});
+
+test('saving the sign-up policy stores it', function () {
+    livewire(AppSettings::class)
+        ->fillForm(['policy' => 'invite_only'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(app(SignUpSettings::class)->refresh()->policy)->toBe('invite_only');
+});
+
+test('changing the sign-up policy is written to the activity log', function () {
+    livewire(AppSettings::class)
+        ->fillForm(['policy' => 'closed'])
+        ->call('save');
+
+    $activity = Activity::query()->where('description', 'Sign-up policy changed')->sole();
+
+    expect($activity->log_name)->toBe('settings')
+        ->and($activity->properties['from'])->toBe('open')
+        ->and($activity->properties['to'])->toBe('closed');
+});
+
+test('saving without changing the sign-up policy writes no policy activity', function () {
+    livewire(AppSettings::class)->call('save');
+
+    expect(Activity::query()->where('description', 'Sign-up policy changed')->count())->toBe(0);
 });
