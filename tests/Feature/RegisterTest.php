@@ -1,12 +1,18 @@
 <?php
 
+use App\Actions\Account\SignUpGate;
+use App\Enums\SignUpRefusal;
 use App\Enums\Tier;
 use App\Filament\Dashboard\Pages\Auth\Register;
+use App\Models\InviteCode;
 use App\Models\User;
 use App\Notifications\PrefixedVerifyEmail;
+use App\Settings\SignUpSettings;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 
 use function Pest\Livewire\livewire;
 
@@ -210,3 +216,137 @@ test('the captcha still applies when only one turnstile key is set, so a half-co
 
     expect(User::where('email', 'jane@example.com')->exists())->toBeFalse();
 })->with(['only the site key' => ['site'], 'only the secret key' => ['secret']]);
+
+function setRegisterPolicy(string $policy): void
+{
+    $settings = app(SignUpSettings::class);
+    $settings->policy = $policy;
+    $settings->save();
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function registrationDetails(array $overrides = []): array
+{
+    return [
+        'name' => 'Jane Subscriber',
+        'email' => 'jane@example.com',
+        'password' => 'Sup3r$ecret!',
+        'passwordConfirmation' => 'Sup3r$ecret!',
+        'turnstile_token' => 'valid-token',
+        ...$overrides,
+    ];
+}
+
+test('the invite code field is hidden when sign-ups are open', function () {
+    livewire(Register::class)->assertFormFieldHidden('invite_code');
+});
+
+test('a closed policy sends visitors to the login page with the closed message', function () {
+    setRegisterPolicy('closed');
+
+    livewire(Register::class)
+        ->assertRedirect(Filament::getLoginUrl())
+        ->assertNotified(SignUpRefusal::Closed->message());
+});
+
+test('a form mounted while open is refused once the policy turns closed', function () {
+    fakeSuccessfulTurnstile();
+    $page = livewire(Register::class);
+    setRegisterPolicy('closed');
+
+    $page->fillForm(registrationDetails())
+        ->call('register')
+        ->assertHasFormErrors(['email']);
+
+    expect(User::where('email', 'jane@example.com')->exists())->toBeFalse();
+});
+
+test('invite only shows a required invite code field', function () {
+    setRegisterPolicy('invite_only');
+
+    livewire(Register::class)->assertFormFieldVisible('invite_code');
+
+    fakeSuccessfulTurnstile();
+    livewire(Register::class)
+        ->fillForm(registrationDetails(['invite_code' => '']))
+        ->call('register')
+        ->assertHasFormErrors(['invite_code' => 'required']);
+});
+
+test('a valid single-use code creates the account and is spent', function () {
+    setRegisterPolicy('invite_only');
+    fakeSuccessfulTurnstile();
+    $invite = InviteCode::factory()->create();
+
+    livewire(Register::class)
+        ->fillForm(registrationDetails(['invite_code' => $invite->code]))
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $user = User::where('email', 'jane@example.com')->sole();
+    expect($user->invite_code_id)->toBe($invite->id)
+        ->and($invite->refresh()->used_count)->toBe(1);
+});
+
+test('a code that cannot be used gives a code error and creates no user', function (string $state) {
+    setRegisterPolicy('invite_only');
+    fakeSuccessfulTurnstile();
+    $invite = InviteCode::factory()->{$state}()->create();
+
+    livewire(Register::class)
+        ->fillForm(registrationDetails(['invite_code' => $invite->code]))
+        ->call('register')
+        ->assertHasFormErrors(['invite_code']);
+
+    expect(User::where('email', 'jane@example.com')->exists())->toBeFalse();
+})->with(['expired', 'revoked', 'usedUp']);
+
+test('a code locked to another email gives the mismatch message', function () {
+    setRegisterPolicy('invite_only');
+    fakeSuccessfulTurnstile();
+    $invite = InviteCode::factory()->forEmail('someone@example.com')->create();
+
+    livewire(Register::class)
+        ->fillForm(registrationDetails(['invite_code' => $invite->code]))
+        ->call('register')
+        ->assertHasFormErrors(['invite_code'])
+        ->assertSee(SignUpRefusal::EmailMismatch->message());
+
+    expect(User::where('email', 'jane@example.com')->exists())->toBeFalse();
+});
+
+test('a code in the link prefills the field and is remembered when valid', function () {
+    setRegisterPolicy('invite_only');
+    $invite = InviteCode::factory()->create();
+
+    Livewire::withQueryParams(['code' => $invite->code])
+        ->test(Register::class)
+        ->assertFormSet(['invite_code' => $invite->code]);
+
+    expect(app(SignUpGate::class)->rememberedCode())->toBe(InviteCode::normalise($invite->code));
+});
+
+test('an invalid code in the link is prefilled but not remembered', function () {
+    setRegisterPolicy('invite_only');
+
+    Livewire::withQueryParams(['code' => 'ZZZZ-ZZZZ'])
+        ->test(Register::class)
+        ->assertFormSet(['invite_code' => 'ZZZZ-ZZZZ']);
+
+    expect(app(SignUpGate::class)->rememberedCode())->toBeNull();
+});
+
+test('the captcha still applies under invite only', function () {
+    setRegisterPolicy('invite_only');
+    Http::fake();
+    $invite = InviteCode::factory()->create();
+
+    livewire(Register::class)
+        ->fillForm(registrationDetails(['invite_code' => $invite->code, 'turnstile_token' => '']))
+        ->call('register')
+        ->assertHasFormErrors(['turnstile_token' => 'required']);
+
+    expect(User::where('email', 'jane@example.com')->exists())->toBeFalse();
+});

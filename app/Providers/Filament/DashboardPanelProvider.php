@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Actions\Support\GenerateChatwootIdentityHash;
 use App\Filament\Dashboard\Pages\Auth\EditProfile;
+use App\Filament\Dashboard\Pages\Auth\Login;
 use App\Filament\Dashboard\Pages\Auth\Register;
 use App\Filament\Dashboard\Widgets\AlertsByCategoryChart;
 use App\Filament\Dashboard\Widgets\AlertsPerDayChart;
@@ -69,7 +70,7 @@ class DashboardPanelProvider extends PanelProvider
                 'Support',
             ])
             ->databaseNotifications()
-            ->login()
+            ->login(Login::class)
             ->registration(Register::class)
             ->passwordReset()
             ->emailVerification()
