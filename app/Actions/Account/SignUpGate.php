@@ -19,9 +19,13 @@ class SignUpGate
 {
     private const SESSION_KEY = 'sign_up.pending_invite';
 
+    /**
+     * An unrecognised stored value fails closed: it can only come from a manual edit, and the owner
+     * was restricting sign-ups, so falling back to Open would defeat that.
+     */
     public function policy(): SignUpPolicy
     {
-        return SignUpPolicy::tryFrom(app(SignUpSettings::class)->policy) ?? SignUpPolicy::Open;
+        return SignUpPolicy::tryFrom(app(SignUpSettings::class)->policy) ?? SignUpPolicy::Closed;
     }
 
     /**

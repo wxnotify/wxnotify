@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Admin\Pages\AppSettings;
+use App\Filament\Admin\Resources\InviteCodes\InviteCodeResource;
 use App\Models\User;
 use App\Settings\GeneralSettings;
 use App\Settings\SignUpSettings;
@@ -185,3 +186,15 @@ test('saving without changing the sign-up policy writes no policy activity', fun
 
     expect(Activity::query()->where('description', 'Sign-up policy changed')->count())->toBe(0);
 });
+
+test('the sign-ups tab links to the invite codes page only under invite only', function (string $policy, bool $shown) {
+    $url = InviteCodeResource::getUrl();
+
+    $component = livewire(AppSettings::class)->fillForm(['policy' => $policy]);
+
+    $shown ? $component->assertSeeHtml($url) : $component->assertDontSeeHtml($url);
+})->with([
+    'invite only' => ['invite_only', true],
+    'open' => ['open', false],
+    'closed' => ['closed', false],
+]);

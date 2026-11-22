@@ -6,6 +6,7 @@ use App\Enums\InviteCodeStatus;
 use App\Models\InviteCode;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -78,12 +79,32 @@ class InviteCodesTable
                     ->label('Copy invite link')
                     ->icon(Heroicon::OutlinedLink)
                     ->color('gray')
-                    ->alpineClickHandler(fn (InviteCode $record): string => '
-                        window.navigator.clipboard.writeText('.Js::from($record->inviteUrl()).')
-                        $tooltip('.Js::from('Invite link copied').', {
-                            theme: $store.theme,
-                        })
-                    '),
+                    ->modalHeading('Invite link')
+                    ->modalDescription('Send this link to the person you are inviting.')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->fillForm(fn (InviteCode $record): array => ['url' => $record->inviteUrl()])
+                    ->schema([
+                        TextInput::make('url')
+                            ->label('Invite link')
+                            ->readOnly()
+                            ->extraInputAttributes(['x-on:focus' => '$el.select()']),
+                    ])
+                    ->extraModalFooterActions(fn (InviteCode $record): array => [
+                        Action::make('copyUrl')
+                            ->label('Copy')
+                            ->icon(Heroicon::OutlinedClipboard)
+                            ->color('gray')
+                            ->alpineClickHandler('
+                                if (navigator.clipboard?.writeText) {
+                                    navigator.clipboard.writeText('.Js::from($record->inviteUrl()).')
+                                } else {
+                                    const input = $el.closest(\'.fi-modal-window\')?.querySelector(\'input[readonly]\')
+                                    input?.select()
+                                    document.execCommand(\'copy\')
+                                }
+                            '),
+                    ]),
                 Action::make('revoke')
                     ->label('Revoke')
                     ->icon(Heroicon::OutlinedNoSymbol)

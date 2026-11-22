@@ -141,10 +141,33 @@ test('delete is refused when the code is spent after the table loaded', function
     expect(InviteCode::find($code->id))->not->toBeNull();
 });
 
-test('the copy link action hands the clipboard the invite url', function () {
+test('the copy link action is visible on every row', function () {
+    $codes = InviteCode::factory()->count(2)->create();
+
+    $component = livewire(ListInviteCodes::class);
+
+    foreach ($codes as $code) {
+        $component->assertActionVisible(TestAction::make('copyLink')->table($code));
+    }
+});
+
+test('the copy link action shows the invite url in a read-only field', function () {
     $code = InviteCode::factory()->create(['code' => 'ABCDEFGH']);
 
-    $html = html_entity_decode(livewire(ListInviteCodes::class)->html(), ENT_QUOTES);
+    livewire(ListInviteCodes::class)
+        ->mountAction(TestAction::make('copyLink')->table($code))
+        ->assertActionDataSet(['url' => $code->inviteUrl()])
+        ->assertMountedActionModalSee('readonly="readonly"', escape: false);
+});
 
-    expect($html)->toContain('window.navigator.clipboard.writeText('.Js::from($code->inviteUrl()).')');
+test('the copy button in the invite link modal hands the clipboard this rows url', function () {
+    $code = InviteCode::factory()->create(['code' => 'ABCDEFGH']);
+
+    $html = html_entity_decode(
+        livewire(ListInviteCodes::class)->mountAction(TestAction::make('copyLink')->table($code))->getMountedActionModalHtml(),
+        ENT_QUOTES,
+    );
+
+    expect($html)->toContain('navigator.clipboard?.writeText')
+        ->and($html)->toContain('navigator.clipboard.writeText('.Js::from($code->inviteUrl()).')');
 });

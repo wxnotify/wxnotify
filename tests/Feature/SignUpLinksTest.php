@@ -79,3 +79,16 @@ it('lets staff create a user and existing users sign in while closed', function 
 
     expect(auth()->id())->toBe($existing->id);
 });
+
+it('keeps the multi-factor subheading mid-challenge when sign-ups are closed', function () {
+    setLinksPolicy('closed');
+    Filament::setCurrentPanel('dashboard');
+
+    $component = livewire(Login::class)->instance();
+
+    expect($component->getSubheading())->toBeNull();
+
+    $component->userUndertakingMultiFactorAuthentication = 'encrypted-user-reference';
+
+    expect($component->getSubheading())->toBe(__('filament-panels::auth/pages/login.multi_factor.subheading'));
+});

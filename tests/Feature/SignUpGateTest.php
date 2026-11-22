@@ -195,3 +195,11 @@ it('remembers a pending invite as a normalised code', function () {
 
     expect($gate->rememberedCode())->toBeNull();
 });
+
+it('fails closed when the stored policy is not recognised', function () {
+    setSignUpPolicy('nonsense');
+    $gate = app(SignUpGate::class);
+
+    expect($gate->policy())->toBe(SignUpPolicy::Closed)
+        ->and($gate->check(null, 'a@b.test')->allowed)->toBeFalse();
+});

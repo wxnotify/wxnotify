@@ -6,6 +6,7 @@ use App\Actions\Pipeline\SendTestHeartbeatPing;
 use App\Enums\MapTileProvider;
 use App\Enums\Secret;
 use App\Enums\SignUpPolicy;
+use App\Filament\Admin\Resources\InviteCodes\InviteCodeResource;
 use App\Settings\FeatureFlagsSettings;
 use App\Settings\GeneralSettings;
 use App\Settings\IntegrationSettings;
@@ -38,6 +39,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\HtmlString;
 use Throwable;
 use UnitEnum;
 
@@ -176,6 +178,8 @@ class AppSettings extends Page implements HasForms
                                             SignUpPolicy::Closed->value => 'Only staff can create accounts, under Users.',
                                             default => null,
                                         }),
+                                    Text::make(fn (): HtmlString => new HtmlString('<a href="'.e(InviteCodeResource::getUrl()).'" class="text-primary-600 underline dark:text-primary-400">Manage invite codes</a>'))
+                                        ->visible(fn (Get $get): bool => $get('policy') === SignUpPolicy::InviteOnly->value),
                                 ]),
                         ]),
                         $this->integrationsTab(),

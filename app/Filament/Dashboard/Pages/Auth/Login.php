@@ -11,12 +11,12 @@ use Illuminate\Contracts\Support\Htmlable;
 class Login extends BaseLogin
 {
     /**
-     * Hides the "Register" link while sign-ups are closed.
+     * Hides the "Register" link while sign-ups are closed, but never during a multi-factor challenge.
      */
     #[Unexposed]
     public function getSubheading(): string|Htmlable|null
     {
-        if (app(SignUpGate::class)->policy() === SignUpPolicy::Closed) {
+        if (blank($this->userUndertakingMultiFactorAuthentication) && app(SignUpGate::class)->policy() === SignUpPolicy::Closed) {
             return null;
         }
 
