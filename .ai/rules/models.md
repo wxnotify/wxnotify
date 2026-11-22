@@ -46,3 +46,7 @@ Whether an event covers a place comes from `active_wwa_areas` (`ActiveWwa::areas
 
 ## Outlook run: maps expire after 30 days on READ, the payload stays
 OutlookReportRun::MAP_DAYS = 30. mapsExpired() (created_at <= now - 30 days) is computed on read in PresentAppOutlookReport and the map controller, so a missed prune never serves an expired map; outlook:prune-maps (daily) deletes outlook-maps/{batch_key}, nulls `maps` only if deleteDirectory() succeeded (the local disk has throw=false, so ALWAYS check put()/deleteDirectory() for false), and sweeps orphan folders left by user deletion (cascade removes rows, not files). The payload row lives as long as its delivery row: if delivery_logs pruning is ever added, it must take the stored run with it. Maps are served only through GET /api/v1/outlook-maps/{batchKey}/{key}, signed (1 hour) and throttled by the named limiter app-outlook-map; signed links are issued only in the owner's own alert detail.
+
+## An invite code's status is derived
+InviteCode::status() and its scopes are the one definition of active, used up, expired and revoked. Order: revoked, then expired (expiry equal to now counts as expired), then used up, then active.
+Status is never stored. used_count, revoked_at and created_by are written with forceFill/increment, not mass assignment.
