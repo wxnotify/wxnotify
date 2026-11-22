@@ -11,6 +11,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use STS\FilamentImpersonate\Actions\Impersonate;
 
 class UsersTable
@@ -18,6 +19,7 @@ class UsersTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('inviteCode'))
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
@@ -43,6 +45,12 @@ class UsersTable
                 TextColumn::make('notification_channels_count')
                     ->label('Channels')
                     ->counts('notificationChannels'),
+                TextColumn::make('joined_with')
+                    ->label('Joined with')
+                    ->state(fn (User $record): ?string => $record->inviteCode?->displayCode())
+                    ->fontFamily('mono')
+                    ->placeholder('-')
+                    ->toggleable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

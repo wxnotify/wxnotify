@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\Users\Schemas;
 
 use App\Enums\Tier;
+use App\Models\User;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -29,6 +30,13 @@ class UserForm
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->disabled(fn (?string $operation): bool => $operation !== 'create'),
+                TextInput::make('joined_with')
+                    ->label('Joined with')
+                    ->helperText('The invite code this subscriber signed up with.')
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->formatStateUsing(fn (?User $record): ?string => $record?->inviteCode?->displayCode())
+                    ->visible(fn (?User $record): bool => $record?->invite_code_id !== null),
                 Toggle::make('is_staff'),
                 Toggle::make('is_owner')
                     ->label('Owner')

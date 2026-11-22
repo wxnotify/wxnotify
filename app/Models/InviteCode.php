@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\InviteCodeStatus;
 use Database\Factories\InviteCodeFactory;
+use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -54,6 +55,14 @@ class InviteCode extends Model
         }
 
         return $this->code;
+    }
+
+    /**
+     * The link a staff member sends: the Register page with the code filled in.
+     */
+    public function inviteUrl(): string
+    {
+        return Filament::getPanel('dashboard')->getRegistrationUrl(['code' => $this->displayCode()]);
     }
 
     /**

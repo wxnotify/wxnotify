@@ -3,6 +3,7 @@
 use App\Filament\Admin\Resources\Users\Pages\EditUser;
 use App\Filament\Admin\Resources\Users\Pages\ListUsers;
 use App\Filament\Admin\Resources\Users\RelationManagers\LocationsRelationManager;
+use App\Models\InviteCode;
 use App\Models\Location;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -141,4 +142,27 @@ test('the users table shows which account is the fixture test account', function
         ->assertTableColumnExists('is_test_account')
         ->assertTableColumnStateSet('is_test_account', true, $fixture)
         ->assertTableColumnStateSet('is_test_account', false, $this->staff);
+});
+
+test('the users table shows the invite code a user joined with', function () {
+    $code = InviteCode::factory()->create(['code' => 'ABCDEFGH']);
+    $joined = User::factory()->create(['invite_code_id' => $code->id]);
+    $plain = User::factory()->create();
+
+    livewire(ListUsers::class)
+        ->assertTableColumnStateSet('joined_with', 'ABCD-EFGH', $joined)
+        ->assertTableColumnStateSet('joined_with', null, $plain);
+});
+
+test('the user edit form shows the invite code only when the user joined with one', function () {
+    $code = InviteCode::factory()->create(['code' => 'ABCDEFGH']);
+    $joined = User::factory()->create(['invite_code_id' => $code->id]);
+    $plain = User::factory()->create();
+
+    livewire(EditUser::class, ['record' => $joined->id])
+        ->assertFormFieldVisible('joined_with')
+        ->assertFormSet(['joined_with' => 'ABCD-EFGH']);
+
+    livewire(EditUser::class, ['record' => $plain->id])
+        ->assertFormFieldHidden('joined_with');
 });
