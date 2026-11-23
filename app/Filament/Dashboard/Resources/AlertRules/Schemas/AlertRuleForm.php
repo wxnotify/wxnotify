@@ -2,7 +2,6 @@
 
 namespace App\Filament\Dashboard\Resources\AlertRules\Schemas;
 
-use App\Actions\Alerts\SaveAlertRule;
 use App\Actions\Channels\DispatchChannelConfirmationCode;
 use App\Enums\AlertCategory;
 use App\Enums\MessageBodyStyle;
@@ -12,6 +11,7 @@ use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
 use App\Enums\Tier;
+use App\Exceptions\AlertRuleLimitReached;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\OutlookReportPreview;
 use App\Filament\Dashboard\Resources\AlertTemplates\Schemas\AlertTemplateForm;
 use App\Filament\Dashboard\Resources\Locations\Schemas\LocationForm;
@@ -91,11 +91,14 @@ class AlertRuleForm
     }
 
     /**
-     * The outlook report is a paid-tier feature: a Free subscriber sees it disabled.
+     * The Outlook Report option is disabled only when the subscriber cannot add one (a Free subscriber
+     * who already has one) and the rule being edited is not itself an Outlook Report.
      */
-    private static function isPaidOnlyForUser(?AlertCategory $category): bool
+    private static function isOutlookUnavailable(?AlertCategory $category, ?AlertRule $record): bool
     {
-        return $category === AlertCategory::OutlookReport && auth()->user()->tier() === Tier::Free;
+        return $category === AlertCategory::OutlookReport
+            && $record?->category !== AlertCategory::OutlookReport
+            && ! auth()->user()->canCreateOutlookReport();
     }
 
     protected static function categoryStep(): Step
@@ -105,14 +108,14 @@ class AlertRuleForm
                 Radio::make('category')
                     ->hiddenLabel()
                     ->options(collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [$c->value => $c->label()]))
-                    ->descriptions(fn (): array => collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [
-                        $c->value => self::isPaidOnlyForUser($c) ? $c->description().' '.SaveAlertRule::PAID_ONLY_MESSAGE : $c->description(),
+                    ->descriptions(fn (?AlertRule $record): array => collect(AlertCategory::cases())->mapWithKeys(fn (AlertCategory $c) => [
+                        $c->value => self::isOutlookUnavailable($c, $record) ? $c->description().' '.AlertRuleLimitReached::outlook()->getMessage() : $c->description(),
                     ])->all())
                     // A disabled option is also refused on the server (Radio's `in` rule lists only enabled options).
-                    ->disableOptionWhen(fn (string $value): bool => self::isPaidOnlyForUser(AlertCategory::tryFrom($value)))
-                    // ...so a downgraded owner saving a kept outlook report is told why, not "invalid".
+                    ->disableOptionWhen(fn (string $value, ?AlertRule $record): bool => self::isOutlookUnavailable(AlertCategory::tryFrom($value), $record))
+                    // ...so a forced pick of the disabled option is told why, not "invalid".
                     ->validationMessages([
-                        'in' => fn (?string $state): ?string => self::isPaidOnlyForUser(AlertCategory::tryFrom((string) $state)) ? SaveAlertRule::PAID_ONLY_MESSAGE : null,
+                        'in' => fn (?string $state, ?AlertRule $record): ?string => self::isOutlookUnavailable(AlertCategory::tryFrom((string) $state), $record) ? AlertRuleLimitReached::outlook()->getMessage() : null,
                     ])
                     ->required()
                     ->live()
@@ -467,10 +470,8 @@ class AlertRuleForm
     {
         return [
             // Collapsed, and the preview asks SPC nothing until it is opened (see OutlookReportPreview).
-            // Paid-only like the report itself; the widget refuses a Free subscriber on its own too.
             Section::make('Today\'s Report')
                 ->key('outlookReportPreview')
-                ->visible(fn (): bool => auth()->user()->tier() !== Tier::Free)
                 ->description('What the Full report would look like right now, for the locations ticked below.')
                 ->collapsed()
                 ->schema([

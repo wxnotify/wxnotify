@@ -62,7 +62,7 @@ function dorFiles(array $day1Cat = ['TSTM', 'SLGT'], string $day1Issued = '2026-
 }
 
 /**
- * A Plus-tier subscriber (the outlook report is a paid-tier feature) whose profile timezone is UTC unless given.
+ * A Plus-tier subscriber whose profile timezone is UTC unless given.
  */
 function dorPaid(string $timezone = 'UTC'): UserFactory
 {
@@ -424,32 +424,18 @@ test('no PWO catalog product means no active PWO', function () {
     expect(app(FindActivePwo::class)('2026-10-31T13:00:00Z'))->toBeNull();
 });
 
-test('a rule whose owner is on the Free tier is skipped without fetching or stamping', function () {
+test('a Free owner\'s due Outlook Report is sent and stamped', function () {
     Carbon::setTestNow('2026-10-31 14:30:00');
     Queue::fake([DeliverScheduledAlert::class]);
     Http::fake(dorFiles());
-    $free = User::factory()->create(['tier_override' => null]);
+    $free = User::factory()->create(['tier_override' => null, 'timezone' => 'UTC']);
     $rule = dorRule([], NotificationChannel::factory()->for($free)->create());
 
     $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
 
-    Queue::assertNothingPushed();
-    Http::assertNothingSent();
-    expect($rule->fresh()->last_scheduled_run_on)->toBeNull();
-});
-
-test('a Free-owned rule does not stop a paid rule in the same run', function () {
-    Carbon::setTestNow('2026-10-31 14:30:00');
-    Queue::fake([DeliverScheduledAlert::class]);
-    Http::fake(dorFiles());
-    $freeRule = dorRule([], NotificationChannel::factory()->for(User::factory())->create());
-    $paidRule = dorRule();
-
-    $this->artisan('alerts:dispatch-outlook-reports')->assertSuccessful();
-
     Queue::assertPushed(DeliverScheduledAlert::class, 1);
-    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->ruleId === $paidRule->id);
-    expect($freeRule->fresh()->last_scheduled_run_on)->toBeNull();
+    Queue::assertPushed(DeliverScheduledAlert::class, fn (DeliverScheduledAlert $job): bool => $job->ruleId === $rule->id);
+    expect($rule->fresh()->last_scheduled_run_on->toDateString())->toBe('2026-10-31');
 });
 
 test('a Brief rule sends the brief to every channel with no report, even to email', function () {

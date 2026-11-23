@@ -30,8 +30,6 @@
 >
     @if ($status === 'idle')
         <p class="text-sm text-gray-600 dark:text-gray-300">{{ "Loading today's report…" }}</p>
-    @elseif ($status === 'paid_only')
-        <p class="text-sm text-gray-600 dark:text-gray-300">{{ $message }}</p>
     @elseif ($status === 'unavailable')
         <p class="text-sm text-gray-600 dark:text-gray-300">{{ "SPC is unavailable right now, so today's report cannot be shown. Please try again in a few minutes." }}</p>
     @else

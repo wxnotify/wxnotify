@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Tier;
 use App\Models\DeliveryLog;
 use App\Models\OutlookReportRun;
 use App\Models\User;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\URL;
 beforeEach(function () {
     Storage::fake('local');
 
-    $this->user = User::factory()->create();
+    // Plus, so a test that stores two runs (each with its own outlook rule) stays within the Free one-report rule.
+    $this->user = User::factory()->create(['tier_override' => Tier::Plus]);
     $this->token = $this->user->createToken('iPhone', ['app'])->plainTextToken;
 });
 

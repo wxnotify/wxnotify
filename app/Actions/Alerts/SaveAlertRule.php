@@ -43,9 +43,6 @@ use Spatie\Activitylog\Support\CauserResolver;
  */
 class SaveAlertRule
 {
-    /** Still shown by AlertRuleForm and OutlookReportPreview; no longer used here (removed with those references). */
-    public const PAID_ONLY_MESSAGE = 'Available on paid plans.';
-
     /** The category-specific columns each category owns; every other one is cleared on save. */
     private const CATEGORY_COLUMNS = [
         'weather_alerts' => [],

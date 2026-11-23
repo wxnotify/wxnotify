@@ -154,19 +154,18 @@ test('an error while building the preview shows the friendly message and logs on
     Log::shouldHaveReceived('warning')->with('Outlook report preview failed', ['exception' => RuntimeException::class])->once();
 });
 
-test('a Free subscriber\'s preview never asks SPC and says the report is a paid feature', function () {
+test('a Free subscriber\'s preview works like anyone\'s', function () {
+    Carbon::setTestNow('2026-10-31 20:00:00 UTC');
     Http::fake(orpFiles());
     $this->user->forceFill(['tier_override' => null])->save();
 
     livewire(OutlookReportPreview::class)
         ->call('load', [(string) $this->home->id])
-        ->assertSeeText('Available on paid plans.')
-        ->assertDontSeeText('Day 1 -');
-
-    Http::assertNothingSent();
+        ->assertSeeText('Day 1 - 🟡 Slight')
+        ->assertSee('Home</td><td style="padding: 3px 8px 3px 0; white-space: nowrap;">🟡 Slight</td>', escape: false);
 });
 
-test('a downgraded owner editing a kept outlook report gets no preview section and no SPC request', function () {
+test('a Free owner editing their outlook report gets the preview section', function () {
     $this->seed(ProductCatalogSeeder::class);
     Http::fake(orpFiles());
     $rule = AlertRule::factory()->outlookReport()->for($this->user)->create();
@@ -174,7 +173,7 @@ test('a downgraded owner editing a kept outlook report gets no preview section a
     $this->user->forceFill(['tier_override' => null])->save();
 
     livewire(EditAlertRule::class, ['record' => $rule->id])
-        ->assertSchemaComponentHidden('outlookReportPreview');
+        ->assertSchemaComponentVisible('outlookReportPreview');
 
     Http::assertNothingSent();
 });

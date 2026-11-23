@@ -2,12 +2,10 @@
 
 namespace App\Filament\Dashboard\Resources\AlertRules\Widgets;
 
-use App\Actions\Alerts\SaveAlertRule;
 use App\Actions\Weather\BuildOutlookReport;
 use App\Actions\Weather\FetchSpcOutlooks;
 use App\Actions\Weather\FindActivePwo;
 use App\Actions\Weather\GetSpcOutlookGraphic;
-use App\Enums\Tier;
 use App\Models\IngestedProduct;
 use App\Support\OutlookReportPresenter;
 use App\Support\Timezones;
@@ -27,8 +25,6 @@ use Throwable;
  * for 2 minutes. The ticked ids come from the browser, so only the signed-in subscriber's own locations
  * with a fix are used. A failure never throws: it shows a friendly message and logs the class only.
  *
- * Paid-only like the report: a Free subscriber (a downgraded owner, or a category set client-side)
- * is never fetched for and sees SaveAlertRule::PAID_ONLY_MESSAGE; the form also hides the section.
  * The fetched outlooks (complete or not) and a failure are memoised for 60 s for every preview, so
  * an outage or a run of location ticks asks SPC at most once a minute; the dispatcher does not use
  * this memo.
@@ -72,10 +68,6 @@ class OutlookReportPreview extends Widget
     {
         if (! $this->isLoaded) {
             return ['status' => 'idle'];
-        }
-
-        if (auth()->user()->tier() === Tier::Free) {
-            return ['status' => 'paid_only', 'message' => SaveAlertRule::PAID_ONLY_MESSAGE];
         }
 
         try {

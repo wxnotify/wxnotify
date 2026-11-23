@@ -3,6 +3,7 @@
 use App\Enums\MessageBodyStyle;
 use App\Enums\OutlookReportMode;
 use App\Enums\Tier;
+use App\Exceptions\AlertRuleLimitReached;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\EditAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
@@ -135,17 +136,31 @@ test('an outlook report saved as Brief stores Brief', function () {
     expect(AlertRule::where('user_id', $this->user->id)->sole()->effectiveMessageBodyStyle())->toBe(MessageBodyStyle::Brief);
 });
 
-test('a Free subscriber sees the outlook report as a paid feature and cannot create one', function () {
+test('a Free subscriber can pick and create their first Outlook Report', function () {
     $this->user->forceFill(['tier_override' => null])->save();
 
     livewire(CreateAlertRule::class)
-        ->assertSee('Available on paid plans.')
+        ->assertDontSee(AlertRuleLimitReached::outlook()->getMessage())
+        ->set('data.category', 'outlook_report')
+        ->fillForm(['channel_ids' => [$this->channel->id]])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(AlertRule::where('user_id', $this->user->id)->sole()->category->value)->toBe('outlook_report');
+});
+
+test('a Free subscriber with one sees Outlook disabled with the reason', function () {
+    $this->user->forceFill(['tier_override' => null])->save();
+    AlertRule::factory()->outlookReport()->for($this->user)->create();
+
+    livewire(CreateAlertRule::class)
+        ->assertSee(AlertRuleLimitReached::outlook()->getMessage())
         ->set('data.category', 'outlook_report')
         ->fillForm(['channel_ids' => [$this->channel->id]])
         ->call('create')
         ->assertHasFormErrors(['category' => 'in']);
 
-    expect(AlertRule::where('user_id', $this->user->id)->exists())->toBeFalse();
+    expect(AlertRule::where('user_id', $this->user->id)->count())->toBe(1);
 });
 
 test('a Pro subscriber can create an outlook report', function () {
@@ -225,19 +240,18 @@ test('without a profile timezone the send time help says times are in UTC', func
         ->assertSee('The latest send time is 22:45, so that wait ends before midnight UTC.');
 });
 
-test('a downgraded owner saving a kept outlook report on Edit is told it is a paid feature', function () {
+test('a Free owner can edit their Outlook Report', function () {
     $rule = AlertRule::factory()->outlookReport()->for($this->user)->create(['name' => 'Chase report']);
     $rule->notificationChannels()->attach($this->channel);
     $this->user->forceFill(['tier_override' => null])->save();
 
     livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->assertDontSee(AlertRuleLimitReached::outlook()->getMessage())
         ->fillForm(['name' => 'Renamed'])
         ->call('save')
-        ->assertHasFormErrors(['category'])
-        ->assertSee('Available on paid plans.')
-        ->assertDontSee('The selected category is invalid.');
+        ->assertHasNoFormErrors();
 
-    expect($rule->fresh()->name)->toBe('Chase report');
+    expect($rule->fresh()->name)->toBe('Renamed');
 });
 
 test('a downgraded owner can still pause and delete a kept outlook report from the list', function () {
@@ -254,6 +268,8 @@ test('a downgraded owner can still pause and delete a kept outlook report from t
 });
 
 test('a SaveAlertRule refusal reached from the form is shown on the category field', function () {
-    expect(fn () => AlertRuleForm::saveForForm(fn () => throw ValidationException::withMessages(['category' => 'Available on paid plans.'])))
-        ->toThrow(fn (ValidationException $e) => expect($e->errors())->toBe(['data.category' => ['Available on paid plans.']]));
+    $message = AlertRuleLimitReached::limit(3)->getMessage();
+
+    expect(fn () => AlertRuleForm::saveForForm(fn () => throw ValidationException::withMessages(['category' => $message])))
+        ->toThrow(fn (ValidationException $e) => expect($e->errors())->toBe(['data.category' => [$message]]));
 });

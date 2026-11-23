@@ -8,7 +8,6 @@ use App\Actions\Weather\FindActivePwo;
 use App\Enums\AlertCategory;
 use App\Enums\MessageBodyStyle;
 use App\Enums\OutlookReportMode;
-use App\Enums\Tier;
 use App\Jobs\DeliverScheduledAlert;
 use App\Models\AlertRule;
 use App\Models\IngestedProduct;
@@ -26,8 +25,7 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Sends the daily Severe Weather Outlook Report, a paid-tier feature: rules of Free owners are skipped
- * (no fetch, no stamp). A Brief rule sends the Brief to every channel; otherwise rich channels also
+ * Sends the daily Severe Weather Outlook Report to every tier (a Free owner may have one). A Brief rule sends the Brief to every channel; otherwise rich channels also
  * get the Full report. Runs every 15 minutes (see bootstrap/app.php); each
  * rule sends at most once per local day at or after its send time, both in the rule owner's timezone
  * (Timezones::forRule(): the profile timezone, else UTC), tracked by last_scheduled_run_on (the local
@@ -67,8 +65,7 @@ class DispatchOutlookReports extends Command
             ->with(['user', 'locations', 'notificationChannels'])
             ->orderBy('id')
             ->get()
-            // Paid-only: a rule kept after its owner moved to Free stays, unstamped, and sends nothing.
-            ->filter(fn (AlertRule $rule): bool => $rule->user->tier() !== Tier::Free && $this->isDue($rule, $now));
+            ->filter(fn (AlertRule $rule): bool => $this->isDue($rule, $now));
 
         if ($rules->isEmpty()) {
             $this->info('No outlook reports due.');
