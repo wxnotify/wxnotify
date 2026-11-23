@@ -17,6 +17,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\TimePicker;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 use function Pest\Livewire\livewire;
@@ -272,4 +273,28 @@ test('a SaveAlertRule refusal reached from the form is shown on the category fie
 
     expect(fn () => AlertRuleForm::saveForForm(fn () => throw ValidationException::withMessages(['category' => $message])))
         ->toThrow(fn (ValidationException $e) => expect($e->errors())->toBe(['data.category' => [$message]]));
+});
+
+test('a switch to Outlook that races past the check ends in a notification and no change', function () {
+    $this->user->forceFill(['tier_override' => null])->save();
+    $rule = AlertRule::factory()->for($this->user)->create();
+    $rule->notificationChannels()->attach($this->channel);
+    $template = AlertRule::factory()->outlookReport()->for($this->user)->make()->getAttributes();
+
+    $filled = false;
+    AlertRule::saving(function () use (&$filled, $template): void {
+        if ($filled) {
+            return;
+        }
+        $filled = true;
+        DB::table('alert_rules')->insert(array_merge($template, ['created_at' => now(), 'updated_at' => now()]));
+    });
+
+    livewire(EditAlertRule::class, ['record' => $rule->id])
+        ->set('data.category', 'outlook_report')
+        ->call('save')
+        ->assertNotified('Alert limit reached');
+
+    expect($rule->fresh()->category->value)->not->toBe('outlook_report')
+        ->and(AlertRule::where('user_id', $this->user->id)->where('category', 'outlook_report')->count())->toBe(1);
 });

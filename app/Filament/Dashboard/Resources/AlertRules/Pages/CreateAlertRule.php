@@ -12,7 +12,6 @@ use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 
 class CreateAlertRule extends CreateRecord
 {
@@ -54,9 +53,7 @@ class CreateAlertRule extends CreateRecord
             return;
         }
 
-        $limit = $user->alertRuleLimit();
-
-        $this->refuse("You've reached your plan's limit of {$limit} ".Str::plural('alert', $limit).'. Remove one or upgrade to add more.');
+        $this->refuse(AlertRuleLimitReached::limit($user->alertRuleLimit())->getMessage());
     }
 
     /**

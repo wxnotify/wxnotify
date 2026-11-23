@@ -68,10 +68,14 @@ class SaveAlertRule
         return app(CauserResolver::class)->withCauser($user, fn (): AlertRule => DB::transaction(function () use ($user, $data, $rule): AlertRule {
             $attributes = $this->attributes($user, $data, $rule);
 
-            if ($rule === null) {
-                $rule = AlertRule::create($attributes);
-            } else {
-                $rule->update($attributes);
+            try {
+                if ($rule === null) {
+                    $rule = AlertRule::create($attributes);
+                } else {
+                    $rule->update($attributes);
+                }
+            } catch (AlertRuleLimitReached $exception) {
+                throw ValidationException::withMessages(['category' => $exception->getMessage()]);
             }
 
             $this->syncRelations($rule, $data);

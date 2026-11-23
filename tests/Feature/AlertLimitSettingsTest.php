@@ -85,4 +85,11 @@ describe('App settings page', function () {
             ->call('save')
             ->assertHasFormErrors(['plus_alerts']);
     });
+
+    test('rejects Pro below Plus', function () {
+        livewire(AppSettings::class)
+            ->fillForm(['plus_alerts' => 8, 'pro_alerts' => 7])
+            ->call('save')
+            ->assertHasFormErrors(['pro_alerts']);
+    });
 });

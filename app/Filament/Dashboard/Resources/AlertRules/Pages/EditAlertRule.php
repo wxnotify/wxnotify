@@ -4,6 +4,7 @@ namespace App\Filament\Dashboard\Resources\AlertRules\Pages;
 
 use App\Actions\Alerts\SaveAlertRule;
 use App\Enums\AlertCategory;
+use App\Exceptions\AlertRuleLimitReached;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\ProductMatchingTable;
@@ -11,9 +12,11 @@ use App\Support\AlertRuleFormUnits;
 use App\Support\SpcWpcRiskLevels;
 use App\Support\Units;
 use Filament\Actions\DeleteAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\EditRecord\Concerns\HasWizard;
 use Filament\Schemas\Components\Wizard\Step;
+use Illuminate\Database\Eloquent\Model;
 
 class EditAlertRule extends EditRecord
 {
@@ -88,6 +91,27 @@ class EditAlertRule extends EditRecord
         $this->saveInput = ProductMatchingTable::toSaveInput($data, auth()->user());
 
         return AlertRuleForm::saveForForm(fn (): array => app(SaveAlertRule::class)->attributes(auth()->user(), $this->saveInput, $this->record));
+    }
+
+    /**
+     * The model's own guard is the authority: a switch to an Outlook Report that races past the
+     * early check ends in a notification, not a 500.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        try {
+            return parent::handleRecordUpdate($record, $data);
+        } catch (AlertRuleLimitReached $exception) {
+            Notification::make()
+                ->title('Alert limit reached')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            $this->halt();
+        }
     }
 
     protected function afterSave(): void

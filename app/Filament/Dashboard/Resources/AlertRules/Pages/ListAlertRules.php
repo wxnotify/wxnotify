@@ -2,6 +2,7 @@
 
 namespace App\Filament\Dashboard\Resources\AlertRules\Pages;
 
+use App\Exceptions\AlertRuleLimitReached;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\ActiveNowWidget;
 use App\Filament\Dashboard\Resources\AlertRules\Widgets\AlertStatsWidget;
@@ -30,9 +31,7 @@ class ListAlertRules extends ListRecords
                         return null;
                     }
 
-                    $limit = $user->alertRuleLimit();
-
-                    return "You've reached your plan's limit of {$limit} ".Str::plural('alert', $limit).' — remove one or upgrade to add more.';
+                    return AlertRuleLimitReached::limit($user->alertRuleLimit())->getMessage();
                 }),
         ];
     }

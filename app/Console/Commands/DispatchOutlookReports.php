@@ -25,8 +25,9 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Sends the daily Severe Weather Outlook Report to every tier (a Free owner may have one). A Brief rule sends the Brief to every channel; otherwise rich channels also
- * get the Full report. Runs every 15 minutes (see bootstrap/app.php); each
+ * Sends the daily Severe Weather Outlook Report to every tier (a Free owner may have one). A
+ * Brief rule sends the Brief to every channel; otherwise rich channels also get the Full report.
+ * Runs every 15 minutes (see bootstrap/app.php); each
  * rule sends at most once per local day at or after its send time, both in the rule owner's timezone
  * (Timezones::forRule(): the profile timezone, else UTC), tracked by last_scheduled_run_on (the local
  * date), like DispatchScheduledAlerts. The grace and Day 1's expected cycle compare instants.

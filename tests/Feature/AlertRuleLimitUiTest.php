@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Tier;
+use App\Exceptions\AlertRuleLimitReached;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\CreateAlertRule;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Models\AlertRule;
@@ -47,7 +48,9 @@ test('the New Alert button is disabled at the limit and enabled under it', funct
 
     AlertRule::factory()->for($this->user)->create(['is_active' => false]);
 
-    livewire(ListAlertRules::class)->assertActionDisabled('create');
+    $page = livewire(ListAlertRules::class)->assertActionDisabled('create');
+
+    expect($page->instance()->getAction('create')->getTooltip())->toBe(AlertRuleLimitReached::limit(2)->getMessage());
 });
 
 test('the list page says how many alerts are used, paused ones included', function () {

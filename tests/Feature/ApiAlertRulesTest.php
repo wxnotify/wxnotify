@@ -732,3 +732,26 @@ test('a downgraded owner reads a null subject but a save keeps the stored produc
     ruleCall($this, 'PUT', "/api/v1/alert-rules/{$id}", $flat)->assertOk();
     expect($stored())->toBe($expected);
 });
+
+test('a create that races past the limit check is a 422 on category, not a 500', function () {
+    $settings = app(TierThresholdSettings::class);
+    $settings->free_alerts = 1;
+    $settings->save();
+    $this->user->forceFill(['tier_override' => Tier::Free])->save();
+
+    $template = AlertRule::factory()->for($this->user)->make()->getAttributes();
+    $filled = false;
+    AlertRule::saving(function () use (&$filled, $template): void {
+        if ($filled) {
+            return;
+        }
+        $filled = true;
+        DB::table('alert_rules')->insert(array_merge($template, ['created_at' => now(), 'updated_at' => now()]));
+    });
+
+    ruleCall($this, 'POST', '/api/v1/alert-rules', validRule($this, 'threshold'))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['category']);
+
+    expect($this->user->alertRules()->count())->toBeLessThanOrEqual(1);
+});
