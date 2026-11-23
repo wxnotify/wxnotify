@@ -50,3 +50,6 @@ OutlookReportRun::MAP_DAYS = 30. mapsExpired() (created_at <= now - 30 days) is 
 ## An invite code's status is derived
 InviteCode::status() and its scopes are the one definition of active, used up, expired and revoked. Order: revoked, then expired (expiry equal to now counts as expired), then used up, then active.
 Status is never stored. used_count, revoked_at and created_by are written with forceFill/increment, not mass assignment.
+
+## Alert limits are enforced in AlertRule's creating/updating hooks
+The per-tier alert-rule limit (User::alertRuleLimit(), settings free_alerts/plus_alerts/pro_alerts) and the Free one-Outlook-Report cap are enforced in AlertRule's `creating` and `updating` hooks, which lock the owner row (lockForUpdate) before counting and throw AlertRuleLimitReached. Paused rules count toward the limit. Only creating (or switching a category to outlook_report) is refused: editing, pausing and deleting an existing alert is never blocked, so a subscriber over the limit keeps everything. SaveAlertRule::attributes() raises the friendly ValidationException first, and CreateAlertRule::beforeValidate() / handleRecordCreation() turn the model's exception into a notification; keep all of them in step. Any new path that creates AlertRule rows must go through the model (no DB::table inserts) or it bypasses the limit.
