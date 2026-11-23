@@ -6,9 +6,12 @@ use App\Filament\Admin\Widgets\AdminStatsOverview;
 use App\Filament\Admin\Widgets\AlertRulesByCategoryChart;
 use App\Filament\Admin\Widgets\DeliveriesPerDayChart;
 use App\Models\User;
+use App\Support\Filament\RecoverableAppAuthentication;
+use App\Support\Filament\RecoverablePasskeyAuthentication;
 use Bityukov\CommandCenter\Filament\CommandCenterPlugin;
 use CerealKiller97\FilamentBugReports\BugReportsPlugin;
 // use EightCedars\FilamentInactivityGuard\FilamentInactivityGuardPlugin;
+use Filament\Auth\Pages\EditProfile;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -39,6 +42,12 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->profile(EditProfile::class)
+            // The same second factors, and the same shared recovery codes, as the dashboard panel.
+            ->multiFactorAuthentication([
+                RecoverableAppAuthentication::make()->recoverable(),
+                RecoverablePasskeyAuthentication::make(),
+            ])
             ->colors([
                 'primary' => Color::Teal,
             ])
