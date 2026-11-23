@@ -210,17 +210,20 @@ test('switching a product rule to an outlook report drops its products and keeps
         ->and($rule->locations->pluck('id')->all())->toBe([$mine->id]);
 });
 
-test('SaveAlertRule refuses an outlook report for a Free subscriber, creating or saving', function () {
+test('SaveAlertRule saves a Free subscriber\'s first outlook report and refuses a second', function () {
     $user = User::factory()->create(['tier_override' => null]);
     $channel = NotificationChannel::factory()->for($user)->create();
     $input = ['category' => 'outlook_report', 'delivery_time' => '14:30', 'report_mode' => 'every_day', 'channel_ids' => [$channel->id]];
 
-    expect(fn () => (new SaveAlertRule)($user, $input))->toThrow(ValidationException::class, 'Available on paid plans.');
-    expect(AlertRule::count())->toBe(0);
+    $first = (new SaveAlertRule)($user, $input);
+    expect($first->category)->toBe(AlertCategory::OutlookReport);
 
-    $stored = AlertRule::factory()->outlookReport()->for($user)->create();
-    expect(fn () => (new SaveAlertRule)($user, ['name' => 'Renamed'], $stored))->toThrow(ValidationException::class);
-    expect($stored->fresh()->name)->not->toBe('Renamed');
+    expect(fn () => (new SaveAlertRule)($user, $input))
+        ->toThrow(ValidationException::class, 'Your plan includes one Severe Weather Outlook Report, and you already have one.');
+    expect(AlertRule::count())->toBe(1);
+
+    $renamed = (new SaveAlertRule)($user, ['name' => 'Renamed'], $first);
+    expect($renamed->name)->toBe('Renamed');
 });
 
 test('SaveAlertRule saves an outlook report for Plus and Pro subscribers', function (Tier $tier) {

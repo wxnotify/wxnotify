@@ -4,11 +4,15 @@ use App\Actions\Alerts\GetAlertStats;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
 use App\Models\User;
+use App\Settings\TierThresholdSettings;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     Carbon::setTestNow('2026-10-03 12:00:00');
+    $settings = app(TierThresholdSettings::class);
+    $settings->free_alerts = 50; // these fixtures hold more alerts than the plan limit
+    $settings->save();
     $this->user = User::factory()->create();
 });
 

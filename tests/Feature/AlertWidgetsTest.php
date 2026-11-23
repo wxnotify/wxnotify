@@ -13,6 +13,7 @@ use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
+use App\Settings\TierThresholdSettings;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -23,6 +24,9 @@ use function Pest\Livewire\livewire;
 beforeEach(function () {
     Filament::setCurrentPanel('dashboard');
     Carbon::setTestNow('2026-10-03 12:00:00');
+    $settings = app(TierThresholdSettings::class);
+    $settings->free_alerts = 50; // these fixtures hold more alerts than the plan limit
+    $settings->save();
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
 });

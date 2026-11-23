@@ -1,12 +1,14 @@
 <?php
 
 use App\Enums\MatchingMode;
+use App\Enums\Tier;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Models\AlertRule;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
+use App\Settings\TierThresholdSettings;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 
@@ -14,6 +16,9 @@ use function Pest\Livewire\livewire;
 
 beforeEach(function () {
     Filament::setCurrentPanel('dashboard');
+    $settings = app(TierThresholdSettings::class);
+    $settings->free_alerts = 50; // these fixtures hold more alerts than the plan limit
+    $settings->save();
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
 });
@@ -100,6 +105,7 @@ test('scheduled alerts show their single location', function () {
 });
 
 test('an outlook report lists its chosen locations, or US-wide when it has none', function () {
+    $this->user->forceFill(['tier_override' => Tier::Plus])->save();
     $home = Location::factory()->for($this->user)->create(['label' => 'Home']);
     $cabin = Location::factory()->for($this->user)->create(['label' => 'Cabin']);
     $chosen = AlertRule::factory()->outlookReport()->for($this->user)->locations($home, $cabin)->create();

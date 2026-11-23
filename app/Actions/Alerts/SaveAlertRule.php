@@ -6,6 +6,7 @@ use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
 use App\Enums\MessageBodyStyle;
 use App\Enums\Tier;
+use App\Exceptions\AlertRuleLimitReached;
 use App\Models\AlertRule;
 use App\Models\Product;
 use App\Models\User;
@@ -34,13 +35,15 @@ use Spatie\Activitylog\Support\CauserResolver;
  * limited to the levels that product offers; the rule's own `risk_levels` holds their union for
  * older readers. An outlook report keeps its `delivery_time`, `report_mode` and an owner-scoped
  * `alert_rule_location` pivot from `location_ids`; every other category clears `report_mode` and
- * that pivot. An outlook report is paid-only: creating or saving one for a Free subscriber throws a
- * ValidationException on `category`. A stored product-based rule saved with neither key keeps its
- * products, their settings and its product-based columns as stored.
+ * that pivot. Creating a rule at the owner's plan limit, or giving a Free owner a second outlook
+ * report (by creating one or switching another rule to it), throws a ValidationException on
+ * `category` (AlertRule's own hooks refuse the same on every other path). A stored product-based
+ * rule saved with neither key keeps its products, their settings and its product-based columns as
+ * stored.
  */
 class SaveAlertRule
 {
-    /** Why a Free subscriber cannot choose a paid-only category (the outlook report); the form shows it too. */
+    /** Still shown by AlertRuleForm and OutlookReportPreview; no longer used here (removed with those references). */
     public const PAID_ONLY_MESSAGE = 'Available on paid plans.';
 
     /** The category-specific columns each category owns; every other one is cleared on save. */
@@ -91,8 +94,14 @@ class SaveAlertRule
     {
         $category = AlertCategory::from((string) ($data['category'] ?? $stored?->category?->value));
 
-        if ($category === AlertCategory::OutlookReport && $user->tier() === Tier::Free) {
-            throw ValidationException::withMessages(['category' => self::PAID_ONLY_MESSAGE]);
+        if ($stored === null && ! $user->canCreateAlertRule()) {
+            throw ValidationException::withMessages(['category' => AlertRuleLimitReached::limit($user->alertRuleLimit())->getMessage()]);
+        }
+
+        if ($category === AlertCategory::OutlookReport
+            && ($stored === null || $stored->category !== AlertCategory::OutlookReport)
+            && ! $user->canCreateOutlookReport()) {
+            throw ValidationException::withMessages(['category' => AlertRuleLimitReached::outlook()->getMessage()]);
         }
 
         $owned = self::CATEGORY_COLUMNS[$category->value];

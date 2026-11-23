@@ -7,6 +7,7 @@ use App\Models\DeliveryLog;
 use App\Models\Location;
 use App\Models\NotificationChannel;
 use App\Models\User;
+use App\Settings\TierThresholdSettings;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
@@ -15,6 +16,9 @@ use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     Carbon::setTestNow('2026-10-03 12:00:00');
+    $settings = app(TierThresholdSettings::class);
+    $settings->free_alerts = 50; // these fixtures hold more alerts than the plan limit
+    $settings->save();
     $this->user = User::factory()->create();
 });
 

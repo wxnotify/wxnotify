@@ -11,6 +11,7 @@ use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
 use App\Enums\Tier;
 use App\Enums\UnitSystem;
+use App\Exceptions\AlertRuleLimitReached;
 use App\Models\Concerns\BlockedDuringMaintenance;
 use App\Support\ProductMatchSettings;
 use App\Support\SpcWpcRiskLevels;
@@ -65,10 +66,21 @@ class AlertRule extends Model
      *
      * A new time that has already passed today is deliberately left alone:
      * clearing the stamp then would re-send immediately and retroactively.
+     *
+     * The plan's limits are enforced here for every path (dashboard, API, factories): creating
+     * is refused at the alert limit, and a Free owner's second Outlook Report is refused whether
+     * created or switched to. An owner already over the limit keeps every alert and may still
+     * edit, pause and delete them.
      */
     protected static function booted(): void
     {
+        static::creating(function (AlertRule $rule): void {
+            $rule->guardPlanLimits(creating: true);
+        });
+
         static::updating(function (AlertRule $rule): void {
+            $rule->guardPlanLimits(creating: false);
+
             if ($rule->last_scheduled_run_on === null
                 || $rule->isDirty('last_scheduled_run_on')
                 || ! $rule->deliveryTimeChanged()) {
@@ -81,6 +93,36 @@ class AlertRule extends Model
                 $rule->last_scheduled_run_on = null;
             }
         });
+    }
+
+    /**
+     * Locks the owner's row first (the dashboard pages and SaveAlertRule run in a transaction),
+     * so two saves racing for the last slot are counted one after the other.
+     *
+     * @throws AlertRuleLimitReached
+     */
+    private function guardPlanLimits(bool $creating): void
+    {
+        $becomesOutlookReport = $this->category === AlertCategory::OutlookReport
+            && ($creating || $this->getOriginal('category') !== AlertCategory::OutlookReport);
+
+        if ((! $creating && ! $becomesOutlookReport) || $this->user_id === null) {
+            return;
+        }
+
+        $owner = User::query()->whereKey($this->user_id)->lockForUpdate()->first();
+
+        if ($owner === null) {
+            return;
+        }
+
+        if ($creating && ! $owner->canCreateAlertRule()) {
+            throw AlertRuleLimitReached::limit($owner->alertRuleLimit());
+        }
+
+        if ($becomesOutlookReport && ! $owner->canCreateOutlookReport()) {
+            throw AlertRuleLimitReached::outlook();
+        }
     }
 
     /**

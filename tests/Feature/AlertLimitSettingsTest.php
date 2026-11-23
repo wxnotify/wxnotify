@@ -38,7 +38,12 @@ test('paused alerts count toward the limit', function () {
 
 test('a Free user over the limit cannot create and has room again once under it', function () {
     $user = userOnTier(Tier::Free);
+    $settings = app(TierThresholdSettings::class);
+    $settings->free_alerts = 7;
+    $settings->save();
     $rules = AlertRule::factory()->count(7)->create(['user_id' => $user->id]);
+    $settings->free_alerts = 3;
+    $settings->save();
 
     expect($user->canCreateAlertRule())->toBeFalse();
 
