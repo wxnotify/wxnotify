@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AlertCategory;
 use App\Enums\Tier;
 use App\Enums\UnitSystem;
 use App\Models\ChannelType as ChannelTypeModel;
@@ -118,6 +119,38 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $limit = $this->locationLimit();
 
         return $limit === null || $this->locations()->notPhoneApp()->count() < $limit;
+    }
+
+    /**
+     * Maximum number of alert rules, paused ones included, this user's tier allows.
+     */
+    public function alertRuleLimit(): int
+    {
+        $limits = app(TierThresholdSettings::class);
+
+        return match ($this->tier()) {
+            Tier::Free => $limits->free_alerts,
+            Tier::Plus => $limits->plus_alerts,
+            Tier::Pro => $limits->pro_alerts,
+        };
+    }
+
+    public function canCreateAlertRule(): bool
+    {
+        return $this->alertRules()->count() < $this->alertRuleLimit();
+    }
+
+    /**
+     * Plus and Pro may have any number of Outlook Reports (within the alert limit);
+     * Free may have one.
+     */
+    public function canCreateOutlookReport(): bool
+    {
+        if ($this->tier() !== Tier::Free) {
+            return true;
+        }
+
+        return ! $this->alertRules()->where('category', AlertCategory::OutlookReport)->exists();
     }
 
     /**

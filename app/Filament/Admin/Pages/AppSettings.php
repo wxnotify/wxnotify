@@ -136,6 +136,11 @@ class AppSettings extends Page implements HasForms
                                 $this->count('free_phone_locations', 'Free phone locations', 1, 10),
                                 $this->count('plus_phone_locations', 'Plus phone locations', 1, 100)->gte('free_phone_locations'),
                             ])->description('Phones signed in to the WxNotify app and sharing their location, counted apart from the locations above. Pro phone locations are unlimited.'),
+                            Section::make('Alerts')->columns(3)->schema([
+                                $this->count('free_alerts', 'Free', 1, 100),
+                                $this->count('plus_alerts', 'Plus', 1, 100)->gte('free_alerts'),
+                                $this->count('pro_alerts', 'Pro', 1, 100)->gte('plus_alerts'),
+                            ])->description('How many alert rules each plan can have. A Free plan can have at most one Severe Weather Outlook Report, which counts toward its limit.'),
                             Section::make('Notification channels')->schema([
                                 $this->count('free_no_cost_channels', 'Free no-cost channels', 0, 5),
                             ])->description('Email is unlimited at every tier; Plus and Pro have no channel limit.'),

@@ -14,6 +14,12 @@ class TierThresholdSettings extends Settings
 
     public int $plus_phone_locations;
 
+    public int $free_alerts;
+
+    public int $plus_alerts;
+
+    public int $pro_alerts;
+
     public int $free_no_cost_channels;
 
     public int $free_traccar_servers;
