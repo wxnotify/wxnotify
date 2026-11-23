@@ -285,7 +285,7 @@ What is different with images:
 
 It does not change sign-up: email verification applies in both modes, and the Turnstile captcha is used in both whenever its keys are set.
 
-**Tiers.** Every account is on the **Free** tier, with its limits (for example, the Severe Weather Outlook report is for paid tiers), unless an owner or staff member gives it another one: **Admin > Users**, edit the user, choose **Tier override** (Plus or Pro) and write a **Reason** (required). Clearing the override puts the account back on Free. There is no other way to change a tier on a self-hosted instance.
+**Tiers.** Every account is on the **Free** tier, with its limits (by default 3 alerts on Free, 5 on Plus and 10 on Pro, and one Severe Weather Outlook Report on Free; change the numbers under **Admin > App settings > Tier & threshold defaults**), unless an owner or staff member gives it another one: **Admin > Users**, edit the user, choose **Tier override** (Plus or Pro) and write a **Reason** (required). Clearing the override puts the account back on Free. There is no other way to change a tier on a self-hosted instance.
 
 ## Backups and day-to-day operation
 
