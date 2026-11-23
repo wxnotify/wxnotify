@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -12,7 +13,7 @@ class AlertRuleLimitReached extends RuntimeException
 {
     public static function limit(int $limit): self
     {
-        return new self("You have reached your plan's limit of {$limit} alerts. Remove one or upgrade to add more.");
+        return new self("You have reached your plan's limit of {$limit} ".Str::plural('alert', $limit).'. Remove one or upgrade to add more.');
     }
 
     public static function outlook(): self

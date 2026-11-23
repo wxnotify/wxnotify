@@ -3,12 +3,16 @@
 namespace App\Filament\Dashboard\Resources\AlertRules\Pages;
 
 use App\Actions\Alerts\SaveAlertRule;
+use App\Exceptions\AlertRuleLimitReached;
 use App\Filament\Dashboard\Resources\AlertRules\AlertRuleResource;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\AlertRuleForm;
 use App\Filament\Dashboard\Resources\AlertRules\Schemas\ProductMatchingTable;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
 use Filament\Schemas\Components\Wizard\Step;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class CreateAlertRule extends CreateRecord
 {
@@ -37,6 +41,48 @@ class CreateAlertRule extends CreateRecord
     public function getSteps(): array
     {
         return AlertRuleForm::steps();
+    }
+
+    /**
+     * Refuses before validating, at the plan's alert limit, the way CreateLocation does.
+     */
+    protected function beforeValidate(): void
+    {
+        $user = auth()->user();
+
+        if ($user->canCreateAlertRule()) {
+            return;
+        }
+
+        $limit = $user->alertRuleLimit();
+
+        $this->refuse("You've reached your plan's limit of {$limit} ".Str::plural('alert', $limit).'. Remove one or upgrade to add more.');
+    }
+
+    /**
+     * The model's own guard is the authority: a save that races past the early check ends in a
+     * notification, not a 500.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function handleRecordCreation(array $data): Model
+    {
+        try {
+            return parent::handleRecordCreation($data);
+        } catch (AlertRuleLimitReached $exception) {
+            $this->refuse($exception->getMessage());
+        }
+    }
+
+    protected function refuse(string $message): never
+    {
+        Notification::make()
+            ->title('Alert limit reached')
+            ->body($message)
+            ->danger()
+            ->send();
+
+        $this->halt();
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array

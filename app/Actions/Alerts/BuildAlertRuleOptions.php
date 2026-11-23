@@ -92,6 +92,10 @@ class BuildAlertRuleOptions
             ],
             'locations' => $user->locations()->orderBy('label')->orderBy('id')->get(['id', 'label'])
                 ->map(fn ($location): array => ['id' => $location->id, 'label' => $location->label])->all(),
+            'alert_limit' => $user->alertRuleLimit(),
+            'alert_count' => $user->alertRules()->count(),
+            'can_create_alert' => $user->canCreateAlertRule(),
+            'can_create_outlook_report' => $user->canCreateAlertRule() && $user->canCreateOutlookReport(),
             'can_create_location' => $user->canCreateLocation(),
             'can_share_phone_location' => $user->canCreatePhoneLocation(),
         ];

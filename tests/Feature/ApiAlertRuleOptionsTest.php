@@ -3,6 +3,7 @@
 use App\Enums\AlertCategory;
 use App\Enums\Tier;
 use App\Enums\UnitSystem;
+use App\Models\AlertRule;
 use App\Models\AlertTemplate;
 use App\Models\Location;
 use App\Models\NotificationChannel;
@@ -156,4 +157,36 @@ test('every product carries the modes its row offers and its default mode', func
         ->and($find('spc_wpc', $plain)['default_mode'])->toBe('polygon')
         ->and($find('spc_wpc', $noPolygonSpc)['modes'])->toBe(['nationwide'])
         ->and($find('spc_wpc', $noPolygonSpc)['default_mode'])->toBe('nationwide');
+});
+
+test('it reports the alert limit, the count and whether another alert or Outlook Report can be created', function () {
+    $limits = app(TierThresholdSettings::class);
+    $limits->free_alerts = 3;
+    $limits->save();
+
+    $data = optionsCall($this)->json('data');
+    expect([$data['alert_limit'], $data['alert_count'], $data['can_create_alert'], $data['can_create_outlook_report']])->toBe([3, 0, true, true]);
+
+    AlertRule::factory()->for($this->user)->create(['category' => AlertCategory::OutlookReport]);
+    AlertRule::factory()->for($this->user)->create(['is_active' => false]);
+
+    $data = optionsCall($this)->json('data');
+    expect([$data['alert_count'], $data['can_create_alert'], $data['can_create_outlook_report']])->toBe([2, true, false]);
+
+    AlertRule::factory()->for($this->user)->create();
+
+    $data = optionsCall($this)->json('data');
+    expect([$data['alert_count'], $data['can_create_alert'], $data['can_create_outlook_report']])->toBe([3, false, false]);
+});
+
+test('a Plus subscriber gets the Plus limit and can create Outlook Reports', function () {
+    $plus = User::factory()->create(['tier_override' => Tier::Plus]);
+    $token = $plus->createToken('Pixel 9', ['app'])->plainTextToken;
+    AlertRule::factory()->for($plus)->create(['category' => AlertCategory::OutlookReport]);
+
+    $data = optionsCall($this, $token)->json('data');
+
+    expect($data['alert_limit'])->toBe(app(TierThresholdSettings::class)->plus_alerts)
+        ->and($data['can_create_alert'])->toBeTrue()
+        ->and($data['can_create_outlook_report'])->toBeTrue();
 });
