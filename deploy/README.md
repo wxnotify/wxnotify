@@ -81,7 +81,7 @@ Both `linux/amd64` and `linux/arm64` machines work. The figures below are starti
 
    - **Cloudflare Turnstile (optional, recommended for a public site).** If both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are blank, sign-up works without a captcha, because the example sets `WXNOTIFY_MODE=selfhost` (in `cloud` mode the captcha is always required). To protect a site anyone can reach from automated sign-ups, create a free Cloudflare account, open Turnstile, add a site for your hostname, and put its keys in those two variables. Set both or neither: with only one of them set the captcha still applies and sign-up fails until the other is filled in, so a half-configured install is noticed instead of silently running unprotected.
 
-   Generate `APP_KEY` once and never change it: channel credentials are encrypted with it. Also set `APP_URL` to the address people will use. `NWWS_USERNAME` and `NWWS_PASSWORD` are optional; leave them empty to run without the NWWS feed (the `nwws` container then stays up, logs a notice and does nothing). Leave `WXNOTIFY_MODE=selfhost` as the example sets it (see [Self-hosted mode and tiers](#self-hosted-mode-and-tiers)).
+   Generate `APP_KEY` once and never change it: channel credentials are encrypted with it. Also set `APP_URL` to the address people will use. `NWWS_USERNAME` and `NWWS_PASSWORD` are optional; leave them empty to run without the NWWS feed (the `nwws` container then stays up, logs a notice and does nothing). Leave `WXNOTIFY_MODE=selfhost` as the example sets it (see [Self-hosted mode](#self-hosted-mode)).
 
 4. Start it:
 
@@ -274,18 +274,19 @@ What is different with images:
 
   Clear the compiled views on A after every version change, upgrade or rollback: A keeps `storage/` (including the compiled Blade views) in the `app-storage` volume and has no startup automation, so without `view:clear` it can keep serving views compiled by the other version. Migrate before the workers on C and D restart. `queue:restart` and `reverb:restart` signal through the shared database cache, so running them on A reaches the workers on C and D. Use the `pg_dump` command above on B. This upgrade order follows the first-start order that we ran; a full multi-server upgrade has not been run end to end yet. If the migration fails, set the previous `WXNOTIFY_VERSION` on A, run `docker compose up -d` there and then `docker compose exec front-end php artisan view:clear`, and do not upgrade C and D.
 
-## Self-hosted mode and tiers
+## Self-hosted mode
 
 `WXNOTIFY_MODE=selfhost` (set in both examples) marks the instance as self-hosted. Compared with `cloud`, the value used by the hosted service, it:
 
 - hides the subscriber **Billing** page, which needs Stripe settings to work;
 - hides the billing and support-chat steps of the owner's setup checklist (the Chatwoot support widget is cloud-only as well);
 - lets a Traccar server on your own network be used (in cloud mode private addresses are refused);
-- allows the opt-in `WXNOTIFY_WEBHOOKS_ALLOW_PRIVATE=true`, which lets webhook and chat-server channels deliver to private-network addresses.
+- allows the opt-in `WXNOTIFY_WEBHOOKS_ALLOW_PRIVATE=true`, which lets webhook and chat-server channels deliver to private-network addresses;
+- removes the plans: no tiers or limits apply.
 
 It does not change sign-up: email verification applies in both modes, and the Turnstile captcha is used in both whenever its keys are set.
 
-**Tiers.** Every account is on the **Free** tier, with its limits (by default 3 alerts on Free, 5 on Plus and 10 on Pro, and one Severe Weather Outlook Report on Free; change the numbers under **Admin > App settings > Tier & threshold defaults**), unless an owner or staff member gives it another one: **Admin > Users**, edit the user, choose **Tier override** (Plus or Pro) and write a **Reason** (required). Clearing the override puts the account back on Free. There is no other way to change a tier on a self-hosted instance.
+With `WXNOTIFY_MODE=selfhost` there are no tiers, plans or limits: every account can use every feature and has no cap on locations, phone locations, alerts, Traccar servers or devices, or channels. The admin has no **Tier override** and no **Tier & threshold defaults** settings. Tier overrides and threshold values already stored in the database stay there but are ignored while the instance is self-hosted; they apply again if the install returns to `cloud` mode. The lightning alert minimum radius is not a plan limit and stays editable under **Admin > App settings**.
 
 ## Backups and day-to-day operation
 
