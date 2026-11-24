@@ -5,7 +5,9 @@ use App\Exceptions\AlertRuleLimitReached;
 use App\Filament\Dashboard\Resources\AlertRules\Pages\ListAlertRules;
 use App\Filament\Dashboard\Resources\Locations\Pages\CreateLocation;
 use App\Models\AlertRule;
+use App\Models\ChannelType as ChannelTypeModel;
 use App\Models\Location;
+use App\Models\NotificationChannel;
 use App\Models\TraccarServer;
 use App\Models\User;
 use App\Settings\TierThresholdSettings;
@@ -156,4 +158,64 @@ test('in cloud mode a Free user at the location limit is refused', function () {
 
     expect($user->locationLimit())->toBe(1)
         ->and($user->locations()->count())->toBe(1);
+});
+
+test('the /me endpoint reports Pro in self-host mode and the real tier in cloud mode', function () {
+    $user = User::factory()->create(['tier_override' => Tier::Free]);
+    $token = $user->createToken('Pixel 9', ['app'])->plainTextToken;
+
+    config(['wxnotify.mode' => 'selfhost']);
+    $this->withToken($token)->getJson('/api/v1/me')
+        ->assertOk()
+        ->assertJsonPath('data.tier.value', 'pro')
+        ->assertJsonPath('data.tier.label', 'Pro');
+
+    config(['wxnotify.mode' => 'cloud']);
+    $this->withToken($token)->getJson('/api/v1/me')
+        ->assertOk()
+        ->assertJsonPath('data.tier.value', 'free')
+        ->assertJsonPath('data.tier.label', 'Free');
+});
+
+test('channel limits and tier gates do not apply in self-host mode', function () {
+    ChannelTypeModel::query()->where('slug', 'pushover')->update(['min_tier' => Tier::Plus]);
+    $settings = app(TierThresholdSettings::class);
+    $settings->free_no_cost_channels = 1;
+    $settings->save();
+
+    $user = User::factory()->create(['tier_override' => Tier::Free]);
+    NotificationChannel::factory()->for($user)->webhook()->create();
+
+    config(['wxnotify.mode' => 'cloud']);
+    expect($user->fresh()->canAddChannel('webhook'))->toBeFalse()
+        ->and($user->fresh()->canAddChannel('pushover'))->toBeFalse();
+
+    config(['wxnotify.mode' => 'selfhost']);
+    expect($user->fresh()->canAddChannel('webhook'))->toBeTrue()
+        ->and($user->fresh()->canAddChannel('pushover'))->toBeTrue();
+});
+
+test('the Traccar per-server device cap does not apply in self-host mode', function () {
+    lowerCloudLimitsToOne();
+    $user = User::factory()->create(['tier_override' => Tier::Free]);
+    $server = TraccarServer::factory()->for($user)->create();
+    Location::factory()->mobile()->for($user)->create(['traccar_server_id' => $server->id]);
+
+    config(['wxnotify.mode' => 'cloud']);
+    expect($user->canAddTraccarDevice($server->id))->toBeFalse();
+
+    config(['wxnotify.mode' => 'selfhost']);
+    expect($user->canAddTraccarDevice($server->id))->toBeTrue();
+});
+
+test('the phone location allowance does not apply in self-host mode', function () {
+    lowerCloudLimitsToOne();
+    $user = User::factory()->create(['tier_override' => Tier::Free]);
+    Location::factory()->for($user)->mobileApp()->create();
+
+    config(['wxnotify.mode' => 'cloud']);
+    expect($user->canCreatePhoneLocation())->toBeFalse();
+
+    config(['wxnotify.mode' => 'selfhost']);
+    expect($user->canCreatePhoneLocation())->toBeTrue();
 });

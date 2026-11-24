@@ -49,7 +49,7 @@ class Announcement extends VendorAnnouncement
         return $query->where(function (Builder $query) use ($user) {
             $query->where('scope', AnnouncementScope::AllSubscribers)
                 ->orWhere(fn (Builder $q) => $q->where('scope', AnnouncementScope::SpecificTiers)
-                    ->whereJsonContains('tiers', $user->tier()->value))
+                    ->when(User::hasTiers(), fn (Builder $q) => $q->whereJsonContains('tiers', $user->tier()->value)))
                 ->orWhere(fn (Builder $q) => $q->where('scope', AnnouncementScope::SpecificUsers)
                     ->whereHas('targetedUsers', fn (Builder $q) => $q->whereKey($user->id)));
         });

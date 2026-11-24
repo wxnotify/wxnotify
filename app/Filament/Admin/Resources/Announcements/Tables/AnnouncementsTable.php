@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources\Announcements\Tables;
 
 use App\Enums\AnnouncementScope;
 use App\Models\Announcement;
+use App\Models\User;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -39,7 +40,9 @@ class AnnouncementsTable
                     ->badge()
                     ->formatStateUsing(fn (AnnouncementScope $state, Announcement $record): string => match ($state) {
                         AnnouncementScope::AllSubscribers => $state->label(),
-                        AnnouncementScope::SpecificTiers => collect($record->tiers)->map(fn (string $tier) => ucfirst($tier))->implode(', '),
+                        AnnouncementScope::SpecificTiers => ! User::hasTiers()
+                            ? 'Specific tiers (shown to everyone when self-hosted)'
+                            : collect($record->tiers)->map(fn (string $tier) => ucfirst($tier))->implode(', '),
                         AnnouncementScope::SpecificUsers => $record->targetedUsers()->count().' subscriber(s)',
                     }),
                 IconColumn::make('is_active')

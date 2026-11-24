@@ -48,9 +48,13 @@ class CreateLocation extends CreateRecord
             return;
         }
 
+        $deviceLimit = auth()->user()->traccarDeviceLimitPerServer();
+
         Notification::make()
             ->title('Device limit reached')
-            ->body('Your plan allows '.auth()->user()->traccarDeviceLimitPerServer().' device(s) per Traccar server. Upgrade to add more.')
+            ->body($deviceLimit === null
+                ? "That Traccar server isn't available to add a device to."
+                : 'Your plan allows '.$deviceLimit.' device(s) per Traccar server. Upgrade to add more.')
             ->danger()
             ->send();
 

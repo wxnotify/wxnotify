@@ -9,6 +9,7 @@ use App\Filament\Dashboard\Resources\Locations\Pages\ListLocations;
 use App\Models\Location;
 use App\Models\TraccarServer;
 use App\Models\User;
+use App\Settings\TierThresholdSettings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
@@ -495,4 +496,44 @@ test('the Position updated column says no phone is sharing for an unlinked app l
     livewire(ListLocations::class)
         ->assertTableColumnFormattedStateSet('position_updated', 'No phone is sharing', $unlinked)
         ->assertTableColumnFormattedStateSet('position_updated', '7 minutes ago', $linked);
+});
+
+test('the Traccar device refusal names the plan limit when there is one', function () {
+    $limits = app(TierThresholdSettings::class);
+    $limits->plus_locations = 50;
+    $limits->save();
+    $user = User::factory()->create(['tier_override' => Tier::Plus]);
+    $server = TraccarServer::factory()->for($user)->create(['base_url' => 'https://traccar.example.com']);
+    Location::factory()->count(5)->mobile()->for($user)->create(['traccar_server_id' => $server->id]);
+    $this->actingAs($user);
+    Http::fake(['traccar.example.com/api/devices' => Http::response([['id' => 99, 'name' => 'Extra Device', 'uniqueId' => 'xyz']])]);
+
+    livewire(CreateLocation::class)
+        ->fillForm(['label' => 'One Too Many', 'type' => 'mobile', 'mobile_source' => 'traccar', 'traccar_server_id' => $server->id, 'traccar_device_id' => 99, 'mobile_update_interval_minutes' => 15])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(sentNotificationBodies())->toBe('Your plan allows 5 device(s) per Traccar server. Upgrade to add more.');
+});
+
+test('the Traccar device refusal has no plan wording when there is no limit', function () {
+    config(['wxnotify.mode' => 'selfhost']);
+    $server = TraccarServer::factory()->for($this->user)->create(['base_url' => 'https://traccar.example.com']);
+    Http::fake(['traccar.example.com/api/devices' => Http::response([['id' => 99, 'name' => 'Extra Device', 'uniqueId' => 'xyz']])]);
+    // The server is removed after the form validates its picker, just before the device check looks it up.
+    $removed = false;
+    DB::beforeExecuting(function (string $sql) use ($server, &$removed): void {
+        if (! $removed && str_contains($sql, 'select exists') && str_contains($sql, '"traccar_servers"."id"')) {
+            $removed = true;
+            DB::table('traccar_servers')->where('id', $server->id)->delete();
+        }
+    });
+
+    livewire(CreateLocation::class)
+        ->fillForm(['label' => 'Gone server', 'type' => 'mobile', 'mobile_source' => 'traccar', 'traccar_server_id' => $server->id, 'traccar_device_id' => 99, 'mobile_update_interval_minutes' => 15])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(sentNotificationBodies())->toBe("That Traccar server isn't available to add a device to.")
+        ->and(Location::where('traccar_server_id', $server->id)->count())->toBe(0);
 });

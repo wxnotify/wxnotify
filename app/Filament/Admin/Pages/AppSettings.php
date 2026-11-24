@@ -162,7 +162,7 @@ class AppSettings extends Page implements HasForms
                         ]),
                         Tab::make('Feature flags')->schema([
                             Section::make('Heads Up')
-                                ->description('An emergency off switch for the predictive Heads Up alerts. Turning it off hides Heads Up dashboard-wide and stops it from firing, but keeps each subscriber\'s per-location opt-ins and disclaimer acknowledgments, so turning it back on restores them without anyone re-confirming. This is independent of the Plus/Pro entitlement that gates who can use it.')
+                                ->description('An emergency off switch for the predictive Heads Up alerts. Turning it off hides Heads Up dashboard-wide and stops it from firing, but keeps each subscriber\'s per-location opt-ins and disclaimer acknowledgments, so turning it back on restores them without anyone re-confirming.')
                                 ->schema([
                                     Toggle::make('heads_up_enabled')->label('Heads Up enabled'),
                                 ]),
