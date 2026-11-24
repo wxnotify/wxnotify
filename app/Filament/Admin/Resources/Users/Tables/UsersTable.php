@@ -26,6 +26,7 @@ class UsersTable
                 TextColumn::make('email')
                     ->searchable(),
                 TextColumn::make('tier')
+                    ->visible(fn (): bool => User::hasTiers())
                     ->badge()
                     ->getStateUsing(fn (User $record): string => ucfirst($record->tier()->value)),
                 IconColumn::make('is_staff')
@@ -59,6 +60,7 @@ class UsersTable
             ->filters([
                 SelectFilter::make('tier_override')
                     ->label('Tier override')
+                    ->visible(fn (): bool => User::hasTiers())
                     ->options(collect(Tier::cases())->mapWithKeys(fn (Tier $tier) => [$tier->value => ucfirst($tier->value)])),
                 TernaryFilter::make('is_staff'),
             ])

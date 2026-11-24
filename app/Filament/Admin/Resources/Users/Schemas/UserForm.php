@@ -49,10 +49,12 @@ class UserForm
                     ->label('Tier override')
                     ->options(collect(Tier::cases())->mapWithKeys(fn (Tier $tier) => [$tier->value => ucfirst($tier->value)]))
                     ->nullable()
+                    ->visible(fn (): bool => User::hasTiers())
                     ->live(),
                 Textarea::make('tier_override_reason')
                     ->label('Reason')
                     ->requiredWith('tier_override')
+                    ->visible(fn (): bool => User::hasTiers())
                     ->helperText('Required when setting a tier override — why is this subscriber being gifted or downgraded?'),
                 Section::make(fn (?string $operation): string => $operation === 'create' ? 'Account setup' : 'Change Password')
                     ->description(fn (?string $operation): ?string => $operation === 'create' ? null : 'Leave both fields blank to keep the current password.')

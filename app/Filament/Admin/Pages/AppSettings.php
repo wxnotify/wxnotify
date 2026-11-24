@@ -7,6 +7,7 @@ use App\Enums\MapTileProvider;
 use App\Enums\Secret;
 use App\Enums\SignUpPolicy;
 use App\Filament\Admin\Resources\InviteCodes\InviteCodeResource;
+use App\Models\User;
 use App\Settings\FeatureFlagsSettings;
 use App\Settings\GeneralSettings;
 use App\Settings\IntegrationSettings;
@@ -126,8 +127,12 @@ class AppSettings extends Page implements HasForms
                                         ->required(fn (Get $get): bool => (bool) $get('message_prefix_enabled'))
                                         ->visible(fn (Get $get): bool => (bool) $get('message_prefix_enabled')),
                                 ]),
+                            Section::make('Thresholds')->schema([
+                                $this->count('lightning_min_radius_miles', 'Lightning alert minimum radius (miles)', 5, 15)
+                                    ->helperText('Applies when a Lightning rule is created or edited; existing rules keep their stored radius.'),
+                            ]),
                         ]),
-                        Tab::make('Tier & threshold defaults')->schema([
+                        Tab::make('Tier & threshold defaults')->visible(fn (): bool => User::hasTiers())->schema([
                             Section::make('Locations')->columns(2)->schema([
                                 $this->count('free_locations', 'Free locations', 1, 10),
                                 $this->count('plus_locations', 'Plus locations', 1, 100)->gte('free_locations'),
@@ -153,10 +158,6 @@ class AppSettings extends Page implements HasForms
                                 $this->count('free_traccar_devices_per_server', 'Free', 0, 100),
                                 $this->count('plus_traccar_devices_per_server', 'Plus', 0, 100)->gte('free_traccar_devices_per_server'),
                                 $this->count('pro_traccar_devices_per_server', 'Pro', 0, 100)->gte('plus_traccar_devices_per_server'),
-                            ]),
-                            Section::make('Thresholds')->schema([
-                                $this->count('lightning_min_radius_miles', 'Lightning alert minimum radius (miles)', 5, 15)
-                                    ->helperText('Applies when a Lightning rule is created or edited; existing rules keep their stored radius.'),
                             ]),
                         ]),
                         Tab::make('Feature flags')->schema([

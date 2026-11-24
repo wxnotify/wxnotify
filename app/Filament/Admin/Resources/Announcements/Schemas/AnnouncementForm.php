@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources\Announcements\Schemas;
 
 use App\Enums\AnnouncementScope;
 use App\Enums\Tier;
+use App\Models\User;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -38,14 +39,16 @@ class AnnouncementForm
                 Grid::make(2)
                     ->schema([
                         Select::make('scope')
-                            ->options(collect(AnnouncementScope::cases())->mapWithKeys(fn (AnnouncementScope $scope) => [$scope->value => $scope->label()]))
+                            ->options(fn (): array => collect(AnnouncementScope::cases())
+                                ->reject(fn (AnnouncementScope $scope): bool => $scope === AnnouncementScope::SpecificTiers && ! User::hasTiers())
+                                ->mapWithKeys(fn (AnnouncementScope $scope) => [$scope->value => $scope->label()])->all())
                             ->required()
                             ->live()
                             ->default(AnnouncementScope::AllSubscribers)
                             ->helperText('Who sees this announcement.'),
                         CheckboxList::make('tiers')
                             ->options(collect(Tier::cases())->mapWithKeys(fn (Tier $tier) => [$tier->value => ucfirst($tier->value)]))
-                            ->visible(fn (Get $get): bool => $get('scope') === AnnouncementScope::SpecificTiers->value)
+                            ->visible(fn (Get $get): bool => User::hasTiers() && $get('scope') === AnnouncementScope::SpecificTiers->value)
                             ->required(fn (Get $get): bool => $get('scope') === AnnouncementScope::SpecificTiers->value),
                     ]),
                 Select::make('targetedUsers')
