@@ -101,10 +101,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     /**
      * Maximum number of locations other than phone-app ones (saved places and Traccar devices)
-     * this user's tier allows, or null for unlimited.
+     * this user's tier allows, or null for unlimited (always, when self-hosted).
      */
     public function locationLimit(): ?int
     {
+        if (! static::hasTiers()) {
+            return null;
+        }
+
         $limits = app(TierThresholdSettings::class);
 
         return match ($this->tier()) {
@@ -122,10 +126,15 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Maximum number of alert rules, paused ones included, this user's tier allows.
+     * Maximum number of alert rules, paused ones included, this user's tier allows, or null
+     * for unlimited (always, when self-hosted).
      */
-    public function alertRuleLimit(): int
+    public function alertRuleLimit(): ?int
     {
+        if (! static::hasTiers()) {
+            return null;
+        }
+
         $limits = app(TierThresholdSettings::class);
 
         return match ($this->tier()) {
@@ -135,9 +144,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         };
     }
 
+    /**
+     * False only when there is a limit, so a refusal built from alertRuleLimit() always has a number.
+     */
     public function canCreateAlertRule(): bool
     {
-        return $this->alertRules()->count() < $this->alertRuleLimit();
+        $limit = $this->alertRuleLimit();
+
+        return $limit === null || $this->alertRules()->count() < $limit;
     }
 
     /**
@@ -154,10 +168,15 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Maximum number of phone-app locations this user's tier allows, or null for unlimited.
+     * Maximum number of phone-app locations this user's tier allows, or null for unlimited
+     * (always, when self-hosted).
      */
     public function phoneLocationLimit(): ?int
     {
+        if (! static::hasTiers()) {
+            return null;
+        }
+
         $limits = app(TierThresholdSettings::class);
 
         return match ($this->tier()) {
@@ -216,13 +235,15 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Maximum number of Traccar servers this user's tier allows. Currently
-     * always a concrete number for every tier -- ?int/null-for-unlimited is
-     * kept for consistency with locationLimit()'s pattern in case a future
-     * tier ever becomes unlimited here too.
+     * Maximum number of Traccar servers this user's tier allows: a concrete number for every
+     * tier, or null for unlimited when self-hosted.
      */
     public function traccarServerLimit(): ?int
     {
+        if (! static::hasTiers()) {
+            return null;
+        }
+
         $limits = app(TierThresholdSettings::class);
 
         return match ($this->tier()) {
@@ -240,14 +261,15 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Maximum number of devices allowed per Traccar server this user's tier
-     * allows. Currently always a concrete number for every tier --
-     * ?int/null-for-unlimited is kept for consistency with
-     * locationLimit()'s pattern in case a future tier ever becomes
-     * unlimited here too.
+     * Maximum number of devices allowed per Traccar server this user's tier allows: a concrete
+     * number for every tier, or null for unlimited when self-hosted.
      */
     public function traccarDeviceLimitPerServer(): ?int
     {
+        if (! static::hasTiers()) {
+            return null;
+        }
+
         $limits = app(TierThresholdSettings::class);
 
         return match ($this->tier()) {
@@ -297,8 +319,21 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         ];
     }
 
+    /**
+     * Whether plans apply at all. A self-hosted install has no tiers: everyone is Pro and
+     * every limit is unlimited, while `tier_override` is kept for a later switch back to cloud.
+     */
+    public static function hasTiers(): bool
+    {
+        return config('wxnotify.mode') !== 'selfhost';
+    }
+
     public function tier(): Tier
     {
+        if (! static::hasTiers()) {
+            return Tier::Pro;
+        }
+
         return $this->tier_override ?? Tier::Free;
     }
 }

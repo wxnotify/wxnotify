@@ -50,7 +50,8 @@ class ListAlertRules extends ListRecords
         $user = auth()->user();
         $count = $user->alertRules()->count();
         $limit = $user->alertRuleLimit();
+        $usage = $limit === null ? '' : "You're using {$count} of {$limit} ".Str::plural('alert', $limit).'. ';
 
-        return "You're using {$count} of {$limit} ".Str::plural('alert', $limit).". Alerts you've set up to be notified about — severe weather warnings, forecast discussions, lightning strikes, and more. Create a new alert to start watching for a specific product, risk level, or threshold.";
+        return $usage."Alerts you've set up to be notified about — severe weather warnings, forecast discussions, lightning strikes, and more. Create a new alert to start watching for a specific product, risk level, or threshold.";
     }
 }
