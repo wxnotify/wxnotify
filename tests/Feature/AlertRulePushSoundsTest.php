@@ -74,9 +74,9 @@ test('an update with an empty object or null clears the stored sounds', function
 test('an update replaces the stored sounds', function () {
     $rule = AlertRule::factory()->for($this->user)->create(['push_sounds' => $this->sounds]);
 
-    soundsCall($this, 'PUT', "/api/v1/alert-rules/{$rule->id}", soundsBody($this, ['push_sounds' => ['advisory' => 'chime']]))->assertOk();
+    soundsCall($this, 'PUT', "/api/v1/alert-rules/{$rule->id}", soundsBody($this, ['push_sounds' => ['advisory' => 'harp']]))->assertOk();
 
-    expect($rule->fresh()->push_sounds)->toBe(['advisory' => 'chime']);
+    expect($rule->fresh()->push_sounds)->toBe(['advisory' => 'harp']);
 });
 
 test('invalid push sounds are refused and nothing is written', function (mixed $value, string $field) {
