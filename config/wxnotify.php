@@ -132,6 +132,20 @@ return [
         'attribution' => 'USGS The National Map · NOAA/NWS MRMS',
     ],
 
+    /*
+    | Push notification sounds an alert rule can pick per alert kind: slug => label. Each slug is the
+    | file name of a bundled sound in the mobile app, so keep slugs to [a-z0-9_].
+    */
+    'push_sounds' => [
+        'alert' => 'Alert',
+        'back' => 'Back',
+        'bell' => 'Bell',
+        'correct' => 'Correct',
+        'fail' => 'Fail',
+        'harp' => 'Harp',
+        'notification' => 'Notification',
+    ],
+
     'storage' => [
         'snapshot_retention_days' => (int) env('STORAGE_SNAPSHOT_RETENTION_DAYS', 90),
     ],
