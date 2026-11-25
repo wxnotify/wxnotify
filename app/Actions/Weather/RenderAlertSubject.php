@@ -105,8 +105,9 @@ class RenderAlertSubject
     }
 
     /**
-     * "until 10:00pm MDT": the latest end among the matched segments (else the bulletin's own), in the
-     * location's own timezone. Empty with no end time or no location timezone.
+     * "until 10:00pm MDT 07/14": the latest end among the matched segments (else the bulletin's own), as a
+     * time with its zone and the MM/DD date, in the location's own timezone. Empty with no end time or no
+     * location timezone.
      *
      * @param  Collection<int, IngestedProductSegment>  $segments
      */
@@ -121,7 +122,7 @@ class RenderAlertSubject
         $ends = $segments->isNotEmpty() ? $segments->pluck('vtec_end') : collect([$bulletin?->vtec_end]);
         $end = $ends->filter()->sortByDesc(fn (CarbonInterface $end): int => $end->getTimestamp())->first();
 
-        return $end === null ? '' : 'until '.$end->copy()->setTimezone($timezone)->format('g:ia T');
+        return $end === null ? '' : 'until '.$end->copy()->setTimezone($timezone)->format('g:ia T m/d');
     }
 
     /**

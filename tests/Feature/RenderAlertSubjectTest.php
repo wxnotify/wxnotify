@@ -310,14 +310,29 @@ test('{until} names the latest end of the matched segments in the location timez
     ]);
 
     expect((new RenderAlertSubject)(untilRule('{product} {until}'), ['Tornado Warning'], $location, $bulletin, $segments))
-        ->toBe('Tornado Warning until 10:00pm MDT');
+        ->toBe('Tornado Warning until 10:00pm MDT 07/14');
 });
 
 test('{until} follows daylight saving and falls back to the bulletin end without segments', function () {
     $location = Location::factory()->create(['timezone' => 'America/Denver']);
     $bulletin = IngestedProduct::factory()->create(['vtec_end' => Carbon::parse('2026-01-15 05:00:00 UTC')]);
 
-    expect((new RenderAlertSubject)(untilRule('{until}'), ['Winter Storm Warning'], $location, $bulletin))->toBe('until 10:00pm MST');
+    expect((new RenderAlertSubject)(untilRule('{until}'), ['Winter Storm Warning'], $location, $bulletin))->toBe('until 10:00pm MST 01/14');
+});
+
+test('{until} ends with the date as MM/DD in the location timezone', function () {
+    $location = Location::factory()->create(['label' => 'Home', 'timezone' => 'America/Denver']);
+    $bulletin = IngestedProduct::factory()->create(['vtec_end' => Carbon::parse('2026-11-26 19:00:00 UTC')]);
+
+    expect((new RenderAlertSubject)(untilRule('{product} for {location} {until}'), ['Winter Storm Watch'], $location, $bulletin))
+        ->toBe('Winter Storm Watch for Home until 12:00pm MST 11/26');
+});
+
+test('{until} keeps a single-digit month and day padded', function () {
+    $location = Location::factory()->create(['timezone' => 'America/Denver']);
+    $bulletin = IngestedProduct::factory()->create(['vtec_end' => Carbon::parse('2026-03-05 20:00:00 UTC')]);
+
+    expect((new RenderAlertSubject)(untilRule('{until}'), ['Wind Advisory'], $location, $bulletin))->toBe('until 1:00pm MST 03/05');
 });
 
 test('{until} is empty without an end time, a location timezone or a bulletin, and leaves no gap', function () {
@@ -417,7 +432,7 @@ test('placeholders render inside a product subject', function () {
     $segments = productSubjectSegments($bulletin, $tornado);
     $segments->first()->update(['vtec_end' => Carbon::parse('2026-07-15 04:00:00 UTC')]);
 
-    expect((new RenderAlertSubject)($rule, $tornado, $location, $bulletin, $segments))->toBe('Tornado Warning for Home until 10:00pm MDT');
+    expect((new RenderAlertSubject)($rule, $tornado, $location, $bulletin, $segments))->toBe('Tornado Warning for Home until 10:00pm MDT 07/14');
 });
 
 test('with several matched products the first matched segment\'s subject is used and {product} still names them all', function () {

@@ -535,7 +535,7 @@ test('a custom subject fills {until}, {states} and {wfo} from the bulletin and t
 
     (new DeliverWeatherAlert($rule->id, $channel->id, $bulletin->id, $location->id, [$watch->id]))->handle(app(ChannelDispatcher::class));
 
-    expect(DeliveryLog::sole()->subject)->toBe('Hurricane Watch until 10:00pm MDT in ID, MT from BOI');
+    expect(DeliveryLog::sole()->subject)->toBe('Hurricane Watch until 10:00pm MDT 07/14 in ID, MT from BOI');
 });
 
 test('an event named twice in one bulletin appears once in the subject', function () {
