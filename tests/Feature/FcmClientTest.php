@@ -1,5 +1,6 @@
 <?php
 
+use App\Settings\SecretSettings;
 use App\Support\Delivery\FcmClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
@@ -168,4 +169,65 @@ test('send without a badge leaves the apns block with only the sound', function 
 
     Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
         && $request['message']['apns']['payload']['aps'] === ['sound' => 'default']);
+});
+
+function fcmStoreServiceAccount(string $projectId = 'wx-stored'): string
+{
+    $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+    openssl_pkey_export($key, $privatePem);
+
+    $json = json_encode([
+        'type' => 'service_account',
+        'project_id' => $projectId,
+        'client_email' => "push@{$projectId}.iam.gserviceaccount.com",
+        'private_key' => $privatePem,
+    ]);
+
+    $settings = app(SecretSettings::class);
+    $settings->firebase_service_account = $json;
+    $settings->save();
+
+    return $json;
+}
+
+test('the service account stored in App settings is used when no key file is configured', function () {
+    config(['services.firebase.service_account' => null]);
+    fcmStoreServiceAccount();
+    fcmFakeGoogle();
+
+    $result = app(FcmClient::class)->send('device-token-1', 'a', 'b');
+
+    expect($result->success)->toBeTrue();
+    Http::assertSent(fn (Request $request) => $request->url() === 'https://fcm.googleapis.com/v1/projects/wx-stored/messages:send');
+});
+
+test('the stored service account wins over the key file', function () {
+    fcmStoreServiceAccount('wx-stored');
+    fcmFakeGoogle();
+
+    app(FcmClient::class)->send('t', 'a', 'b');
+
+    Http::assertSent(fn (Request $request) => $request->url() === 'https://fcm.googleapis.com/v1/projects/wx-stored/messages:send');
+    Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '/projects/wx-test/'));
+});
+
+test('a stored value that is not a usable service account falls back to the key file', function () {
+    $settings = app(SecretSettings::class);
+    $settings->firebase_service_account = 'nope';
+    $settings->save();
+    fcmFakeGoogle();
+
+    app(FcmClient::class)->send('t', 'a', 'b');
+
+    Http::assertSent(fn (Request $request) => $request->url() === 'https://fcm.googleapis.com/v1/projects/wx-test/messages:send');
+});
+
+test('isConfigured is true for a stored service account or a key file, and false for neither', function () {
+    expect(app(FcmClient::class)->isConfigured())->toBeTrue();
+
+    config(['services.firebase.service_account' => null]);
+    expect(app(FcmClient::class)->isConfigured())->toBeFalse();
+
+    fcmStoreServiceAccount();
+    expect(app(FcmClient::class)->isConfigured())->toBeTrue();
 });

@@ -2,6 +2,8 @@
 
 namespace App\Support\Delivery;
 
+use App\Enums\Secret;
+use App\Support\Secrets;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -115,17 +117,45 @@ class FcmClient
     }
 
     /**
+     * Whether a usable service account is available, from App settings or the key file.
+     */
+    public function isConfigured(): bool
+    {
+        return $this->credentials() !== null;
+    }
+
+    /**
+     * The service account stored (encrypted) in App settings wins, so one entry reaches every server through
+     * the shared database; the key file named by `FIREBASE_SERVICE_ACCOUNT` is the fallback, and is also used
+     * when the stored value is not a usable service account.
+     *
      * @return array{project_id: string, client_email: string, private_key: string}|null
      */
     private function credentials(): ?array
     {
+        if (Secrets::isStored(Secret::FirebaseServiceAccount)) {
+            $stored = $this->fromJson((string) Secrets::get(Secret::FirebaseServiceAccount));
+
+            if ($stored !== null) {
+                return $stored;
+            }
+        }
+
         $path = config('services.firebase.service_account');
 
         if (blank($path) || ! is_file($path)) {
             return null;
         }
 
-        $json = json_decode((string) file_get_contents($path), true);
+        return $this->fromJson((string) file_get_contents($path));
+    }
+
+    /**
+     * @return array{project_id: string, client_email: string, private_key: string}|null
+     */
+    private function fromJson(string $contents): ?array
+    {
+        $json = json_decode($contents, true);
 
         foreach (['project_id', 'client_email', 'private_key'] as $key) {
             if (! is_array($json) || ! is_string($json[$key] ?? null) || $json[$key] === '') {

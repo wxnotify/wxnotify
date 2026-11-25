@@ -99,7 +99,11 @@ function setupConditionCases(): array
 function setupConditionTempFile(): string
 {
     $path = tempnam(sys_get_temp_dir(), 'firebase');
-    file_put_contents($path, '{}');
+    file_put_contents($path, json_encode([
+        'project_id' => 'wx-test',
+        'client_email' => 'push@wx-test.iam.gserviceaccount.com',
+        'private_key' => 'not-a-real-key',
+    ]));
     register_shutdown_function(fn () => @unlink($path));
 
     return $path;
@@ -205,6 +209,28 @@ it('counts a readable firebase file as mobile push without any VAPID keys', func
     ]);
 
     expect(setupConditionPasses('push_configured'))->toBeTrue();
+});
+
+it('counts a service account stored in App settings as mobile push, with no key file', function () {
+    config(['services.firebase.service_account' => null]);
+    $settings = app(SecretSettings::class);
+    $settings->firebase_service_account = json_encode([
+        'project_id' => 'wx-test',
+        'client_email' => 'push@wx-test.iam.gserviceaccount.com',
+        'private_key' => 'not-a-real-key',
+    ]);
+    $settings->save();
+
+    expect(setupConditionPasses('push_configured'))->toBeTrue();
+});
+
+it('does not count a key file that is not a service account as push configured', function () {
+    $path = tempnam(sys_get_temp_dir(), 'firebase');
+    file_put_contents($path, '{}');
+    register_shutdown_function(fn () => @unlink($path));
+    config(['services.firebase.service_account' => $path]);
+
+    expect(setupConditionPasses('push_configured'))->toBeFalse();
 });
 
 it('does not count a missing VAPID key as browser push configured', function (?string $public, ?string $private) {

@@ -2,10 +2,11 @@
 
 namespace App\Onboarding\Conditions;
 
+use App\Support\Delivery\FcmClient;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A readable Firebase service-account file, which is what mobile push needs.
+ * A usable Firebase service account (stored in App settings or in a readable key file), which is what mobile push needs.
  */
 final class PushConfiguredCondition extends SafeCondition
 {
@@ -16,11 +17,6 @@ final class PushConfiguredCondition extends SafeCondition
 
     protected function check(Model $subject): bool
     {
-        $serviceAccount = config('services.firebase.service_account');
-
-        return is_string($serviceAccount)
-            && $serviceAccount !== ''
-            && is_file($serviceAccount)
-            && is_readable($serviceAccount);
+        return app(FcmClient::class)->isConfigured();
     }
 }
