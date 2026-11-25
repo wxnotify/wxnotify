@@ -57,6 +57,7 @@ class MobilePushTransport implements Transport
                 'payload' => self::FOREGROUND_PUSH_PAYLOAD,
             ],
             $badge,
+            $this->sound($meta),
         );
 
         if ($result->success) {
@@ -68,6 +69,19 @@ class MobilePushTransport implements Transport
         }
 
         return DeliveryResult::failed((string) $result->error);
+    }
+
+    /**
+     * The sound the rule chose for this alert's kind (`push_sound`, added by the delivery jobs). Only an alert plays
+     * it: the test push and every other type keep the default sound. FcmClient checks the slug again.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function sound(array $meta): ?string
+    {
+        $sound = $meta['push_sound'] ?? null;
+
+        return ($meta['type'] ?? 'alert') === 'alert' && is_string($sound) ? $sound : null;
     }
 
     /**

@@ -215,6 +215,32 @@ test('an iOS device with no stored token fails without calling Firebase', functi
     Http::assertNothingSent();
 });
 
+test('an alert plays the sound its meta names, on both platforms, and never sends it as data', function () {
+    fcmFakeGoogle();
+
+    app(ChannelDispatcher::class)->send($this->channel, 'Body', 'Title', ['type' => 'alert', 'push_sound' => 'bell']);
+
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['apns']['payload']['aps']['sound'] === 'bell.wav'
+        && $request['message']['android']['notification']['channel_id'] === 'wx_sound_bell'
+        && ! array_key_exists('push_sound', (array) $request['message']['data']));
+});
+
+test('a push that is not an alert, or names no sound, plays the default sound', function (array $meta) {
+    fcmFakeGoogle();
+
+    app(ChannelDispatcher::class)->send($this->channel, 'Body', 'Title', $meta);
+
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['apns']['payload']['aps']['sound'] === 'default'
+        && $request['message']['android']['notification']['channel_id'] === 'fcm_default_channel');
+})->with([
+    'the test push' => [['type' => 'test', 'push_sound' => 'bell']],
+    'another type' => [['type' => 'confirmation', 'push_sound' => 'bell']],
+    'no sound key' => [['type' => 'alert']],
+    'a non-string sound' => [['type' => 'alert', 'push_sound' => ['bell']]],
+]);
+
 test('the badge is never a data field', function () {
     fcmFakeGoogle();
     $phone = NotificationChannel::factory()->mobilePush('ios-token-3', 'ios')->create();

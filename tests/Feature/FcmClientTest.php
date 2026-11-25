@@ -171,6 +171,35 @@ test('send without a badge leaves the apns block with only the sound', function 
         && $request['message']['apns']['payload']['aps'] === ['sound' => 'default']);
 });
 
+test('a chosen sound plays its wav file on iOS and posts to its own Android channel', function () {
+    fcmFakeGoogle();
+
+    app(FcmClient::class)->send('device-token-1', 'a', 'b', [], 2, 'alert');
+
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['apns']['payload']['aps'] === ['sound' => 'alert.wav', 'badge' => 2]
+        && $request['message']['android']['notification']['channel_id'] === 'wx_sound_alert');
+});
+
+test('no sound or an unknown sound sends exactly the default-sound message', function (?string $sound) {
+    $this->freezeTime();
+    fcmFakeGoogle();
+
+    app(FcmClient::class)->send('device-token-1', 'a', 'b', ['url' => '/'], 1);
+    app(FcmClient::class)->send('device-token-1', 'a', 'b', ['url' => '/'], 1, $sound);
+
+    [$withoutSound, $withSound] = Http::recorded(fn (Request $request) => str_contains($request->url(), 'messages:send'))
+        ->map(fn (array $pair) => $pair[0]->body())->values()->all();
+
+    expect($withSound)->toBe($withoutSound)
+        ->toContain('"sound":"default"')
+        ->toContain('"channel_id":"fcm_default_channel"');
+})->with([
+    'null' => [null],
+    'unknown slug' => ['siren'],
+    'path-like slug' => ['../alert'],
+]);
+
 function fcmStoreServiceAccount(string $projectId = 'wx-stored'): string
 {
     $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);

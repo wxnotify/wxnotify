@@ -100,7 +100,7 @@ test('caller meta can never overwrite the reserved top-level payload keys', func
         ->and($payload['alert'])->toBe(['rule' => 'My rule']);
 });
 
-test('the alert group ids meant for the phone badge never reach a webhook', function () {
+test('the alert group ids and push sound meant for the phone never reach a webhook', function () {
     $history = chanFakeWebhookEndpoint([new Response(200)]);
     $channel = NotificationChannel::factory()->webhook()->create();
 
@@ -110,11 +110,13 @@ test('the alert group ids meant for the phone badge never reach a webhook', func
         'alert_rule_id' => 12,
         'ingested_product_id' => 34,
         'batch_key' => '0b9c1f9e-2f6d-4a39-9a51-3d7c2f1e8a10',
+        'push_sound' => 'alert',
     ]);
 
-    $payload = json_decode((string) $history[0]['request']->getBody(), true);
+    $body = (string) $history[0]['request']->getBody();
 
-    expect($payload['alert'])->toBe(['rule' => 'My rule']);
+    expect(json_decode($body, true)['alert'])->toBe(['rule' => 'My rule'])
+        ->and($body)->not->toContain('push_sound');
 });
 
 test('a confirmation message carries the code in the payload', function () {

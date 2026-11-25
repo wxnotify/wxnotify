@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Alerts\ResolveAlertPushSound;
 use App\Actions\Weather\ComposeTemplatedAlertBody;
 use App\Actions\Weather\RenderAlertSubject;
 use App\Enums\ChannelTransport;
@@ -181,6 +182,7 @@ class DeliverWeatherAlert implements ShouldBeUnique, ShouldQueue
             'url' => $product->viewUrl(),
             'alert_rule_id' => $rule->id,
             'ingested_product_id' => $product->id,
+            'push_sound' => app(ResolveAlertPushSound::class)($rule, $product, $segments),
         ]);
 
         $log = DeliveryLog::create([

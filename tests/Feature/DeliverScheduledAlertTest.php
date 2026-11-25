@@ -38,6 +38,21 @@ test('it delivers via apprise and writes a success DeliveryLog row', function ()
         ->and($log->ingested_product_id)->toBeNull();
 });
 
+test('a summary pushed to a phone plays the sound the rule chose for other alerts', function () {
+    $credentials = fcmUseCredentials();
+    fcmFakeGoogle();
+
+    $rule = AlertRule::factory()->dailySummary()->create(['push_sounds' => ['other' => 'bell']]);
+    $phone = NotificationChannel::factory()->for($rule->user)->mobilePush('android-token-1', 'android')->create();
+
+    (new DeliverScheduledAlert($rule->id, $phone->id, 'Daily summary', 'Today: Sunny.'))->handle(app(ChannelDispatcher::class));
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['apns']['payload']['aps']['sound'] === 'bell.wav'
+        && $request['message']['android']['notification']['channel_id'] === 'wx_sound_bell');
+    @unlink($credentials['path']);
+});
+
 test('every summary pushed to an iPhone counts as a new unread alert on top of the unread ones', function () {
     $credentials = fcmUseCredentials();
     fcmFakeGoogle();

@@ -179,6 +179,29 @@ test('each weather alert pushed to an iPhone carries the unread alert count incl
     @unlink($credentials['path']);
 });
 
+test('a weather alert pushed to a phone plays the sound the rule chose for the matched event\'s kind', function (string $code, string $sound, string $channelId) {
+    $credentials = fcmUseCredentials();
+    fcmFakeGoogle();
+
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'push_sounds' => ['short_fuse_warning' => 'alert'],
+    ]);
+    $phone = NotificationChannel::factory()->for($rule->user)->mobilePush('device-token-1')->create();
+    $bulletin = IngestedProduct::factory()->createQuietly();
+    $segment = IngestedProductSegment::factory()->for($bulletin)->forCatalogCode($code)->create();
+
+    (new DeliverWeatherAlert($rule->id, $phone->id, $bulletin->id, null, [$segment->id]))->handle(app(ChannelDispatcher::class));
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['apns']['payload']['aps']['sound'] === $sound
+        && $request['message']['android']['notification']['channel_id'] === $channelId);
+    @unlink($credentials['path']);
+})->with([
+    'a tornado warning' => ['TO.W', 'alert.wav', 'wx_sound_alert'],
+    'an advisory the rule chose no sound for' => ['WI.Y', 'default', 'fcm_default_channel'],
+]);
+
 test('message_body_style Brief truncates the body to 280 characters', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);
 

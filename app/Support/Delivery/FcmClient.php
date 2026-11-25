@@ -3,6 +3,7 @@
 namespace App\Support\Delivery;
 
 use App\Enums\Secret;
+use App\Support\PushSounds;
 use App\Support\Secrets;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
@@ -31,14 +32,21 @@ class FcmClient
      */
     private const ANDROID_CHANNEL = 'fcm_default_channel';
 
+    /** A chosen sound's Android channel is this prefix plus the sound's slug; the app creates one per sound. */
+    private const ANDROID_SOUND_CHANNEL_PREFIX = 'wx_sound_';
+
     private const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
     /**
      * @param  array<string, string>  $data  string values only (an FCM requirement)
      * @param  int|null  $badge  the iOS app-icon badge number; null leaves the badge alone
+     * @param  string|null  $sound  a PushSounds slug: iOS plays `{slug}.wav` and Android posts to channel `wx_sound_{slug}`;
+     *                              null or an unknown slug sends the default sound and channel
      */
-    public function send(string $deviceToken, string $title, string $body, array $data = [], ?int $badge = null): FcmResult
+    public function send(string $deviceToken, string $title, string $body, array $data = [], ?int $badge = null, ?string $sound = null): FcmResult
     {
+        $sound = PushSounds::isKnown($sound) ? $sound : null;
+
         $credentials = $this->credentials();
 
         if ($credentials === null) {
@@ -61,11 +69,11 @@ class FcmClient
                     'android' => [
                         'priority' => 'HIGH',
                         'ttl' => self::TTL_SECONDS.'s',
-                        'notification' => ['channel_id' => self::ANDROID_CHANNEL],
+                        'notification' => ['channel_id' => $sound === null ? self::ANDROID_CHANNEL : self::ANDROID_SOUND_CHANNEL_PREFIX.$sound],
                     ],
                     'apns' => [
                         'headers' => ['apns-expiration' => (string) (now()->timestamp + self::TTL_SECONDS)],
-                        'payload' => ['aps' => ['sound' => 'default'] + ($badge !== null ? ['badge' => $badge] : [])],
+                        'payload' => ['aps' => ['sound' => $sound === null ? 'default' : "{$sound}.wav"] + ($badge !== null ? ['badge' => $badge] : [])],
                     ],
                 ]],
             );

@@ -26,12 +26,12 @@ class WebhookTransport implements Transport
     private const RESERVED_KEYS = ['type', 'title', 'body', 'sent_at'];
 
     /**
-     * Meta keys for our own transports only (the alert's group, for the phone badge in MobilePushTransport):
-     * internal ids that are never sent to a subscriber's endpoint.
+     * Meta keys for our own transports only (the alert's group for the phone badge, and the phone's push sound,
+     * in MobilePushTransport): internal values that are never sent to a subscriber's endpoint.
      *
      * @var list<string>
      */
-    private const INTERNAL_KEYS = ['alert_rule_id', 'ingested_product_id', 'batch_key'];
+    private const INTERNAL_KEYS = ['alert_rule_id', 'ingested_product_id', 'batch_key', 'push_sound'];
 
     /**
      * The top-level keys an alert payload carries, in order. The channel form's

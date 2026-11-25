@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Alerts\ResolveAlertPushSound;
 use App\Actions\Alerts\StoreOutlookReportRun;
 use App\Actions\Weather\GetRadarSnapshot;
 use App\Actions\Weather\GetSpcOutlookGraphic;
@@ -112,6 +113,7 @@ class DeliverScheduledAlert implements ShouldQueue
             'alert_rule_id' => $rule->id,
             'ingested_product_id' => null,
             'batch_key' => $batchKey,
+            'push_sound' => app(ResolveAlertPushSound::class)($rule),
         ];
 
         // A job serialized before $report existed (SerializesModels' native
