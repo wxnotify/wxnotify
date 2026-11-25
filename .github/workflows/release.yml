@@ -11,10 +11,13 @@
 #   variable DOCKERHUB_NAMESPACE  the Docker Hub namespace (user or organisation)
 #   secret   DOCKERHUB_USERNAME   Docker Hub user the token belongs to
 #   secret   DOCKERHUB_TOKEN      Docker Hub access token with write access
+#   secret   SLACK_WEBHOOK        optional Slack incoming-webhook URL; with it set, a
+#                                 tag run posts its result (published, or which job
+#                                 failed). Unset, the notification is skipped.
 #
 # Jobs: test -> build (5 images x 2 platforms: ONE build per image and platform,
 # loaded for the smoke test and, on a tag, pushed by digest in the same build)
-# -> merge (tags only, one manifest per image).
+# -> merge (tags only, one manifest per image) -> notify (tags only, always runs).
 name: Release
 
 on:
@@ -336,3 +339,61 @@ jobs:
           VERSION: ${{ steps.meta.outputs.version }}
           REPOSITORY: ${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.image }}
         run: docker buildx imagetools inspect "${REPOSITORY}:${VERSION}"
+
+  # Tags only, so the pull_request and workflow_dispatch runs still reference no secret. It runs whether
+  # the earlier jobs passed or failed, and it never fails the release: a missing or broken webhook is a
+  # warning, not an error.
+  notify:
+    name: Notify Slack
+    if: always() && github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [test, build, merge]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Post the result to Slack
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          TAG: ${{ github.ref_name }}
+          NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TEST_RESULT: ${{ needs.test.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          MERGE_RESULT: ${{ needs.merge.result }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo 'SLACK_WEBHOOK is not set; skipping the Slack notification.'
+            exit 0
+          fi
+
+          failed=''
+          cancelled=''
+          for job in "Test suite:$TEST_RESULT" "Build and smoke-test:$BUILD_RESULT" "Publish:$MERGE_RESULT"; do
+            name="${job%%:*}"
+            result="${job##*:}"
+            case "$result" in
+              failure) failed="${failed:+$failed, }$name" ;;
+              cancelled) cancelled="${cancelled:+$cancelled, }$name" ;;
+            esac
+          done
+
+          if [ -n "$failed" ]; then
+            if [ "$MERGE_RESULT" = 'failure' ]; then
+              outcome='Some images may not have been tagged.'
+            else
+              outcome='Nothing was published.'
+            fi
+            text=":x: *Release ${TAG} failed* in: ${failed}. ${outcome} <${RUN_URL}|Open the run>"
+          elif [ -n "$cancelled" ]; then
+            text=":warning: *Release ${TAG} was cancelled* (${cancelled}). <${RUN_URL}|Open the run>"
+          elif [ "$MERGE_RESULT" = 'success' ]; then
+            text=":white_check_mark: *Release ${TAG} published* to Docker Hub (${NAMESPACE}, version ${TAG#v}). <${RUN_URL}|Open the run>"
+          else
+            text=":question: *Release ${TAG} finished without publishing* (test ${TEST_RESULT}, build ${BUILD_RESULT}, publish ${MERGE_RESULT}). <${RUN_URL}|Open the run>"
+          fi
+
+          payload="$(jq -n --arg text "$text" '{text: $text}')"
+
+          if ! curl -sS --max-time 15 --fail-with-body -X POST \
+            -H 'Content-Type: application/json' --data "$payload" "$SLACK_WEBHOOK" > /dev/null; then
+            echo '::warning::The Slack notification could not be sent. Check the SLACK_WEBHOOK secret.'
+          fi
