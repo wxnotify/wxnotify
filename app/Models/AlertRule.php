@@ -51,6 +51,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'custom_subject_template',
     'message_body_style',
     'alert_template_id',
+    'push_sounds',
 ])]
 class AlertRule extends Model
 {
@@ -162,6 +163,7 @@ class AlertRule extends Model
             'matching_mode' => MatchingMode::class,
             'report_mode' => OutlookReportMode::class,
             'risk_levels' => 'array',
+            'push_sounds' => 'array',
             'variable' => ThresholdVariable::class,
             'direction' => ThresholdDirection::class,
             'threshold_value' => 'decimal:1',

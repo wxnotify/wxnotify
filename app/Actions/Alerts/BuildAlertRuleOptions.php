@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Settings\TierThresholdSettings;
 use App\Support\ChannelTypes\ChannelTypeRegistry;
 use App\Support\ProductMatching;
+use App\Support\PushSounds;
 use App\Support\Units;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -79,6 +80,7 @@ class BuildAlertRuleOptions
             'units' => ['system' => $units->system->value],
             'tier' => ['can_customize_messages' => $user->tier() !== Tier::Free],
             'message_body_styles' => collect(MessageBodyStyle::cases())->map(fn (MessageBodyStyle $s): array => ['value' => $s->value, 'label' => $s->label()])->all(),
+            'push_sounds' => PushSounds::options(),
             'channels' => $user->notificationChannels()->orderBy('label')->orderBy('id')->get()->map(fn (NotificationChannel $channel): array => [
                 'id' => $channel->id,
                 'label' => $channel->label,

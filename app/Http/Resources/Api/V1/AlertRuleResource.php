@@ -63,6 +63,7 @@ class AlertRuleResource extends JsonResource
             'message_body_style' => $rule->message_body_style?->value,
             'custom_subject_template' => $rule->custom_subject_template,
             'alert_template_id' => $rule->alert_template_id,
+            'push_sounds' => (object) ($rule->push_sounds ?? []),
             'channel_ids' => $rule->notificationChannels->pluck('id')->values()->all(),
         ];
     }

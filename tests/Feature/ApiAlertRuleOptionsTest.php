@@ -10,6 +10,7 @@ use App\Models\NotificationChannel;
 use App\Models\Product;
 use App\Models\User;
 use App\Settings\TierThresholdSettings;
+use App\Support\PushSounds;
 use Database\Seeders\ProductCatalogSeeder;
 
 beforeEach(function () {
@@ -189,4 +190,12 @@ test('a Plus subscriber gets the Plus limit and can create Outlook Reports', fun
     expect($data['alert_limit'])->toBe(app(TierThresholdSettings::class)->plus_alerts)
         ->and($data['can_create_alert'])->toBeTrue()
         ->and($data['can_create_outlook_report'])->toBeTrue();
+});
+
+test('it lists the push sound kinds and sounds', function () {
+    $sounds = optionsCall($this)->assertOk()->json('data.push_sounds');
+
+    expect($sounds['kinds'])->toHaveCount(6)
+        ->and($sounds['sounds'])->toHaveCount(7)
+        ->and($sounds)->toBe(PushSounds::options());
 });

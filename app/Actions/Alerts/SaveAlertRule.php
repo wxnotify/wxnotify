@@ -5,12 +5,14 @@ namespace App\Actions\Alerts;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
 use App\Enums\MessageBodyStyle;
+use App\Enums\PushSoundKind;
 use App\Enums\Tier;
 use App\Exceptions\AlertRuleLimitReached;
 use App\Models\AlertRule;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\AlertRuleFormUnits;
+use App\Support\PushSounds;
 use App\Support\SpcWpcRiskLevels;
 use App\Support\Units;
 use Illuminate\Support\Arr;
@@ -130,6 +132,10 @@ class SaveAlertRule
                 $attributes['risk_levels'] = collect($this->riskLevelsByProduct($category, $data, $this->productSettings($data) ?? [], $stored))
                     ->flatten()->unique()->values()->all();
             }
+        }
+
+        if (array_key_exists('push_sounds', $data)) {
+            $attributes['push_sounds'] = $this->pushSounds($data['push_sounds']);
         }
 
         $attributes = [...$attributes, ...$this->messageCustomisation($user, $category, $data, $stored)];
@@ -331,6 +337,20 @@ class SaveAlertRule
     private static function usesProducts(?AlertCategory $category): bool
     {
         return in_array($category?->value, self::CATEGORIES_WITH_PRODUCTS, true);
+    }
+
+    /**
+     * The sounds to store: only known kinds with known sounds, null when none remain.
+     *
+     * @return array<string, string>|null
+     */
+    private function pushSounds(mixed $sounds): ?array
+    {
+        $kept = collect(is_array($sounds) ? $sounds : [])
+            ->filter(fn (mixed $slug, mixed $kind): bool => PushSoundKind::tryFrom((string) $kind) !== null && is_string($slug) && PushSounds::isKnown($slug))
+            ->all();
+
+        return $kept === [] ? null : $kept;
     }
 
     /**

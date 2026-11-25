@@ -6,6 +6,7 @@ use App\Actions\Alerts\BuildAlertRuleOptions;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
 use App\Enums\MessageBodyStyle;
+use App\Enums\PushSoundKind;
 use App\Enums\ThresholdDirection;
 use App\Enums\ThresholdTimeframe;
 use App\Enums\ThresholdVariable;
@@ -14,6 +15,7 @@ use App\Models\Product;
 use App\Rules\KnownUgcCode;
 use App\Settings\TierThresholdSettings;
 use App\Support\ProductMatching;
+use App\Support\PushSounds;
 use App\Support\Units;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -57,6 +59,12 @@ class SaveAlertRuleRequest extends FormRequest
             'channel_ids.*' => ['integer', Rule::exists('notification_channels', 'id')->where('user_id', $user->id)],
             'quiet_hours_start' => ['nullable', 'date_format:H:i'],
             'quiet_hours_end' => ['nullable', 'date_format:H:i'],
+            'push_sounds' => ['nullable', 'array', function (string $attribute, mixed $value, Closure $fail): void {
+                if (is_array($value) && array_diff(array_keys($value), array_column(PushSoundKind::cases(), 'value')) !== []) {
+                    $fail('The :attribute has an unknown alert kind.');
+                }
+            }],
+            'push_sounds.*' => ['string', Rule::in(PushSounds::slugs())],
         ];
 
         if ($user->tier() !== Tier::Free) {
