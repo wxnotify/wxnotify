@@ -64,7 +64,7 @@ class SaveAlertRuleRequest extends FormRequest
                     $fail('The :attribute has an unknown alert kind.');
                 }
             }],
-            'push_sounds.*' => ['string', Rule::in(PushSounds::slugs())],
+            'push_sounds.*' => ['nullable', 'string', Rule::in(PushSounds::slugs())],
         ];
 
         if ($user->tier() !== Tier::Free) {

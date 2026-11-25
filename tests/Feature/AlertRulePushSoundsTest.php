@@ -71,6 +71,14 @@ test('an update with an empty object or null clears the stored sounds', function
     expect($rule->fresh()->push_sounds)->toBeNull();
 })->with([[[]], [null]]);
 
+test('a null value for a kind is accepted and dropped while a valid sibling is stored', function () {
+    $rule = AlertRule::factory()->for($this->user)->create(['push_sounds' => $this->sounds]);
+
+    soundsCall($this, 'PUT', "/api/v1/alert-rules/{$rule->id}", soundsBody($this, ['push_sounds' => ['other' => null, 'advisory' => 'harp']]))->assertOk();
+
+    expect($rule->fresh()->push_sounds)->toBe(['advisory' => 'harp']);
+});
+
 test('an update replaces the stored sounds', function () {
     $rule = AlertRule::factory()->for($this->user)->create(['push_sounds' => $this->sounds]);
 
