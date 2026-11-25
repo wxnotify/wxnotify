@@ -113,7 +113,7 @@ class DeliverScheduledAlert implements ShouldQueue
             'alert_rule_id' => $rule->id,
             'ingested_product_id' => null,
             'batch_key' => $batchKey,
-            'push_sound' => app(ResolveAlertPushSound::class)($rule),
+            'push_sound' => $this->pushSound($channel, $rule),
         ];
 
         // A job serialized before $report existed (SerializesModels' native
@@ -158,6 +158,26 @@ class DeliverScheduledAlert implements ShouldQueue
             'batch_key' => $batchKey,
             'dispatched_at' => now(),
         ]);
+    }
+
+    /**
+     * The sound the rule chose for this alert (the `other` kind), for a phone only (no other channel plays one).
+     * A failing lookup never loses the alert: the push goes out with the phone's default sound and only the
+     * exception class is logged.
+     */
+    private function pushSound(NotificationChannel $channel, AlertRule $rule): ?string
+    {
+        if ($channel->channel_type !== 'mobile_push') {
+            return null;
+        }
+
+        try {
+            return app(ResolveAlertPushSound::class)($rule);
+        } catch (Throwable $e) {
+            logger()->warning('Push sound lookup failed: '.$e::class);
+
+            return null;
+        }
     }
 
     /**

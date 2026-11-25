@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Alerts\ResolveAlertPushSound;
 use App\Enums\Tier;
 use App\Jobs\DeliverScheduledAlert;
 use App\Mail\ChannelMessageMail;
@@ -11,6 +12,7 @@ use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\DeliveryResult;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -50,6 +52,31 @@ test('a summary pushed to a phone plays the sound the rule chose for other alert
     Http::assertSent(fn ($request) => str_contains($request->url(), 'messages:send')
         && $request['message']['apns']['payload']['aps']['sound'] === 'bell.wav'
         && $request['message']['android']['notification']['channel_id'] === 'wx_sound_bell');
+    @unlink($credentials['path']);
+});
+
+test('a failing push sound lookup still pushes the summary with the default sound and logs it delivered', function () {
+    $credentials = fcmUseCredentials();
+    fcmFakeGoogle();
+    app()->instance(ResolveAlertPushSound::class, new class extends ResolveAlertPushSound
+    {
+        public function __invoke(AlertRule $rule, ?IngestedProduct $bulletin = null, ?Collection $segments = null): ?string
+        {
+            throw new RuntimeException('products table is gone');
+        }
+    });
+    Log::spy();
+
+    $rule = AlertRule::factory()->dailySummary()->create(['push_sounds' => ['other' => 'bell']]);
+    $phone = NotificationChannel::factory()->for($rule->user)->mobilePush('android-token-1', 'android')->create();
+
+    (new DeliverScheduledAlert($rule->id, $phone->id, 'Daily summary', 'Today: Sunny.'))->handle(app(ChannelDispatcher::class));
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['apns']['payload']['aps']['sound'] === 'default'
+        && $request['message']['android']['notification']['channel_id'] === 'fcm_default_channel');
+    expect(DeliveryLog::sole()->status)->toBe('success');
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message): bool => $message === 'Push sound lookup failed: RuntimeException');
     @unlink($credentials['path']);
 });
 

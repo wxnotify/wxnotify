@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Alerts\ResolveAlertPushSound;
 use App\Enums\Tier;
 use App\Jobs\DeliverWeatherAlert;
 use App\Mail\ChannelMessageMail;
@@ -14,6 +15,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
 use App\Support\Delivery\DeliveryResult;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -201,6 +203,53 @@ test('a weather alert pushed to a phone plays the sound the rule chose for the m
     'a tornado warning' => ['TO.W', 'alert.wav', 'wx_sound_alert'],
     'an advisory the rule chose no sound for' => ['WI.Y', 'default', 'fcm_default_channel'],
 ]);
+
+test('a failing push sound lookup still pushes the weather alert with the default sound and logs it delivered', function () {
+    $credentials = fcmUseCredentials();
+    fcmFakeGoogle();
+    app()->instance(ResolveAlertPushSound::class, new class extends ResolveAlertPushSound
+    {
+        public function __invoke(AlertRule $rule, ?IngestedProduct $bulletin = null, ?Collection $segments = null): ?string
+        {
+            throw new RuntimeException('products table is gone');
+        }
+    });
+    Log::spy();
+
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'push_sounds' => ['short_fuse_warning' => 'alert'],
+    ]);
+    $phone = NotificationChannel::factory()->for($rule->user)->mobilePush('device-token-1')->create();
+    $bulletin = IngestedProduct::factory()->createQuietly();
+    $segment = IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('TO.W')->create();
+
+    (new DeliverWeatherAlert($rule->id, $phone->id, $bulletin->id, null, [$segment->id]))->handle(app(ChannelDispatcher::class));
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'messages:send')
+        && $request['message']['apns']['payload']['aps']['sound'] === 'default'
+        && $request['message']['android']['notification']['channel_id'] === 'fcm_default_channel');
+    expect(DeliveryLog::sole()->status)->toBe('success');
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message): bool => $message === 'Push sound lookup failed: RuntimeException');
+    @unlink($credentials['path']);
+});
+
+test('a weather alert to a channel that is not a phone never looks up a push sound', function () {
+    Mail::fake();
+    $this->mock(ResolveAlertPushSound::class)->shouldNotReceive('__invoke');
+
+    $rule = AlertRule::factory()->create([
+        'category' => 'weather_alerts', 'matching_mode' => 'nationwide', 'location_id' => null,
+        'push_sounds' => ['short_fuse_warning' => 'alert'],
+    ]);
+    $email = NotificationChannel::factory()->for($rule->user)->email()->create();
+    $bulletin = IngestedProduct::factory()->createQuietly();
+    $segment = IngestedProductSegment::factory()->for($bulletin)->forCatalogCode('TO.W')->create();
+
+    (new DeliverWeatherAlert($rule->id, $email->id, $bulletin->id, null, [$segment->id]))->handle(app(ChannelDispatcher::class));
+
+    expect(DeliveryLog::sole()->status)->toBe('success');
+});
 
 test('message_body_style Brief truncates the body to 280 characters', function () {
     Http::fake(['*/notify/*' => Http::response(status: 200)]);

@@ -23,6 +23,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Dispatched once per AlertRule x NotificationChannel matched by
@@ -182,7 +183,7 @@ class DeliverWeatherAlert implements ShouldBeUnique, ShouldQueue
             'url' => $product->viewUrl(),
             'alert_rule_id' => $rule->id,
             'ingested_product_id' => $product->id,
-            'push_sound' => app(ResolveAlertPushSound::class)($rule, $product, $segments),
+            'push_sound' => $this->pushSound($channel, $rule, $product, $segments),
         ]);
 
         $log = DeliveryLog::create([
@@ -199,6 +200,27 @@ class DeliverWeatherAlert implements ShouldBeUnique, ShouldQueue
         ]);
 
         $this->linkSegments($log, $segments);
+    }
+
+    /**
+     * The sound the rule chose for this alert, for a phone only (no other channel plays one). A failing lookup
+     * never loses the alert: the push goes out with the phone's default sound and only the exception class is logged.
+     *
+     * @param  Collection<int, IngestedProductSegment>  $segments
+     */
+    private function pushSound(NotificationChannel $channel, AlertRule $rule, IngestedProduct $product, Collection $segments): ?string
+    {
+        if ($channel->channel_type !== 'mobile_push') {
+            return null;
+        }
+
+        try {
+            return app(ResolveAlertPushSound::class)($rule, $product, $segments);
+        } catch (Throwable $e) {
+            logger()->warning('Push sound lookup failed: '.$e::class);
+
+            return null;
+        }
     }
 
     /**
