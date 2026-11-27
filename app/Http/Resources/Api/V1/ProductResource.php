@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Actions\Products\BuildReadingText;
 use App\Actions\Products\GetProductDetails;
 use App\Models\IngestedProduct;
 use Illuminate\Http\Request;
@@ -9,7 +10,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * One product's page content for the app's Product screen: the same title, headline, text and detail lines as the
- * public View Product page.
+ * public View Product page. `text`, `reading_text` and `has_original` come from BuildReadingText, so a CAP alert is
+ * never sent as XML.
  *
  * @property IngestedProduct $resource
  */
@@ -24,8 +26,8 @@ class ProductResource extends JsonResource
 
         return [
             'title' => $product->displayTitle(),
-            'headline' => filled($product->headline) ? $product->headline : null,
-            'text' => (string) $product->text,
+            'headline' => filled($product->headline) && ! BuildReadingText::containsXml($product->headline) ? $product->headline : null,
+            ...app(BuildReadingText::class)($product),
             'is_test' => (bool) $product->is_test,
             'view_url' => $product->viewUrl(),
             'details' => collect(app(GetProductDetails::class)($product))
