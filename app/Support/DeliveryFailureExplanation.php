@@ -63,23 +63,26 @@ final class DeliveryFailureExplanation
         ['pattern' => '/endpoint did not accept the message/i', 'reason' => "Your endpoint didn't accept the message; it may be redirecting.", 'fix' => "Use the endpoint's final address. WxNotify does not follow redirects.", 'channels' => true],
         ['pattern' => '/private or reserved network|private network address|must start with https|must not contain a username|query or #fragment|port is not allowed|full domain name|full https:\/\/ address/i', 'reason' => "That address isn't allowed.", 'fix' => 'Use a public https:// address with no username, password or extra parts.', 'channels' => true],
         ['pattern' => '/Apprise reported non-delivery/i', 'reason' => "The service didn't accept the message.", 'fix' => "Check the channel's credentials and that the account is still active.", 'channels' => true],
-        ['pattern' => '/turned off on this server|not configured on this server|Unknown channel type|mail server could not send|could not be prepared or sent|cannot send (text )?messages|cannot place voice calls/i', 'reason' => self::OURS_REASON, 'fix' => self::OURS_FIX, 'ours' => true],
+        ['pattern' => '/turned off on this server|not configured on this server|Unknown channel type|mail server could not send|could not be prepared or sent|cannot send (text )?messages|cannot place voice calls|has an app badge|takes a badge-only push/i', 'reason' => self::OURS_REASON, 'fix' => self::OURS_FIX, 'ours' => true],
     ];
 
     /** @var array<string, array{reason: string, fix: string}>|null */
     private static ?array $byoMessages = null;
 
     /**
-     * Null for a delivery that went out (or has no status to explain).
+     * Null for a delivery that went out (or has no status to explain). `$inApp` is the row's `in_app` mark: a held
+     * phone alert that the app shows. It changes the advice for a held row only.
      *
      * @return array{reason: string, fix: ?string, ours: bool, channels: bool}|null
      */
-    public static function for(string $status, ?string $errorDetail): ?array
+    public static function for(string $status, ?string $errorDetail, bool $inApp = false): ?array
     {
         return match ($status) {
             'suppressed' => [
                 'reason' => 'Held back during your quiet hours.',
-                'fix' => 'It is not sent later. Change the quiet hours on the alert if you want alerts to go out then.',
+                'fix' => $inApp
+                    ? "No notification was sent. The alert is in the WxNotify app's Inbox. Change the quiet hours on the alert if you want to be notified then."
+                    : 'It is not sent later. Change the quiet hours on the alert if you want alerts to go out then.',
                 'ours' => false,
                 'channels' => false,
             ],

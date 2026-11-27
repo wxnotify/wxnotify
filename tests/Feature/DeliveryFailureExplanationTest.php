@@ -40,6 +40,19 @@ test('quiet hours are explained by status, whatever the stored text', function (
         ->and($quiet['fix'])->toContain('quiet hours');
 });
 
+test('a held alert that is in the app says where to find it, and any other held alert keeps the old advice', function () {
+    $inApp = DeliveryFailureExplanation::for('suppressed', null, true);
+    $held = DeliveryFailureExplanation::for('suppressed', null);
+
+    expect($inApp)->toBe([
+        'reason' => 'Held back during your quiet hours.',
+        'fix' => "No notification was sent. The alert is in the WxNotify app's Inbox. Change the quiet hours on the alert if you want to be notified then.",
+        'ours' => false,
+        'channels' => false,
+    ])->and($held['reason'])->toBe('Held back during your quiet hours.')
+        ->and($held['fix'])->toBe('It is not sent later. Change the quiet hours on the alert if you want alerts to go out then.');
+});
+
 test('a skipped delivery says why from its stored reason, and only a deactivated rule is told to turn it back on', function () {
     $off = DeliveryFailureExplanation::for('skipped', 'The rule was deactivated after this delivery was dispatched.');
     $gone = DeliveryFailureExplanation::for('skipped', 'The ingested product no longer exists.');
@@ -153,6 +166,8 @@ test('every fixed failure sentence in the delivery code is explained', function 
         'Firebase could not be reached.',
         'Firebase rejected the server credentials (HTTP 401).',
         'This device is no longer registered for push.',
+        'Only a phone push channel has an app badge.',
+        'Only an iPhone takes a badge-only push.',
         'Firebase rejected the message (HTTP 400).',
         BlueskyAccountGuard::NOT_HOSTED_BY_BLUESKY,
         BlueskyAccountGuard::UNVERIFIED,

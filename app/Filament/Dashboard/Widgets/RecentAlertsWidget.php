@@ -34,14 +34,14 @@ class RecentAlertsWidget extends TableWidget
     private function explainAction(): Action
     {
         return Action::make('explainDelivery')
-            ->visible(fn (DeliveryLog $record): bool => DeliveryFailureExplanation::for($record->status, $record->error_detail) !== null)
+            ->visible(fn (DeliveryLog $record): bool => DeliveryFailureExplanation::for($record->status, $record->error_detail, (bool) $record->in_app) !== null)
             ->modalHeading(fn (DeliveryLog $record): string => match ($record->status) {
                 'failure' => 'Why this delivery failed',
                 'suppressed' => 'Why this alert was held back',
                 default => 'Why this alert was skipped',
             })
             ->modalContent(fn (DeliveryLog $record) => view('filament.dashboard.widgets.delivery-explanation', [
-                'explanation' => DeliveryFailureExplanation::for($record->status, $record->error_detail),
+                'explanation' => DeliveryFailureExplanation::for($record->status, $record->error_detail, (bool) $record->in_app),
                 'channel' => $record->notificationChannel?->label,
                 'when' => $record->dispatched_at?->diffForHumans(),
                 'channelsUrl' => NotificationChannelResource::getUrl('index'),
@@ -77,8 +77,8 @@ class RecentAlertsWidget extends TableWidget
                         default => 'gray',
                     })
                     ->action($this->explainAction())
-                    ->disabledClick(fn (DeliveryLog $record): bool => DeliveryFailureExplanation::for($record->status, $record->error_detail) === null)
-                    ->tooltip(fn (DeliveryLog $record): ?string => DeliveryFailureExplanation::for($record->status, $record->error_detail) === null ? null : 'Tap to see why'),
+                    ->disabledClick(fn (DeliveryLog $record): bool => DeliveryFailureExplanation::for($record->status, $record->error_detail, (bool) $record->in_app) === null)
+                    ->tooltip(fn (DeliveryLog $record): ?string => DeliveryFailureExplanation::for($record->status, $record->error_detail, (bool) $record->in_app) === null ? null : 'Tap to see why'),
                 TextColumn::make('dispatched_at')
                     ->label('When')
                     ->since()

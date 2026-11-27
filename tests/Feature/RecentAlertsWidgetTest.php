@@ -135,6 +135,17 @@ test('quiet hours and skipped rows can be explained too, and a success badge can
         ->and($modal['html'])->toContain('Held back during your quiet hours.');
 });
 
+test('a held alert says it is in the app\'s Inbox only when its row is marked for the app', function (bool $inApp, string $shown) {
+    $held = DeliveryLog::factory()->for($this->subscriber)->create(['channel_type' => 'mobile_push', 'status' => 'suppressed', 'in_app' => $inApp]);
+
+    $modal = recentAlertsModal(livewire(RecentAlertsWidget::class)->mountTableAction('explainDelivery', $held));
+
+    expect($modal['html'])->toContain($shown);
+})->with([
+    'marked' => [true, 'No notification was sent. The alert is in the WxNotify app&#039;s Inbox.'],
+    'unmarked' => [false, 'It is not sent later.'],
+]);
+
 test('only a badge that can be explained is a control, and another subscriber\'s delivery cannot be opened', function () {
     $failed = DeliveryLog::factory()->for($this->subscriber)->failed()->create();
     $sent = DeliveryLog::factory()->for($this->subscriber)->create(['status' => 'success']);
