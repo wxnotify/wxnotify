@@ -8,7 +8,9 @@ use App\Support\WeatherKit\WeatherKitClient;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * A place's WeatherKit weather, normalised to metric, units-neutral values and shared through the
@@ -40,16 +42,65 @@ class GetPlaceWeather
 
     private const FAILURE_TTL_SECONDS = 60;
 
-    public function __construct(private readonly WeatherKitClient $client) {}
+    private const TIMEZONE_TTL_DAYS = 7;
+
+    private const TIMEZONE_FAILURE_TTL_SECONDS = 3600;
+
+    public function __construct(private readonly WeatherKitClient $client, private readonly GetNwsPoint $nwsPoint) {}
+
+    /**
+     * The place's own timezone; else the one at its coordinates (a phone location has none of its own, and a phone
+     * is not always where its owner lives); else the owner's; else the app's.
+     */
+    private function timezone(Location $location, float $lat, float $lng): string
+    {
+        if (filled($location->timezone)) {
+            return $location->timezone;
+        }
+
+        return $this->timezoneAt($lat, $lng) ?? Timezones::forLocation($location) ?? config('app.timezone');
+    }
+
+    /**
+     * The timezone at a 0.01 degree cell, from api.weather.gov (US coordinates only). Remembered per cell so a
+     * moving phone does not look up every position, and a failure is not retried for an hour.
+     */
+    private function timezoneAt(float $lat, float $lng): ?string
+    {
+        $key = 'weather-timezone:'.number_format($lat, 2, '.', '').','.number_format($lng, 2, '.', '');
+        $cached = Cache::get($key);
+
+        if ($cached !== null) {
+            return $cached === false ? null : $cached;
+        }
+
+        try {
+            $timezone = ($this->nwsPoint)(new Location(['lat' => $lat, 'lng' => $lng]))['timeZone'] ?? null;
+        } catch (Throwable $e) {
+            // The card must still show: a lookup error costs only the better timezone.
+            Log::warning('Weather timezone lookup failed', ['exception' => $e::class]);
+            $timezone = null;
+        }
+
+        if (! Timezones::isValid($timezone)) {
+            Cache::put($key, false, self::TIMEZONE_FAILURE_TTL_SECONDS);
+
+            return null;
+        }
+
+        Cache::put($key, $timezone, now()->addDays(self::TIMEZONE_TTL_DAYS));
+
+        return $timezone;
+    }
 
     /**
      * @return array{as_of: ?string, timezone: string, current: array<string, mixed>, hours: list<array<string, mixed>>, days: list<array<string, mixed>>, next_hour: array{summary: list<array{start: string, end: ?string, condition: string}>, minutes: list<array{start: string, chance: ?int, intensity_mm_h: ?float}>}|null}|null
      */
     public function __invoke(Location $location): ?array
     {
-        $timezone = Timezones::forLocation($location) ?? config('app.timezone');
         $lat = round((float) $location->lat, 2) + 0.0;
         $lng = round((float) $location->lng, 2) + 0.0;
+        $timezone = $this->timezone($location, $lat, $lng);
         $key = 'weatherkit:place:'.number_format($lat, 2, '.', '').','.number_format($lng, 2, '.', '').':'.$timezone;
 
         $cached = Cache::get($key);

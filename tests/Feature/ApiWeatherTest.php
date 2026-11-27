@@ -30,6 +30,8 @@ function apwWeatherBody(float $celsius = 12.6): array
 function apwFakeWeatherKit(int $status = 200): void
 {
     Http::fake([
+        // Places without a timezone of their own look it up by coordinates; here that finds nothing.
+        'api.weather.gov/points/*' => Http::response([], 404),
         'weatherkit.apple.com/api/v1/weather/*' => Http::response($status === 200 ? apwWeatherBody() : [], $status),
         'weatherkit.apple.com/attribution/*' => Http::response([
             'serviceName' => 'Weather',

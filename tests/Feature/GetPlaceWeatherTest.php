@@ -367,7 +367,10 @@ test('a failed lookup is cached as unavailable for sixty seconds', function () {
 
 test('timezone is the location, else the owner, else the app timezone', function (?string $locationTz, ?string $userTz, string $expected) {
     config(['app.timezone' => 'UTC']);
-    Http::fake(['weatherkit.apple.com/*' => Http::response(gpwFixture())]);
+    Http::fake([
+        'api.weather.gov/points/*' => Http::response([], 404),
+        'weatherkit.apple.com/*' => Http::response(gpwFixture()),
+    ]);
     $user = User::factory()->create(['timezone' => $userTz]);
 
     $weather = app(GetPlaceWeather::class)(gpwLocation(['user_id' => $user->id, 'timezone' => $locationTz]));
@@ -377,13 +380,88 @@ test('timezone is the location, else the owner, else the app timezone', function
     Http::assertSent(function (Request $request) use ($expected) {
         parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
 
-        return $query['timezone'] === $expected;
+        return str_contains($request->url(), '/weather/') && $query['timezone'] === $expected;
     });
 })->with([
     'location' => ['America/Chicago', 'America/Denver', 'America/Chicago'],
     'owner' => [null, 'America/Denver', 'America/Denver'],
     'app' => [null, null, 'UTC'],
 ]);
+
+function gpwFakePoint(mixed $pointResponse): void
+{
+    Http::fake([
+        'api.weather.gov/points/*' => $pointResponse,
+        'weatherkit.apple.com/*' => Http::response(gpwFixture()),
+    ]);
+}
+
+function gpwPointRequests(): int
+{
+    return Http::recorded(fn (Request $request) => str_contains($request->url(), 'api.weather.gov/points/'))->count();
+}
+
+test('a place without a timezone of its own takes it from its coordinates, ahead of the owner\'s', function () {
+    gpwFakePoint(Http::response(nwsPoint(['timeZone' => 'America/Denver'])));
+    $user = User::factory()->create(['timezone' => 'America/Chicago']);
+
+    $weather = app(GetPlaceWeather::class)(gpwLocation(['user_id' => $user->id, 'timezone' => null]));
+
+    expect($weather['timezone'])->toBe('America/Denver')
+        ->and($weather['hours'][0]['time'])->toEndWith('-07:00');
+});
+
+test('a place with its own timezone never looks the coordinates up', function () {
+    gpwFakePoint(Http::response(nwsPoint(['timeZone' => 'America/Denver'])));
+
+    app(GetPlaceWeather::class)(gpwLocation(['timezone' => 'America/Chicago']));
+
+    expect(gpwPointRequests())->toBe(0);
+});
+
+test('an unusable timezone from the lookup falls back to the owner\'s', function () {
+    gpwFakePoint(Http::response(nwsPoint(['timeZone' => 'Not/AZone'])));
+    $user = User::factory()->create(['timezone' => 'America/Chicago']);
+
+    $weather = app(GetPlaceWeather::class)(gpwLocation(['user_id' => $user->id, 'timezone' => null]));
+
+    expect($weather['timezone'])->toBe('America/Chicago');
+});
+
+test('a moving phone within the same cell is looked up once', function () {
+    gpwFakePoint(Http::response(nwsPoint(['timeZone' => 'America/Denver'])));
+    $user = User::factory()->create(['timezone' => null]);
+
+    app(GetPlaceWeather::class)(gpwLocation(['user_id' => $user->id, 'timezone' => null, 'lat' => 39.7392, 'lng' => -104.9903]));
+    app(GetPlaceWeather::class)(gpwLocation(['user_id' => $user->id, 'timezone' => null, 'lat' => 39.7413, 'lng' => -104.9888]));
+
+    expect(gpwPointRequests())->toBe(1);
+});
+
+test('a lookup that throws still gives the weather, in the owner\'s timezone', function () {
+    gpwFakePoint(fn () => throw new RuntimeException('boom'));
+    $user = User::factory()->create(['timezone' => 'America/Chicago']);
+
+    $weather = app(GetPlaceWeather::class)(gpwLocation(['user_id' => $user->id, 'timezone' => null]));
+
+    expect($weather['timezone'])->toBe('America/Chicago');
+});
+
+test('a failed coordinate lookup is not repeated for an hour', function () {
+    gpwFakePoint(Http::response([], 404));
+    $location = gpwLocation(['timezone' => null]);
+
+    app(GetPlaceWeather::class)($location);
+    Carbon::setTestNow(now()->addMinutes(59));
+    app(GetPlaceWeather::class)($location);
+
+    expect(gpwPointRequests())->toBe(1);
+
+    Carbon::setTestNow(now()->addMinutes(2));
+    app(GetPlaceWeather::class)($location);
+
+    expect(gpwPointRequests())->toBe(2);
+});
 
 test('attribution maps the logos, name and legal link and is cached for a day', function () {
     Http::fake(['weatherkit.apple.com/*' => Http::response([
