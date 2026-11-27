@@ -202,6 +202,22 @@ test('legend rows, bracketed notes and SHEF comment lines stay as sent (excerpts
         .":from the previous day.\n",
 ]);
 
+test('a zone-code list that wraps onto the next line is never joined inside a code (excerpt of AFD 859734)', function () {
+    $source = ".PHI WATCHES/WARNINGS/ADVISORIES...\n"
+        ."PA...High Wind Warning until 1 AM EST Friday for PAZ054-055-060>062-\n"
+        ."     070-071-101>106.\n"
+        ."     Coastal Flood Advisory until 7 PM EST Friday for PAZ070-071-\n"
+        ."     106.\n"
+        ."NJ...High Wind Warning until 1 AM EST Friday for NJZ007>010-012>020-\n"
+        ."     026-027.\n"
+        ."     Coastal Flood Warning until 3 AM EST Friday for NJZ012>014-\n"
+        ."     021>025-027.\n"
+        ."     Coastal Flood Warning until 3 PM EST Friday for NJZ020-026.\n"
+        ."DE...High Wind Warning until 1 AM EST Friday for DEZ001.\n";
+
+    expect(ReflowBulletin::reflow($source))->toBe($source);
+});
+
 test('a starred headline ends at its closing stars (excerpt of HLS 441925)', function () {
     $source = "**HURRICANE HUNTERS FIND THAT ISAIAS NOW HAS 100 MPH WINDS** \n"
         ."**PREPARATIONS TO PROTECT LIFE AND PROPERTY FROM STORM SURGE AND\n"

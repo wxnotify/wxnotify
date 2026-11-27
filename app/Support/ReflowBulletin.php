@@ -278,6 +278,10 @@ class ReflowBulletin
             return false;
         }
 
+        if (self::splitsAZoneCode($previous, $next)) {
+            return false;
+        }
+
         $nextIndent = self::indentOf($next);
 
         if ($nextIndent === 0 ? self::indentOf($previous) !== 0 : ! self::continuesHangingIndent($hangingIndent, $nextIndent, $previous, $next)) {
@@ -322,6 +326,16 @@ class ReflowBulletin
             || (preg_match('/^\d/', $trimmed) === 1 && preg_match('/^\d/', trim($blockFirstLine)) === 1)
             || str_starts_with($trimmed, '(')
             || preg_match('/ affecting .+ Count(y|ies)\.$/', $trimmed) === 1;
+    }
+
+    /**
+     * A zone-code list wrapped mid-list ("... for PAZ070-071-" then "     106."): joining would put a space
+     * inside the code, so the lines stay as sent.
+     */
+    private static function splitsAZoneCode(string $previous, string $next): bool
+    {
+        return preg_match('/(?:[A-Z]{2}[CZ]|[->])\d{3}[->]$/', rtrim($previous)) === 1
+            && preg_match('/^\d{3}[->.]/', ltrim($next)) === 1;
     }
 
     /** A `...HEADLINE...` that has been closed: nothing joins after it. */
