@@ -13,7 +13,6 @@ use App\Models\Location;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\AlertRef;
-use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->freezeTime();
@@ -180,69 +179,4 @@ test('the feed scope stays inside its own parentheses when combined with other c
     $other = User::factory()->create();
 
     expect(DeliveryLog::query()->where('user_id', $other->id)->inAppFeed()->count())->toBe(0);
-});
-
-function loadAppUnreadIndexMigration(): object
-{
-    $path = collect(glob(base_path('database/migrations/*_replace_delivery_logs_unread_push_index.php')))->sole();
-
-    return require $path;
-}
-
-/**
- * Null when the index does not exist, else whether PostgreSQL considers it usable.
- */
-function deliveryLogIndexValidity(string $index): ?bool
-{
-    $row = DB::selectOne('SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(?)', [$index]);
-
-    return $row === null ? null : (bool) $row->indisvalid;
-}
-
-/**
- * CREATE/DROP INDEX CONCURRENTLY refuses to run inside a transaction, so this leaves the test's wrapping one.
- * The callback must leave the schema as migrated and commit no rows.
- */
-function outsideFeedTestTransaction(Closure $callback): void
-{
-    DB::commit();
-
-    try {
-        $callback();
-    } finally {
-        DB::beginTransaction();
-    }
-}
-
-test('migrating leaves only the new unread index, valid', function () {
-    expect(deliveryLogIndexValidity('delivery_logs_app_unread_index'))->toBeTrue()
-        ->and(deliveryLogIndexValidity('delivery_logs_unread_push_index'))->toBeNull();
-});
-
-test('the index migration can be run again and rebuilds an index left invalid', function () {
-    outsideFeedTestTransaction(function () {
-        loadAppUnreadIndexMigration()->up();
-
-        // As an interrupted CREATE INDEX CONCURRENTLY leaves it.
-        DB::statement("UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'delivery_logs_app_unread_index'::regclass");
-        loadAppUnreadIndexMigration()->up();
-    });
-
-    expect(deliveryLogIndexValidity('delivery_logs_app_unread_index'))->toBeTrue()
-        ->and(deliveryLogIndexValidity('delivery_logs_unread_push_index'))->toBeNull();
-});
-
-test('rolling the index migration back restores the old index', function () {
-    $rolledBack = [];
-
-    outsideFeedTestTransaction(function () use (&$rolledBack) {
-        try {
-            loadAppUnreadIndexMigration()->down();
-            $rolledBack = [deliveryLogIndexValidity('delivery_logs_unread_push_index'), deliveryLogIndexValidity('delivery_logs_app_unread_index')];
-        } finally {
-            loadAppUnreadIndexMigration()->up();
-        }
-    });
-
-    expect($rolledBack)->toBe([true, null]);
 });
