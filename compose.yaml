@@ -475,7 +475,12 @@ services:
     # monitoring/support tool -- server-c should be able to actually deliver
     # alerts on its own.
     apprise:
-        image: 'caronc/apprise:2.0.0'
+        image: 'caronc/apprise:2.2.0'
+        # It has no login, and WxNotify only sends through its stateless /notify/ endpoint,
+        # so reminders (scheduled sends) and saved configurations are off.
+        environment:
+            APPRISE_REMINDER_ENABLED: 'no'
+            APPRISE_STATEFUL_MODE: disabled
         ports:
             - '${FORWARD_APPRISE_PORT:-8026}:8000'
         networks:

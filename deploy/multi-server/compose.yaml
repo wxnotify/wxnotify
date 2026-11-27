@@ -298,7 +298,12 @@ services:
     # confirmation codes). No authentication: bind it to D's PRIVATE address
     # (APPRISE_BIND_ADDRESS) and firewall it to servers A and D.
     apprise:
-        image: 'caronc/apprise:2.0.0'
+        image: 'caronc/apprise:2.2.0'
+        # It has no login, and WxNotify only sends through its stateless /notify/ endpoint,
+        # so reminders (scheduled sends) and saved configurations are off.
+        environment:
+            APPRISE_REMINDER_ENABLED: 'no'
+            APPRISE_STATEFUL_MODE: disabled
         ports:
             - '${APPRISE_BIND_ADDRESS:-127.0.0.1}:8026:8000'
         restart: unless-stopped
