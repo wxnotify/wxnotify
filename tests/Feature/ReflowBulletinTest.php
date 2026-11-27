@@ -132,3 +132,84 @@ test('a several-hundred-line product reflows in under 100 ms', function () {
 
     expect($elapsedMilliseconds)->toBeLessThan(100);
 });
+
+test('rows of a list that each end a sentence stay on their own lines', function () {
+    $highways = ReflowBulletin::reflow(file_get_contents(__DIR__.'/../Fixtures/reading-view/cap-svr-highways.txt'));
+    $rivers = ReflowBulletin::reflow(file_get_contents(__DIR__.'/../Fixtures/reading-view/cap-flood-warning-river-rows.txt'));
+    $outlook = ReflowBulletin::reflow(file_get_contents(__DIR__.'/../Fixtures/reading-view/afd-outlook-list.txt'));
+
+    expect($highways)->toContain(
+        "This includes the following highways...\n"
+        ."Interstate 80 in Illinois between mile markers 6 and 32.\n"
+        ."Interstate 74 in Illinois between mile markers 8 and 14.\n"
+    )->and($rivers)->toContain(
+        "Alafia River At Lithia affecting Hillsborough County.\n"
+        ."Manatee River Near Myakka Head at SR 64 affecting Manatee County.\n"
+        ."Peace River At Arcadia at SR 70 affecting DeSoto County.\n"
+    )->and($outlook)->toContain(
+        "Friday: Mainly IFR, with areas MVFR possible. Chance RA.\n"
+        ."Friday Night: Mainly IFR, with local MVFR possible. Definite SHRA.\n"
+        ."Saturday: Mainly IFR, with areas MVFR possible. Chance SHRA.\n"
+    );
+});
+
+test('a closed headline and a short introduction line end the block before them', function () {
+    $headline = ReflowBulletin::reflow(file_get_contents(__DIR__.'/../Fixtures/reading-view/cap-flood-warning-headline.txt'));
+    $impact = ReflowBulletin::reflow(file_get_contents(__DIR__.'/../Fixtures/reading-view/cap-svr-impact-locations.txt'));
+
+    expect($headline)->toStartWith(
+        "...The National Weather Service in Wilmington has issued a Flood Warning for the following rivers in North Carolina...\n"
+        ."Northeast Cape Fear River Near Burgaw affecting Pender County.\n"
+    )->and($impact)->toContain(
+        "IMPACT...Expect damage to roofs, siding, and trees.\n"
+        ."Locations impacted include...\n"
+    );
+});
+
+test('storm surge rows stay on their own lines (synthetic rows in the NHC public advisory format)', function () {
+    $source = "Englewood to Bonita Beach, including Charlotte Harbor...12-18 ft\n"
+        ."Bonita Beach to Chokoloskee...8-12 ft\n"
+        ."Anclote River to Englewood, including Tampa Bay...5-10 ft\n";
+
+    expect(ReflowBulletin::reflow($source))->toBe($source);
+});
+
+test('tropical cyclone coded lines and SPC outlook point lists are never joined', function (string $name) {
+    $source = file_get_contents(__DIR__."/../Fixtures/reading-view/{$name}.txt");
+    $reflowed = explode("\n", ReflowBulletin::reflow($source));
+
+    foreach (explode("\n", $source) as $line) {
+        if (preg_match('/\b\d{1,2}\.\d[NS]\s+\d{1,3}\.\d[EW]\b|\b\d+ [NESW]{1,3} [A-Z0-9]{3}\b/', $line) === 1) {
+            expect($reflowed)->toContain($line);
+        }
+    }
+})->with(['tcm-forecast-advisory', 'tcp-storm-surge', 'spc-day1-outlook-points']);
+
+test('legend rows, bracketed notes and SHEF comment lines stay as sent (excerpts of real AFM, PFW and PNS products)', function (string $source) {
+    expect(ReflowBulletin::reflow($source))->toBe($source);
+})->with([
+    'AFM 844855 legend' => "If a hurricane is expected then the following applies...\n"
+        ."0-24 hours before landfall...the actual wind speeds will be used.\n"
+        ."25-60 hours before landfall...the code \"HU\" will be used for winds\n"
+        ."                              and \"HG\" for wind gusts.\n"
+        ."61-120 hours before landfall...the code \"HU\" will only be used.\n",
+    'PFW 781932 note' => "BELOW IS A WEATHER ELEMENT KEY FOR THIS PRODUCT.\n"
+        ."(NOTE...WINDS DO NOT REFLECT LOCAL TERRAIN EFFECTS.)\n",
+    'PNS 686308 comments' => ":.......COOPERATIVE OBSERVATIONS.......\n"
+        .":\n"
+        .":Data are for the 24 hours ending around 7 AM. In some weather\n"
+        .":situations...reported low temperatures may reflect conditions\n"
+        .":from the previous day.\n",
+]);
+
+test('a starred headline ends at its closing stars (excerpt of HLS 441925)', function () {
+    $source = "**HURRICANE HUNTERS FIND THAT ISAIAS NOW HAS 100 MPH WINDS** \n"
+        ."**PREPARATIONS TO PROTECT LIFE AND PROPERTY FROM STORM SURGE AND\n"
+        ."DAMAGING WINDS IN THE WARNING AREA SHOULD BE RUSHED TO COMPLETION\n"
+        ."TODAY**\n";
+
+    expect(ReflowBulletin::reflow($source))->toBe(
+        "**HURRICANE HUNTERS FIND THAT ISAIAS NOW HAS 100 MPH WINDS** \n"
+        ."**PREPARATIONS TO PROTECT LIFE AND PROPERTY FROM STORM SURGE AND DAMAGING WINDS IN THE WARNING AREA SHOULD BE RUSHED TO COMPLETION TODAY**\n"
+    );
+});
