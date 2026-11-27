@@ -2,9 +2,11 @@
 
 namespace App\Actions\Weather;
 
+use App\Actions\Alerts\CanShowHeldAlertInApp;
 use App\Enums\AlertCategory;
 use App\Enums\MatchingMode;
 use App\Jobs\DeliverWeatherAlert;
+use App\Jobs\SendQuietAlertBadge;
 use App\Models\ActiveWwa;
 use App\Models\AlertRule;
 use App\Models\DeliveryLog;
@@ -200,6 +202,8 @@ class MatchWeatherAlertRules
                 }
 
                 if ($suppressed) {
+                    $inApp = app(CanShowHeldAlertInApp::class)($channel);
+
                     $log = DeliveryLog::create([
                         'alert_rule_id' => $rule->id,
                         'notification_channel_id' => $channel->id,
@@ -210,10 +214,16 @@ class MatchWeatherAlertRules
                         'subject' => app(RenderAlertSubject::class)($rule, $eventNames, $matchedLocation, $product, $segments),
                         'ingested_product_id' => $product->id,
                         'dispatched_at' => now(),
+                        'in_app' => $inApp,
                     ]);
 
                     if ($segments->isNotEmpty()) {
                         $log->segments()->attach($segments->modelKeys());
+                    }
+
+                    // After the row, so the badge counts it. Android gets no push for a held alert.
+                    if ($inApp && ($channel->config['platform'] ?? null) === 'ios') {
+                        $this->queueQuietBadge($channel);
                     }
 
                     return;
@@ -229,6 +239,18 @@ class MatchWeatherAlertRules
                 ]);
             }
         });
+    }
+
+    /**
+     * A failure to queue the badge is only logged: the alert is already held and in the app.
+     */
+    private function queueQuietBadge(NotificationChannel $channel): void
+    {
+        try {
+            SendQuietAlertBadge::dispatch($channel->id);
+        } catch (Throwable $e) {
+            logger()->warning('Failed to queue the quiet alert badge: '.$e::class, ['channel_id' => $channel->id]);
+        }
     }
 
     /**
