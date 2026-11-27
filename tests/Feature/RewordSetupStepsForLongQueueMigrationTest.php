@@ -30,7 +30,8 @@ test('it leaves owner-edited steps alone', function () {
 test('down restores the shipped wording', function () {
     $migration = rewordSetupStepsForLongQueueMigration();
 
-    // A rollback undoes the later boundaries rewording first.
+    // A rollback undoes the later boundaries and queue rewordings first.
+    (require database_path('migrations/2026_11_27_214257_add_broadcasts_queue_to_scheduler_setup_step.php'))->down();
     (require database_path('migrations/2026_11_15_110001_add_shapefile_scan_command_to_boundaries_step.php'))->down();
     $migration->down();
 
