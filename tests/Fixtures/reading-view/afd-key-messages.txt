@@ -1,0 +1,88 @@
+
+479
+FXUS63 KIWX 270007
+AFDIWX
+
+Area Forecast Discussion
+National Weather Service Northern Indiana
+707 PM EST Thu Nov 26 2026
+
+.KEY MESSAGES...
+
+- Rain and gusty winds continue through Friday, though winds 
+  and rain intensity diminish with time later tonight into 
+  Friday. 
+
+- Wet snow may mix in at times later tonight into Friday
+  morning. Light slushy accumulations possible in spots, though
+  roads should remain wet.
+
+- Another round of rain Sunday into Sunday evening. 
+
+- Mainly dry with gradual warming next week. 
+
+&&
+
+.DISCUSSION...
+Issued at 103 PM EST Thu Nov 26 2026
+
+A large eastern CONUS low pressure system, double-barreled with one 
+center lifting up the east coast and another taking a northeast 
+track just west of the Appalachians, will continue to provide the 
+local area with blustery/cool conditions and a steady rain for the 
+remainder of today through at least Friday morning. Aggressive 
+moisture surge and isentropic ascent within a 50-65 kt easterly jet 
+in the 850-700 mb layer brings more moderate rainfall this afternoon 
+and evening. Deformation forcing lingering on the western flank of 
+the system by later tonight and Friday with rainfall intensity and 
+coverage likely waning a bit with time, especially by later Friday 
+morning and afternoon when some dry pockets emerge. Modest CAA on 
+the backside of the low cold make it possible for wet snow to mix in 
+later tonight into Friday morning in spots. Still not expecting much 
+in the way of impacts given the wet ground and sfc temps/dewpoints 
+holding in the mid-upper 30s. The primary impacts from this system 
+still appear to be the widespread 1" or so rainfall totals, and 
+gusty northeast winds this afternoon-evening in the 30-40 mph range. 
+
+Saturday will feature weak warm advection and some sunshine as the 
+large low pressure system exits east and a trailing small scale 
+perturbation bypasses north of the area. A deeper, more progressive 
+shortwave trough remains on target to track east through the OH 
+Valley and Great Lakes Sunday into Sunday evening. Ensemble and 
+deterministic model solutions now generally agree on an associated 
+sfc low track through the OH Valley. Forcing and moisture return 
+will bring another round of primarily rain with amounts up to near a 
+half inch possible. Much of next week then appears mainly dry with 
+gradual moderation thanks to a transition to a lower amplitude, 
+split flow regime.
+
+&&
+
+.AVIATION /00Z TAFS THROUGH 00Z SATURDAY/...
+Issued at 701 PM EST Thu Nov 26 2026
+
+Predominantly MVFR to IFR conditions through the period at both
+terminals, with rain showers or drizzle persisting into Friday.
+Snow may mix in at times for both sites later tonight into
+Friday AM, but with warm ground temperatures and marginal air
+temps (around 34-38) do not expect much in the way of
+accumulations or impacts. Gusty northeast winds will shift N-NW
+overnight, gradually diminishing in intensity. Ceilings around 
+1500 ft should drop to around 700ft at times, with KFWA
+potentially down to 500-600ft. 
+
+
+&&
+
+.IWX WATCHES/WARNINGS/ADVISORIES...
+IN...None.
+OH...None.
+MI...None.
+MARINE...Gale Warning until 1 AM EST Friday for LMZ043-046.
+
+&&
+
+$$
+
+DISCUSSION...Steinwedel
+AVIATION...MCD

@@ -1,0 +1,47 @@
+AWUS01 KWNH 111341
+FFGMPD
+ILZ000-IAZ000-111738-
+
+Mesoscale Precipitation Discussion 1566
+NWS Weather Prediction Center College Park MD
+840 AM EST Wed Nov 11 2026
+
+Areas affected...eastern Iowa into northern/central Illinois
+
+Concerning...Heavy rainfall...Flash flooding possible
+
+Valid 111338Z - 111738Z
+
+Summary...Isolated/spotty flash flood potential exists from the
+Cedar Rapids area east-southeast into portions of Illinois over
+the next 2-4 hours (through 17Z/11a central).
+
+Discussion...A small cluster of convection has materialized in
+east-central Iowa with local training noted near the Cedar Rapids
+area.  The cells are being maintained by 1) convergent flow in the
+850-700mb layer, 2) steep lapse rates (7.5 C/km) from cool air
+aloft, and 3) a vigorous mid-level shortwave trough moving through
+the region.  The orientation of the axis of convergence (and
+resultant convection) is parallel to westerly steering flow aloft,
+allowing for local training and spots of rain rates exceeding 1.5
+inch/hr, which is also surpassing local FFG thresholds.  Flash
+flood potential exists in the near term.
+
+Over time, models/CAMs and observations hint at persistence of
+this cluster eastward into northern IL through at least 17Z.
+Local/limited training of cells will pose a continued flash flood
+threat as local FFG exceedance (and 1+ inch/hr rain rates) is
+possible.  This threat should remain isolated though.  Cells
+should reach the Peoria/Bloomington/Peru region of IL through
+16-17Z.
+
+Cook
+
+...Please see www.wpc.ncep.noaa.gov for graphic product...
+
+ATTN...WFO...DMX...DVN...ILX...LOT...
+
+ATTN...RFC...MSR...NWC...
+
+LAT...LON   42429041 42048876 41318813 40578865 40729018
+            41269214 42419207

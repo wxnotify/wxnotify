@@ -1,0 +1,69 @@
+
+095
+WWUS71 KCTP 262352
+NPWCTP
+
+URGENT - WEATHER MESSAGE
+National Weather Service State College PA
+652 PM EST Thu Nov 26 2026
+
+PAZ024-033-270100-
+/O.EXP.KCTP.HW.W.0002.000000T0000Z-261127T0000Z/
+Cambria-Somerset-
+Including the cities of Somerset and Johnstown
+652 PM EST Thu Nov 26 2026
+
+...HIGH WIND WARNING WILL EXPIRE AT 7 PM EST THIS EVENING...
+
+The wind is diminishing.
+
+$$
+
+PAZ012-017>019-025>028-034>036-041-042-045-046-049>053-056-063>065-
+270100-
+/O.EXP.KCTP.WI.Y.0009.000000T0000Z-261127T0000Z/
+Northern Clinton-Clearfield-Northern Centre-Southern Centre-Blair-
+Huntingdon-Mifflin-Juniata-Bedford-Fulton-Franklin-Northern Lycoming-
+Sullivan-Southern Clinton-Southern Lycoming-Union-Snyder-Montour-
+Northumberland-Columbia-Perry-Cumberland-Adams-York-
+Including the cities of Clearfield, Newport, Renovo, Lewistown, Mount
+Union, Bedford, Gettysburg, Danville, Selinsgrove, State College,
+Lewisburg, Laporte, Mifflintown, York, Chambersburg, Berwick,
+Huntingdon, Shamokin, Williamsport, Sunbury, McConnellsburg,
+Carlisle, Philipsburg, Lock Haven, Altoona, Bloomsburg, DuBois, and
+Trout Run
+652 PM EST Thu Nov 26 2026
+
+...WIND ADVISORY WILL EXPIRE AT 7 PM EST THIS EVENING...
+
+The wind is diminishing.
+
+$$
+
+PAZ057>059-066-270300-
+/O.CON.KCTP.HW.W.0002.000000T0000Z-261127T0300Z/
+Dauphin-Schuylkill-Lebanon-Lancaster-
+Including the cities of Pottsville, Harrisburg, Lancaster, Lebanon,
+and Hershey
+652 PM EST Thu Nov 26 2026
+
+...HIGH WIND WARNING REMAINS IN EFFECT UNTIL 10 PM EST THIS EVENING...
+
+* WHAT...East winds 20 to 30 mph with gusts up to 50 mph.
+
+* WHERE...Dauphin, Lancaster, Lebanon, and Schuylkill Counties.
+
+* WHEN...Until 10 PM EST this evening.
+
+* IMPACTS...Damaging winds will blow down trees and power lines. Widespread power outages are expected. Travel will be difficult, especially for high profile vehicles.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+Do not touch downed lines and report any power outages to your electric company. Travel is highly discouraged due to slick roadways and the possibility of downed trees and power lines.
+
+
+&&
+
+$$
+
+Martin/Bauco

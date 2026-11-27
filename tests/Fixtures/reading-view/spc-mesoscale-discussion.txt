@@ -1,0 +1,53 @@
+
+597
+ACUS11 KWNS 252131
+SWOMCD
+SPC MCD 252130 
+ILZ000-MOZ000-260300-
+
+Mesoscale Discussion 2465
+NWS Storm Prediction Center Norman OK
+0330 PM CST Wed Nov 25 2026
+
+Areas affected...Parts of southeastern Missouri and southwestern
+Illinois
+
+Concerning...Heavy snow 
+
+Valid 252130Z - 260300Z
+
+SUMMARY...Areas of heavy snow with rates near 1 inch per hour are
+possible later this afternoon and evening (around 6pm-9pm CST).
+
+DISCUSSION...Preceding a midlevel low tracking southeastward toward
+the Ozarks, regional VWP and mosaic radar data indicate a broad
+region of warm-advection-driven precipitation expanding northward
+across the Middle MS Valley region. Despite marginal low-level
+thermal profiles, cooling associated with increasing precipitation
+rates and strengthening ascent should support a gradual transition
+to snow across parts of the area over the next few hours. As this
+occurs, strengthening low/mid-level frontogenesis in the deformation
+zone of the approaching system should focus strengthening mesoscale
+ascent through a deeply saturated profile, including within the
+dendritic growth zone. This should support areas of heavy snow with
+rates near 1 inch per hour -- especially beneath any localized
+banding that evolves. 
+
+Current thinking is that the potential for localized banding and
+1-inch per hour snowfall rates will occur between 6pm-9pm CST, when
+the stronger mesoscale ascent should overlap the cooling thermal
+profiles. There is considerable uncertainty on precipitation type
+with eastward extent into parts of southern IL, given the deep plume
+of warm advection and associated warm nose -- which could favor a
+relatively sharp transition from snow to sleet/rain. Moderate to
+heavy snow is expected to persist through the overnight hours across
+parts of southeastern MO and southwestern IL.
+
+..Weinman.. 11/25/2026
+
+...Please see www.spc.noaa.gov for graphic product...
+
+ATTN...WFO...PAH...LSX...SGF...
+
+LAT...LON   37199112 37829120 38599111 38939089 39119055 39089012
+            38848974 37748967 37128984 36849017 36909090 37199112 

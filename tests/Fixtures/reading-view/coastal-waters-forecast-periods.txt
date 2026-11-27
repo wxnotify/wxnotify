@@ -1,0 +1,174 @@
+
+339
+FZUS54 KHGX 270039
+CWFHGX
+
+Coastal Waters Forecast for Texas
+National Weather Service Houston/Galveston TX
+639 PM CST Thu Nov 26 2026
+
+Upper Texas coastal waters from High Island to the Matagorda Ship
+Channel out 60 nautical miles including Galveston and Matagorda
+Bays.
+
+Seas are provided as a range of the average height of the highest
+1/3 of the waves...along with the occasional height of the
+average highest 10 percent of the waves.
+
+GMZ300-271315-
+639 PM CST Thu Nov 26 2026
+
+.Synopsis For High Island to the Matagorda Ship Channel Out 60 NM
+including Galveston and Matagorda Bays. 
+
+Northern parts of Galveston Bay will see some low water conditions
+through Friday's low tide cycles. Otherwise, winds and seas are 
+expected to decrease into Friday as surface high pressure moves 
+into the area. Onshore flow resumes late Friday and winds and seas
+will begin increasing Saturday and Saturday night in advance of 
+the next cold front that will push into the waters on Sunday. 
+Small Craft Advisories will likely be needed both ahead of and 
+behind the front. There is a non-zero chance of some fog a few 
+hours before the front's arrival early Sunday morning, but wind 
+speeds and direction appear fairly unfavorable for dense fog at 
+the current time. 
+
+$$
+
+GMZ335-271315-
+Galveston Bay-
+639 PM CST Thu Nov 26 2026
+
+...LOW WATER ADVISORY IN EFFECT UNTIL 9 PM CST FRIDAY...
+
+.TONIGHT...Northwest winds 10 to 15 knots. Bay waters slightly
+choppy. 
+.FRIDAY...Northwest winds 5 to 10 knots, becoming southwest in
+the afternoon. Bay waters smooth. 
+.FRIDAY NIGHT...Southwest winds 5 to 10 knots. Bay waters smooth.
+.SATURDAY...South winds 10 to 15 knots. Bay waters slightly
+choppy. 
+.SATURDAY NIGHT...South winds 15 to 20 knots with gusts up to
+25 knots. Bay waters choppy. Patchy fog after midnight. 
+.SUNDAY...West winds 15 to 20 knots, becoming northwest in the
+afternoon. Bay waters choppy. Patchy fog in the morning. 
+.SUNDAY NIGHT...North winds 15 to 20 knots, diminishing to around
+15 knots after midnight. Bay waters choppy, diminishing to
+slightly choppy after midnight. 
+.MONDAY...Northeast winds 10 to 15 knots, becoming east around
+10 knots in the afternoon. Bay waters slightly choppy,
+diminishing to smooth in the afternoon. 
+.MONDAY NIGHT...Southeast winds 5 to 10 knots. Bay waters smooth.
+.TUESDAY...Southeast winds 5 to 10 knots. Bay waters smooth. 
+.TUESDAY NIGHT...South winds 5 to 10 knots. Bay waters smooth. 
+
+$$
+
+GMZ330-271315-
+Matagorda Bay-
+639 PM CST Thu Nov 26 2026
+
+.TONIGHT...North winds around 10 knots. Bay waters smooth to
+slightly choppy. 
+.FRIDAY...North winds 5 to 10 knots, becoming south in the
+afternoon. Bay waters smooth. 
+.FRIDAY NIGHT...South winds 5 to 10 knots, becoming southwest
+after midnight. Bay waters smooth, increasing to smooth to
+slightly choppy after midnight. 
+.SATURDAY...Southwest winds 10 to 15 knots. Gusts up to 25 knots
+in the afternoon. Bay waters slightly choppy. 
+.SATURDAY NIGHT...South winds 20 to 25 knots, becoming southwest
+around 20 knots after midnight. Bay waters rough, diminishing to
+choppy after midnight. Patchy fog after midnight. 
+.SUNDAY...West winds around 20 knots, becoming north 20 to
+25 knots in the afternoon. Bay waters choppy, increasing to rough
+in the afternoon. Patchy fog in the morning. 
+.SUNDAY NIGHT...North winds 15 to 20 knots, diminishing to around
+15 knots after midnight. Bay waters choppy, diminishing to
+slightly choppy after midnight. 
+.MONDAY...Northeast winds 10 to 15 knots, becoming east around
+10 knots in the afternoon. Bay waters slightly choppy,
+diminishing to smooth in the afternoon. 
+.MONDAY NIGHT...Southeast winds 5 to 10 knots. Bay waters smooth.
+.TUESDAY...South winds 5 to 10 knots. Bay waters smooth. 
+.TUESDAY NIGHT...South winds 5 to 10 knots. Bay waters smooth. 
+
+$$
+
+GMZ350-355-271315-
+Coastal waters from Freeport to Matagorda Ship Channel TX out
+20 NM-Coastal waters from High Island to Freeport TX out 20 NM-
+639 PM CST Thu Nov 26 2026
+
+.TONIGHT...Northwest winds 10 to 15 knots. Seas 2 to 3 feet. Wave
+Detail: North 2 feet at 4 seconds. 
+.FRIDAY...North winds 5 to 10 knots, becoming southwest in the
+afternoon. Seas around 2 feet in the morning, then 1 foot or
+less. Wave Detail: North 1 foot at 3 seconds, becoming northeast
+1 foot at 4 seconds. 
+.FRIDAY NIGHT...Southwest winds 10 to 15 knots. Seas around
+2 feet. Wave Detail: Southwest 2 feet at 4 seconds and northeast
+1 foot at 4 seconds. 
+.SATURDAY...Southwest winds around 15 knots, becoming south 15 to
+20 knots with gusts up to 25 knots in the afternoon. Seas 2 to
+3 feet, building to 3 to 5 feet in the afternoon. Wave Detail:
+Southwest 2 feet at 4 seconds, becoming south 3 feet at
+4 seconds. 
+.SATURDAY NIGHT...South winds 20 to 25 knots with gusts up to
+30 knots. Seas 5 to 8 feet, occasionally to 10 feet. Wave Detail:
+South 7 feet at 6 seconds. 
+.SUNDAY...West winds 15 to 20 knots, becoming northwest in the
+afternoon. Seas 5 to 7 feet, occasionally to 9 feet, subsiding to
+4 to 5 feet in the afternoon. Wave Detail: South 6 feet at
+7 seconds, becoming south 5 feet at 7 seconds and northwest
+3 feet at 3 seconds. 
+.SUNDAY NIGHT...North winds 20 to 25 knots, diminishing to around
+20 knots after midnight. Seas 3 to 5 feet. 
+.MONDAY...Northeast winds 10 to 15 knots, becoming east around
+10 knots in the afternoon. Seas 2 to 4 feet. 
+.MONDAY NIGHT...Southeast winds 5 to 10 knots. Seas around
+2 feet. 
+.TUESDAY...South winds 5 to 10 knots. Seas around 2 feet. 
+.TUESDAY NIGHT...South winds 5 to 10 knots. Seas 2 to 3 feet. 
+
+$$
+
+GMZ370-375-271315-
+Waters from Freeport to Matagorda Ship Channel TX from 20 to
+60 NM-Waters from High Island to Freeport TX from 20 to 60 NM-
+639 PM CST Thu Nov 26 2026
+
+.TONIGHT...Northwest winds around 15 knots. Seas 2 to 4 feet. 
+Wave Detail: North 3 feet at 5 seconds. 
+.FRIDAY...North winds 10 to 15 knots, becoming northwest around
+5 knots in the afternoon. Seas 2 to 3 feet. Wave Detail: North
+3 feet at 5 seconds. 
+.FRIDAY NIGHT...South winds around 10 knots, becoming southwest
+10 to 15 knots after midnight. Seas around 2 feet. Wave Detail:
+Southwest 2 feet at 3 seconds and northeast 1 foot at 5 seconds. 
+.SATURDAY...South winds around 15 knots, increasing to 20 to
+25 knots in the afternoon. Seas 2 to 3 feet, building to 3 to
+5 feet in the afternoon. Wave Detail: Southwest 2 feet at
+4 seconds and east 1 foot at 5 seconds, becoming south 5 feet at
+5 seconds. 
+.SATURDAY NIGHT...South winds 20 to 25 knots with gusts up to
+30 knots. Seas 5 to 7 feet, occasionally to 9 feet, building to
+7 to 8 feet, occasionally to 10 feet after midnight. Wave Detail:
+South 7 feet at 6 seconds, becoming south 8 feet at 7 seconds. 
+.SUNDAY...Southwest winds around 20 knots, becoming northwest in
+the afternoon. Seas 6 to 8 feet, occasionally to 10 feet,
+subsiding to 5 to 6 feet, occasionally to 8 feet in the
+afternoon. Wave Detail: Southwest 8 feet at 7 seconds, becoming
+south 6 feet at 7 seconds and northwest 4 feet at 5 seconds. 
+.SUNDAY NIGHT...North winds 20 to 25 knots. Seas 5 to 7 feet,
+occasionally to 9 feet. 
+.MONDAY...Northeast winds 15 to 20 knots, diminishing to around
+10 knots in the afternoon. Seas 4 to 6 feet, occasionally to
+8 feet. 
+.MONDAY NIGHT...East winds around 10 knots, becoming southeast
+after midnight. Seas 2 to 4 feet. 
+.TUESDAY...South winds 5 to 10 knots. Seas 2 to 3 feet. 
+.TUESDAY NIGHT...South winds around 10 knots, increasing to 10 to
+15 knots after midnight. Seas 2 to 4 feet. 
+
+$$

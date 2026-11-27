@@ -1,0 +1,68 @@
+
+403
+WWUS53 KDVN 111432
+SVSDVN
+
+Severe Weather Statement
+National Weather Service Quad Cities IA/IL
+832 AM CST Wed Nov 11 2026
+
+ILC161-111441-
+/O.CAN.KDVN.SV.W.0293.000000T0000Z-261111T1515Z/
+Rock Island IL-
+832 AM CST Wed Nov 11 2026
+
+...THE SEVERE THUNDERSTORM WARNING FOR EAST CENTRAL ROCK ISLAND COUNTY IS CANCELLED...
+
+The severe thunderstorm which prompted the warning has moved out of the warned area. Therefore, the warning has been cancelled.
+
+&&
+
+LAT...LON 4137 8992 4144 9043 4146 9043 4146 9041
+      4148 9038 4151 9036 4151 9031 4152 9030
+      4152 9025 4154 9021 4152 8989
+TIME...MOT...LOC 1431Z 276DEG 26KT 4149 9030 
+
+$$
+
+ILC073-111515-
+/O.CON.KDVN.SV.W.0293.000000T0000Z-261111T1515Z/
+Henry IL-
+832 AM CST Wed Nov 11 2026
+
+...A SEVERE THUNDERSTORM WARNING REMAINS IN EFFECT UNTIL 915 AM CST FOR NORTHERN HENRY COUNTY...
+
+At 831 AM CST, a severe thunderstorm was located over Dayton, or near East Moline, moving east at 30 mph.
+
+HAZARD...60 mph wind gusts and quarter size hail.
+
+SOURCE...Trained weather spotters.
+
+IMPACT...Hail damage to vehicles is expected. Expect wind damage to roofs, siding, and trees.
+
+Locations impacted include...
+Geneseo, Colona, Coal Valley, Atkinson, Annawan, Hooppole, Cleveland, Osborn, Dayton, Green River, and Shady Beach.
+
+This includes the following highways...
+ Interstate 80 in Illinois between mile markers 6 and 32.
+ Interstate 74 in Illinois between mile markers 8 and 14.
+
+PRECAUTIONARY/PREPAREDNESS ACTIONS...
+
+For your protection move to an interior room on the lowest floor of a sturdy building.
+
+&&
+
+LAT...LON 4137 8992 4144 9043 4146 9043 4146 9041
+      4148 9038 4151 9036 4151 9031 4152 9030
+      4152 9025 4154 9021 4152 8989
+TIME...MOT...LOC 1431Z 276DEG 26KT 4149 9030 
+
+HAIL THREAT...OBSERVED
+MAX HAIL SIZE...1.00 IN
+WIND THREAT...RADAR INDICATED
+MAX WIND GUST...60 MPH
+
+$$
+
+08

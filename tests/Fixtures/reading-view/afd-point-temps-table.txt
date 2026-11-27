@@ -1,0 +1,78 @@
+
+275
+FXUS64 KJAN 261128 AAA
+AFDJAN
+
+Area Forecast Discussion...UPDATED
+National Weather Service Jackson MS
+528 AM CST Thu Nov 26 2026
+
+...New AVIATION...
+
+.KEY MESSAGES...
+ 
+- Dry and chilly weather is expected for Thanksgiving Day.
+
+&&
+
+.DISCUSSION...
+Issued at 1217 AM CST Thu Nov 26 2026
+
+Today through Wednesday night...The rain has mostly ended across 
+the area tonight, but some drizzle and mist continue across the 
+area. Drier air will build in across the area today and skies will
+begin to clear over much of the area, but expect clouds to 
+persist over the northeast. As cold air advection continues,
+temperatures will remain cool, ranging from the mid 40s across the
+Golden Triangle to the mid 50s in northeast Louisianan. 
+Temperatures tonight will fall just below freezing across most of 
+the area. The surface ridge will shift east of the area on Friday 
+and the flow will become more southeasterly. Highs will mostly be 
+in the mid 50s. 
+
+Southerly flow will increase out ahead over another front/short 
+wave on Saturday with warmer highs in the upper 60s. The 
+boundary will sweep across the area on Sunday, but it looks like 
+moisture/instability will be limited. Expect mostly scattered 
+showers/storms Sunday afternoon into the evening hours. High 
+pressure will build across the area on Monday and continue through
+the end of the period./15/
+
+&&
+
+.AVIATION...
+(12Z TAFS)
+Issued at 526 AM CST Thu Nov 26 2026
+
+Flight categories will gradually improve at most area TAF sites 
+this forecast period as a low pressure system steadily lifts 
+northeast and out of the region. Through this morning, look for a 
+mix of IFR to VFR flight categories due to low stratus across the 
+area. Then through the afternoon and into this evening, a return 
+to VFR conditions is expected. Winds will increase through late 
+morning and will be sustained around 15 knots, with gusts between 
+20- 25 knots possible through the afternoon as they become more 
+westerly through the period. /19/
+
+&&
+
+.PRELIMINARY POINT TEMPS/POPS...
+Jackson       50  32  59  33 /   0   0   0   0 
+Meridian      48  29  58  29 /   0   0   0   0 
+Vicksburg     54  31  61  33 /   0   0   0   0 
+Hattiesburg   53  33  59  33 /   0   0   0   0 
+Natchez       55  33  61  35 /   0   0   0   0 
+Greenville    52  34  60  37 /   0   0   0   0 
+Greenwood     49  29  58  32 /   0   0   0   0 
+
+&&
+
+.JAN WATCHES/WARNINGS/ADVISORIES...
+MS...None.
+LA...None.
+AR...None.
+&&
+
+$$
+
+19

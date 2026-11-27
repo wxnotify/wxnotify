@@ -1,0 +1,39 @@
+
+215
+WGUS84 KEWX 110110
+FLSEWX
+
+Flood Statement
+National Weather Service Austin/San Antonio TX
+710 PM CST Tue Nov 10 2026
+
+...The Flood Warning is cancelled for the following rivers in Texas...
+
+  Devils River At Pafford Crossing nr Comstock affecting Val Verde
+  County.
+
+TXC465-110215-
+/O.CAN.KEWX.FL.W.0061.000000T0000Z-261111T0110Z/
+/CMKT2.2.ER.261110T0625Z.261110T1030Z.000000T0000Z.NO/
+710 PM CST Tue Nov 10 2026
+
+...FLOOD WARNING IS CANCELLED...
+
+The Flood Warning is cancelled for
+  the Devils River At Pafford Crossing nr Comstock.
+
+* ADDITIONAL DETAILS...
+  - At 6:15 PM CST Tuesday the stage was 4.5 feet.
+  - Bankfull stage is 4.0 feet.
+  - Forecast...The river is expected to fall to 4.0 feet Thursday morning.
+  - http://www.weather.gov/safety/flood
+
+&&
+
+LAT...LON 2968 10103 2971 10095 2966 10089 2956 10092
+      2953 10100 2963 10097
+
+
+$$
+
+Tran

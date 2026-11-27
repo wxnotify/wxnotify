@@ -16,3 +16,7 @@ indent_size = 2
 
 [{compose,docker-compose}.{yml,yaml}]
 indent_size = 4
+
+[tests/Fixtures/reading-view/*.txt]
+trim_trailing_whitespace = false
+insert_final_newline = false
