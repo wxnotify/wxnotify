@@ -214,7 +214,8 @@ class MatchWeatherAlertRules
                         'subject' => app(RenderAlertSubject::class)($rule, $eventNames, $matchedLocation, $product, $segments),
                         'ingested_product_id' => $product->id,
                         'dispatched_at' => now(),
-                        'in_app' => $inApp,
+                        // Named only when true: on a database not yet migrated, no other held row may fail.
+                        ...($inApp ? ['in_app' => true] : []),
                     ]);
 
                     if ($segments->isNotEmpty()) {

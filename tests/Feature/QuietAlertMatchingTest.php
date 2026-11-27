@@ -17,6 +17,8 @@ use App\Models\Product;
 use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
@@ -160,6 +162,49 @@ test('an eligibility check that throws still writes the held row, and logs only 
         ->and($row->in_app)->toBeFalse()
         ->and($this->logged->all())->toBe(['Held alert app check failed: RuntimeException []']);
     Queue::assertNothingPushed();
+});
+
+test('a database error in the eligibility check does not abort the transaction or lose the held row', function () {
+    Queue::fake();
+    // A real PostgreSQL error inside the test's open transaction: without a savepoint every later statement fails.
+    $this->mock(ChannelDispatcher::class)->shouldReceive('refusalFor')->andReturnUsing(function (): ?string {
+        DB::select('select * from table_that_does_not_exist');
+
+        return null;
+    });
+    $first = ($this->phone)('ios', 'first-token');
+    $second = ($this->phone)('ios', 'second-token');
+    ($this->attach)($first, $second);
+
+    ($this->match)();
+
+    expect(($this->rowFor)($first)->status)->toBe('suppressed')
+        ->and(($this->rowFor)($first)->in_app)->toBeFalse()
+        ->and(($this->rowFor)($second)->status)->toBe('suppressed')
+        ->and($this->logged->all())->toBe(array_fill(0, 2, 'Held alert app check failed: '.QueryException::class.' []'));
+});
+
+test('only a marked held row names in_app in its insert, so the others survive a database not yet migrated', function () {
+    Queue::fake();
+    $email = NotificationChannel::factory()->for($this->user)->email()->create();
+    $phone = ($this->phone)('ios');
+    ($this->attach)($email, $phone);
+    // Each insert into delivery_logs, keyed by the channel type it wrote.
+    $inserts = [];
+    DB::listen(function (QueryExecuted $query) use (&$inserts): void {
+        if (str_starts_with($query->sql, 'insert into "delivery_logs"')) {
+            $channelType = collect($query->bindings)->first(fn (mixed $binding): bool => in_array($binding, ['email', 'mobile_push'], true));
+            $inserts[$channelType] = $query->sql;
+        }
+    });
+
+    ($this->match)();
+
+    expect($inserts)->toHaveKeys(['email', 'mobile_push'])
+        ->and($inserts['email'])->not->toContain('in_app')
+        ->and($inserts['mobile_push'])->toContain('"in_app"')
+        ->and(($this->rowFor)($email)->in_app)->toBeFalse()
+        ->and(($this->rowFor)($phone)->in_app)->toBeTrue();
 });
 
 test('a channel whose config cannot be decrypted is still held, and the other channels are unaffected', function () {
