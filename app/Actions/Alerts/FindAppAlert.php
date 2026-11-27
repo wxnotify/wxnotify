@@ -9,8 +9,8 @@ use App\Support\AppAlert;
 
 /**
  * One of the subscriber's alerts for the mobile app, by the id the feed gave out, or null
- * when it is unknown, belongs to someone else or never reached a phone (no successful push
- * row in its group, so it is not in the feed either). Any row id of a group finds the whole group (the same three
+ * when it is unknown, belongs to someone else or is not in the app's feed (no row of its group
+ * passes DeliveryLog::isInAppFeed()). Any row id of a group finds the whole group (the same three
  * cases as AppAlert::keyFor()), whose id is still its lowest row id.
  */
 class FindAppAlert
@@ -44,7 +44,7 @@ class FindAppAlert
     /**
      * The alert a push's tap link names (AlertRef): the subscriber's own group for that reference, or null when the
      * reference is malformed, nothing is written for it yet (the push is tapped while its delivery row is being
-     * written), it is someone else's, or it never reached a phone.
+     * written), it is someone else's, or it is not in the app's feed.
      */
     public function byRef(User $user, string $ref): ?AppAlert
     {

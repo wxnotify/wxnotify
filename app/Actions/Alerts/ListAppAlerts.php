@@ -15,9 +15,9 @@ use Illuminate\Support\Facades\DB;
  * lightning run of a rule with no product, sent to each of its channels); ordering is by the group's latest delivery time, then
  * its id, and the cursor carries both so pages are stable when times tie.
  *
- * Only alerts that reached one of the subscriber's phones are listed: a group is in the feed when at least one
- * of its rows is a successful `mobile_push` (DeliveryLog::scopePushedToPhone()). The group's id, time and cursor
- * still come from all of its rows, so they are the same as before the feed was narrowed.
+ * Only alerts shown on the subscriber's phones are listed: a group is in the feed when at least one of its rows is
+ * (DeliveryLog::IN_APP_FEED_SQL: a successful `mobile_push`, or one marked `in_app`). The group's id, time and
+ * cursor still come from all of its rows, so they are the same as before the feed was narrowed.
  */
 class ListAppAlerts
 {
@@ -28,12 +28,12 @@ class ListAppAlerts
     public const GROUP_KEY = "CASE WHEN ingested_product_id IS NOT NULL THEN COALESCE(alert_rule_id::text, 'none') || '-' || ingested_product_id WHEN batch_key IS NOT NULL THEN 'batch-' || batch_key ELSE 'row-' || id END";
 
     /**
-     * True for a group with at least one successful push row; mirrors DeliveryLog::scopePushedToPhone(). It is a
+     * True for a group with at least one row in the app's feed (DeliveryLog::IN_APP_FEED_SQL). It is a
      * column of the grouped subquery filtered outside it, not a HAVING: on Postgres the HAVING form tipped the
      * planner into sorting every row by the text group key (about 4x slower on 160k rows of one user), while
      * this form keeps today's hash aggregate.
      */
-    public const HAS_PUSH = "bool_or(channel_type = 'mobile_push' AND status = 'success')";
+    public const HAS_PUSH = 'bool_or('.DeliveryLog::IN_APP_FEED_SQL.')';
 
     /**
      * @return array{alerts: Collection<int, AppAlert>, next_cursor: ?string}

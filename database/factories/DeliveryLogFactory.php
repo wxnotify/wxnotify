@@ -47,6 +47,18 @@ class DeliveryLogFactory extends Factory
         ]);
     }
 
+    /**
+     * A held phone push that is shown in the app: not sent, but in the feed.
+     */
+    public function heldInApp(): static
+    {
+        return $this->state(fn () => [
+            'channel_type' => 'mobile_push',
+            'status' => 'suppressed',
+            'in_app' => true,
+        ]);
+    }
+
     public function read(): static
     {
         return $this->state(fn () => [

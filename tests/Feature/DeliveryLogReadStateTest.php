@@ -108,13 +108,24 @@ function outsideTestTransaction(Closure $callback): void
     }
 }
 
+/**
+ * The read-state migration's own index was later replaced (and its `read_at` column, dropped by its down(), takes
+ * the replacement with it), so each test of it ends by running the replacing migration again.
+ */
+function restoreAppUnreadIndex(): void
+{
+    (require base_path('database/migrations/2026_11_27_203343_replace_delivery_logs_unread_push_index.php'))->up();
+}
+
 function unreadPushIndexIsValid(): bool
 {
     return (bool) DB::selectOne("SELECT indisvalid FROM pg_index WHERE indexrelid = 'delivery_logs_unread_push_index'::regclass")?->indisvalid;
 }
 
 test('the read-state migration can be run again after an interruption and leaves a valid index', function () {
-    outsideTestTransaction(function () {
+    $valid = false;
+
+    outsideTestTransaction(function () use (&$valid) {
         $migration = loadDeliveryLogReadAtMigration();
 
         $migration->down();
@@ -126,18 +137,28 @@ test('the read-state migration can be run again after an interruption and leaves
         // Interrupted before the index was built: the column is there, the index is missing.
         DB::statement('DROP INDEX CONCURRENTLY IF EXISTS delivery_logs_unread_push_index');
         $migration->up();
+
+        $valid = unreadPushIndexIsValid();
+        restoreAppUnreadIndex();
     });
 
-    expect(unreadPushIndexIsValid())->toBeTrue();
+    expect($valid)->toBeTrue();
 });
 
 test('an index left invalid by an interrupted concurrent build is rebuilt', function () {
-    outsideTestTransaction(function () {
+    $valid = false;
+
+    outsideTestTransaction(function () use (&$valid) {
+        loadDeliveryLogReadAtMigration()->up();
+
         // Mark the index invalid, as a failed CREATE INDEX CONCURRENTLY leaves it.
         DB::statement("UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'delivery_logs_unread_push_index'::regclass");
 
         loadDeliveryLogReadAtMigration()->up();
+
+        $valid = unreadPushIndexIsValid();
+        restoreAppUnreadIndex();
     });
 
-    expect(unreadPushIndexIsValid())->toBeTrue();
+    expect($valid)->toBeTrue();
 });

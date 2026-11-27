@@ -9,9 +9,9 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Marks the subscriber's app alerts read. An alert is read by stamping `read_at` on every successful push row
- * of its group that exists now (rows added since the list was fetched included), in one UPDATE of the rows
- * still unread, so repeating a call changes nothing. Every method returns the new unread count.
+ * Marks the subscriber's app alerts read. An alert is read by stamping `read_at` on every row of its group that is
+ * in the app's feed (DeliveryLog::scopeInAppFeed()) and exists now (rows added since the list was fetched
+ * included), in one UPDATE of the rows still unread, so repeating a call changes nothing. Every method returns the new unread count.
  */
 class MarkAppAlertsRead
 {
@@ -53,7 +53,7 @@ class MarkAppAlertsRead
             DeliveryLog::query()
                 ->where('user_id', $user->id)
                 ->inAlertGroup($group['alert_rule_id'], $group['ingested_product_id'], $group['batch_key'])
-                ->pushedToPhone()
+                ->inAppFeed()
                 ->unread()
                 ->toBase()
                 ->update(['read_at' => now()]);
@@ -72,7 +72,7 @@ class MarkAppAlertsRead
     {
         DeliveryLog::query()
             ->where('user_id', $user->id)
-            ->pushedToPhone()
+            ->inAppFeed()
             ->unread()
             ->when($through !== null, fn (Builder $query): Builder => $query->where(
                 'created_at',

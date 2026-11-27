@@ -35,17 +35,18 @@ final class AppAlert
     }
 
     /**
-     * The rows that delivered this alert to one of the subscriber's phones (DeliveryLog::scopePushedToPhone()).
+     * The rows that put this alert in the app's feed (DeliveryLog::isInAppFeed()): sent to one of the subscriber's
+     * phones, or marked to be shown without being sent.
      *
      * @return Collection<int, DeliveryLog>
      */
     public function pushRows(): Collection
     {
-        return $this->rows->filter(fn (DeliveryLog $row): bool => $row->isPushedToPhone())->values();
+        return $this->rows->filter(fn (DeliveryLog $row): bool => $row->isInAppFeed())->values();
     }
 
     /**
-     * Unread while any push row is unread, so a new push to an alert already read makes it unread again.
+     * Unread while any of those rows is unread, so a new push to an alert already read makes it unread again.
      */
     public function isUnread(): bool
     {

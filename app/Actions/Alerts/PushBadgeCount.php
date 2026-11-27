@@ -9,11 +9,12 @@ use App\Models\User;
  * The iOS icon number to send with a push: the subscriber's unread app alerts (CountUnreadAppAlerts), plus one
  * when the push is an alert whose group is not already unread. The delivery row of this push does not exist yet
  * (the jobs write it after the send), so the pushed alert is added here: it adds one unless the subscriber already
- * has an unread successful push in the same group (with a product: same rule, NULL-safe, and same product; without
- * one: same batch key, e.g. the push to the subscriber's other phone in the same run), i.e. a read group or a new
- * one counts. A push with neither (a job queued before batch keys) is always a new single-row group. A push that is not
- * an alert (the test push, which writes no delivery row) gets the plain unread count. Two near-simultaneous pushes
- * can be off by one; the app corrects the icon from the feed's `unread_count`.
+ * has an unread row of the app's feed (DeliveryLog::scopeInAppFeed()) in the same group (with a product: same
+ * rule, NULL-safe, and same product; without one: same batch key, e.g. the push to the subscriber's other phone
+ * in the same run), i.e. a read group or a new one counts. A push with neither (a job queued before batch keys)
+ * is always a new single-row group. A push that is not an alert (the test push, which writes no delivery row) gets
+ * the plain unread count. Two near-simultaneous pushes can be off by one; the app corrects the icon from the
+ * feed's `unread_count`.
  */
 class PushBadgeCount
 {
@@ -32,7 +33,7 @@ class PushBadgeCount
         $groupIsUnread = DeliveryLog::query()
             ->where('user_id', $user->id)
             ->inAlertGroup($alertRuleId, $ingestedProductId, $batchKey)
-            ->pushedToPhone()
+            ->inAppFeed()
             ->unread()
             ->exists();
 
