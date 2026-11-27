@@ -294,3 +294,14 @@ test('a CAP product shows its readable text and never XML', function () {
         ->not->toContain('<?xml')
         ->not->toContain('type="checkbox"');
 });
+
+test('both product text blocks are set in a monospace font and the switch label is spaced from its checkbox', function () {
+    $product = pageProduct();
+
+    $html = $this->get(route('view-product.show', $product->view_slug))->assertOk()->getContent();
+
+    // The compiled theme leaves --font-mono empty on this page, so the font-mono utility alone does nothing.
+    expect($html)
+        ->toContain('pre.product-text-reading, pre.product-text-original { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }')
+        ->toContain('.original-layout-toggle + label { margin-inline-start: 0.5rem; }');
+});

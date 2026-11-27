@@ -14,6 +14,8 @@
         details.fi-section > summary .product-details-chevron { flex: none; margin-inline-start: auto; transition: transform 150ms; }
         details.fi-section[open] > summary .product-details-chevron { transform: rotate(180deg); }
 
+        pre.product-text-reading, pre.product-text-original { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+        .original-layout-toggle + label { margin-inline-start: 0.5rem; }
         .original-layout-toggle ~ pre { margin-top: 0.75rem; }
         .product-text-original { display: none; }
         .original-layout-toggle:checked ~ .product-text-reading { display: none; }
