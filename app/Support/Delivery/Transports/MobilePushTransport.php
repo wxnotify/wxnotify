@@ -8,6 +8,7 @@ use App\Models\NotificationChannel;
 use App\Support\AlertRef;
 use App\Support\Delivery\DeliveryResult;
 use App\Support\Delivery\FcmClient;
+use App\Support\Delivery\FcmResult;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -20,6 +21,8 @@ class MobilePushTransport implements Transport
 {
     /** Long enough for DeliverWeatherAlert to write its delivery-log row first. */
     public const PRUNE_DELAY_SECONDS = 60;
+
+    private const MISSING_TOKEN = 'This device channel has no push token; open the app to register it again.';
 
     /**
      * Named in the FCM data of every phone push for app builds from before read/unread alerts, whose listener
@@ -41,7 +44,7 @@ class MobilePushTransport implements Transport
         $token = $channel->config['fcm_token'] ?? null;
 
         if (blank($token)) {
-            return DeliveryResult::failed('This device channel has no push token; open the app to register it again.');
+            return DeliveryResult::failed(self::MISSING_TOKEN);
         }
 
         $badge = ($channel->config['platform'] ?? null) === 'ios' ? $this->badge($channel, $meta) : null;
@@ -60,6 +63,32 @@ class MobilePushTransport implements Transport
             $this->sound($meta),
         );
 
+        return $this->outcome($channel, $token, $result);
+    }
+
+    /**
+     * Sets the icon badge of one iPhone without notifying it. Any other platform is refused before any request.
+     */
+    public function sendBadge(NotificationChannel $channel, int $badge): DeliveryResult
+    {
+        if (($channel->config['platform'] ?? null) !== 'ios') {
+            return DeliveryResult::failed('Only an iPhone takes a badge-only push.');
+        }
+
+        $token = $channel->config['fcm_token'] ?? null;
+
+        if (blank($token)) {
+            return DeliveryResult::failed(self::MISSING_TOKEN);
+        }
+
+        return $this->outcome($channel, $token, $this->fcm->sendBadge($token, $badge));
+    }
+
+    /**
+     * A token Firebase calls dead queues the removal of its channel.
+     */
+    private function outcome(NotificationChannel $channel, string $token, FcmResult $result): DeliveryResult
+    {
         if ($result->success) {
             return DeliveryResult::delivered();
         }

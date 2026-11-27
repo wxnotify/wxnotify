@@ -44,21 +44,53 @@ class ChannelDispatcher
      */
     public function send(NotificationChannel $channel, string $body, ?string $title = null, array $meta = []): DeliveryResult
     {
-        $type = $this->registry->find($channel->channel_type);
-
-        if ($type === null) {
-            return DeliveryResult::failed("Unknown channel type [{$channel->channel_type}].");
-        }
-
-        $refusal = $this->refusal($channel, $type, $meta);
+        $refusal = $this->refusalFor($channel, $meta);
 
         if ($refusal !== null) {
             return DeliveryResult::failed($refusal);
         }
 
+        $type = $this->registry->find($channel->channel_type);
+
         $title = $title !== null ? MessagePrefix::apply($title) : null;
 
         return $this->transportFor($type->transport())->send($channel, $body, $title, $meta);
+    }
+
+    /**
+     * Sets a phone's app-icon badge without notifying it, through the same refusals as an alert. Only a phone
+     * push channel takes one, and only an iPhone's (MobilePushTransport::sendBadge()).
+     */
+    public function sendAppBadge(NotificationChannel $channel, int $badge): DeliveryResult
+    {
+        $refusal = $this->refusalFor($channel);
+
+        if ($refusal !== null) {
+            return DeliveryResult::failed($refusal);
+        }
+
+        if ($this->registry->find($channel->channel_type)?->transport() !== ChannelTransport::MobilePush) {
+            return DeliveryResult::failed('Only a phone push channel has an app badge.');
+        }
+
+        return app(MobilePushTransport::class)->sendBadge($channel, $badge);
+    }
+
+    /**
+     * Why this channel would be refused right now, or null when a send would reach its transport. It makes no
+     * HTTP call. The meta matters only for a confirmation code; without it the answer is the one for an alert.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    public function refusalFor(NotificationChannel $channel, array $meta = []): ?string
+    {
+        $type = $this->registry->find($channel->channel_type);
+
+        if ($type === null) {
+            return "Unknown channel type [{$channel->channel_type}].";
+        }
+
+        return $this->refusal($channel, $type, $meta);
     }
 
     /**

@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\Http;
  * Sends one push message through the Firebase Cloud Messaging v1 HTTP API. Authentication is a
  * service-account JWT (RS256, signed with openssl) traded at Google's token endpoint for an
  * access token that is cached until shortly before it expires. Both hosts are fixed (no
- * subscriber-controlled URL), redirects are off, and there is exactly one attempt: the outcome
- * is the delivery-log row, not a retried job.
+ * subscriber-controlled URL), redirects are off, and there is exactly one attempt: an alert's
+ * outcome is the delivery-log row, not a retried job.
  */
 class FcmClient
 {
@@ -24,6 +24,12 @@ class FcmClient
 
     /** A weather alert that could not be delivered within an hour is stale: FCM drops it (default 4 weeks). */
     private const TTL_SECONDS = 3600;
+
+    /** A badge number is not a warning: a phone that is offline overnight should still get it. */
+    private const BADGE_TTL_SECONDS = 86400;
+
+    /** One id for every badge push, so APNs keeps only the newest number waiting for a phone. */
+    private const BADGE_COLLAPSE_ID = 'wx-badge';
 
     /**
      * The high-importance channel the nativephp firebase plugin creates in its service. Without it
@@ -47,6 +53,47 @@ class FcmClient
     {
         $sound = PushSounds::isKnown($sound) ? $sound : null;
 
+        return $this->deliver([
+            'token' => $deviceToken,
+            'notification' => ['title' => $title, 'body' => $body],
+            'data' => (object) $data,
+            'android' => [
+                'priority' => 'HIGH',
+                'ttl' => self::TTL_SECONDS.'s',
+                'notification' => ['channel_id' => $sound === null ? self::ANDROID_CHANNEL : self::ANDROID_SOUND_CHANNEL_PREFIX.$sound],
+            ],
+            'apns' => [
+                'headers' => ['apns-expiration' => (string) (now()->timestamp + self::TTL_SECONDS)],
+                'payload' => ['aps' => ['sound' => $sound === null ? 'default' : "{$sound}.wav"] + ($badge !== null ? ['badge' => $badge] : [])],
+            ],
+        ]);
+    }
+
+    /**
+     * Sets an iPhone's app-icon badge number and nothing else: no `notification`, `data` or sound, so the phone
+     * shows no banner and stays silent. For iOS devices only; the message has no `android` block.
+     */
+    public function sendBadge(string $deviceToken, int $badge): FcmResult
+    {
+        return $this->deliver([
+            'token' => $deviceToken,
+            'apns' => [
+                'headers' => [
+                    'apns-push-type' => 'alert',
+                    'apns-priority' => '10',
+                    'apns-collapse-id' => self::BADGE_COLLAPSE_ID,
+                    'apns-expiration' => (string) (now()->timestamp + self::BADGE_TTL_SECONDS),
+                ],
+                'payload' => ['aps' => ['badge' => $badge]],
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $message  the FCM v1 `message` object
+     */
+    private function deliver(array $message): FcmResult
+    {
         $credentials = $this->credentials();
 
         if ($credentials === null) {
@@ -62,20 +109,7 @@ class FcmClient
         try {
             $response = $this->request()->withToken($accessToken)->post(
                 'https://fcm.googleapis.com/v1/projects/'.rawurlencode($credentials['project_id']).'/messages:send',
-                ['message' => [
-                    'token' => $deviceToken,
-                    'notification' => ['title' => $title, 'body' => $body],
-                    'data' => (object) $data,
-                    'android' => [
-                        'priority' => 'HIGH',
-                        'ttl' => self::TTL_SECONDS.'s',
-                        'notification' => ['channel_id' => $sound === null ? self::ANDROID_CHANNEL : self::ANDROID_SOUND_CHANNEL_PREFIX.$sound],
-                    ],
-                    'apns' => [
-                        'headers' => ['apns-expiration' => (string) (now()->timestamp + self::TTL_SECONDS)],
-                        'payload' => ['aps' => ['sound' => $sound === null ? 'default' : "{$sound}.wav"] + ($badge !== null ? ['badge' => $badge] : [])],
-                    ],
-                ]],
+                ['message' => $message],
             );
         } catch (ConnectionException) {
             return FcmResult::failed('Firebase could not be reached.');

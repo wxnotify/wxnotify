@@ -260,3 +260,59 @@ test('isConfigured is true for a stored service account or a key file, and false
     fcmStoreServiceAccount();
     expect(app(FcmClient::class)->isConfigured())->toBeTrue();
 });
+
+test('a badge push carries only the badge, with its own headers and a one-day expiry', function (int $badge) {
+    $this->freezeTime();
+    fcmFakeGoogle();
+
+    $result = app(FcmClient::class)->sendBadge('device-token-1', $badge);
+
+    [$request] = Http::recorded(fn (Request $request) => str_contains($request->url(), 'messages:send'))->sole();
+
+    expect($result->success)->toBeTrue()
+        ->and($request->url())->toBe('https://fcm.googleapis.com/v1/projects/wx-test/messages:send')
+        ->and($request->hasHeader('Authorization', 'Bearer ya29.test-access-token'))->toBeTrue()
+        ->and(json_decode($request->body(), true))->toBe(['message' => [
+            'token' => 'device-token-1',
+            'apns' => [
+                'headers' => [
+                    'apns-push-type' => 'alert',
+                    'apns-priority' => '10',
+                    'apns-collapse-id' => 'wx-badge',
+                    'apns-expiration' => (string) (now()->timestamp + 86400),
+                ],
+                'payload' => ['aps' => ['badge' => $badge]],
+            ],
+        ]]);
+})->with(['an unread count' => 3, 'zero' => 0]);
+
+test('a badge push classifies Firebase errors like an alert push, in one attempt', function (int $status, array $body, bool $tokenInvalid, string $error) {
+    fcmFakeGoogle(Http::response($body, $status));
+
+    $result = app(FcmClient::class)->sendBadge('super-secret-device-token', 1);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->tokenInvalid)->toBe($tokenInvalid)
+        ->and($result->error)->toBe($error);
+    expect(Http::recorded(fn (Request $request) => str_contains($request->url(), 'messages:send')))->toHaveCount(1);
+})->with([
+    'unregistered' => [404, ['error' => ['details' => [['errorCode' => 'UNREGISTERED']]]], true, 'This device is no longer registered for push.'],
+    'server error' => [503, [], false, 'Firebase rejected the message (HTTP 503).'],
+]);
+
+test('a badge push with a rejected access token forgets it', function () {
+    fcmFakeGoogle(Http::response([], 401));
+
+    $result = app(FcmClient::class)->sendBadge('t', 1);
+
+    expect($result->error)->toBe('Firebase rejected the server credentials (HTTP 401).')
+        ->and(Cache::has('fcm.access_token.'.sha1('push@wx-test.iam.gserviceaccount.com')))->toBeFalse();
+});
+
+test('a badge push without usable credentials sends nothing', function () {
+    config(['services.firebase.service_account' => null]);
+    Http::fake();
+
+    expect(app(FcmClient::class)->sendBadge('t', 1)->error)->toBe('Push is not configured on this server.');
+    Http::assertNothingSent();
+});
