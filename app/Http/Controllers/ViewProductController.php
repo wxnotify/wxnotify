@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Pipeline\GenerateViewSlug;
+use App\Actions\Products\BuildReadingText;
 use App\Actions\Products\GetProductDetails;
 use App\Models\IngestedProduct;
 use Carbon\CarbonInterface;
@@ -15,7 +16,7 @@ class ViewProductController extends Controller
 
     private const FOUND_CACHE = 'public, max-age=31536000, immutable';
 
-    public function __invoke(string $slug, GenerateViewSlug $generateViewSlug, GetProductDetails $getProductDetails): Response
+    public function __invoke(string $slug, GenerateViewSlug $generateViewSlug, GetProductDetails $getProductDetails, BuildReadingText $buildReadingText): Response
     {
         // Registers the dashboard panel's colors, fonts and theme for the layout.
         Filament::setCurrentPanel('dashboard');
@@ -35,6 +36,8 @@ class ViewProductController extends Controller
         return response()->view('view-product.show', [
             'product' => $product,
             'title' => $title,
+            'headline' => BuildReadingText::readableHeadline($product->headline),
+            'reading' => $buildReadingText($product),
             'office' => $office,
             'description' => trim("{$title}".($office ? " issued by {$office}" : '').($issuedAt ? ' on '.$this->format($issuedAt) : '')).'.',
             'details' => $getProductDetails($product),

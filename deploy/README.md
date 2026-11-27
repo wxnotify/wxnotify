@@ -212,6 +212,8 @@ server {
 
 `front-end` migrates the database first and the workers start after it is healthy; recreating the containers also replaces the old workers, so there is nothing else to restart.
 
+Product pages are served `Cache-Control: public, max-age=31536000, immutable`, so after upgrading to the release that adds the reading view (reflowed product text with an Original layout switch), purge any CDN cache of `/view-product/*` (browsers that already hold a page keep it until their copy expires).
+
 `front-end` gets five minutes (`start_period: 300s` on its `healthcheck` in `compose.yaml`) to finish starting before failed health checks count. If an upgrade has an unusually long migration, raise that value. Never run a second `front-end`, or a manual `migrate`, while one is starting: only one container may migrate at a time.
 
 **If a migration fails**, `front-end` keeps restarting and never becomes healthy, `up -d` exits with `dependency failed to start`, and the other services stay stopped (the old version is not running either): a full outage until you act. `docker compose logs front-end` shows the failing migration. To go back, set `WXNOTIFY_VERSION` to the version you were running and run `docker compose up -d` again. On PostgreSQL a failed migration is rolled back, so the previous version starts against the schema it knows. Then report the failure before trying the upgrade again.

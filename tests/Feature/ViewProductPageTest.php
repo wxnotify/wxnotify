@@ -211,3 +211,86 @@ test('the Log in button is marked so a phone-sized screen can hide it', function
         ->toContain('@media (max-width: 639px)')
         ->toContain('.product-login-button { display: none; }');
 });
+
+/** Two hard-wrapped lines of prose that the reading view joins into one paragraph. */
+const PAGE_WRAPPED_FIRST_LINE = 'A cold front will move across the area on Tuesday and bring a chance';
+const PAGE_WRAPPED_SECOND_LINE = 'of showers and thunderstorms to the eastern half of the region.';
+
+/**
+ * The contents of the page's product text blocks, in page order, keyed by their CSS hook class.
+ *
+ * @return array<string, string>
+ */
+function pageTextBlocks(string $html): array
+{
+    preg_match_all('/<pre class="(product-text-[a-z]+)[^"]*">(.*?)<\/pre>/s', $html, $blocks);
+
+    return array_combine($blocks[1], $blocks[2]);
+}
+
+test('a text product shows the reading text first, with the original layout behind a CSS-only switch', function () {
+    $product = pageProduct(['text' => "FXUS64 KEWX 200625\nAFDEWX\n\n".PAGE_WRAPPED_FIRST_LINE."\n".PAGE_WRAPPED_SECOND_LINE."\n"]);
+
+    $response = $this->get(route('view-product.show', $product->view_slug))->assertOk();
+    $html = $response->getContent();
+    $blocks = pageTextBlocks($html);
+
+    expect(array_keys($blocks))->toBe(['product-text-reading', 'product-text-original'])
+        ->and($blocks['product-text-reading'])->toContain(PAGE_WRAPPED_FIRST_LINE.' '.PAGE_WRAPPED_SECOND_LINE)
+        ->and($blocks['product-text-original'])->toContain(PAGE_WRAPPED_FIRST_LINE."\n".PAGE_WRAPPED_SECOND_LINE);
+
+    // The checkbox precedes both blocks (the sibling selectors need that), starts unchecked and has a label.
+    expect($html)
+        ->toMatch('/<input type="checkbox" id="original-layout" class="original-layout-toggle fi-checkbox-input" autocomplete="off">\s*<label for="original-layout"[^>]*>\s*Original layout\s*<\/label>\s*<pre class="product-text-reading/')
+        ->toContain('.product-text-original { display: none; }')
+        ->toContain('.original-layout-toggle:checked ~ .product-text-reading { display: none; }')
+        ->toContain('.original-layout-toggle:checked ~ .product-text-original { display: block; }');
+
+    // The only script is the layout's inline theme script: the switch needs none.
+    expect(substr_count($html, '<script'))->toBe(1)
+        ->and($response->headers->get('Cache-Control'))->toContain('public')->toContain('max-age=31536000')->toContain('immutable');
+});
+
+test('a product with nothing to reflow has one text block and no switch', function () {
+    $product = pageProduct();
+
+    $html = $this->get(route('view-product.show', $product->view_slug))->assertOk()->getContent();
+
+    expect(array_keys(pageTextBlocks($html)))->toBe(['product-text-reading'])
+        ->and($html)->not->toContain('type="checkbox"')
+        ->not->toContain('Original layout');
+});
+
+test('markup in the text is escaped in both the reading and the original block', function () {
+    $product = pageProduct(['text' => PAGE_WRAPPED_FIRST_LINE."\n".'of <script>alert(1)</script> showers and storms across the region.'."\n"]);
+
+    $html = $this->get(route('view-product.show', $product->view_slug))->assertOk()->getContent();
+    $blocks = pageTextBlocks($html);
+
+    expect($blocks)->toHaveCount(2)
+        ->and($blocks['product-text-reading'])->toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+        ->and($blocks['product-text-original'])->toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+        ->and($html)->not->toContain('<script>alert(1)');
+});
+
+test('a CAP product shows its readable text and never XML', function () {
+    $xml = '<?xml version="1.0" encoding="UTF-8"?><alert xmlns="urn:oasis:names:tc:emergency:cap:1.2"><info/></alert>';
+    $product = pageProduct([
+        'format' => 'cap',
+        'text' => $xml,
+        'headline' => $xml,
+        'description' => 'Flooding is expected along the river.',
+        'instruction' => 'Move to higher ground.',
+    ]);
+
+    $html = $this->get(route('view-product.show', $product->view_slug))->assertOk()->getContent();
+
+    expect(pageTextBlocks($html))->toHaveCount(1)
+        ->and(pageTextBlocks($html)['product-text-reading'])
+        ->toContain("Flooding is expected along the river.\n\nInstructions\nMove to higher ground.")
+        ->and($html)->not->toContain('&lt;alert')
+        ->not->toContain('<alert')
+        ->not->toContain('&lt;?xml')
+        ->not->toContain('<?xml')
+        ->not->toContain('type="checkbox"');
+});

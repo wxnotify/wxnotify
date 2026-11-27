@@ -55,9 +55,17 @@ class BuildReadingText
     }
 
     /**
+     * The stored headline as the product page and the API show it: null when blank or holding XML.
+     */
+    public static function readableHeadline(?string $headline): ?string
+    {
+        return filled($headline) && ! self::containsXml($headline) ? $headline : null;
+    }
+
+    /**
      * True when a stored field holds XML markup instead of words, so it must not be shown.
      */
-    public static function containsXml(string $value): bool
+    private static function containsXml(string $value): bool
     {
         return preg_match(self::XML_MARKUP, $value) !== 0;
     }

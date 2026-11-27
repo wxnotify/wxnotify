@@ -26,7 +26,7 @@ class ProductResource extends JsonResource
 
         return [
             'title' => $product->displayTitle(),
-            'headline' => filled($product->headline) && ! BuildReadingText::containsXml($product->headline) ? $product->headline : null,
+            'headline' => BuildReadingText::readableHeadline($product->headline),
             ...app(BuildReadingText::class)($product),
             'is_test' => (bool) $product->is_test,
             'view_url' => $product->viewUrl(),
