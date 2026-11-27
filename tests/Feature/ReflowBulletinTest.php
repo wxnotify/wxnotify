@@ -69,12 +69,18 @@ test('a wrapped sentence that mentions several numbers is still joined', functio
     );
 });
 
-test('CRLF and CR line endings give the same result as LF', function () {
+test('CRLF, AWIPS CR CR LF and CR line endings give the same result as LF', function () {
     $source = file_get_contents(base_path('tests/Fixtures/reading-view/afd-key-messages.txt'));
     $expected = ReflowBulletin::reflow($source);
 
     expect(ReflowBulletin::reflow(str_replace("\n", "\r\n", $source)))->toBe($expected)
+        ->and(ReflowBulletin::reflow(str_replace("\n", "\r\r\n", $source)))->toBe($expected)
         ->and(ReflowBulletin::reflow(str_replace("\n", "\r", $source)))->toBe($expected);
+});
+
+test('normaliseLineEndings makes each CR CR LF, CR LF and CR one LF', function () {
+    expect(ReflowBulletin::normaliseLineEndings("FLWDVN\r\r\n\r\r\nFlood Warning\r\nNational Weather Service\rQuad Cities\n"))
+        ->toBe("FLWDVN\n\nFlood Warning\nNational Weather Service\nQuad Cities\n");
 });
 
 test('an empty string and a single line are returned unchanged', function () {
@@ -114,6 +120,8 @@ test('an error while reflowing returns the text as sent, line endings normalised
     };
 
     expect($faulty::reflow("Gusts up to 50 mph are expected through the afternoon and into\rthe evening."))
+        ->toBe("Gusts up to 50 mph are expected through the afternoon and into\nthe evening.")
+        ->and($faulty::reflow("Gusts up to 50 mph are expected through the afternoon and into\r\r\nthe evening."))
         ->toBe("Gusts up to 50 mph are expected through the afternoon and into\nthe evening.");
 });
 

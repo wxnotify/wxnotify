@@ -57,6 +57,16 @@ test('a text product sends its text as stored beside the reflowed reading text',
         ->assertJsonPath('data.has_original', true);
 });
 
+test('a text product with AWIPS CR CR LF line endings sends its text byte for byte as stored', function () {
+    $stored = "A strong cold front will move across the region this evening and\r\r\nbring gusty winds to all of the area.\r\r\n";
+    $product = ($this->make)(['text' => $stored]);
+
+    ($this->show)($product->view_slug)->assertOk()
+        ->assertJsonPath('data.text', $stored)
+        ->assertJsonPath('data.reading_text', "A strong cold front will move across the region this evening and bring gusty winds to all of the area.\n")
+        ->assertJsonPath('data.has_original', true);
+});
+
 test('a CAP product never sends XML', function (array $fields, string $expected) {
     $xml = '<?xml version="1.0"?><alert xmlns="urn:oasis:names:tc:emergency:cap:1.2"></alert>';
     $product = ($this->make)(['format' => 'cap', 'text' => $xml, ...$fields]);

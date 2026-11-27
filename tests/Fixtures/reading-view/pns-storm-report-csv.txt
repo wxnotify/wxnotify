@@ -1,0 +1,54 @@
+NOUS42 KGSP 141651
+PNSGSP
+GAZ010-017-018-026-028-029-NCZ033-035>037-048>053-056>059-062>065-
+068>072-082-501>510-SCZ008>014-019-101>109-150451-
+
+Public Information Statement
+National Weather Service Greenville-Spartanburg SC
+1151 AM EST Sat Nov 14 2026
+
+...SNOWFALL REPORTS...
+
+Location                     Amount    Time/Date       Provider
+Beech Mountain               6.5 Inch  0730 AM 11/14   COOPAB
+5 NE Faust                   5.8 Inch  0918 AM 11/14   Trained Spotter
+5.4 N Bakersville            4.4 Inch  0700 AM 11/14   CoCoRaHS
+3 W Minneapolis              4.0 Inch  0800 AM 11/14   Public
+3 NW Beech Mountain          3.5 Inch  0700 AM 11/14   CoCoRaHS
+4 SW Rocky Fork              2.2 Inch  0700 AM 11/14   CoCoRaHS
+3 S Grandfather Mountain     2.0 Inch  0800 AM 11/13   Public
+2.9 ENE Maggie Valley        1.2 Inch  0700 AM 11/14   CoCoRaHS
+8.2 SW Hot Springs           1.0 Inch  0700 AM 11/14   CoCoRaHS
+6 SSW Burnsville             1.0 Inch  0700 AM 11/13   CoCoRaHS
+7.5 WSW Marshall             0.5 Inch  0700 AM 11/14   CoCoRaHS
+1 W Little Switzerland       0.5 Inch  0700 AM 11/14   CoCoRaHS
+5 N Bakersville              0.5 Inch  0700 AM 11/13   CoCoRaHS
+1.3 ESE Buladean             0.2 Inch  0700 AM 11/13   CoCoRaHS
+
+&&
+
+**METADATA**
+11/13/2026, 0800 AM, NC, Avery, , , , 36.055, -81.847, SNOW, 2, Inch, Public, Storm total snowfall,
+11/14/2026, 0700 AM, NC, Avery, , , , 36.2525, -81.91333, SNOW, 3.5, Inch, CoCoRaHS, Storm total snowfall,
+11/14/2026, 0800 AM, NC, Avery, , , , 36.097, -82.043, SNOW, 4, Inch, Public, Storm total snowfall,
+11/14/2026, 0730 AM, NC, Avery, Beech Mountain, , , 36.1874, -81.8741, SNOW, 6.5, Inch, COOPAB, Storm total snowfall,
+11/14/2026, 0700 AM, NC, Haywood, , , , 35.533252742621706, -83.0438490826707, SNOW, 1.2, Inch, CoCoRaHS, Storm total snowfall,
+11/14/2026, 0700 AM, NC, Madison, , , , 35.75509694314576, -82.80757779240116, SNOW, 0.5, Inch, CoCoRaHS, Storm total snowfall,
+11/14/2026, 0700 AM, NC, Madison, , , , 35.80763613542017, -82.9317783629856, SNOW, 1, Inch, CoCoRaHS, Storm total snowfall,
+11/14/2026, 0700 AM, NC, Madison, , , , 36.0083503723145, -82.6182174682617, SNOW, 2.2, Inch, CoCoRaHS, Storm total snowfall,
+11/13/2026, 0700 AM, NC, Mitchell, , , , 36.10109787060854, -82.17348591438639, SNOW, 0.2, Inch, CoCoRaHS, Storm total snowfall,
+11/14/2026, 0700 AM, NC, Mitchell, , , , 35.84649871423871, -82.10785514726467, SNOW, 0.5, Inch, CoCoRaHS, Storm total snowfall,
+11/13/2026, 0700 AM, NC, Mitchell, , , , 36.08716594901073, -82.15840000000003, SNOW, 0.5, Inch, CoCoRaHS, Storm total snowfall,
+11/14/2026, 0700 AM, NC, Mitchell, , , , 36.092955222124026, -82.15840000000003, SNOW, 4.4, Inch, CoCoRaHS, Storm total snowfall,
+11/13/2026, 0700 AM, NC, Yancey, , , , 35.836264201971595, -82.33889191248232, SNOW, 1, Inch, CoCoRaHS, Storm total snowfall,
+11/14/2026, 0918 AM, NC, Yancey, , , , 35.977, -82.495, SNOW, 5.75, Inch, Trained Spotter, Storm total snowfall,
+
+
+Observations are collected from a variety of sources with varying
+equipment and exposures. We thank all volunteer weather observers
+for their dedication. Not all data listed are considered official.
+
+$$
+AR
+
+

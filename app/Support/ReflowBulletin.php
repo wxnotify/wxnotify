@@ -37,7 +37,7 @@ class ReflowBulletin
 
     public static function reflow(string $text): string
     {
-        $normalised = str_replace(["\r\n", "\r"], "\n", $text);
+        $normalised = self::normaliseLineEndings($text);
 
         try {
             $reflowed = static::joinWrappedLines($normalised);
@@ -46,6 +46,15 @@ class ReflowBulletin
         }
 
         return self::sameWords($normalised, $reflowed) ? $reflowed : $normalised;
+    }
+
+    /**
+     * Makes every line break "\n". AWIPS bulletins end lines in "\r\r\n", which is one break, so it is replaced
+     * before "\r\n" and "\r" (the order ChannelMessageMail and OutlookReportPresenter use).
+     */
+    public static function normaliseLineEndings(string $text): string
+    {
+        return str_replace(["\r\r\n", "\r\n", "\r"], "\n", $text);
     }
 
     /**
@@ -196,6 +205,7 @@ class ReflowBulletin
             || self::endsWithShortValue($trimmed)
             || str_contains($trimmed, '....')                                                    // dot leaders
             || preg_match('/^[=\-_*]{4,}$/', $trimmed) === 1                                     // rule lines
+            || preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}, ?\d{4} [AP]M,/', $trimmed) === 1            // storm report CSV rows (PNS **METADATA**)
             || self::isDataRow($trimmed);
     }
 

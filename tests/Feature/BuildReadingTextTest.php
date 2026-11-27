@@ -65,6 +65,8 @@ test('XML text is treated as CAP whatever the format says', function (string $te
     'after CRLF header lines with a correction group' => ["408 \r\r\nXOUS51 KWBC 270114 CCA\r\r\nCAPBGM\r\r\n<?xml version=\"1.0\"?>\r\r\n<alert></alert>"],
     'at the start' => ["  \n<?xml version=\"1.0\"?><alert></alert>"],
     'an alert element with no declaration' => ["Some preamble text\n<alert xmlns=\"urn:oasis:names:tc:emergency:cap:1.2\"></alert>"],
+    'a prefixed alert element with no declaration' => ["Some preamble text\n<cap:alert xmlns:cap=\"urn:oasis:names:tc:emergency:cap:1.2\"></cap:alert>"],
+    'after a byte order mark' => ["\xEF\xBB\xBF<?xml version=\"1.0\"?><alert></alert>"],
 ]);
 
 test('a bulletin that only mentions XML further down is still a text product', function () {
@@ -83,6 +85,28 @@ test('a text product keeps its text as stored and reads reflowed', function () {
 
 test('a text product with nothing to join offers no original layout, whatever its line endings', function () {
     $stored = "The river is rising.\r\n\r\nMove to higher ground.\r\n";
+    $product = IngestedProduct::factory()->create(['text' => $stored]);
+
+    expect(($this->build)($product))->toBe([
+        'text' => $stored,
+        'reading_text' => "The river is rising.\n\nMove to higher ground.\n",
+        'has_original' => false,
+    ]);
+});
+
+test('a text product with AWIPS CR CR LF line endings reads as one break per line', function () {
+    $stored = str_replace("\n", "\r\r\n", $this->wrapped."\n\nThe river is rising.\n");
+    $product = IngestedProduct::factory()->create(['text' => $stored]);
+
+    expect(($this->build)($product))->toBe([
+        'text' => $stored,
+        'reading_text' => "{$this->joined}\n\nThe river is rising.\n",
+        'has_original' => true,
+    ]);
+});
+
+test('a text product with AWIPS CR CR LF line endings and nothing to join offers no original layout', function () {
+    $stored = "The river is rising.\r\r\n\r\r\nMove to higher ground.\r\r\n";
     $product = IngestedProduct::factory()->create(['text' => $stored]);
 
     expect(($this->build)($product))->toBe([

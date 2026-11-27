@@ -79,7 +79,7 @@
         <pre class="product-text-reading overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-950 dark:text-white">{{ $reading['reading_text'] }}</pre>
 
         @if ($reading['has_original'])
-            <pre class="product-text-original overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-950 dark:text-white">{{ $reading['text'] }}</pre>
+            <pre class="product-text-original overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-950 dark:text-white">{{ \App\Support\ReflowBulletin::normaliseLineEndings($reading['text']) }}</pre>
         @endif
     </x-filament::section>
 @endsection

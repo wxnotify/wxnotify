@@ -251,6 +251,15 @@ test('a text product shows the reading text first, with the original layout behi
         ->and($response->headers->get('Cache-Control'))->toContain('public')->toContain('max-age=31536000')->toContain('immutable');
 });
 
+test('the original layout block prints AWIPS CR CR LF line endings as one break each', function () {
+    $product = pageProduct(['text' => "FXUS64 KEWX 200625\r\r\nAFDEWX\r\r\n\r\r\n".PAGE_WRAPPED_FIRST_LINE."\r\r\n".PAGE_WRAPPED_SECOND_LINE."\r\r\n"]);
+
+    $blocks = pageTextBlocks($this->get(route('view-product.show', $product->view_slug))->assertOk()->getContent());
+
+    expect($blocks['product-text-original'])->toBe("FXUS64 KEWX 200625\nAFDEWX\n\n".PAGE_WRAPPED_FIRST_LINE."\n".PAGE_WRAPPED_SECOND_LINE."\n")
+        ->and($blocks['product-text-reading'])->toContain(PAGE_WRAPPED_FIRST_LINE.' '.PAGE_WRAPPED_SECOND_LINE);
+});
+
 test('a product with nothing to reflow has one text block and no switch', function () {
     $product = pageProduct();
 

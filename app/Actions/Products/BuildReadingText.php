@@ -23,6 +23,9 @@ class BuildReadingText
 
     private const XML_MARKUP = '/<\?xml|<\/?(?:[a-z]+:)?alert[\s\/>]/i';
 
+    /** A CAP root element anywhere, prefixed or not (`<alert xmlns=...>`, `<cap:alert xmlns:cap=...>`). */
+    private const CAP_ROOT = '/<(?:[a-z]+:)?alert\s+xmlns/i';
+
     /**
      * @return array{text: string, reading_text: string, has_original: bool}
      */
@@ -45,7 +48,7 @@ class BuildReadingText
             return [
                 'text' => $stored,
                 'reading_text' => $readingText,
-                'has_original' => str_replace(["\r\n", "\r"], "\n", $stored) !== $readingText,
+                'has_original' => ReflowBulletin::normaliseLineEndings($stored) !== $readingText,
             ];
         } catch (Throwable $e) {
             Log::warning('Reading text failed', ['exception' => $e::class]);
@@ -72,7 +75,7 @@ class BuildReadingText
 
     private function isXml(string $text): bool
     {
-        return preg_match(self::STARTS_AS_XML, $text) === 1 || stripos($text, '<alert xmlns') !== false;
+        return preg_match(self::STARTS_AS_XML, $text) === 1 || preg_match(self::CAP_ROOT, $text) === 1;
     }
 
     /**
