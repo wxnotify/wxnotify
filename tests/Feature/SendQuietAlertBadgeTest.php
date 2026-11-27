@@ -8,9 +8,12 @@ use App\Models\DeliveryLog;
 use App\Models\NotificationChannel;
 use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -152,8 +155,70 @@ test('a dead token queues the same delayed prune as an alert push', function () 
     expect(DeliveryLog::count())->toBe(0);
 });
 
-test('the badge job stays off the deliveries queue and gets one attempt', function () {
-    $job = new SendQuietAlertBadge($this->channel->id);
+test('the badge job goes on the broadcasts queue, behind product processing, and gets one attempt', function () {
+    config(['queue.default' => 'database']);
 
-    expect($job->queue)->toBe('default')->and($job->tries)->toBe(1);
+    SendQuietAlertBadge::dispatch($this->channel->id);
+
+    expect(DB::table('jobs')->sole()->queue)->toBe('broadcasts')
+        ->and((new SendQuietAlertBadge($this->channel->id))->tries)->toBe(1);
+});
+
+test('a second badge for a phone is dropped while one is still waiting', function () {
+    config(['queue.default' => 'database']);
+
+    SendQuietAlertBadge::dispatch($this->channel->id);
+    SendQuietAlertBadge::dispatch($this->channel->id);
+
+    expect(DB::table('jobs')->count())->toBe(1);
+});
+
+test('each phone has its own waiting badge', function () {
+    config(['queue.default' => 'database']);
+    $other = NotificationChannel::factory()->for($this->user)->mobilePush('other-token', 'ios')->create();
+
+    SendQuietAlertBadge::dispatch($this->channel->id);
+    SendQuietAlertBadge::dispatch($other->id);
+
+    expect(DB::table('jobs')->count())->toBe(2);
+});
+
+test('an alert held while the badge job is running queues another, which sends the newer count', function () {
+    config(['queue.default' => 'database']);
+    // The first push is in flight, its count already read, when the second alert is held.
+    $held = false;
+    fcmFakeGoogle(function () use (&$held) {
+        if (! $held) {
+            $held = true;
+            ($this->heldRow)();
+            SendQuietAlertBadge::dispatch($this->channel->id);
+        }
+
+        return Http::response(['name' => 'projects/p/messages/1']);
+    });
+    ($this->heldRow)();
+    SendQuietAlertBadge::dispatch($this->channel->id);
+
+    Artisan::call('queue:work', ['connection' => 'database', '--queue' => 'broadcasts', '--stop-when-empty' => true, '--tries' => 1, '--sleep' => 0, '--timeout' => 0, '--memory' => 1_000_000]);
+
+    expect(($this->sentBadges)())->toBe([1, 2])
+        ->and(DB::table('jobs')->count())->toBe(0);
+});
+
+test('a badge left waiting for ten minutes no longer blocks a new one', function () {
+    config(['queue.default' => 'database']);
+    $this->freezeTime();
+    SendQuietAlertBadge::dispatch($this->channel->id);
+
+    $this->travel(599)->seconds();
+    SendQuietAlertBadge::dispatch($this->channel->id);
+    expect(DB::table('jobs')->count())->toBe(1);
+
+    $this->travel(2)->seconds();
+    SendQuietAlertBadge::dispatch($this->channel->id);
+    expect(DB::table('jobs')->count())->toBe(2);
+});
+
+test('the badge lock is keyed by the channel id alone', function () {
+    expect(UniqueLock::getKey(new SendQuietAlertBadge(42)))->toBe('laravel_unique_job:'.SendQuietAlertBadge::class.':42');
 });

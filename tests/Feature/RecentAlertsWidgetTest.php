@@ -146,6 +146,16 @@ test('a held alert says it is in the app\'s Inbox only when its row is marked fo
     'unmarked' => [false, 'It is not sent later.'],
 ]);
 
+test('an explanation names the channel without saying anything was sent to it', function (string $status) {
+    $channel = NotificationChannel::factory()->for($this->subscriber)->email()->create(['label' => 'Home inbox']);
+    $log = DeliveryLog::factory()->for($this->subscriber)->create(['status' => $status, 'notification_channel_id' => $channel->id]);
+
+    $modal = recentAlertsModal(livewire(RecentAlertsWidget::class)->mountTableAction('explainDelivery', $log));
+
+    expect(preg_replace('/\s+/', ' ', strip_tags($modal['html'])))->toContain('Channel: Home inbox')
+        ->not->toContain('Sent to');
+})->with(['suppressed', 'failure', 'skipped']);
+
 test('only a badge that can be explained is a control, and another subscriber\'s delivery cannot be opened', function () {
     $failed = DeliveryLog::factory()->for($this->subscriber)->failed()->create();
     $sent = DeliveryLog::factory()->for($this->subscriber)->create(['status' => 'success']);

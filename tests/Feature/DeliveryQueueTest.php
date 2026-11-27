@@ -173,3 +173,19 @@ test('the no-restart development override reads the same queues in the same orde
         ->toContain('--queue='.CHAN_WORKER_QUEUES.' ')
         ->toContain('--tries=1');
 });
+
+test('every compose file\'s delivery worker reads broadcasts after deliveries and default, where the quiet badge waits', function (string $file) {
+    $commands = collect(Yaml::parseFile(base_path($file))['services'])
+        ->pluck('command')
+        ->filter(fn (mixed $command): bool => is_string($command) && preg_match('/--queue=\S*deliveries/', $command) === 1);
+
+    expect($commands)->not->toBeEmpty();
+
+    $commands->each(fn (string $command) => expect($command)->toContain('--queue='.CHAN_WORKER_QUEUES.' '));
+})->with(['compose.yaml', 'compose.dev-listen.yaml', 'deploy/single-server/compose.yaml', 'deploy/multi-server/compose.yaml']);
+
+test('the production override leaves the stack worker\'s command alone', function () {
+    $services = Yaml::parseFile(base_path('compose.production.yaml'), Yaml::PARSE_CUSTOM_TAGS)['services'];
+
+    expect($services['queue'])->not->toHaveKey('command');
+});

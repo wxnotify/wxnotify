@@ -17,6 +17,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Support\Delivery\ChannelDispatcher;
 use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\Request;
@@ -249,6 +250,34 @@ test('matching the same product again adds no row and no badge job', function ()
 
     expect(DeliveryLog::count())->toBe(1);
     Queue::assertPushed(SendQuietAlertBadge::class, 1);
+});
+
+test('two held alerts for one iPhone leave one badge job waiting, and both reach the app', function () {
+    config(['queue.default' => 'database']);
+    $phone = ($this->phone)('ios');
+    ($this->attach)($phone);
+    $later = IngestedProduct::withoutEvents(fn () => IngestedProduct::factory()->create([
+        'product_id' => $this->product->id, 'ugc_codes' => ['NYZ072'],
+    ]));
+
+    ($this->match)();
+    (new MatchWeatherAlertRules)($later);
+
+    expect(DB::table('jobs')->pluck('queue')->all())->toBe(['broadcasts'])
+        ->and(DeliveryLog::where('in_app', true)->count())->toBe(2);
+});
+
+test('a badge lock that cannot be taken keeps the held row, and the next channel is still held', function () {
+    $this->mock(Cache::class)->shouldReceive('lock')->andThrow(new RuntimeException('cache is down'));
+    $iphone = ($this->phone)('ios', 'ios-token');
+    $android = ($this->phone)('android', 'android-token');
+    ($this->attach)($iphone, $android);
+
+    ($this->match)();
+
+    expect(($this->rowFor)($iphone)->in_app)->toBeTrue()
+        ->and(($this->rowFor)($android)->in_app)->toBeTrue()
+        ->and($this->logged->all())->toBe(['Failed to queue the quiet alert badge: RuntimeException '.json_encode(['channel_id' => $iphone->id])]);
 });
 
 test('matching a quiet alert makes no network request', function () {

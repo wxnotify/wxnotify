@@ -3,7 +3,10 @@
     @if (filled($channel) || filled($when))
         <p class="text-gray-500 dark:text-gray-400">
             @if (filled($channel))
-                Sent to <span class="font-medium text-gray-950 dark:text-white">{{ $channel }}</span>
+                Channel: <span class="font-medium text-gray-950 dark:text-white">{{ $channel }}</span>
+            @endif
+            @if (filled($channel) && filled($when))
+                &middot;
             @endif
             @if (filled($when))
                 {{ $when }}
